@@ -1,4 +1,9 @@
 
+.PHONY: install
+install:
+	@uv venv
+	@uv pip install -e .
+
 .PHONY: test
 test:
 	@echo "No tests defined"
@@ -10,10 +15,23 @@ publish:
 	@echo "Publishing Python package to PyPI"
 	uv publish
 	@echo "Published Python package to PyPI"
-	
-lint: tidy pylint flake8
-.PHONY: lint
-tidy: black isort
-.PHONY: tidy
+
+.PHONY: black
 black:
-	@poetry run black penelope tests
+	@uv run black src test app.py
+
+.PHONY: pylint
+pylint:
+	@uv run pylint src test app.py
+
+.PHONY: lint
+lint: tidy pylint flake8
+
+isort:
+	@uv run isort src test app.py
+
+.PHONY: tidy
+tidy: black isort
+
+requirements.txt: pyproject.toml
+	@uv export -o requirements.txt
