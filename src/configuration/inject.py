@@ -49,9 +49,13 @@ class ConfigValue(Generic[T]):
             return self.key()
         if self.mandatory and not self.default:
             if not ConfigStore.config(context).exists(self.key):
-                raise ValueError(f"ConfigValue {self.key} is mandatory but missing from config")
+                raise ValueError(
+                    f"ConfigValue {self.key} is mandatory but missing from config"
+                )
 
-        value = ConfigStore.config(context).get(*self.key.split(","), default=self.default)
+        value = ConfigStore.config(context).get(
+            *self.key.split(","), default=self.default
+        )
         if value and self.after:
             return self.after(value)
         return value
@@ -60,7 +64,9 @@ class ConfigValue(Generic[T]):
     def create_field(key: str, default: Any = None, description: str = None) -> Any:
         """Create a field for a dataclass that will be resolved from the configuration file"""
         return field(  # pylint: disable=invalid-field-call
-            default_factory=lambda: ConfigValue(key=key, default=default, description=description).resolve()
+            default_factory=lambda: ConfigValue(
+                key=key, default=default, description=description
+            ).resolve()
         )
 
 
@@ -108,11 +114,17 @@ class ConfigStore:
             env_prefix=env_prefix,
         )
 
-        return cls._set_config(context=context, cfg=cfg, switch_to_context=switch_to_context)
+        return cls._set_config(
+            context=context, cfg=cfg, switch_to_context=switch_to_context
+        )
 
     @classmethod
     def consolidate(
-        cls, opts: dict[str, Any], ignore_keys: set[str] = None, context: str = "default", section: str = None
+        cls,
+        opts: dict[str, Any],
+        ignore_keys: set[str] = None,
+        context: str = "default",
+        section: str = None,
     ) -> Self:
 
         if not cls.store.get(context):
@@ -125,7 +137,11 @@ class ConfigStore:
 
         opts = recursive_update(
             opts,
-            recursive_filter_dict(cls.store[context].get(section, {}), filter_keys=ignore_keys, filter_mode="exclude"),
+            recursive_filter_dict(
+                cls.store[context].get(section, {}),
+                filter_keys=ignore_keys,
+                filter_mode="exclude",
+            ),
         )
 
         cls.store[context].data[section] = opts
@@ -134,7 +150,11 @@ class ConfigStore:
 
     @classmethod
     def _set_config(
-        cls, *, context: str = "default", cfg: Config | None = None, switch_to_context: bool = True
+        cls,
+        *,
+        context: str = "default",
+        cfg: Config | None = None,
+        switch_to_context: bool = True,
     ) -> Self:
         if not isinstance(cfg, Config):
             raise ValueError(f"Expected Config, found {type(cfg)}")
@@ -152,7 +172,8 @@ def resolve_arguments(fn_or_cls, args, kwargs):
     kwargs = {
         k: v.default
         for k, v in inspect.signature(fn_or_cls).parameters.items()
-        if isinstance(v.default, ConfigValue) and v.default is not inspect.Parameter.empty
+        if isinstance(v.default, ConfigValue)
+        and v.default is not inspect.Parameter.empty
     } | kwargs
     args = (a.resolve() if isinstance(a, ConfigValue) else a for a in args)
     for k, v in kwargs.items():
