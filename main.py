@@ -13,7 +13,7 @@ from psycopg.rows import dict_row
 from configuration.config import Config
 from configuration.inject import ConfigStore, ConfigValue
 from render import render_preview
-from strategies import ReconciliationStrategy, Strategies
+from strategies.interface import ReconciliationStrategy, Strategies
 from utility import configure_logging, create_db_uri
 
 AUTO_ACCEPT = float(os.environ.get("AUTO_ACCEPT_THRESHOLD", "0.90"))
@@ -29,7 +29,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 async def startup():
     try:
 
-        ConfigStore.configure_context(source="config.yml", env_filename=".env", env_prefix="SEAD_AUTHORITY")
+        ConfigStore.configure_context(source="config/config.yml", env_filename=".env", env_prefix="SEAD_AUTHORITY")
         configure_logging(ConfigValue("logging").resolve() or {})
 
         cfg: Config = ConfigStore.config()
@@ -37,7 +37,7 @@ async def startup():
         app.state.conn = await psycopg.AsyncConnection.connect(dsn)
         app.state.config = cfg
 
-        cfg.add("runtime:connection", app.state.conn)
+        cfg.add({"runtime:connection": app.state.conn})
 
     except Exception as e:
         print(f"Failed to connect to database: {e}")
@@ -132,7 +132,7 @@ async def reconcile(request: Request) -> JSONResponse:
 @app.get("/reconcile/preview")
 async def preview(
     id: str,  # pylint: disable=redefined-builtin
-) -> ValueError | HTMLResponse:
+) -> HTMLResponse:
 
     id_base: str = ConfigValue("service:id_base").resolve()
     if not id.startswith(id_base):

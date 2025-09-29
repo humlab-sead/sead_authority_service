@@ -1,7 +1,7 @@
 from ast import Dict
 from typing import Any, List, Optional
 
-from . import ReconciliationStrategy, Strategies
+from .interface import ReconciliationStrategy, Strategies
 
 
 @Strategies.register(key="taxon")

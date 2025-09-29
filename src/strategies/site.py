@@ -3,7 +3,7 @@ from typing import Any
 
 import psycopg
 
-from . import ReconciliationStrategy, Strategies
+from .interface import ReconciliationStrategy, Strategies
 
 
 @Strategies.register(key="site")
@@ -52,7 +52,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
 
         return sorted(candidates, key=lambda x: x.get("name_sim", 0), reverse=True)[:limit]
 
-    def _parse_query(self, query: str) -> Dict[str, Any]:
+    def _parse_query(self, query: str) -> dict[str, Any]:
         """Parse query string to extract different components"""
         # This is a simple implementation - you could make this more sophisticated
         # Examples of what you might parse:
@@ -95,7 +95,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
 
-    async def _apply_geographic_scoring(self, candidates: list[dict], coords: Dict, cursor) -> list[dict]:
+    async def _apply_geographic_scoring(self, candidates: list[dict], coords: dict, cursor) -> list[dict]:
         """Boost scores based on geographic proximity"""
         if not coords or not candidates:
             return candidates
@@ -132,7 +132,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
 
         return candidates
 
-    async def get_details(self, entity_id: str, cursor) -> Optional[Dict[str, Any]]:
+    async def get_details(self, entity_id: str, cursor) -> dict[str, Any] | None:
         """Fetch details for a specific site."""
         try:
             site_id_int = int(entity_id)

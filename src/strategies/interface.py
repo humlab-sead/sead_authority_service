@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
+from src.utility import Registry
+
 
 class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
@@ -24,3 +26,10 @@ class ReconciliationStrategy(ABC):
     @abstractmethod
     def get_id_path(self) -> str:
         """Return the URL path segment for this entity type"""
+
+
+class StrategyRegistry(Registry):
+    items: dict[str, ReconciliationStrategy] = {}
+
+
+Strategies: StrategyRegistry = StrategyRegistry()

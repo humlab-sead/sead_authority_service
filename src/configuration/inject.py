@@ -6,7 +6,8 @@ from dataclasses import dataclass, field, fields
 from inspect import isclass
 from typing import Any, Callable, Generic, Self, Type, TypeVar
 
-from ..utility import dget, recursive_filter_dict, recursive_update
+from src.utility import dget, recursive_filter_dict, recursive_update
+
 from .config import Config
 
 T = TypeVar("T", str, int, float)

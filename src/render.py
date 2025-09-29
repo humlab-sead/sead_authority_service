@@ -4,8 +4,7 @@ from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
 from configuration.inject import ConfigValue
-from strategies import Strategies
-from strategies.interface import ReconciliationStrategy
+from strategies.interface import ReconciliationStrategy, Strategies
 
 
 async def render_preview(uri: str) -> ValueError | str:
