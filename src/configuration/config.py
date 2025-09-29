@@ -33,9 +33,7 @@ class SafeLoaderIgnoreUnknown(yaml.SafeLoader):  # pylint: disable=too-many-ance
         return None
 
 
-SafeLoaderIgnoreUnknown.add_constructor(
-    None, SafeLoaderIgnoreUnknown.let_unknown_through
-)
+SafeLoaderIgnoreUnknown.add_constructor(None, SafeLoaderIgnoreUnknown.let_unknown_through)
 SafeLoaderIgnoreUnknown.add_constructor("!join", yaml_str_join)
 SafeLoaderIgnoreUnknown.add_constructor("!jj", yaml_path_join)
 SafeLoaderIgnoreUnknown.add_constructor("!path_join", yaml_path_join)
@@ -59,9 +57,7 @@ class Config:
     # def data_folder(self) -> str:
     #     return self.get("data_folder", "root_folder")
 
-    def get(
-        self, *keys: str, default: Any | Type[Any] = None, mandatory: bool = False
-    ) -> Any:
+    def get(self, *keys: str, default: Any | Type[Any] = None, mandatory: bool = False) -> Any:
         if self.data is None:
             raise ValueError("Configuration not initialized")
 
@@ -75,9 +71,7 @@ class Config:
 
         return default() if isclass(default) else default
 
-    def update(
-        self, data: tuple[str, Any] | dict[str, Any] | list[tuple[str, Any]]
-    ) -> None:
+    def update(self, data: tuple[str, Any] | dict[str, Any] | list[tuple[str, Any]]) -> None:
         if isinstance(data, tuple):
             data = [data]
         if isinstance(data, dict):
@@ -128,9 +122,7 @@ class Config:
         """Test if the source is a valid path to a configuration file."""
         if not isinstance(source, str):
             return False
-        return source.endswith(".yaml") or source.endswith(
-            ".yml"
-        )  # or pathvalidate.is_valid_filepath(source)
+        return source.endswith(".yaml") or source.endswith(".yml")  # or pathvalidate.is_valid_filepath(source)
 
     def add(self, data: dict) -> None:
         """Recursively add data to the configuration."""
