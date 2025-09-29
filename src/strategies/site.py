@@ -19,7 +19,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
     def get_id_path(self) -> str:
         return "site"
 
-    async def find_candidates(self, query: str, cursor, limit: int = 10) -> list[dict[str, Any]]:
+    async def find_candidates(self, query: str, cursor: psycopg.AsyncCursor, limit: int = 10) -> list[dict[str, Any]]:
         candidates = []
 
         # Parse query for additional context (this could be more sophisticated)

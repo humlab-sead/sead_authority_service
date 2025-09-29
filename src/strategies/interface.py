@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
+import psycopg
+
 from src.utility import Registry
 
 
@@ -8,7 +10,7 @@ class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
     @abstractmethod
-    async def find_candidates(self, query: str, cursor, limit: int = 10) -> List[Dict[str, Any]]:
+    async def find_candidates(self, query: str, cursor: psycopg.AsyncCursor, limit: int = 10) -> List[Dict[str, Any]]:
         """Find candidate matches for the given query"""
 
     @abstractmethod
