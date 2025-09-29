@@ -1,10 +1,12 @@
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any
 
 import psycopg
 
-from . import ReconciliationStrategy
+from . import ReconciliationStrategy, Strategies
 
 
+@Strategies.register(key="site")
 class SiteReconciliationStrategy(ReconciliationStrategy):
     """Site-specific reconciliation with place names and coordinates"""
 
@@ -17,9 +19,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
     def get_id_path(self) -> str:
         return "site"
 
-    async def find_candidates(
-        self, query: str, cursor, limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    async def find_candidates(self, query: str, cursor, limit: int = 10) -> list[dict[str, Any]]:
         candidates = []
 
         # Parse query for additional context (this could be more sophisticated)
@@ -40,25 +40,17 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
 
         # 2) Fuzzy name matching with enhanced scoring
         if not candidates:
-            candidates.extend(
-                await self._fuzzy_name_search(query_parts["name"], cursor, limit)
-            )
+            candidates.extend(await self._fuzzy_name_search(query_parts["name"], cursor, limit))
 
         # 3) Geographic proximity boost if coordinates provided
         if query_parts.get("coordinates") and candidates:
-            candidates = await self._apply_geographic_scoring(
-                candidates, query_parts["coordinates"], cursor
-            )
+            candidates = await self._apply_geographic_scoring(candidates, query_parts["coordinates"], cursor)
 
         # 4) Place name context boost
         if query_parts.get("place") and candidates:
-            candidates = await self._apply_place_context_scoring(
-                candidates, query_parts["place"], cursor
-            )
+            candidates = await self._apply_place_context_scoring(candidates, query_parts["place"], cursor)
 
-        return sorted(candidates, key=lambda x: x.get("name_sim", 0), reverse=True)[
-            :limit
-        ]
+        return sorted(candidates, key=lambda x: x.get("name_sim", 0), reverse=True)[:limit]
 
     def _parse_query(self, query: str) -> Dict[str, Any]:
         """Parse query string to extract different components"""
@@ -70,7 +62,6 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
         parts = {"name": query.strip()}
 
         # Extract coordinates if present (lat, lon) format
-        import re
 
         coord_pattern = r"\((-?\d+\.?\d*),\s*(-?\d+\.?\d*)\)"
         coord_match = re.search(coord_pattern, query)
@@ -93,24 +84,18 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
         place_match = re.search(place_pattern, parts["name"], re.IGNORECASE)
         if place_match:
             parts["place"] = place_match.group(1).strip()
-            parts["name"] = re.sub(
-                place_pattern, "", parts["name"], flags=re.IGNORECASE
-            ).strip()
+            parts["name"] = re.sub(place_pattern, "", parts["name"], flags=re.IGNORECASE).strip()
 
         return parts
 
-    async def _fuzzy_name_search(
-        self, name: str, cursor, limit: int
-    ) -> List[Dict[str, Any]]:
+    async def _fuzzy_name_search(self, name: str, cursor, limit: int) -> list[dict[str, Any]]:
         """Perform fuzzy name search"""
         fuzzy_sql = "SELECT * FROM authority.fuzzy_sites(%(q)s, %(n)s);"
         await cursor.execute(fuzzy_sql, {"q": name, "n": limit})
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
 
-    async def _apply_geographic_scoring(
-        self, candidates: List[Dict], coords: Dict, cursor
-    ) -> List[Dict]:
+    async def _apply_geographic_scoring(self, candidates: list[dict], coords: Dict, cursor) -> list[dict]:
         """Boost scores based on geographic proximity"""
         if not coords or not candidates:
             return candidates
@@ -130,13 +115,9 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
               AND longitude_dd IS NOT NULL
         """
 
-        await cursor.execute(
-            geo_sql, {"lat": coords["lat"], "lon": coords["lon"], "site_ids": site_ids}
-        )
+        await cursor.execute(geo_sql, {"lat": coords["lat"], "lon": coords["lon"], "site_ids": site_ids})
 
-        geo_results = {
-            row["site_id"]: row["distance_km"] for row in await cursor.fetchall()
-        }
+        geo_results = {row["site_id"]: row["distance_km"] for row in await cursor.fetchall()}
 
         # Apply distance-based scoring boost
         for candidate in candidates:
@@ -146,9 +127,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
                 # Boost score based on proximity (closer = higher boost)
                 # Max boost of 0.2 for sites within 1km, diminishing to 0 at 100km
                 proximity_boost = max(0, 0.2 * (1 - min(distance / 100.0, 1.0)))
-                candidate["name_sim"] = min(
-                    1.0, candidate["name_sim"] + proximity_boost
-                )
+                candidate["name_sim"] = min(1.0, candidate["name_sim"] + proximity_boost)
                 candidate["distance_km"] = distance
 
         return candidates
@@ -176,9 +155,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
         except (ValueError, psycopg.Error):
             return None
 
-    async def _apply_place_context_scoring(
-        self, candidates: List[Dict], place: str, cursor
-    ) -> List[Dict]:
+    async def _apply_place_context_scoring(self, candidates: list[dict], place: str, cursor) -> list[dict]:
         """Boost scores based on place name context"""
         # This could query a places/regions table or use external geocoding
         # For now, simple implementation checking site descriptions
@@ -193,9 +170,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
         site_ids = [c["site_id"] for c in candidates]
         await cursor.execute(place_sql, {"place": place, "site_ids": site_ids})
 
-        place_results = {
-            row["site_id"]: row["place_sim"] for row in await cursor.fetchall()
-        }
+        place_results = {row["site_id"]: row["place_sim"] for row in await cursor.fetchall()}
 
         # Apply place context boost
         for candidate in candidates:

@@ -1,9 +1,10 @@
 from ast import Dict
 from typing import Any, List, Optional
 
-from . import ReconciliationStrategy
+from . import ReconciliationStrategy, Strategies
 
 
+@Strategies.register(key="taxon")
 class TaxonReconciliationStrategy(ReconciliationStrategy):
     """Future taxon reconciliation strategy"""
 
@@ -16,9 +17,7 @@ class TaxonReconciliationStrategy(ReconciliationStrategy):
     def get_id_path(self) -> str:
         return "taxon"
 
-    async def find_candidates(
-        self, query: str, cursor, limit: int = 10
-    ) -> List[Dict[str, Any]]:
+    async def find_candidates(self, query: str, cursor, limit: int = 10) -> List[Dict[str, Any]]:
         # Implement taxon-specific logic here
         # Could handle genus/species parsing, synonym matching, etc.
         pass
