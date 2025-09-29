@@ -22,17 +22,17 @@ publish:
 
 .PHONY: black
 black:
-	@uv run black src tests app.py
+	@uv run black src tests main.py
 
 .PHONY: pylint
 pylint:
-	@uv run pylint src tests app.py
+	@uv run pylint src tests main.py
 
 .PHONY: lint
 lint: tidy pylint flake8
 
 isort:
-	@uv run isort src tests app.py
+	@uv run isort src tests main.py
 
 .PHONY: tidy
 tidy: black isort
