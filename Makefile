@@ -1,3 +1,7 @@
+SHELL := /bin/bash
+
+serve:       
+	@uv run uvicorn main:app --reload
 
 .PHONY: install
 install:
@@ -18,17 +22,17 @@ publish:
 
 .PHONY: black
 black:
-	@uv run black src test app.py
+	@uv run black src tests app.py
 
 .PHONY: pylint
 pylint:
-	@uv run pylint src test app.py
+	@uv run pylint src tests app.py
 
 .PHONY: lint
 lint: tidy pylint flake8
 
 isort:
-	@uv run isort src test app.py
+	@uv run isort src tests app.py
 
 .PHONY: tidy
 tidy: black isort
