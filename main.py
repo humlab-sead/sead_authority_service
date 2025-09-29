@@ -1,13 +1,12 @@
-# app.py
 import json
 import os
 from typing import Any, Dict, List
 
-import dotenv
 import psycopg
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+from loguru import logger
 from psycopg.rows import dict_row
 
 from configuration.config import Config
@@ -18,18 +17,20 @@ from utility import configure_logging, create_db_uri
 
 AUTO_ACCEPT = float(os.environ.get("AUTO_ACCEPT_THRESHOLD", "0.90"))
 
-dotenv.load_dotenv(dotenv.find_dotenv())
+ConfigStore.configure_context(source="config/config.yml", env_filename=".env", env_prefix="SEAD_AUTHORITY")
 
 
 app = FastAPI(title="SEAD Entity Reconciliation Service")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+@app.get("/is_alive")
+async def is_alive():
+    return {"status": "alive"}
 
 @app.on_event("startup")
 async def startup():
     try:
 
-        ConfigStore.configure_context(source="config/config.yml", env_filename=".env", env_prefix="SEAD_AUTHORITY")
         configure_logging(ConfigValue("logging").resolve() or {})
 
         cfg: Config = ConfigStore.config()
