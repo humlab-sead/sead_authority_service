@@ -1,0 +1,15 @@
+options:
+  id_base: "https://w3id.org/sead/id/"
+  database:
+    dbname: sead_staging
+
+
+logging:
+  folder: ./logs
+  handlers:
+    - sink: "import_excel.log"
+      level: "DEBUG"
+      format: "{time} - {level} - {message}"
+    - sink: "sys.stdout"
+      level: "DEBUG"
+      format: "{time} - {level} - {message}"
