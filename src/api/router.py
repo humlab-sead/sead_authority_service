@@ -160,8 +160,34 @@ async def reconcile(request: Request) -> JSONResponse:
     - 500: Database errors, internal server errors
     """
     try:
-        payload = await request.json()
-        queries = payload.get("queries")
+        content_type = request.headers.get("content-type", "").lower()
+        logger.info(f"Content-Type: {content_type}")
+
+        # Handle form-encoded data (what OpenRefine sends)
+        if "application/x-www-form-urlencoded" in content_type:
+            form_data = await request.form()
+            logger.info(f"Form data keys: {list(form_data.keys())}")
+            queries_str = form_data.get("queries")
+            if queries_str:
+                queries = json.loads(queries_str)
+            else:
+                logger.error("No 'queries' field in form data")
+                return JSONResponse({"error": "No queries provided"}, status_code=400)
+        else:
+            # Handle JSON data (fallback)
+            try:
+                body = await request.body()
+                if body:
+                    payload = json.loads(body)
+                    queries = payload.get("queries")
+                else:
+                    logger.error("Empty request body")
+                    return JSONResponse({"error": "Empty request body"}, status_code=400)
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error: {e}")
+                return JSONResponse({"error": "Invalid JSON in request"}, status_code=400)
+
+        # Handle queries as string (sometimes OpenRefine double-encodes)
         if isinstance(queries, str):
             queries = json.loads(queries)
 
