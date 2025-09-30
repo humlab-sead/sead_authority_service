@@ -1,0 +1,24 @@
+services:
+  swedeb_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_PORT: "${APP_PORT}"
+        APP_TAG: "${APP_TAG}"
+    image: "${APP_IMAGE_NAME}:${APP_IMAGE_TAG}"
+    container_name: "${APP_CONTAINER_NAME}-${APP_ENVIRONMENT}"
+    restart: always
+    ports:
+      - "${APP_HOST_PORT}:${APP_PORT}"
+    env_file:
+      - ".env.${APP_ENVIRONMENT}"
+    environment:
+      - APP_CONFIG_PATH=${APP_CONFIG_PATH}
+    networks:
+      - sead_authority_service_network
+
+networks:
+  sead_authority_service_network:
+    name: "sead_authority_service_${APP_ENVIRONMENT}_network"
+    driver: bridge

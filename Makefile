@@ -10,8 +10,7 @@ install:
 
 .PHONY: test
 test:
-	@echo "No tests defined"
-	@exit 0
+	@uv run pytest tests -v
 
 # Build and publish Python package on PyPI using uv
 .PHONY: publish
@@ -29,7 +28,7 @@ pylint:
 	@uv run pylint src tests main.py
 
 .PHONY: lint
-lint: tidy pylint flake8
+lint: tidy pylint
 
 isort:
 	@uv run isort src tests main.py
@@ -39,3 +38,7 @@ tidy: black isort
 
 requirements.txt: pyproject.toml
 	@uv export -o requirements.txt
+
+.PHONY: test-coverage
+test-coverage:
+	@uv run pytest test_main.py --cov=main --cov-report=html --cov-report=term
