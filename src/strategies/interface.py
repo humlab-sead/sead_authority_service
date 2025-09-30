@@ -3,14 +3,20 @@ from typing import Any, Dict, List, Optional
 
 import psycopg
 
+from configuration.inject import ConfigValue
 from src.utility import Registry
 
 
 class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
+    def __init__(self) -> None:
+        self.connection: psycopg.AsyncConnection = ConfigValue("runtime:connection").resolve()
+
     @abstractmethod
-    async def find_candidates(self, query: str, cursor: psycopg.AsyncCursor, limit: int = 10) -> List[Dict[str, Any]]:
+    async def find_candidates(
+        self, cursor: psycopg.AsyncCursor, query: str, properties: None | list[dict[str, Any]] = None, limit: int = 10
+    ) -> List[Dict[str, Any]]:
         """Find candidate matches for the given query"""
 
     @abstractmethod
@@ -28,6 +34,28 @@ class ReconciliationStrategy(ABC):
     @abstractmethod
     def get_id_path(self) -> str:
         """Return the URL path segment for this entity type"""
+
+    def as_candidate(self, entity_data: dict[str, Any]) -> dict[str, Any]:
+        """Convert entity data to OpenRefine candidate format"""
+        auto_accept_threshold: float = ConfigValue("options:auto_accept_threshold").resolve() or 0.85
+        id_base: str = ConfigValue("options:id_base").resolve()
+
+        entity_id: str = entity_data[self.get_entity_id_field()]
+        label: str = entity_data[self.get_label_field()]
+        score = float(entity_data.get("name_sim", 0))
+        candidate: dict[str, Any] = {
+            "id": f"{id_base}{self.get_id_path()}/{entity_id}",
+            "name": label,
+            "score": min(100.0, round(score * 100, 2)),
+            "match": bool(score >= auto_accept_threshold),
+            "type": [{"id": self.get_id_path(), "name": label}],
+        }
+
+        # Add additional metadata if available
+        if "distance_km" in entity_data:
+            candidate["distance_km"] = round(entity_data["distance_km"], 2)
+
+        return candidate
 
 
 class StrategyRegistry(Registry):
