@@ -5,6 +5,7 @@ from psycopg.rows import dict_row
 from src.configuration.inject import ConfigValue
 from src.strategies.interface import ReconciliationStrategy, Strategies
 
+
 async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
 
     connection = ConfigValue("runtime:connection").resolve()

@@ -7,20 +7,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 from loguru import logger
 
-from src.utility import (
-    Registry,
-    configure_logging,
-    create_db_uri,
-    dget,
-    dotexists,
-    dotexpand,
-    dotget,
-    dotset,
-    env2dict,
-    get_connection_uri,
-    recursive_filter_dict,
-    recursive_update,
-)
+from src.utility import (Registry, configure_logging, create_db_uri, dget,
+                         dotexists, dotexpand, dotget, dotset, env2dict,
+                         get_connection_uri, recursive_filter_dict,
+                         recursive_update)
 
 
 class TestRecursiveUpdate:
@@ -131,7 +121,7 @@ class TestDotNotationUtilities:
         """Test dotexpand with simple path."""
         result = dotexpand("a.b.c")
         assert result == ["a.b.c"]
-        
+
         result = dotexpand(["a.b.c"])
         assert result == ["a.b.c"]
 
@@ -323,11 +313,7 @@ class TestConfigureLogging:
     @patch("src.utility.logger")
     def test_configure_logging_with_stdout(self, mock_logger):
         """Test configure_logging with stdout handler."""
-        opts = {
-            "handlers": [
-                {"sink": "sys.stdout", "level": "DEBUG"}
-            ]
-        }
+        opts = {"handlers": [{"sink": "sys.stdout", "level": "DEBUG"}]}
         configure_logging(opts)
         mock_logger.configure.assert_called_once()
         # Check that sys.stdout was substituted
@@ -339,15 +325,10 @@ class TestConfigureLogging:
     def test_configure_logging_with_file(self, mock_datetime, mock_logger):
         """Test configure_logging with file handler."""
         mock_datetime.now.return_value.strftime.return_value = "20231201_120000"
-        
-        opts = {
-            "folder": "test_logs",
-            "handlers": [
-                {"sink": "test.log", "level": "ERROR"}
-            ]
-        }
+
+        opts = {"folder": "test_logs", "handlers": [{"sink": "test.log", "level": "ERROR"}]}
         configure_logging(opts)
-        
+
         handlers = mock_logger.configure.call_args[1]["handlers"]
         expected_path = os.path.join("test_logs", "20231201_120000_test.log")
         assert handlers[0]["sink"] == expected_path
@@ -355,11 +336,7 @@ class TestConfigureLogging:
     @patch("src.utility.logger")
     def test_configure_logging_no_sink(self, mock_logger):
         """Test configure_logging with handler missing sink."""
-        opts = {
-            "handlers": [
-                {"level": "DEBUG"}  # No sink
-            ]
-        }
+        opts = {"handlers": [{"level": "DEBUG"}]}  # No sink
         configure_logging(opts)
         # Should not call configure since handler has no sink
         mock_logger.configure.assert_called_once_with(handlers=opts["handlers"])
@@ -374,28 +351,31 @@ class TestRegistry:
 
     def test_register_function(self):
         """Test registering a function."""
+
         @Registry.register(key="test_func")
         def test_function():
             return "test_result"
-        
+
         assert Registry.is_registered("test_func")
         assert Registry.get("test_func")() == "test_result"
 
     def test_register_with_function_type(self):
         """Test registering with function type (calls function)."""
+
         @Registry.register(key="test_func", type="function")
         def test_function():
             return "test_result"
-        
+
         assert Registry.is_registered("test_func")
         assert Registry.get("test_func") == "test_result"
 
     def test_register_without_key(self):
         """Test registering without explicit key (uses function name)."""
+
         @Registry.register()
         def my_function():
             return "result"
-        
+
         assert Registry.is_registered("my_function")
         assert Registry.get("my_function")() == "result"
 
@@ -410,11 +390,12 @@ class TestRegistry:
 
     def test_register_class(self):
         """Test registering a class."""
+
         @Registry.register(key="test_class")
         class TestClass:
             def method(self):
                 return "class_result"
-        
+
         assert Registry.is_registered("test_class")
         instance = Registry.get("test_class")()
         assert instance.method() == "class_result"
@@ -438,13 +419,8 @@ class TestDatabaseUtilities:
     def test_get_connection_uri(self):
         """Test get_connection_uri function."""
         mock_connection = MagicMock()
-        mock_connection.get_dsn_parameters.return_value = {
-            "user": "testuser",
-            "host": "localhost",
-            "port": "5432",
-            "dbname": "testdb"
-        }
-        
+        mock_connection.get_dsn_parameters.return_value = {"user": "testuser", "host": "localhost", "port": "5432", "dbname": "testdb"}
+
         uri = get_connection_uri(mock_connection)
         expected = "postgresql://testuser@localhost:5432/testdb"
         assert uri == expected
@@ -452,13 +428,8 @@ class TestDatabaseUtilities:
     def test_get_connection_uri_missing_params(self):
         """Test get_connection_uri with missing parameters."""
         mock_connection = MagicMock()
-        mock_connection.get_dsn_parameters.return_value = {
-            "user": None,
-            "host": "localhost",
-            "port": "5432",
-            "dbname": "testdb"
-        }
-        
+        mock_connection.get_dsn_parameters.return_value = {"user": None, "host": "localhost", "port": "5432", "dbname": "testdb"}
+
         uri = get_connection_uri(mock_connection)
         expected = "postgresql://None@localhost:5432/testdb"
         assert uri == expected
@@ -472,10 +443,10 @@ class TestDatabaseUtilities:
 #     def test_import_sub_modules(self, mock_import, mock_listdir):
 #         """Test import_sub_modules function."""
 #         mock_listdir.return_value = ["module1.py", "module2.py", "__init__.py", "not_python.txt"]
-        
+
 #         from src.utility import import_sub_modules
 #         import_sub_modules("/fake/path")
-        
+
 #         # Should import module1 and module2, but not __init__ or non-python files
 #         assert mock_import.call_count == 2
 #         mock_import.assert_any_call(".module1", package="src.utility")
@@ -486,10 +457,10 @@ class TestDatabaseUtilities:
 #     def test_import_sub_modules_empty_dir(self, mock_import, mock_listdir):
 #         """Test import_sub_modules with empty directory."""
 #         mock_listdir.return_value = []
-        
+
 #         from src.utility import import_sub_modules
 #         import_sub_modules("/fake/path")
-        
+
 #         mock_import.assert_not_called()
 
 
@@ -502,40 +473,30 @@ class TestIntegration:
         data = {}
         dotset(data, "config:database:host", "localhost")
         dotset(data, "config:database:port", 5432)
-        
+
         assert dotget(data, "config.database.host") == "localhost"
         assert dotget(data, "config:database:port") == 5432
 
     def test_recursive_update_and_filter_integration(self):
         """Test recursive_update and recursive_filter_dict work together."""
-        base_config = {
-            "database": {"host": "localhost", "port": 5432},
-            "logging": {"level": "INFO"}
-        }
-        
-        user_config = {
-            "database": {"port": 3306, "name": "mydb"},
-            "cache": {"enabled": True}
-        }
-        
+        base_config = {"database": {"host": "localhost", "port": 5432}, "logging": {"level": "INFO"}}
+
+        user_config = {"database": {"port": 3306, "name": "mydb"}, "cache": {"enabled": True}}
+
         # Update configuration
         merged = recursive_update(base_config.copy(), user_config)
-        
+
         # Filter out sensitive info
         filtered = recursive_filter_dict(merged, {"port"}, "exclude")
-        
-        expected = {
-            "database": {"host": "localhost", "name": "mydb"},
-            "logging": {"level": "INFO"},
-            "cache": {"enabled": True}
-        }
+
+        expected = {"database": {"host": "localhost", "name": "mydb"}, "logging": {"level": "INFO"}, "cache": {"enabled": True}}
         assert filtered == expected
 
     def test_env2dict_and_dotget_integration(self):
         """Test env2dict and dotget work together."""
         with patch.dict(os.environ, {"APP_DB_HOST": "localhost", "APP_DB_PORT": "5432"}):
             config = env2dict("APP")
-            
+
             assert dotget(config, "db.host") == "localhost"
             assert dotget(config, "db.port") == "5432"
             assert dget(config, "db:host", "db.host") == "localhost"

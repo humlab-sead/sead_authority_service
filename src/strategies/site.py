@@ -1,7 +1,8 @@
 from typing import Any, Tuple
 
-from configuration.inject import ConfigValue
 import psycopg
+
+from configuration.inject import ConfigValue
 
 from .interface import ReconciliationStrategy, Strategies
 
@@ -154,10 +155,10 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
         """Boost scores based on place name context"""
 
         place_results = await proxy.fetch_site_location_similarity(candidates, place)
-        
+
         similarity_threshold: float = ConfigValue("policy:site:place_name_similarity_boost:similarity_threshold").resolve() or 0.3
         max_boost: float = ConfigValue("policy:site:place_name_similarity_boost:max_boost").resolve() or 0.1
-    
+
         # Apply place context boost
         for candidate in candidates:
             site_id = candidate["site_id"]

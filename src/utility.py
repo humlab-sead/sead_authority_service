@@ -66,7 +66,7 @@ def dotexists(data: dict, *paths: list[str]) -> bool:
     return False
 
 
-def dotexpand(paths: str|list[str]) -> list[str]:
+def dotexpand(paths: str | list[str]) -> list[str]:
     """Expands paths with ',' and ':'."""
     if not paths:
         return []

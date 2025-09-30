@@ -34,9 +34,7 @@ async def render_preview(uri: str) -> ValueError | str:
         details: Dict[str, Any] | None = await strategy.get_details(entity_id_str, cur)
 
     if not details:
-        raise ValueError(
-            f"Entity with ID {entity_id_str} not found or preview not implemented."
-        )
+        raise ValueError(f"Entity with ID {entity_id_str} not found or preview not implemented.")
 
     html = "<div style='padding:10px; font:14px sans-serif; line-height:1.6;'>"
     # Use 'Name' or 'label' for the title, falling back to the first value
