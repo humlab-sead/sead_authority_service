@@ -3,34 +3,78 @@ FastAPI router for SEAD Entity Reconciliation Service endpoints.
 """
 
 import json
-from typing import Any
+from configuration.config import Config
+from loguru import logger
 
 import psycopg
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from utility import configure_logging, create_db_uri
 
-from src.configuration.inject import ConfigValue
+from src.configuration.inject import ConfigStore, ConfigValue
 from src.reconcile import reconcile_queries
 from src.render import render_preview
 from strategies.interface import Strategies
+
+# pylint: disable=unused-argument
+
+def get_default_config_filename() -> str:
+    return "config/config.yml"
+
+async def setup_config_store(source: str = None) -> None:
+    if ConfigStore.is_configured():
+        return
+    source = source or get_default_config_filename()
+    logger.info(f"Initializing ConfigStore with source: {source}")
+
+    ConfigStore.configure_context(source=source, env_filename=".env", env_prefix="SEAD_AUTHORITY")
+
+    assert ConfigStore.is_configured(), "ConfigStore failed to configure properly"
+
+    cfg: Config = ConfigStore.config()
+    if not cfg:
+        raise ValueError("ConfigStore did not return a config")
+
+    configure_logging(cfg.get("logging") or {})
+    dsn: str = create_db_uri(**cfg.get("options:database"))
+
+    if not dsn:
+        raise ValueError("Database DSN is not configured properly")
+
+    connection: psycopg.AsyncConnection = await psycopg.AsyncConnection.connect(dsn)
+
+    if not connection:
+        raise ValueError("Database connection could not be established")
+
+    cfg.update({"runtime:connection": connection})
+
+    logger.info("ConfigStore initialized successfully.")
+
+
+async def get_config_dependency(source: str = None) -> Config:
+    if not ConfigStore.is_configured():
+        await setup_config_store(source)
+    return ConfigStore.config()
+
 
 router = APIRouter()
 
 
 @router.get("/is_alive")
-async def is_alive() -> dict[str, str]:
+async def is_alive(config: Config = Depends(get_config_dependency)) -> dict[str, str]:
     """Health check endpoint"""
     return {"status": "alive"}
 
 
 @router.get("/reconcile")
-async def meta():
+async def meta(config: Config = Depends(get_config_dependency)):
     """
     OpenRefine reconciliation service metadata endpoint.
 
     Returns service configuration including supported entity types and properties
     that can be used for enhanced reconciliation matching.
     """
+
     default_types: list[dict[str, str]] = [{"id": entity_type, "name": entity_type} for entity_type in Strategies.items]
     id_base: str = ConfigValue("options:id_base").resolve()
 
@@ -65,7 +109,7 @@ async def meta():
 
 
 @router.post("/reconcile")
-async def reconcile(request: Request) -> JSONResponse:
+async def reconcile(request: Request, config: Config = Depends(get_config_dependency)) -> JSONResponse:
     """
     OpenRefine reconciliation endpoint for batch queries.
 
@@ -214,7 +258,7 @@ async def reconcile(request: Request) -> JSONResponse:
 
 
 @router.get("/reconcile/properties")
-async def suggest_properties(query: str = "") -> JSONResponse:
+async def suggest_properties(query: str = "", config: Config = Depends(get_config_dependency)) -> JSONResponse:
     """
     Property suggestion endpoint for OpenRefine.
 
@@ -276,9 +320,7 @@ async def suggest_properties(query: str = "") -> JSONResponse:
 
 
 @router.get("/reconcile/preview")
-async def preview(
-    id: str,  # pylint: disable=redefined-builtin
-) -> HTMLResponse:
+async def preview(id: str, config: Config = Depends(get_config_dependency)) -> HTMLResponse:  # pylint: disable=redefined-builtin
     """Preview endpoint for OpenRefine reconciliation results"""
     id_base: str = ConfigValue("options:id_base").resolve()
     if not id.startswith(id_base):
