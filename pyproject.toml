@@ -84,8 +84,12 @@ warn_return_any = false
 # pytest
 # --------------------
 [tool.pytest.ini_options]
-addopts = "-q --maxfail=1 --strict-markers"
+addopts = "-q -ra --strict-markers"
 testpaths = ["tests"]
+python_classes = "Test*"
+python_functions = "test_*"
+
+# python_files = "test_*.py" "*_test.py"
 
 # --------------------
 # coverage.py
