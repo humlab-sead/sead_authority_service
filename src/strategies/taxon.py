@@ -1,5 +1,4 @@
-from ast import Dict
-from typing import Any, Optional
+from typing import Any
 
 import psycopg
 
@@ -24,7 +23,7 @@ class TaxonReconciliationStrategy(ReconciliationStrategy):
         # Could handle genus/species parsing, synonym matching, etc.
         pass
 
-    async def get_details(self, entity_id: str, cursor) -> Optional[Dict[str, Any]]:
+    async def get_details(self, entity_id: str, cursor) -> dict[str, Any] | None:
         """Fetch details for a specific taxon (placeholder)."""
         # When implemented, this would query the taxon authority tables.
         return None
