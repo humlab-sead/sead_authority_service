@@ -432,35 +432,6 @@ class TestDatabaseUtilities:
         assert uri == expected
 
 
-# class TestImportSubModules:
-#     """Tests for import_sub_modules function."""
-
-#     @patch("src.utility.os.listdir")
-#     @patch("src.utility.importlib.import_module")
-#     def test_import_sub_modules(self, mock_import, mock_listdir):
-#         """Test import_sub_modules function."""
-#         mock_listdir.return_value = ["module1.py", "module2.py", "__init__.py", "not_python.txt"]
-
-#         from src.utility import import_sub_modules
-#         import_sub_modules("/fake/path")
-
-#         # Should import module1 and module2, but not __init__ or non-python files
-#         assert mock_import.call_count == 2
-#         mock_import.assert_any_call(".module1", package="src.utility")
-#         mock_import.assert_any_call(".module2", package="src.utility")
-
-#     @patch("src.utility.os.listdir")
-#     @patch("src.utility.importlib.import_module")
-#     def test_import_sub_modules_empty_dir(self, mock_import, mock_listdir):
-#         """Test import_sub_modules with empty directory."""
-#         mock_listdir.return_value = []
-
-#         from src.utility import import_sub_modules
-#         import_sub_modules("/fake/path")
-
-#         mock_import.assert_not_called()
-
-
 # Integration tests
 class TestIntegration:
     """Integration tests combining multiple utility functions."""
