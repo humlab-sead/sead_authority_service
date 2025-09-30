@@ -66,17 +66,23 @@ def dotexists(data: dict, *paths: list[str]) -> bool:
     return False
 
 
-def dotexpand(path: str) -> list[str]:
+def dotexpand(paths: str|list[str]) -> list[str]:
     """Expands paths with ',' and ':'."""
-    paths: list[str] = []
-    for p in path.replace(" ", "").split(","):
-        if not p:
-            continue
-        if ":" in p:
-            paths.extend([p.replace(":", "."), p.replace(":", "_")])
-        else:
-            paths.append(p)
-    return paths
+    if not paths:
+        return []
+    if not isinstance(paths, (str, list)):
+        raise ValueError("dot path must be a string or list of strings")
+    paths = paths if isinstance(paths, list) else [paths]
+    expanded_paths: list[str] = []
+    for p in paths:
+        for q in p.replace(" ", "").split(","):
+            if not q:
+                continue
+            if ":" in q:
+                expanded_paths.extend([q.replace(":", "."), q.replace(":", "_")])
+            else:
+                expanded_paths.append(q)
+    return expanded_paths
 
 
 def dotget(data: dict, path: str, default: Any = None) -> Any:
@@ -114,10 +120,12 @@ def env2dict(prefix: str, data: dict[str, str] | None = None, lower_key: bool = 
         data = {}
     if not prefix:
         return data
+    if lower_key:
+        prefix = prefix.lower()
     for key, value in os.environ.items():
         if lower_key:
             key = key.lower()
-        if key.startswith(prefix.lower()):
+        if key.startswith(prefix):
             dotset(data, key[len(prefix) + 1 :].replace("_", ":"), value)
     return data
 
@@ -188,7 +196,7 @@ class Registry:
 
 def create_db_uri(*, host: str, port: int | str, user: str, dbname: str) -> str:
     """
-    Returns the database URI from the environment variables.
+    Builds database URI from the individual config elements.
     """
     return f"postgresql://{user}@{host}:{port}/{dbname}"
 
