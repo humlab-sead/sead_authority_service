@@ -40,7 +40,7 @@ class MockStrategies:
     """Mock Strategies class that behaves like the real one"""
 
     def __init__(self):
-        self.strategy = MockStrategy()
+        self.strategy = MockStrategy
         self.items: dict[str, MockStrategy] = {"site": self.strategy, "taxon": self.strategy}
 
 
@@ -90,7 +90,10 @@ class TestRenderPreview:
         """Test successful rendering when entity has 'Name' field"""
 
         uri = f"{ID_BASE}site/123"
-        result = await render_preview(uri)
+
+        # Mock src.render.Strategies to use MockStrategies
+        with patch("src.render.Strategies", MockStrategies()):
+            result = await render_preview(uri)
 
         assert isinstance(result, str)
         assert "<h3 style='margin-top:0;'>Test Site</h3>" in result
@@ -105,7 +108,8 @@ class TestRenderPreview:
     async def test_successful_render_with_label_fallback(self):
         """Test rendering when entity has 'label' but no 'Name' field"""
         uri = f"{ID_BASE}site/456"
-        result = await render_preview(uri)
+        with patch("src.render.Strategies", MockStrategies()):
+            result = await render_preview(uri)
 
         assert isinstance(result, str)
         assert "<h3 style='margin-top:0;'>Site Without Name</h3>" in result
@@ -118,7 +122,8 @@ class TestRenderPreview:
     async def test_render_filters_empty_values(self):
         """Test that None, empty strings, and whitespace-only values are filtered out"""
         uri = f"{ID_BASE}site/789"
-        result = await render_preview(uri)
+        with patch("src.render.Strategies", MockStrategies()):
+            result = await render_preview(uri)
 
         assert isinstance(result, str)
         # Should include field1 and field5
@@ -177,7 +182,8 @@ class TestRenderPreview:
     async def test_html_structure(self):
         """Test that generated HTML has correct structure"""
         uri = f"{ID_BASE}site/123"
-        result = await render_preview(uri)
+        with patch("src.render.Strategies", MockStrategies()):
+            result = await render_preview(uri)
 
         # Check main container
         assert result.startswith("<div style='padding:10px; font:14px sans-serif; line-height:1.6;'>")
@@ -195,7 +201,8 @@ class TestRenderPreview:
         """Test that different entity types work correctly"""
         # Test with 'taxon' entity type
         uri = f"{ID_BASE}taxon/123"
-        result = await render_preview(uri)
+        with patch("src.render.Strategies", MockStrategies()):
+            result = await render_preview(uri)
 
         assert isinstance(result, str)
         assert "<h3 style='margin-top:0;'>Test Site</h3>" in result  # Uses same mock data
@@ -209,7 +216,8 @@ class TestRenderPreview:
             mock_get_details.return_value = {"Name": "Site with <special> & 'chars'", "description": 'Description with "quotes" & ampersands'}
 
             uri = f"{ID_BASE}site/special"
-            result = await render_preview(uri)
+            with patch("src.render.Strategies", MockStrategies()):
+                result = await render_preview(uri)
 
             assert isinstance(result, str)
             # HTML should contain the special characters (not escaped in this simple implementation)
@@ -228,7 +236,7 @@ class TestRenderPreviewEdgeCases:
     @pytest.mark.asyncio
     async def test_strategy_get_details_raises_exception(self):
         """Test when strategy.get_details raises an exception"""
-        ConfigStore.config().add({"runtime:connection": mock_connection()})
+        ConfigStore.config().update({"runtime:connection": mock_connection()})
 
         with patch("src.render.Strategies", MockStrategies()), patch.object(MockStrategy, "get_details") as mock_get_details:
 
@@ -236,7 +244,8 @@ class TestRenderPreviewEdgeCases:
             uri = f"{ID_BASE}site/123"
 
             with pytest.raises(Exception, match="Strategy error"):
-                await render_preview(uri)
+                with patch("src.render.Strategies", MockStrategies()):
+                    _ = await render_preview(uri)
 
 
 if __name__ == "__main__":
