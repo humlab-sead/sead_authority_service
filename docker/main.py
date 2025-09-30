@@ -27,7 +27,7 @@ async def startup():
         app.state.conn = await psycopg.AsyncConnection.connect(dsn)
         app.state.config = cfg
 
-        cfg.add({"runtime:connection": app.state.conn})
+        cfg.update({"runtime:connection": app.state.conn})
 
     except Exception as e:
         print(f"Failed to connect to database: {e}")
