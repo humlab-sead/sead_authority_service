@@ -32,7 +32,7 @@ async def meta():
     that can be used for enhanced reconciliation matching.
     """
     default_types: list[dict[str, str]] = [{"id": entity_type, "name": entity_type} for entity_type in Strategies.items]
-    id_base: str = ConfigValue("service:id_base").resolve()
+    id_base: str = ConfigValue("options:id_base").resolve()
 
     return {
         "name": "SEAD Entity Reconciliation",
