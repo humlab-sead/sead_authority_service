@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import psycopg
 import pytest
@@ -8,11 +8,13 @@ from src.render import render_preview
 
 ID_BASE = "https://w3id.org/sead/id/"
 
+# pylint: disable=attribute-defined-outside-init,protected-access, redefined-outer-name
+
 
 class MockStrategy:
     """Mock strategy for testing"""
 
-    async def get_details(self, entity_id: str, cursor):
+    async def get_details(self, entity_id: str, cursor):  # pylint: disable=unused-argument:
         """Mock get_details method"""
         if entity_id == "123":
             return {
@@ -23,16 +25,15 @@ class MockStrategy:
                 "country": "Sweden",
                 "description": "A test archaeological site",
             }
-        elif entity_id == "456":
+        if entity_id == "456":
             return {"label": "Site Without Name", "coordinates": "59.85, 17.64", "type": "Settlement"}
-        elif entity_id == "789":
+        if entity_id == "789":
             return {"field1": "Value 1", "field2": None, "field3": "", "field4": "   ", "field5": "Valid Value"}  # Whitespace only
-        elif entity_id == "empty":
+        if entity_id == "empty":
             return {}
-        elif entity_id == "notfound":
+        if entity_id == "notfound":
             return None
-        else:
-            return {"default": "value"}
+        return {"default": "value"}
 
 
 class MockStrategies:
@@ -40,7 +41,7 @@ class MockStrategies:
 
     def __init__(self):
         self.strategy = MockStrategy()
-        self.items = {"site": self.strategy, "taxon": self.strategy}
+        self.items: dict[str, MockStrategy] = {"site": self.strategy, "taxon": self.strategy}
 
 
 class MockAsyncContextManager:
@@ -85,7 +86,7 @@ class TestRenderPreview:
         self.mock_cursor = connection.cursor()
 
     @pytest.mark.asyncio
-    async def test_successful_render_with_name(self, mock_strategies):
+    async def test_successful_render_with_name(self):
         """Test successful rendering when entity has 'Name' field"""
 
         uri = f"{ID_BASE}site/123"
@@ -101,7 +102,7 @@ class TestRenderPreview:
         assert "<span>Sweden</span>" in result
 
     @pytest.mark.asyncio
-    async def test_successful_render_with_label_fallback(self, mock_strategies):
+    async def test_successful_render_with_label_fallback(self):
         """Test rendering when entity has 'label' but no 'Name' field"""
         uri = f"{ID_BASE}site/456"
         result = await render_preview(uri)
@@ -114,7 +115,7 @@ class TestRenderPreview:
         assert "<span>59.85, 17.64</span>" in result
 
     @pytest.mark.asyncio
-    async def test_render_filters_empty_values(self, mock_strategies):
+    async def test_render_filters_empty_values(self):
         """Test that None, empty strings, and whitespace-only values are filtered out"""
         uri = f"{ID_BASE}site/789"
         result = await render_preview(uri)
@@ -132,7 +133,7 @@ class TestRenderPreview:
         assert "field4:" not in result
 
     @pytest.mark.asyncio
-    async def test_invalid_id_format(self, mock_strategies):
+    async def test_invalid_id_format(self):
         """Test error when URI doesn't start with id_base"""
         # Use wrong URI that doesn't match the configured id_base
         uri = "https://wrong-domain.org/sead/site/123"
@@ -149,7 +150,7 @@ class TestRenderPreview:
             await render_preview(uri)
 
     @pytest.mark.asyncio
-    async def test_invalid_id_path_too_many_parts(self, mock_strategies):
+    async def test_invalid_id_path_too_many_parts(self):
         """Test error when URI path has too many parts"""
         uri = f"{ID_BASE}site/123/extra"
 
@@ -157,7 +158,7 @@ class TestRenderPreview:
             await render_preview(uri)
 
     @pytest.mark.asyncio
-    async def test_unknown_entity_type(self, mock_strategies):
+    async def test_unknown_entity_type(self):
         """Test error when entity type is not supported"""
         uri = f"{ID_BASE}unknown/123"
 
@@ -165,7 +166,7 @@ class TestRenderPreview:
             await render_preview(uri)
 
     @pytest.mark.asyncio
-    async def test_entity_not_found(self, mock_strategies):
+    async def test_entity_not_found(self):
         """Test error when entity is not found in database"""
         uri = f"{ID_BASE}site/notfound"
 
@@ -173,7 +174,7 @@ class TestRenderPreview:
             await render_preview(uri)
 
     @pytest.mark.asyncio
-    async def test_html_structure(self, mock_strategies):
+    async def test_html_structure(self):
         """Test that generated HTML has correct structure"""
         uri = f"{ID_BASE}site/123"
         result = await render_preview(uri)
@@ -190,7 +191,7 @@ class TestRenderPreview:
         assert "</span>" in result
 
     @pytest.mark.asyncio
-    async def test_different_entity_types(self, mock_strategies):
+    async def test_different_entity_types(self):
         """Test that different entity types work correctly"""
         # Test with 'taxon' entity type
         uri = f"{ID_BASE}taxon/123"
@@ -200,7 +201,7 @@ class TestRenderPreview:
         assert "<h3 style='margin-top:0;'>Test Site</h3>" in result  # Uses same mock data
 
     @pytest.mark.asyncio
-    async def test_special_characters_in_values(self, mock_strategies):
+    async def test_special_characters_in_values(self):
         """Test handling of special characters in entity values"""
 
         # Mock strategy that returns values with special characters

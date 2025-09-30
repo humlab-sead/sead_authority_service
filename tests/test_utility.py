@@ -1,11 +1,8 @@
 import os
 import sys
-import tempfile
-from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-from loguru import logger
 
 from src.utility import (Registry, configure_logging, create_db_uri, dget,
                          dotexists, dotexpand, dotget, dotset, env2dict,
@@ -392,7 +389,7 @@ class TestRegistry:
         """Test registering a class."""
 
         @Registry.register(key="test_class")
-        class TestClass:
+        class TestClass:  # pylint: disable=unused-variable
             def method(self):
                 return "class_result"
 

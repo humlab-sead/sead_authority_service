@@ -1,4 +1,3 @@
-from typing import Any, Dict, List
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import psycopg
@@ -6,6 +5,8 @@ import pytest
 
 from configuration.inject import ConfigStore
 from src.strategies.site import QueryProxy, SiteReconciliationStrategy
+
+# pylint: disable=attribute-defined-outside-init,protected-access
 
 
 class TestQueryProxy:
@@ -85,7 +86,7 @@ class TestQueryProxy:
         # Verify SQL execution with proper parameters
         expected_params = {"lat": 59.3293, "lon": 18.0686, "site_ids": [1, 2, 3]}
         self.mock_cursor.execute.assert_called_once()
-        args, kwargs = self.mock_cursor.execute.call_args
+        args, _ = self.mock_cursor.execute.call_args
         assert args[1] == expected_params
 
         self.mock_cursor.fetchall.assert_called_once()
@@ -167,7 +168,7 @@ class TestQueryProxy:
 class TestSiteReconciliationStrategy:
     """Tests for SiteReconciliationStrategy class."""
 
-    def setup_method(self, cfg):
+    def setup_method(self):
         """Set up test fixtures."""
         ConfigStore.configure_context(source="./tests/config.yml")
         self.strategy = SiteReconciliationStrategy()
@@ -235,8 +236,8 @@ class TestSiteReconciliationStrategy:
         with patch.object(self.strategy, "_apply_geographic_scoring", new_callable=AsyncMock) as mock_geo_scoring:
             mock_geo_scoring.return_value = mock_sites
 
-            properties = {"latitude": 59.3293, "longitude": 18.0686}
-            result = await self.strategy.find_candidates(self.mock_cursor, "test site", properties, limit=10)
+            properties: dict[str, float] = {"latitude": 59.3293, "longitude": 18.0686}
+            _ = await self.strategy.find_candidates(self.mock_cursor, "test site", properties, limit=10)
 
             mock_geo_scoring.assert_called_once_with(mock_sites, {"lat": 59.3293, "lon": 18.0686}, mock_proxy)
 
@@ -254,8 +255,8 @@ class TestSiteReconciliationStrategy:
         with patch.object(self.strategy, "_apply_place_context_scoring", new_callable=AsyncMock) as mock_place_scoring:
             mock_place_scoring.return_value = mock_sites
 
-            properties = {"place": "Stockholm"}
-            result = await self.strategy.find_candidates(self.mock_cursor, "test site", properties, limit=10)
+            properties: dict[str, str] = {"place": "Stockholm"}
+            _ = await self.strategy.find_candidates(self.mock_cursor, "test site", properties, limit=10)
 
             mock_place_scoring.assert_called_once_with(mock_sites, "Stockholm", mock_proxy)
 
@@ -270,8 +271,8 @@ class TestSiteReconciliationStrategy:
 
         candidates = [{"site_id": 1, "label": "Near Site", "name_sim": 0.7}, {"site_id": 2, "label": "Far Site", "name_sim": 0.8}]
 
-        coordinate = {"lat": 59.3293, "lon": 18.0686}
-        distances = {1: 0.5, 2: 15.0}  # 0.5km and 15km away
+        coordinate: dict[str, float] = {"lat": 59.3293, "lon": 18.0686}
+        distances: dict[int, float] = {1: 0.5, 2: 15.0}  # 0.5km and 15km away
 
         mock_proxy = AsyncMock()
         mock_proxy.fetch_site_distances.return_value = distances
@@ -304,7 +305,7 @@ class TestSiteReconciliationStrategy:
     @pytest.mark.asyncio
     async def test_apply_geographic_scoring_no_candidates(self):
         """Test geographic scoring with no candidates."""
-        coordinate = {"lat": 59.3293, "lon": 18.0686}
+        coordinate: dict[str, float] = {"lat": 59.3293, "lon": 18.0686}
         mock_proxy = AsyncMock()
 
         result = await self.strategy._apply_geographic_scoring([], coordinate, mock_proxy)
@@ -323,7 +324,7 @@ class TestSiteReconciliationStrategy:
 
         candidates = [{"site_id": 1, "label": "Stockholm Site", "name_sim": 0.7}, {"site_id": 2, "label": "Other Site", "name_sim": 0.8}]
 
-        place_results = {1: 0.9, 2: 0.2}  # High similarity for site 1, low for site 2
+        place_results: dict[int, float] = {1: 0.9, 2: 0.2}  # High similarity for site 1, low for site 2
 
         mock_proxy = AsyncMock()
         mock_proxy.fetch_site_location_similarity.return_value = place_results

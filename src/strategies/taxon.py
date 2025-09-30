@@ -1,5 +1,7 @@
 from ast import Dict
-from typing import Any, List, Optional
+from typing import Any, Optional
+
+import psycopg
 
 from .interface import ReconciliationStrategy, Strategies
 
@@ -17,7 +19,7 @@ class TaxonReconciliationStrategy(ReconciliationStrategy):
     def get_id_path(self) -> str:
         return "taxon"
 
-    async def find_candidates(self, query: str, cursor, limit: int = 10) -> List[Dict[str, Any]]:
+    async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         # Implement taxon-specific logic here
         # Could handle genus/species parsing, synonym matching, etc.
         pass
