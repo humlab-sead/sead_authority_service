@@ -70,8 +70,12 @@ class ConfigStore:
     context: str = "default"
 
     @classmethod
+    def is_configured(cls, context: str = None) -> bool:
+        return isinstance(cls.store.get(context or cls.context), Config)    
+    
+    @classmethod
     def config(cls, context: str = None) -> "Config":
-        if not isinstance(cls.store.get(cls.context), Config):
+        if not cls.is_configured(context):
             raise ValueError(f"Config context {cls.context} not properly initialized")
         return cls.store.get(context or cls.context)
 
