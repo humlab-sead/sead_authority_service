@@ -10,7 +10,7 @@ from strategies.interface import ReconciliationStrategy, Strategies
 async def render_preview(uri: str) -> ValueError | str:
     """Provides a generic HTML preview for a given entity ID."""
 
-    id_base: str = ConfigValue("service:id_base").resolve()
+    id_base: str = ConfigValue("options:id_base").resolve()
     connection: AsyncConnection = ConfigValue("runtime:connection").resolve()
 
     if not uri.startswith(id_base):
@@ -35,8 +35,7 @@ async def render_preview(uri: str) -> ValueError | str:
 
     if not details:
         raise ValueError(
-            f"Entity with ID {entity_id_str} not found or preview not implemented.",
-            status_code=404,
+            f"Entity with ID {entity_id_str} not found or preview not implemented."
         )
 
     html = "<div style='padding:10px; font:14px sans-serif; line-height:1.6;'>"
