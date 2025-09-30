@@ -1,0 +1,27 @@
+options:
+  id_base: "https://w3id.org/sead/id/"
+  auto_accept_threshold: 0.90
+  default_query_limit: 10
+  database:
+    host: humle.dumle.japp.ouch
+    dbname: smurfs
+    user: holamundo
+    port: 9999
+policy:
+  site:
+    proximity_boost:
+      very_near_distance_km: 0.2
+      to_far_distance_km: 10.0
+    place_name_similarity_boost:
+      similarity_threshold: 0.3
+      max_boost: 0.1
+
+logging:
+  folder: ./logs
+  handlers:
+    - sink: "import_excel.log"
+      level: "DEBUG"
+      format: "{time} - {level} - {message}"
+    - sink: "sys.stdout"
+      level: "DEBUG"
+      format: "{time} - {level} - {message}"
