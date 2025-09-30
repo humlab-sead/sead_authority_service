@@ -189,21 +189,28 @@ async def reconcile(request: Request) -> JSONResponse:
 
         # Handle queries as string (sometimes OpenRefine double-encodes)
         if isinstance(queries, str):
+            logger.info("Queries is string, parsing again...")
             queries = json.loads(queries)
 
         if not queries:
+            logger.error("No queries found after parsing")
             return JSONResponse({"error": "No queries provided"}, status_code=400)
 
-        results: dict[str, Any] = await reconcile_queries(queries)
+        # Check if queries have 'type' field - if not, default to 'site'
+        for query_id, query_data in queries.items():
+            if "type" not in query_data:
+                logger.info(f"Adding default type 'site' to query {query_id}")
+                query_data["type"] = "site"
+
+        # Call your reconciliation function
+        results = await reconcile_queries(queries)
 
         return JSONResponse(results)
 
-    except psycopg.Error as e:
-        return JSONResponse({"error": f"Database error: {str(e)}"}, status_code=500)
-    except json.JSONDecodeError:
-        return JSONResponse({"error": "Invalid JSON in request"}, status_code=400)
-    except Exception as e:  # pylint: disable=broad-except
-        return JSONResponse({"error": f"Internal server error: {str(e)}"}, status_code=500)
+    except Exception as e:
+        raise e
+        logger.error(f"Exception in reconcile endpoint: {e}", exc_info=True)
+        return JSONResponse({"error": f"Server error: {str(e)}"}, status_code=500)
 
 
 @router.get("/reconcile/properties")
