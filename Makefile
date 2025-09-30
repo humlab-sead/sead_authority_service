@@ -12,12 +12,10 @@ install:
 test:
 	@uv run pytest tests -v
 
-# Build and publish Python package on PyPI using uv
 .PHONY: publish
 publish:
 	@echo "Publishing Python package to PyPI"
-	uv publish
-	@echo "Published Python package to PyPI"
+	@uv publish
 
 .PHONY: black
 black:
