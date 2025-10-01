@@ -3,8 +3,8 @@ from typing import Any, Dict
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
-from configuration.inject import ConfigValue
-from strategies.interface import ReconciliationStrategy, Strategies
+from src.configuration.inject import ConfigValue
+from src.strategies.interface import ReconciliationStrategy, Strategies
 
 
 async def render_preview(uri: str) -> ValueError | str:

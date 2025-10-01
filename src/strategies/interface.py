@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 import psycopg
 
-from configuration.inject import ConfigValue
+from src.configuration.inject import ConfigValue
 from src.utility import Registry
 
 

@@ -3,18 +3,21 @@ FastAPI router for SEAD Entity Reconciliation Service endpoints.
 """
 
 import json
-from configuration.config import Config
-from loguru import logger
+import os
 
+import dotenv
 import psycopg
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from utility import configure_logging, create_db_uri
+from loguru import logger
 
+from src.configuration.config import Config
 from src.configuration.inject import ConfigStore, ConfigValue
+from src.configuration.setup import setup_config_store
 from src.reconcile import reconcile_queries
 from src.render import render_preview
-from strategies.interface import Strategies
+from src.strategies.interface import Strategies
+from src.utility import configure_logging, create_db_uri
 
 # pylint: disable=unused-argument
 

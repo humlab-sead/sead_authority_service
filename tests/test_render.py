@@ -3,7 +3,8 @@ from unittest.mock import AsyncMock, patch
 import psycopg
 import pytest
 
-from configuration.inject import ConfigStore
+from src.configuration.inject import ConfigStore
+from src.configuration.setup import setup_config_store
 from src.render import render_preview
 
 ID_BASE = "https://w3id.org/sead/id/"

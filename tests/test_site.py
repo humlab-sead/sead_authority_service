@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import psycopg
 import pytest
 
-from configuration.inject import ConfigStore
+from src.configuration.inject import ConfigStore
 from src.strategies.site import QueryProxy, SiteReconciliationStrategy
 
 # pylint: disable=attribute-defined-outside-init,protected-access

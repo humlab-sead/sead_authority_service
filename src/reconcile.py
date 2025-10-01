@@ -2,10 +2,9 @@ from typing import Any
 
 from psycopg.rows import dict_row
 
+from src.configuration.config import Config
 from src.configuration.inject import ConfigStore, ConfigValue
 from src.strategies.interface import ReconciliationStrategy, Strategies
-
-from src.configuration.config import Config
 
 
 async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
