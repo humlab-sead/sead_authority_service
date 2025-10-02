@@ -12,6 +12,10 @@ as $$
   select unaccent('public.unaccent'::regdictionary, p_value)
 $$;
 
+/**********************************************************************************************
+**  Sites
+**********************************************************************************************/
+
 drop view if exists authority.sites;
 create or replace view authority.sites as
   select  site_id,
@@ -25,8 +29,8 @@ create or replace view authority.sites as
   from public.tbl_sites;
 
 create index if not exists tbl_sites_norm_trgm
-on public.tbl_sites
-using gin ( (authority.immutable_unaccent(lower(site_name))) gin_trgm_ops );
+  on public.tbl_sites
+    using gin ( (authority.immutable_unaccent(lower(site_name))) gin_trgm_ops );
 
 
 drop function if exists authority.fuzzy_sites(text, integer);
@@ -51,3 +55,25 @@ as $$
         order by name_sim desc, s.label
         limit p_limit;
 $$;
+
+/**********************************************************************************************
+**  Locations
+**********************************************************************************************/
+
+drop view if exists authority.locations;
+create or replace view authority.locations as
+  select  location_id,
+          location_name as label,
+          authority.immutable_unaccent(lower(location_name)) as norm_label,
+          default_lat_dd,
+          default_long_dd,
+          location_type_id,
+          location_type,
+          description,
+          st_setsrid(st_makepoint(default_long_dd, default_lat_dd), 4326) as geom
+  from public.tbl_locations
+  join public.tbl_location_types using (location_type_id);
+
+create index if not exists tbl_locations_norm_trgm
+  on public.tbl_locations
+    using gin ( (authority.immutable_unaccent(lower(location_name))) gin_trgm_ops );
