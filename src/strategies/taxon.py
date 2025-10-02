@@ -18,6 +18,35 @@ class TaxonReconciliationStrategy(ReconciliationStrategy):
     def get_id_path(self) -> str:
         return "taxon"
 
+    def get_properties_meta(self) -> list[dict[str, str]]:
+        """Return metadata for taxon-specific properties used in enhanced reconciliation"""
+        return [
+            {
+                "id": "scientific_name",
+                "name": "Scientific Name",
+                "type": "string",
+                "description": "Full taxonomic scientific name",
+            },
+            {
+                "id": "genus",
+                "name": "Genus",
+                "type": "string",
+                "description": "Taxonomic genus name",
+            },
+            {
+                "id": "species",
+                "name": "Species",
+                "type": "string",
+                "description": "Taxonomic species name",
+            },
+            {
+                "id": "family",
+                "name": "Family",
+                "type": "string",
+                "description": "Taxonomic family name",
+            },
+        ]
+
     async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         # Implement taxon-specific logic here
         # Could handle genus/species parsing, synonym matching, etc.

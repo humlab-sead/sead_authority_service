@@ -226,7 +226,7 @@ async def reconcile(request: Request, config: Config = Depends(get_config_depend
 
 
 @router.get("/reconcile/properties")
-async def suggest_properties(query: str = "", config: Config = Depends(get_config_dependency)) -> JSONResponse:
+async def suggest_properties(query: str = "", type: str = "", config: Config = Depends(get_config_dependency)) -> JSONResponse:
     """
     Property suggestion endpoint for OpenRefine.
 
@@ -235,43 +235,26 @@ async def suggest_properties(query: str = "", config: Config = Depends(get_confi
 
     Args:
         query: Optional search term to filter properties
+        type: Optional entity type to filter properties (e.g., "site", "taxon")
 
     Returns:
         JSON response with matching properties
     """
-    # Define all supported properties for SEAD entities
-    all_properties: list[dict[str, str]] = [
-        {
-            "id": "latitude",
-            "name": "Latitude",
-            "type": "number",
-            "description": "Geographic latitude in decimal degrees (WGS84)",
-        },
-        {
-            "id": "longitude",
-            "name": "Longitude",
-            "type": "number",
-            "description": "Geographic longitude in decimal degrees (WGS84)",
-        },
-        {
-            "id": "country",
-            "name": "Country",
-            "type": "string",
-            "description": "Country name where the site is located",
-        },
-        {
-            "id": "national_id",
-            "name": "National Site ID",
-            "type": "string",
-            "description": "Official national site identifier or registration number",
-        },
-        {
-            "id": "place_name",
-            "name": "Place Name",
-            "type": "string",
-            "description": "Geographic place, locality, or administrative area name",
-        },
-    ]
+    # Get properties from registered strategies
+    if type and type in Strategies.items:
+        # Get properties for the specific entity type
+        strategy_class = Strategies.items[type]
+        strategy_instance = strategy_class()
+        all_properties = strategy_instance.get_properties_meta()
+    elif type and type not in Strategies.items:
+        # Unknown entity type - return empty to avoid confusion
+        all_properties = []
+    else:
+        # No type specified - return properties from all registered strategies
+        all_properties = []
+        for strategy_class in Strategies.items.values():
+            strategy_instance = strategy_class()
+            all_properties.extend(strategy_instance.get_properties_meta())
 
     # Filter properties based on query if provided
     if query:

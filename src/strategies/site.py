@@ -109,6 +109,41 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
     def get_id_path(self) -> str:
         return "site"
 
+    def get_properties_meta(self) -> list[dict[str, str]]:
+        """Return metadata for site-specific properties used in enhanced reconciliation"""
+        return [
+            {
+                "id": "latitude",
+                "name": "Latitude",
+                "type": "number",
+                "description": "Geographic latitude in decimal degrees (WGS84)",
+            },
+            {
+                "id": "longitude",
+                "name": "Longitude",
+                "type": "number",
+                "description": "Geographic longitude in decimal degrees (WGS84)",
+            },
+            {
+                "id": "country",
+                "name": "Country",
+                "type": "string",
+                "description": "Country name where the site is located",
+            },
+            {
+                "id": "national_id",
+                "name": "National Site ID",
+                "type": "string",
+                "description": "Official national site identifier or registration number",
+            },
+            {
+                "id": "place_name",
+                "name": "Place Name",
+                "type": "string",
+                "description": "Geographic place, locality, or administrative area name",
+            },
+        ]
+
     async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         """Find candidate sites based on name, identifier, and optional geographic context"""
         candidates: list[dict] = []

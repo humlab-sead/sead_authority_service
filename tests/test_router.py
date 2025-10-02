@@ -19,11 +19,24 @@ from tests.decorators import with_test_config
 ID_BASE = "https://w3id.org/sead/id/"
 
 
+class MockStrategy:
+    """Mock strategy class with get_properties_meta method"""
+    
+    def get_properties_meta(self):
+        return [
+            {"id": "latitude", "name": "Latitude", "type": "number", "description": "Geographic latitude"},
+            {"id": "longitude", "name": "Longitude", "type": "number", "description": "Geographic longitude"},
+            {"id": "country", "name": "Country", "type": "string", "description": "Country name"},
+            {"id": "national_id", "name": "National Site ID", "type": "string", "description": "National identifier"},
+            {"id": "place_name", "name": "Place Name", "type": "string", "description": "Place name"},
+        ]
+
+
 class MockStrategies:
     """Mock Strategies class for testing"""
 
     def __init__(self):
-        self.items = {"Site": MagicMock(), "Taxon": MagicMock()}
+        self.items = {"Site": lambda: MockStrategy(), "Taxon": lambda: MockStrategy()}
 
 
 @pytest.fixture
@@ -202,7 +215,7 @@ class TestPropertiesEndpoint:
 
     @with_test_config
     def test_properties_all(self, client: TestClient, test_provider: MockConfigProvider):
-        """Test getting all properties without filter"""
+        """Test getting all properties without filter - returns properties from all strategies"""
         response = client.get("/reconcile/properties")
         assert response.status_code == 200
 
@@ -210,12 +223,19 @@ class TestPropertiesEndpoint:
         assert "properties" in data
 
         properties = data["properties"]
-        assert len(properties) == 5
+        assert len(properties) == 9  # 5 site properties + 4 taxon properties
 
-        # Check all expected properties are present
+        # Check that we have properties from both strategies
         property_ids = [p["id"] for p in properties]
-        expected_ids = ["latitude", "longitude", "country", "national_id", "place_name"]
-        for expected_id in expected_ids:
+        
+        # Site properties
+        site_properties = ["latitude", "longitude", "country", "national_id", "place_name"]
+        for expected_id in site_properties:
+            assert expected_id in property_ids
+            
+        # Taxon properties  
+        taxon_properties = ["scientific_name", "genus", "species", "family"]
+        for expected_id in taxon_properties:
             assert expected_id in property_ids
 
         # Check property structure
@@ -276,6 +296,71 @@ class TestPropertiesEndpoint:
         data = response.json()
         properties = data["properties"]
         assert len(properties) == 0
+
+    @with_test_config
+    def test_properties_filtered_by_site_type(self, client: TestClient, test_provider: MockConfigProvider):
+        """Test filtering properties by site entity type"""
+        response = client.get("/reconcile/properties?type=site")
+        assert response.status_code == 200
+
+        data = response.json()
+        properties = data["properties"]
+        
+        # Should return only site properties
+        assert len(properties) == 5
+        property_ids = [p["id"] for p in properties]
+        expected_site_ids = ["latitude", "longitude", "country", "national_id", "place_name"]
+        for expected_id in expected_site_ids:
+            assert expected_id in property_ids
+            
+        # Should not contain taxon properties
+        taxon_ids = ["scientific_name", "genus", "species", "family"]
+        for taxon_id in taxon_ids:
+            assert taxon_id not in property_ids
+
+    @with_test_config
+    def test_properties_filtered_by_taxon_type(self, client: TestClient, test_provider: MockConfigProvider):
+        """Test filtering properties by taxon entity type"""
+        response = client.get("/reconcile/properties?type=taxon")
+        assert response.status_code == 200
+
+        data = response.json()
+        properties = data["properties"]
+        
+        # Should return only taxon properties
+        assert len(properties) == 4
+        property_ids = [p["id"] for p in properties]
+        expected_taxon_ids = ["scientific_name", "genus", "species", "family"]
+        for expected_id in expected_taxon_ids:
+            assert expected_id in property_ids
+            
+        # Should not contain site properties
+        site_ids = ["latitude", "longitude", "country", "national_id", "place_name"]
+        for site_id in site_ids:
+            assert site_id not in property_ids
+
+    @with_test_config
+    def test_properties_unknown_entity_type(self, client: TestClient, test_provider: MockConfigProvider):
+        """Test filtering properties by unknown entity type returns empty list"""
+        response = client.get("/reconcile/properties?type=unknown")
+        assert response.status_code == 200
+
+        data = response.json()
+        properties = data["properties"]
+        assert len(properties) == 0
+
+    @with_test_config
+    def test_properties_combined_filters(self, client: TestClient, test_provider: MockConfigProvider):
+        """Test combining type and query filters"""
+        response = client.get("/reconcile/properties?type=site&query=lat")
+        assert response.status_code == 200
+
+        data = response.json()
+        properties = data["properties"]
+        
+        # Should return only latitude from site properties
+        assert len(properties) == 1
+        assert properties[0]["id"] == "latitude"
 
 
 class TestPreviewEndpoint:
@@ -341,11 +426,11 @@ class TestEndpointIntegration:
         meta_data = meta_response.json()
         assert "Site" in [t["id"] for t in meta_data["defaultTypes"]]
 
-        # Step 2: Get available properties
+        # Step 2: Get available properties (both strategies return same properties, so we get duplicates)
         props_response = client.get("/reconcile/properties")
         assert props_response.status_code == 200
         props_data = props_response.json()
-        assert len(props_data["properties"]) == 5
+        assert len(props_data["properties"]) == 10  # 5 properties from each of the 2 mock strategies
 
         # Step 3: Perform reconciliation
         mock_reconcile_queries.return_value = {

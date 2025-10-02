@@ -184,6 +184,30 @@ class TestSiteReconciliationStrategy:
         strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         assert strategy.get_id_path() == "site"
 
+    @with_test_config
+    def test_get_properties_meta(self, test_provider: MockConfigProvider):
+        """Test get_properties_meta method returns site-specific properties."""
+        strategy = SiteReconciliationStrategy()
+        properties = strategy.get_properties_meta()
+        
+        assert isinstance(properties, list)
+        assert len(properties) == 5  # latitude, longitude, country, national_id, place_name
+        
+        # Check that all properties have required fields
+        for prop in properties:
+            assert "id" in prop
+            assert "name" in prop
+            assert "type" in prop
+            assert "description" in prop
+        
+        # Check specific properties exist
+        property_ids = [prop["id"] for prop in properties]
+        assert "latitude" in property_ids
+        assert "longitude" in property_ids
+        assert "country" in property_ids
+        assert "national_id" in property_ids
+        assert "place_name" in property_ids
+
     @patch("src.strategies.site.QueryProxy")
     @pytest.mark.asyncio
     @with_test_config
