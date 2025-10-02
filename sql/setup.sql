@@ -60,13 +60,14 @@ $$;
 **  Locations
 **********************************************************************************************/
 
+
 drop view if exists authority.locations;
 create or replace view authority.locations as
   select  location_id,
           location_name as label,
           authority.immutable_unaccent(lower(location_name)) as norm_label,
-          default_lat_dd,
-          default_long_dd,
+          default_lat_dd as latitude,
+          default_long_dd as longitude,
           location_type_id,
           location_type,
           description,
@@ -77,3 +78,4 @@ create or replace view authority.locations as
 create index if not exists tbl_locations_norm_trgm
   on public.tbl_locations
     using gin ( (authority.immutable_unaccent(lower(location_name))) gin_trgm_ops );
+
