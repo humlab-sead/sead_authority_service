@@ -79,3 +79,26 @@ create index if not exists tbl_locations_norm_trgm
   on public.tbl_locations
     using gin ( (authority.immutable_unaccent(lower(location_name))) gin_trgm_ops );
 
+
+drop function if exists authority.fuzzy_locations(text, integer);
+create or replace function authority.fuzzy_locations(p_text text, p_limit integer default 10)
+returns table ( location_id integer, label text, name_sim double precision )
+language sql
+stable
+as $$
+    with params as (
+        select authority.immutable_unaccent(lower(p_text))::text as q
+    )
+        select
+        s.location_id,
+        s.label,
+        greatest(
+            case when s.norm_label = (select q from params) then 1.0
+                else similarity(s.norm_label, (select q from params))
+            end, 0.0001
+        ) as name_sim
+        from authority.locations as s
+        where s.norm_label % (select q from params)       -- trigram candidate filter
+        order by name_sim desc, s.label
+        limit p_limit;
+$$;
