@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import functools
 import inspect
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields
 from inspect import isclass
+import threading
 from typing import Any, Callable, Generic, Self, Type, TypeVar
 
 from src.utility import dget, recursive_filter_dict, recursive_update
@@ -11,6 +13,70 @@ from src.utility import dget, recursive_filter_dict, recursive_update
 from .config import Config
 
 T = TypeVar("T", str, int, float)
+
+
+class ConfigProvider(ABC):
+    """Abstract configuration provider for dependency injection"""
+    
+    @abstractmethod
+    def get_config(self, context: str = None) -> Config:
+        """Get configuration for the given context"""
+        pass
+    
+    @abstractmethod
+    def is_configured(self, context: str = None) -> bool:
+        """Check if configuration exists for the given context"""
+        pass
+
+
+class SingletonConfigProvider(ConfigProvider):
+    """Production config provider using ConfigStore singleton"""
+    
+    def get_config(self, context: str = None) -> Config:
+        return ConfigStore.get_instance().config(context)
+    
+    def is_configured(self, context: str = None) -> bool:
+        return ConfigStore.get_instance().is_configured(context)
+
+
+class MockConfigProvider(ConfigProvider):
+    """Test config provider with controllable configuration"""
+    
+    def __init__(self, config: Config, context: str = "default"):
+        self._config = config
+        self._context = context
+    
+    def get_config(self, context: str = None) -> Config:
+        return self._config
+    
+    def is_configured(self, context: str = None) -> bool:
+        return self._config is not None
+
+
+# Global provider instance - can be swapped for testing
+_current_provider: ConfigProvider = SingletonConfigProvider()
+_provider_lock = threading.Lock()
+
+
+def get_config_provider() -> ConfigProvider:
+    """Get the current configuration provider"""
+    return _current_provider
+
+
+def set_config_provider(provider: ConfigProvider) -> ConfigProvider:
+    """Set the current configuration provider (useful for testing)"""
+    global _current_provider
+    with _provider_lock:
+        old_provider = _current_provider
+        _current_provider = provider
+        return old_provider
+
+
+def reset_config_provider() -> None:
+    """Reset to the default singleton provider"""
+    global _current_provider
+    with _provider_lock:
+        _current_provider = SingletonConfigProvider()
 
 
 @dataclass
@@ -45,14 +111,14 @@ class ConfigValue(Generic[T]):
     def resolve(self, context: str = None) -> T:
         """Resolve the value from the current store (configuration file)"""
         if isinstance(self.key, Config):
-            return ConfigStore.config(context)  # type: ignore
+            return get_config_provider().get_config(context)  # type: ignore
         if isclass(self.key):
             return self.key()
         if self.mandatory and not self.default:
-            if not ConfigStore.config(context).exists(self.key):
+            if not get_config_provider().get_config(context).exists(self.key):
                 raise ValueError(f"ConfigValue {self.key} is mandatory but missing from config")
 
-        value = ConfigStore.config(context).get(*self.key.split(","), default=self.default)
+        value = get_config_provider().get_config(context).get(*self.key.split(","), default=self.default)
         if value and self.after:
             return self.after(value)
         return value
@@ -65,29 +131,57 @@ class ConfigValue(Generic[T]):
 
 class ConfigStore:
     """A class to manage configuration files and contexts"""
+    _instance: 'ConfigStore' = None
+    _lock = threading.Lock()
 
-    store: dict[str, str | Config] = {"default": None}
-    context: str = "default"
+    def __init__(self):
+        if ConfigStore._instance is not None:
+            raise RuntimeError("ConfigStore is a singleton. Use get_instance()")
+        self.store: dict[str, Config] = {"default": None}
+        self.context: str = "default"
 
     @classmethod
-    def is_configured(cls, context: str = None) -> bool:
-        return isinstance(cls.store.get(context or cls.context), Config)    
+    def get_instance(cls) -> Self:
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls()
+        return cls._instance
     
     @classmethod
-    def config(cls, context: str = None) -> "Config":
-        if not cls.is_configured(context):
-            raise ValueError(f"Config context {cls.context} not properly initialized")
-        return cls.store.get(context or cls.context)
+    def reset_instance(cls) -> None:
+        """Reset singleton - useful for testing"""
+        with cls._lock:
+            cls._instance = None
+            # Also reset the provider to singleton when resetting ConfigStore
+            reset_config_provider()
 
+    def is_configured(self, context: str = None) -> bool:
+        return isinstance(self.store.get(context or self.context), Config)
+    
+    def config(self, context: str = None) -> Config:
+        if not self.is_configured(context):
+            raise ValueError(f"Config context {self.context} not properly initialized")
+        return self.store.get(context or self.context)
+    
+    # Convenience class methods for backward compatibility
     @classmethod
-    def resolve(cls, value: T | ConfigValue, context: str = None) -> T:
+    def is_configured_global(cls, context: str = None) -> bool:
+        """Check if configuration is available (uses provider layer)"""
+        return get_config_provider().is_configured(context)
+    
+    @classmethod
+    def config_global(cls, context: str = None) -> Config:
+        """Get configuration (uses provider layer)"""
+        return get_config_provider().get_config(context)
+
+    def resolve(self, value: T | ConfigValue, context: str = None) -> T:
         if not isinstance(value, ConfigValue):
             return value
-        return dget(cls.config(context), value.key)
+        return dget(self.config(context), value.key)
 
-    @classmethod
     def configure_context(
-        cls,
+        self,
         *,
         context: str = "default",
         source: Config | str | dict = None,
@@ -95,34 +189,33 @@ class ConfigStore:
         env_prefix: str = None,
         switch_to_context: bool = True,
     ) -> Self:
-        if not cls.store.get(context) and not source:
+        if not self.store.get(context) and not source:
             raise ValueError(f"Config context {context} undefined, cannot initialize")
 
         if isinstance(source, Config):
-            return cls._set_config(context=context, cfg=source)
+            return self._set_config(context=context, cfg=source)
 
-        if not source and isinstance(cls.store.get(context), Config):
-            return cls.store.get(context)
+        if not source and isinstance(self.store.get(context), Config):
+            return self.store.get(context)
 
         cfg: Config = Config.load(
-            source=source or cls.store.get(context),
+            source=source or self.store.get(context),
             context=context,
             env_filename=env_filename,
             env_prefix=env_prefix,
         )
 
-        return cls._set_config(context=context, cfg=cfg, switch_to_context=switch_to_context)
+        return self._set_config(context=context, cfg=cfg, switch_to_context=switch_to_context)
 
-    @classmethod
     def consolidate(
-        cls,
+        self,
         opts: dict[str, Any],
         ignore_keys: set[str] = None,
         context: str = "default",
         section: str = None,
     ) -> Self:
 
-        if not cls.store.get(context):
+        if not self.store.get(context):
             raise ValueError(f"Config context {context} undefined, cannot consolidate")
 
         if not section:
@@ -133,19 +226,18 @@ class ConfigStore:
         opts = recursive_update(
             opts,
             recursive_filter_dict(
-                cls.store[context].get(section, {}),
+                self.store[context].get(section, {}),
                 filter_keys=ignore_keys,
                 filter_mode="exclude",
             ),
         )
 
-        cls.store[context].data[section] = opts
+        self.store[context].data[section] = opts
 
         return opts
 
-    @classmethod
     def _set_config(
-        cls,
+        self,
         *,
         context: str = "default",
         cfg: Config | None = None,
@@ -153,10 +245,10 @@ class ConfigStore:
     ) -> Self:
         if not isinstance(cfg, Config):
             raise ValueError(f"Expected Config, found {type(cfg)}")
-        cls.store[context] = cfg
+        self.store[context] = cfg
         if switch_to_context:
-            cls.context = context
-        return cls.store[context]
+            self.context = context
+        return self.store[context]
 
 
 configure_context = ConfigStore.configure_context
