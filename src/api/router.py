@@ -3,61 +3,25 @@ FastAPI router for SEAD Entity Reconciliation Service endpoints.
 """
 
 import json
-import os
 
-import dotenv
-import psycopg
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
 
 from src.configuration.config import Config
-from src.configuration.inject import ConfigStore, ConfigValue
+from src.configuration.inject import ConfigValue, get_config_provider
 from src.configuration.setup import setup_config_store
 from src.reconcile import reconcile_queries
 from src.render import render_preview
 from src.strategies.interface import Strategies
-from src.utility import configure_logging, create_db_uri
 
 # pylint: disable=unused-argument
 
-def get_default_config_filename() -> str:
-    return "config/config.yml"
 
-async def setup_config_store(source: str = None) -> None:
-    if ConfigStore.is_configured():
-        return
-    source = source or get_default_config_filename()
-    logger.info(f"Initializing ConfigStore with source: {source}")
-
-    ConfigStore.configure_context(source=source, env_filename=".env", env_prefix="SEAD_AUTHORITY")
-
-    assert ConfigStore.is_configured(), "ConfigStore failed to configure properly"
-
-    cfg: Config = ConfigStore.config()
-    if not cfg:
-        raise ValueError("ConfigStore did not return a config")
-
-    configure_logging(cfg.get("logging") or {})
-    dsn: str = create_db_uri(**cfg.get("options:database"))
-
-    if not dsn:
-        raise ValueError("Database DSN is not configured properly")
-
-    connection: psycopg.AsyncConnection = await psycopg.AsyncConnection.connect(dsn)
-
-    if not connection:
-        raise ValueError("Database connection could not be established")
-
-    cfg.update({"runtime:connection": connection})
-
-    logger.info("ConfigStore initialized successfully.")
-
-
-async def get_config_dependency(source: str = None) -> Config:
-    if not ConfigStore.is_configured():
-        await setup_config_store(source)
-    return ConfigStore.config()
+async def get_config_dependency() -> Config:
+    if not get_config_provider().is_configured():
+        await setup_config_store()
+    return get_config_provider().get_config()
 
 
 router = APIRouter()
