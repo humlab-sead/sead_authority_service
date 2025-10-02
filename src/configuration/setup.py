@@ -42,13 +42,14 @@ async def _setup_connection_factory(cfg):
     if not dsn:
         raise ValueError("Database DSN is not configured properly")
 
-    def connection_factory() -> psycopg.AsyncConnection:
+    async def connection_factory() -> psycopg.AsyncConnection:
         if cfg.get("runtime:connection") is None:
-            con = cfg.get("runtime:connection")
-        else:
-            con = psycopg.AsyncConnection.connect(dsn)
+            logger.info("Creating new database connection")
+            con = await psycopg.AsyncConnection.connect(dsn)
             cfg.update({"runtime:connection": con})
-        return con
+            return con
+        else:
+            return cfg.get("runtime:connection")
 
     cfg.update(
         {
@@ -59,7 +60,7 @@ async def _setup_connection_factory(cfg):
     )
 
 
-def get_connection() -> psycopg.AsyncConnection:
+async def get_connection() -> psycopg.AsyncConnection:
     """Get a database connection from the config"""
     cfg: Config = get_config_provider().get_config()
     if not cfg:
@@ -68,5 +69,6 @@ def get_connection() -> psycopg.AsyncConnection:
         connection_factory = cfg.get("runtime:connection_factory")
         if not connection_factory:
             raise ValueError("Connection factory is not configured")
-        cfg.update({"runtime:connection": connection_factory()})
+        connection = await connection_factory()
+        cfg.update({"runtime:connection": connection})
     return cfg.get("runtime:connection")
