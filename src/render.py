@@ -4,6 +4,7 @@ from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
 from src.configuration.inject import ConfigValue
+from src.configuration.setup import get_connection
 from src.strategies.interface import ReconciliationStrategy, Strategies
 
 
@@ -11,7 +12,7 @@ async def render_preview(uri: str) -> ValueError | str:
     """Provides a generic HTML preview for a given entity ID."""
 
     id_base: str = ConfigValue("options:id_base").resolve()
-    connection: AsyncConnection = ConfigValue("runtime:connection").resolve()
+    connection: AsyncConnection = get_connection()
 
     if not uri.startswith(id_base):
         raise ValueError("Invalid ID format")

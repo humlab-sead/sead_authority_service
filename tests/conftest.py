@@ -2,12 +2,12 @@ import os
 from typing import Any, Callable, Generator
 from unittest.mock import AsyncMock
 
-from src.configuration.config import Config
-
-from src.configuration.inject import ConfigStore, MockConfigProvider, reset_config_provider
 import psycopg
 import pytest
 
+from src.configuration.config import Config
+from src.configuration.inject import (ConfigStore, MockConfigProvider,
+                                      reset_config_provider)
 from src.configuration.setup import setup_config_store
 
 
@@ -16,6 +16,7 @@ async def pytest_sessionstart(session) -> None:
     os.environ["CONFIG_FILE"] = "./tests/config.yml"
     os.environ["ENV_FILE"] = "./tests/.env"
     await setup_config_store("./tests/config.yml")
+
 
 @pytest.fixture(autouse=True)
 def setup_reset_config() -> Generator[None, Any, None]:
@@ -80,12 +81,12 @@ def mock_connection_factory() -> Callable[[], AsyncMock]:
 
     return factory
 
+
 def mock_strategy_with_get_details(mock_strategies, value: dict[str, str]) -> AsyncMock:
     mock_strategy = AsyncMock()
     mock_strategy.get_details.return_value = value
     mock_strategies.items.get.return_value = lambda: mock_strategy
     return mock_strategy
-
 
 
 @pytest.fixture

@@ -1,11 +1,14 @@
 from typing import LiteralString
 from unittest.mock import AsyncMock, patch
 
-from configuration.inject import ConfigProvider
 import pytest
 
-from src.configuration.inject import ConfigStore, ConfigValue, MockConfigProvider, set_config_provider, reset_config_provider
+from configuration.inject import ConfigProvider
 from src.configuration.config import Config
+from src.configuration.inject import (ConfigStore, ConfigValue,
+                                      MockConfigProvider,
+                                      reset_config_provider,
+                                      set_config_provider)
 from src.render import render_preview
 from tests.conftest import mock_strategy_with_get_details
 from tests.decorators import with_test_config
@@ -27,9 +30,8 @@ GET_DETAILS_DATA: dict[str, dict[str, str]] = {
     "456": {"label": "Site Without Name", "coordinates": "59.85, 17.64", "type": "Settlement"},
     "789": {"field1": "Value 1", "field2": None, "field3": "", "field4": "   ", "field5": "Valid Value"},
     "empty": {},
-    "notfound": None
+    "notfound": None,
 }
-
 
 
 class TestRenderPreview:
@@ -104,7 +106,7 @@ class TestRenderPreview:
             mock_strategy_with_get_details(mock_strategies, GET_DETAILS_DATA["123"])
             with pytest.raises(ValueError, match="Invalid ID format"):
                 await render_preview(uri)
-        
+
     @pytest.mark.asyncio
     @with_test_config
     async def test_invalid_id_path_too_few_parts(self, test_provider):
@@ -115,7 +117,7 @@ class TestRenderPreview:
             mock_strategy_with_get_details(mock_strategies, {})
             with pytest.raises(ValueError, match="Invalid ID path"):
                 await render_preview(uri)
-        
+
     @pytest.mark.asyncio
     @with_test_config
     async def test_invalid_id_path_too_many_parts(self, test_provider):
@@ -125,7 +127,7 @@ class TestRenderPreview:
             mock_strategy_with_get_details(mock_strategies, {})
             with pytest.raises(ValueError, match="Invalid ID path"):
                 await render_preview(uri)
-        
+
     @pytest.mark.asyncio
     @with_test_config
     async def test_entity_not_found(self, test_provider):
@@ -135,7 +137,7 @@ class TestRenderPreview:
             mock_strategy_with_get_details(mock_strategies, GET_DETAILS_DATA["notfound"])
             with pytest.raises(ValueError, match="Entity with ID notfound not found or preview not implemented"):
                 await render_preview(uri)
-        
+
     @pytest.mark.asyncio
     @with_test_config
     async def test_html_structure(self, test_provider):
@@ -155,7 +157,7 @@ class TestRenderPreview:
         assert "<strong style='color:#333; min-width:100px; display:inline-block;'>" in result
         assert "<span>" in result
         assert "</span>" in result
-        
+
     @pytest.mark.asyncio
     @with_test_config
     async def test_different_entity_types(self, test_provider):
@@ -168,7 +170,7 @@ class TestRenderPreview:
 
         assert isinstance(result, str)
         assert "<h3 style='margin-top:0;'>Test Site</h3>" in result  # Uses same mock data
-        
+
 
 class TestConfigProvider:
     """Test edge cases and error conditions"""
@@ -179,7 +181,7 @@ class TestConfigProvider:
         """Test that ConfigValue works with the new provider system"""
         # Test ConfigValue resolution
         id_base_config = ConfigValue("options:id_base")
-        
+
         # This will use the test_provider's configuration
         assert id_base_config.resolve() == "https://w3id.org/sead/id/"
 

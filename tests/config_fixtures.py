@@ -1,19 +1,17 @@
 """Test fixtures and utilities for configuration management"""
 
-import pytest
 from contextlib import contextmanager
-from typing import Generator, Dict, Any
+from typing import Any, Dict, Generator
 from unittest.mock import AsyncMock
+
 import psycopg
+import pytest
 
 from src.configuration.config import Config
-from src.configuration.inject import (
-    ConfigProvider, 
-    MockConfigProvider, 
-    set_config_provider, 
-    reset_config_provider,
-    ConfigStore
-)
+from src.configuration.inject import (ConfigProvider, ConfigStore,
+                                      MockConfigProvider,
+                                      reset_config_provider,
+                                      set_config_provider)
 
 
 @contextmanager
@@ -31,7 +29,7 @@ def config_context(config_dict: Dict[str, Any]) -> Generator[Config, None, None]
     """Context manager that provides a test configuration"""
     config = Config(data=config_dict)
     provider = MockConfigProvider(config)
-    
+
     with patch_config_provider(provider):
         yield config
 
@@ -42,7 +40,7 @@ def reset_config():
     ConfigStore.reset_instance()
     reset_config_provider()
     yield
-    ConfigStore.reset_instance() 
+    ConfigStore.reset_instance()
     reset_config_provider()
 
 
@@ -57,22 +55,10 @@ def mock_connection():
 def test_config_dict():
     """Default test configuration dictionary"""
     return {
-        "options": {
-            "id_base": "https://test.example.com/sead/id/"
-        },
-        "database": {
-            "host": "localhost",
-            "port": 5432,
-            "database": "test_sead",
-            "user": "test_user",
-            "password": "test_password"
-        },
-        "runtime": {
-            "connection_factory": lambda: mock_connection()
-        },
-        "logging": {
-            "level": "DEBUG"
-        }
+        "options": {"id_base": "https://test.example.com/sead/id/"},
+        "database": {"host": "localhost", "port": 5432, "database": "test_sead", "user": "test_user", "password": "test_password"},
+        "runtime": {"connection_factory": lambda: mock_connection()},
+        "logging": {"level": "DEBUG"},
     }
 
 
@@ -83,7 +69,7 @@ def test_config_provider(test_config_dict):
     return MockConfigProvider(config)
 
 
-@pytest.fixture 
+@pytest.fixture
 def mock_config_context(test_config_provider):
     """Fixture that sets up a test config context for the duration of the test"""
     with patch_config_provider(test_config_provider):
@@ -94,13 +80,8 @@ def mock_config_context(test_config_provider):
 def setup_test_config(config_dict: Dict[str, Any] = None) -> MockConfigProvider:
     """Manually set up test configuration (for use outside pytest)"""
     if config_dict is None:
-        config_dict = {
-            "options": {
-                "id_base": "https://test.example.com/sead/id/",
-                "database": {"host": "localhost"}
-            }
-        }
-    
+        config_dict = {"options": {"id_base": "https://test.example.com/sead/id/", "database": {"host": "localhost"}}}
+
     config = Config(data=config_dict)
     provider = MockConfigProvider(config)
     set_config_provider(provider)

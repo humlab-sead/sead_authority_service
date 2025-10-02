@@ -31,7 +31,7 @@ async def setup_config_store(filename: str = "config.yml") -> None:
     configure_logging(cfg.get("logging") or {})
 
     await _setup_connection_factory(cfg)
-    
+
     logger.info("ConfigStore initialized successfully.")
 
 

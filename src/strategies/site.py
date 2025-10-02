@@ -45,8 +45,10 @@ SQL_QUERIES: dict[str, str] = {
             longitude_dd as "Longitude"
         from authority.sites 
         where site_id = %(id)s
-    """
+    """,
 }
+
+
 class QueryProxy:
     def __init__(self, cursor: psycopg.AsyncCursor) -> None:
         self.cursor: psycopg.AsyncCursor[Tuple[Any]] = cursor
@@ -65,7 +67,7 @@ class QueryProxy:
         return [dict(row) for row in rows]
 
     async def fetch_site_distances(self, coordinate: dict[str, float], site_ids: list[int]) -> dict[int, float]:
-        sql: str = SQL_QUERIES["fetch_site_distances"]   
+        sql: str = SQL_QUERIES["fetch_site_distances"]
         await self.cursor.execute(sql, coordinate | {"site_ids": site_ids})
         distances: dict[int, float] = {row["site_id"]: row["distance_km"] for row in await self.cursor.fetchall()}
         return distances
@@ -73,7 +75,7 @@ class QueryProxy:
     async def get_site_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific site."""
         try:
-            sql: str = SQL_QUERIES["get_site_details"]  
+            sql: str = SQL_QUERIES["get_site_details"]
             await self.cursor.execute(sql, {"id": int(entity_id)})
             row: Tuple[Any] | None = await self.cursor.fetchone()
             return dict(row) if row else None

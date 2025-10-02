@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import functools
 import inspect
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields
 from inspect import isclass
-import threading
 from typing import Any, Callable, Generic, Self, Type, TypeVar
 
 from src.utility import dget, recursive_filter_dict, recursive_update
@@ -17,12 +17,12 @@ T = TypeVar("T", str, int, float)
 
 class ConfigProvider(ABC):
     """Abstract configuration provider for dependency injection"""
-    
+
     @abstractmethod
     def get_config(self, context: str = None) -> Config:
         """Get configuration for the given context"""
         pass
-    
+
     @abstractmethod
     def is_configured(self, context: str = None) -> bool:
         """Check if configuration exists for the given context"""
@@ -31,24 +31,24 @@ class ConfigProvider(ABC):
 
 class SingletonConfigProvider(ConfigProvider):
     """Production config provider using ConfigStore singleton"""
-    
+
     def get_config(self, context: str = None) -> Config:
         return ConfigStore.get_instance().config(context)
-    
+
     def is_configured(self, context: str = None) -> bool:
         return ConfigStore.get_instance().is_configured(context)
 
 
 class MockConfigProvider(ConfigProvider):
     """Test config provider with controllable configuration"""
-    
+
     def __init__(self, config: Config, context: str = "default"):
         self._config = config
         self._context = context
-    
+
     def get_config(self, context: str = None) -> Config:
         return self._config
-    
+
     def is_configured(self, context: str = None) -> bool:
         return self._config is not None
 
@@ -131,7 +131,8 @@ class ConfigValue(Generic[T]):
 
 class ConfigStore:
     """A class to manage configuration files and contexts"""
-    _instance: 'ConfigStore' = None
+
+    _instance: "ConfigStore" = None
     _lock = threading.Lock()
 
     def __init__(self):
@@ -147,7 +148,7 @@ class ConfigStore:
                 if cls._instance is None:
                     cls._instance = cls()
         return cls._instance
-    
+
     @classmethod
     def reset_instance(cls) -> None:
         """Reset singleton - useful for testing"""
@@ -158,18 +159,18 @@ class ConfigStore:
 
     def is_configured(self, context: str = None) -> bool:
         return isinstance(self.store.get(context or self.context), Config)
-    
+
     def config(self, context: str = None) -> Config:
         if not self.is_configured(context):
             raise ValueError(f"Config context {self.context} not properly initialized")
         return self.store.get(context or self.context)
-    
+
     # Convenience class methods for backward compatibility
     @classmethod
     def is_configured_global(cls, context: str = None) -> bool:
         """Check if configuration is available (uses provider layer)"""
         return get_config_provider().is_configured(context)
-    
+
     @classmethod
     def config_global(cls, context: str = None) -> Config:
         """Get configuration (uses provider layer)"""
