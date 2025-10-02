@@ -140,11 +140,14 @@ GET {{baseUrl}}/reconcile/properties?type=site
 ### Get Available Properties for Taxon Entity Type
 GET {{baseUrl}}/reconcile/properties?type=taxon
 
-### Test Entity Preview (replace ID with actual entity ID from reconciliation results)
-GET {{baseUrl}}/reconcile/preview?id=4196&type=location
+### Test Entity Preview (use FULL URI from reconciliation results)
+# Note: The preview endpoint expects the full URI starting with id_base (e.g. https://w3id.org/sead/id/)
+# For locations, the path segment is "place".
+GET {{baseUrl}}/reconcile/preview?id=https://w3id.org/sead/id/location/100
 
-### Test Site Preview (replace with actual site ID)
-GET {{baseUrl}}/reconcile/preview?id=1234&type=site
+### Test Site Preview (use FULL URI from reconciliation results)
+# For sites, the path segment is "site".
+GET {{baseUrl}}/reconcile/preview?id=https://w3id.org/sead/id/site/22
 
 ### Test Empty Query (should return empty results)
 POST {{baseUrl}}/reconcile
