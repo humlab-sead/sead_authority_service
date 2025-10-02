@@ -4,19 +4,20 @@ Unit tests for the API router endpoints.
 
 import json
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from psycopg import Error
 
-from configuration.inject import ConfigProvider
 from src.api.router import router
-from src.configuration.inject import MockConfigProvider, set_config_provider
+from src.configuration.inject import MockConfigProvider
 from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
+
+# pylint: disable=redundant-parens, protected-access, unused-argument, redefined-outer-name
 
 
 class MockStrategy:

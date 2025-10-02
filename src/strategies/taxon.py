@@ -38,13 +38,20 @@ SPECIFICATION: dict[str, str] = {
     "sql_queries": {},
 }
 
+class TaxonQueryProxy:
+    def __init__(self, specification: dict[str, str | dict[str, Any]], cursor: psycopg.AsyncCursor):
+        self.specification: dict[str, str | dict[str, Any]] = specification
+        self.cursor = cursor
+
+    # Placeholder for future query methods
+    # e.g., async def fetch_by_name(self, name: str, limit: int) -> list[dict[str, Any]]: ...
 
 @Strategies.register(key="taxon")
 class TaxonReconciliationStrategy(ReconciliationStrategy):
     """Future taxon reconciliation strategy"""
 
     def __init__(self):
-        super().__init__(SPECIFICATION)
+        super().__init__(SPECIFICATION, TaxonQueryProxy)
 
     async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         # Implement taxon-specific logic here

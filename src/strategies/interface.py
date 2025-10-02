@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, Optional, Type
 
 import psycopg
+from src.strategies.query import QueryProxy
 
 from src.configuration.inject import ConfigValue
 from src.utility import Registry
@@ -10,10 +11,11 @@ from src.utility import Registry
 class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
-    def __init__(self, specification: dict[str, str | dict[str, Any]]) -> None:
+    def __init__(self, specification: dict[str, str | dict[str, Any]], query_proxy_class: Type[QueryProxy]) -> None:
         connection_factory = ConfigValue("runtime:connection_factory").resolve()
         self.connection: psycopg.AsyncConnection = connection_factory()
         self.specification: dict[str, str | dict[str, Any]] = specification or {}
+        self.query_proxy_class: Type[QueryProxy] = query_proxy_class
 
     def get_entity_id_field(self) -> str:
         """Return the ID field name for this entity type"""

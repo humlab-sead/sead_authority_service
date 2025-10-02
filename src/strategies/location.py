@@ -69,13 +69,13 @@ class LocationReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 
     def __init__(self):
-        super().__init__(SPECIFICATION)
+        super().__init__(SPECIFICATION, LocationQueryProxy)
 
     async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         """Find candidate sites based on name, identifier, and optional geographic context"""
         candidates: list[dict] = []
         properties = properties or {}
-        proxy: QueryProxy = QueryProxy(cursor)
+        proxy: QueryProxy = self.query_proxy_class(self.specification, cursor)
 
         # Only fuzzy match on name for now
         candidates.extend(await proxy.fetch_by_fuzzy_name_search(query, limit))
@@ -84,4 +84,4 @@ class LocationReconciliationStrategy(ReconciliationStrategy):
 
     async def get_details(self, entity_id: str, cursor: psycopg.AsyncCursor) -> dict[str, Any] | None:
         """Fetch details for a specific site."""
-        return await LocationQueryProxy(cursor).get_details(entity_id)
+        return await self.query_proxy_class(self.specification, cursor).get_details(entity_id)

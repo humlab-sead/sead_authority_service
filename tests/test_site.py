@@ -9,7 +9,7 @@ from src.strategies.site import (SPECIFICATION, SiteQueryProxy,
                                  SiteReconciliationStrategy)
 from tests.decorators import with_test_config
 
-# pylint: disable=attribute-defined-outside-init,protected-access
+# pylint: disable=attribute-defined-outside-init,protected-access, unused-argument
 
 SQL_QUERIES: dict[str, str] = SPECIFICATION["sql_queries"]
 
@@ -23,7 +23,7 @@ class TestSiteQueryProxy:
         """Test fetching site by national ID when site exists."""
         # Mock data returned from database
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        proxy = SiteQueryProxy(mock_cursor)
+        proxy = SiteQueryProxy(SPECIFICATION, mock_cursor)
         mock_row: dict[str, Any] = {"site_id": 1, "label": "Test Site", "name_sim": 1.0, "latitude": 59.3293, "longitude": 18.0686}
         mock_cursor.fetchone.return_value = mock_row
 
@@ -40,7 +40,7 @@ class TestSiteQueryProxy:
     async def test_fetch_site_by_national_id_not_found(self):
         """Test fetching site by national ID when site doesn't exist."""
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        proxy = SiteQueryProxy(mock_cursor)
+        proxy = SiteQueryProxy(SPECIFICATION, mock_cursor)
         mock_cursor.fetchone.return_value = None
 
         result = await proxy.fetch_site_by_national_id("NONEXISTENT")
@@ -53,7 +53,7 @@ class TestSiteQueryProxy:
     async def test_fetch_by_fuzzy_name_search(self):
         """Test fuzzy name search."""
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        proxy = SiteQueryProxy(mock_cursor)
+        proxy = SiteQueryProxy(SPECIFICATION, mock_cursor)
         mock_rows = [{"site_id": 1, "label": "Test Site 1", "name_sim": 0.9}, {"site_id": 2, "label": "Test Site 2", "name_sim": 0.8}]
         mock_cursor.fetchall.return_value = mock_rows
 
@@ -68,7 +68,7 @@ class TestSiteQueryProxy:
     async def test_fetch_by_fuzzy_name_search_default_limit(self):
         """Test fuzzy name search with default limit."""
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        proxy = SiteQueryProxy(mock_cursor)
+        proxy = SiteQueryProxy(SPECIFICATION, mock_cursor)
 
         mock_cursor.fetchall.return_value = []
 
@@ -80,7 +80,7 @@ class TestSiteQueryProxy:
     async def test_fetch_site_distances(self):
         """Test fetching site distances."""
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        proxy = SiteQueryProxy(mock_cursor)
+        proxy = SiteQueryProxy(SPECIFICATION, mock_cursor)
         coordinate: dict[str, float] = {"lat": 59.3293, "lon": 18.0686}
         site_ids: list[int] = [1, 2, 3]
 
@@ -103,7 +103,7 @@ class TestSiteQueryProxy:
     async def test_get_site_details_valid_id(self):
         """Test getting site details with valid ID."""
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        proxy = SiteQueryProxy(mock_cursor)
+        proxy = SiteQueryProxy(SPECIFICATION, mock_cursor)
         mock_row = {"ID": 123, "Name": "Test Site", "Description": "A test site", "National ID": "TEST123", "Latitude": 59.3293, "Longitude": 18.0686}
         mock_cursor.fetchone.return_value = mock_row
 
@@ -117,7 +117,7 @@ class TestSiteQueryProxy:
     async def test_get_site_details_invalid_id(self):
         """Test getting site details with invalid ID."""
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        proxy = SiteQueryProxy(mock_cursor)
+        proxy = SiteQueryProxy(SPECIFICATION, mock_cursor)
         result: dict[str, Any] | None = await proxy.get_details("not_a_number")
         assert result is None
         mock_cursor.execute.assert_not_called()
@@ -126,7 +126,7 @@ class TestSiteQueryProxy:
     async def test_get_site_details_not_found(self):
         """Test getting site details when site doesn't exist."""
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        proxy = SiteQueryProxy(mock_cursor)
+        proxy = SiteQueryProxy(SPECIFICATION, mock_cursor)
         mock_cursor.fetchone.return_value = None
 
         result = await proxy.get_details("999")
@@ -138,7 +138,7 @@ class TestSiteQueryProxy:
     async def test_get_site_details_database_error(self):
         """Test getting site details when database error occurs."""
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        proxy = SiteQueryProxy(mock_cursor)
+        proxy = SiteQueryProxy(SPECIFICATION, mock_cursor)
         mock_cursor.execute.side_effect = psycopg.Error("Database error")
 
         result = await proxy.get_details("123")
@@ -149,7 +149,7 @@ class TestSiteQueryProxy:
     async def test_fetch_site_location_similarity(self):
         """Test fetching site location similarity."""
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        proxy = SiteQueryProxy(mock_cursor)
+        proxy = SiteQueryProxy(SPECIFICATION, mock_cursor)
         candidates = [{"site_id": 1, "label": "Site 1"}, {"site_id": 2, "label": "Site 2"}]
 
         mock_rows = [{"site_id": 1, "place_sim": 0.8}, {"site_id": 2, "place_sim": 0.6}]
@@ -425,7 +425,8 @@ class TestSiteReconciliationStrategy:
 
         result = await strategy.get_details("123", mock_cursor)
 
-        mock_query_proxy_class.assert_called_once_with(mock_cursor)
+        # The SiteQueryProxy is called with the SPECIFICATION and cursor
+        mock_query_proxy_class.assert_called_once_with(SPECIFICATION, mock_cursor)
         mock_proxy.get_details.assert_called_once_with("123")
         assert result == expected_details
 
@@ -434,7 +435,6 @@ class TestSiteReconciliationStrategy:
     async def test_find_candidates_empty_properties(self, test_provider: MockConfigProvider):
         """Test finding candidates with empty properties."""
 
-        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         with patch("src.strategies.site.SiteQueryProxy") as mock_query_proxy_class:
             mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
             mock_proxy = AsyncMock()
@@ -444,6 +444,7 @@ class TestSiteReconciliationStrategy:
             mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.8}]
             mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
 
+            strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
             result = await strategy.find_candidates(mock_cursor, "test query", None, limit=10)
 
             # Should not call national_id search
@@ -456,7 +457,6 @@ class TestSiteReconciliationStrategy:
     async def test_find_candidates_sorting(self, test_provider: MockConfigProvider):
         """Test that candidates are sorted by name_sim in descending order."""
 
-        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         with patch("src.strategies.site.SiteQueryProxy") as mock_query_proxy_class:
             mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
             mock_proxy = AsyncMock()
@@ -471,6 +471,7 @@ class TestSiteReconciliationStrategy:
             ]
             mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
 
+            strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
             result = await strategy.find_candidates(mock_cursor, "test query", {}, limit=10)
 
             # Should be sorted by name_sim descending
@@ -483,7 +484,6 @@ class TestSiteReconciliationStrategy:
     async def test_find_candidates_limit_applied(self, test_provider: MockConfigProvider):
         """Test that limit is properly applied to results."""
 
-        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         with patch("src.strategies.site.SiteQueryProxy") as mock_query_proxy_class:
             mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
             mock_proxy = AsyncMock()
@@ -494,6 +494,8 @@ class TestSiteReconciliationStrategy:
             mock_sites: list[dict[str, Any]] = [{"site_id": i, "label": f"Site {i}", "name_sim": 1.0 - i * 0.1} for i in range(15)]  # 15 candidates
             mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
 
+            # Create strategy AFTER patching SiteQueryProxy
+            strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
             result = await strategy.find_candidates(mock_cursor, "test query", {}, limit=5)  # Limit to 5
 
             assert len(result) == 5
@@ -517,7 +519,6 @@ class TestSiteStrategyIntegration:
         """Test the complete reconciliation workflow."""
         # Mock configuration values
 
-        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         mock_config_instance = MagicMock()
         mock_config_instance.resolve.side_effect = [0.2, 10.0, 0.3, 0.1]
         mock_config_value.return_value = mock_config_instance
@@ -544,6 +545,7 @@ class TestSiteStrategyIntegration:
 
             properties = {"latitude": 59.3293, "longitude": 18.0686, "place": "Stockholm"}
 
+            strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
             result = await strategy.find_candidates(mock_cursor, "archaeological site", properties, limit=10)
 
             # Verify all methods were called
@@ -723,8 +725,6 @@ class TestSiteStrategyEdgeCases:
     async def test_find_candidates_all_enhancements_applied(self, test_provider: MockConfigProvider):
         """Test that all enhancements are applied in the correct order."""
 
-        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-
         with patch("src.strategies.site.SiteQueryProxy") as mock_query_proxy_class:
             mock_proxy = AsyncMock()
             mock_query_proxy_class.return_value = mock_proxy
@@ -734,6 +734,8 @@ class TestSiteStrategyEdgeCases:
             mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.5}]
             mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
             mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+
+            strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
 
             # Mock both enhancement methods
             with (

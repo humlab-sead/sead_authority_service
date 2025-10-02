@@ -91,8 +91,8 @@ SPECIFICATION: dict[str, str] = {
 
 
 class SiteQueryProxy(QueryProxy):
-    def __init__(self, cursor: psycopg.AsyncCursor) -> None:
-        super().__init__(SPECIFICATION, cursor)
+    def __init__(self, specification: dict[str, str | dict[str, Any]], cursor: psycopg.AsyncCursor) -> None:
+        super().__init__(specification, cursor)
 
     async def fetch_site_by_national_id(self, national_id: str) -> list[dict[str, Any]]:
         sql: str = self.specification["sql_queries"]["fetch_site_by_national_id"]
@@ -125,13 +125,13 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
     """Site-specific reconciliation with place names and coordinates"""
 
     def __init__(self):
-        super().__init__(SPECIFICATION)
+        super().__init__(SPECIFICATION, SiteQueryProxy)
 
     async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         """Find candidate sites based on name, identifier, and optional geographic context"""
         candidates: list[dict] = []
         properties = properties or {}
-        proxy: SiteQueryProxy = SiteQueryProxy(cursor)
+        proxy: SiteQueryProxy = self.query_proxy_class(self.specification, cursor)
 
         # 1) Exact match by national site identifier
         if properties.get("national_id"):
@@ -172,7 +172,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
 
     async def get_details(self, entity_id: str, cursor: psycopg.AsyncCursor) -> dict[str, Any] | None:
         """Fetch details for a specific site."""
-        return await SiteQueryProxy(cursor).get_details(entity_id)
+        return await self.query_proxy_class(self.specification, cursor).get_details(entity_id)
 
     async def _apply_place_context_scoring(self, candidates: list[dict], place: str, proxy: SiteQueryProxy) -> list[dict]:
         """Boost scores based on place name context"""

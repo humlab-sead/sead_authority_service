@@ -15,7 +15,7 @@ from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
 
-# pylint: disable=attribute-defined-outside-init,protected-access, redefined-outer-name
+# pylint: disable=attribute-defined-outside-init,protected-access, redefined-outer-name, unused-argument
 
 
 GET_DETAILS_DATA: dict[str, dict[str, str]] = {
