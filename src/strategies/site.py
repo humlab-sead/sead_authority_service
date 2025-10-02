@@ -143,13 +143,13 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
     """Site-specific reconciliation with place names and coordinates"""
 
     def get_entity_id_field(self) -> str:
-        return "site_id"
+        return SPECIFICATION["id_field"]
 
     def get_label_field(self) -> str:
-        return "label"
+        return SPECIFICATION["label_field"]
 
     def get_id_path(self) -> str:
-        return "site"
+        return SPECIFICATION["key"]
 
     def get_properties_meta(self) -> list[dict[str, str]]:
         """Return metadata for site-specific properties used in enhanced reconciliation"""

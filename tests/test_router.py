@@ -30,6 +30,12 @@ class MockStrategy:
             {"id": "national_id", "name": "National Site ID", "type": "string", "description": "National identifier"},
             {"id": "place_name", "name": "Place Name", "type": "string", "description": "Place name"},
         ]
+    
+    def get_property_settings(self):
+        return {
+            "latitude": {"min": -90.0, "max": 90.0, "precision": 6},
+            "longitude": {"min": -180.0, "max": 180.0, "precision": 6},
+        }
 
 
 class MockStrategies:
