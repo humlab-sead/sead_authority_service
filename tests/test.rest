@@ -1,0 +1,173 @@
+# SEAD Authority Service REST API Tests
+# Use with VS Code REST Client extension
+# 
+# Usage: Click "Send Request" above any ### request
+# Change the port number if your service runs on a different port
+
+@baseUrl = http://localhost:8000
+
+### Health Check
+GET {{baseUrl}}/is_alive
+
+### Get Service Metadata (OpenRefine service discovery)
+GET {{baseUrl}}/reconcile
+
+### Test Location Reconciliation - Single Query
+POST {{baseUrl}}/reconcile
+Content-Type: application/json
+
+{
+  "queries": {
+    "q0": {
+      "query": "Stockholm",
+      "type": "location"
+    }
+  }
+}
+
+### Test Site Reconciliation - Single Query
+POST {{baseUrl}}/reconcile
+Content-Type: application/json
+
+{
+  "queries": {
+    "q0": {
+      "query": "Birka",
+      "type": "site"
+    }
+  }
+}
+
+### Test Taxon Reconciliation - Single Query
+POST {{baseUrl}}/reconcile
+Content-Type: application/json
+
+{
+  "queries": {
+    "q0": {
+      "query": "Quercus",
+      "type": "taxon"
+    }
+  }
+}
+
+### Test Multiple Queries (Batch Reconciliation)
+POST {{baseUrl}}/reconcile
+Content-Type: application/json
+
+{
+  "queries": {
+    "q0": {
+      "query": "Stockholm",
+      "type": "location"
+    },
+    "q1": {
+      "query": "Birka", 
+      "type": "site"
+    },
+    "q2": {
+      "query": "Pinus",
+      "type": "taxon"
+    }
+  }
+}
+
+### Test Location with Properties
+POST {{baseUrl}}/reconcile
+Content-Type: application/json
+
+{
+  "queries": {
+    "q0": {
+      "query": "Uppsala",
+      "type": "location",
+      "properties": [
+        {
+          "pid": "place_name",
+          "v": "Uppsala"
+        }
+      ]
+    }
+  }
+}
+
+### Test Site with Geographic Properties
+POST {{baseUrl}}/reconcile
+Content-Type: application/json
+
+{
+  "queries": {
+    "q0": {
+      "query": "Birka",
+      "type": "site",
+      "properties": [
+        {
+          "pid": "country",
+          "v": "Sweden"
+        },
+        {
+          "pid": "latitude", 
+          "v": "59.3"
+        }
+      ]
+    }
+  }
+}
+
+### Test with Limit Parameter
+POST {{baseUrl}}/reconcile
+Content-Type: application/json
+
+{
+  "queries": {
+    "q0": {
+      "query": "Stockholm",
+      "type": "location",
+      "limit": 3
+    }
+  }
+}
+
+### Get Available Properties for All Entity Types
+GET {{baseUrl}}/reconcile/properties
+
+### Get Available Properties for Location Entity Type
+GET {{baseUrl}}/reconcile/properties?type=location
+
+### Get Available Properties for Site Entity Type  
+GET {{baseUrl}}/reconcile/properties?type=site
+
+### Get Available Properties for Taxon Entity Type
+GET {{baseUrl}}/reconcile/properties?type=taxon
+
+### Test Entity Preview (replace ID with actual entity ID from reconciliation results)
+GET {{baseUrl}}/reconcile/preview?id=4196&type=location
+
+### Test Site Preview (replace with actual site ID)
+GET {{baseUrl}}/reconcile/preview?id=1234&type=site
+
+### Test Empty Query (should return empty results)
+POST {{baseUrl}}/reconcile
+Content-Type: application/json
+
+{
+  "queries": {
+    "q0": {
+      "query": "",
+      "type": "location"
+    }
+  }
+}
+
+### Test Invalid Entity Type (should return error)
+POST {{baseUrl}}/reconcile
+Content-Type: application/json
+
+{
+  "queries": {
+    "q0": {
+      "query": "test",
+      "type": "invalid_type"
+    }
+  }
+}
