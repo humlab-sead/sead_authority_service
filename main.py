@@ -1,11 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from configuration.config import Config
-from src.api.router import router, setup_config_store
-
 # Force import of strategies to register them
 import src.strategies  # pylint: disable=unused-import
+from src.api.router import router
+from src.configuration.setup import setup_config_store
 
 app = FastAPI(title="SEAD Entity Reconciliation Service")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -19,13 +18,6 @@ async def startup():
 
         await setup_config_store()
 
-        # configure_logging(cfg.get("logging") or {})
-
-        # dsn: str = create_db_uri(**cfg.get("options:database"))
-        # app.state.conn = await psycopg.AsyncConnection.connect(dsn)
-        # app.state.config = cfg
-
-        # cfg.add({"runtime:connection": app.state.conn})
     except Exception as e:
         print(f"Failed to connect to database: {e}")
         raise
