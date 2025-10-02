@@ -1,20 +1,20 @@
 from typing import Any
 
+from configuration.setup import get_connection
+from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
 from src.configuration.config import Config
-from src.configuration.inject import ConfigStore, ConfigValue
+from src.configuration.inject import get_config_provider
 from src.strategies.interface import ReconciliationStrategy, Strategies
 
 
 async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
 
-    config: Config = ConfigStore.config("default")
-    connection = config.get("runtime:connection")
-    default_query_limit: int = config.get("options:default_query_limit") or 10
+    default_query_limit: int = get_config_provider().get_config().get("options:default_query_limit") or 10
 
     results: dict[str, Any] = {}
-    async with connection.cursor(row_factory=dict_row) as cursor:
+    async with get_connection().cursor(row_factory=dict_row) as cursor:
         for query_id, query in queries.items():
 
             if not (query.get("query") or "").strip():
