@@ -22,6 +22,7 @@ from src.configuration.inject import (
 )
 
 
+
 def production_example():
     """Example of production usage - uses singleton ConfigStore"""
     print("=== Production Example ===")
