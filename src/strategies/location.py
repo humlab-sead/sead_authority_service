@@ -7,7 +7,7 @@ from src.strategies.query import QueryProxy
 from .interface import ReconciliationStrategy, Strategies
 
 SPECIFICATION: dict[str, str] = {
-    "key": "place",
+    "key": "location",
     "id_field": "location_id",
     "label_field": "label",
     "properties": [
@@ -51,7 +51,7 @@ SPECIFICATION: dict[str, str] = {
                     description as "Description",
                     geom as "Geometry WKT"
             from authority.locations
-            where location_id = %(id)s
+            where location_id = %(id)s::int
     """,
     },
 }
