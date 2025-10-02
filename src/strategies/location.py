@@ -36,10 +36,8 @@ SPECIFICATION: dict[str, str] = {
             "description": "Geographic place, locality, or administrative area name",
         },
     ],
-    # "property_settings": {
-    #     "latitude": {"min": -90.0, "max": 90.0, "precision": 6},
-    #     "longitude": {"min": -180.0, "max": 180.0, "precision": 6},
-    # },
+    "property_settings": {
+    },
     "sql_queries": {
         "fetch_by_fuzzy_name_search": """
         select * from authority.fuzzy_locations(%(q)s, %(n)s);
