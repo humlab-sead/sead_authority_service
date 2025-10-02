@@ -1,51 +1,12 @@
 from typing import Any, Tuple
 
 import psycopg
+from src.strategies.query import QueryProxy
 
 from src.configuration.inject import ConfigValue
 
 from .interface import ReconciliationStrategy, Strategies
 
-SQL_QUERIES: dict[str, str] = {
-    "fetch_site_by_national_id": """
-        select site_id, label, 1.0 as name_sim, latitude_dd as latitude, longitude_dd as longitude
-        from authority.sites
-        where national_site_identifier = %(identifier)s
-        limit 1
-    """,
-    "fetch_by_fuzzy_name_search": """
-        SELECT * FROM authority.fuzzy_sites(%(q)s, %(n)s);
-    """,
-    "fetch_site_distances": """
-        select site_id, 
-               ST_Distance(
-                   ST_Transform(ST_SetSRID(ST_MakePoint(longitude_dd, latitude_dd), 4326), 3857),
-                   ST_Transform(ST_SetSRID(ST_MakePoint(%(lon)s, %(lat)s), 4326), 3857)
-               ) / 1000.0 as distance_km
-        from authority.sites 
-        where site_id = ANY(%(site_ids)s) 
-          and latitude_dd is not null 
-          and longitude_dd is not null
-    """,
-    "fetch_site_location_similarity": """
-        select site_id, max(similarity(location_name, %(place)s)) as place_sim
-        from public.tbl_site_locations
-        join public.tbl_locations using(location_id)
-        where site_id = any(%(site_ids)s) 
-          and location_name is not null
-        group by site_id
-    """,
-    "get_details": """
-        select 
-            location_id as "ID", 
-            label as "Name", 
-            "description" as "Description", 
-            default_lat_dd as "Latitude", 
-            default_long_dd as "Longitude"
-        from authority.locations 
-        where location_id = %(id)s
-    """,
-}
 
 SPECIFICATION: dict[str, str] = {
     "key": "site",
@@ -87,28 +48,68 @@ SPECIFICATION: dict[str, str] = {
         "latitude": {"min": -90.0, "max": 90.0, "precision": 6},
         "longitude": {"min": -180.0, "max": 180.0, "precision": 6},
     },
+    "sql_queries": {
+        "fetch_site_by_national_id": """
+        select site_id, label, 1.0 as name_sim, latitude_dd as latitude, longitude_dd as longitude
+        from authority.sites
+        where national_site_identifier = %(identifier)s
+        limit 1
+    """,
+        "fetch_by_fuzzy_name_search": """
+        SELECT * FROM authority.fuzzy_sites(%(q)s, %(n)s);
+    """,
+        "fetch_site_distances": """
+        select site_id, 
+               ST_Distance(
+                   ST_Transform(ST_SetSRID(ST_MakePoint(longitude_dd, latitude_dd), 4326), 3857),
+                   ST_Transform(ST_SetSRID(ST_MakePoint(%(lon)s, %(lat)s), 4326), 3857)
+               ) / 1000.0 as distance_km
+        from authority.sites 
+        where site_id = ANY(%(site_ids)s) 
+          and latitude_dd is not null 
+          and longitude_dd is not null
+    """,
+        "fetch_site_location_similarity": """
+        select site_id, max(similarity(location_name, %(place)s)) as place_sim
+        from public.tbl_site_locations
+        join public.tbl_locations using(location_id)
+        where site_id = any(%(site_ids)s) 
+          and location_name is not null
+        group by site_id
+    """,
+        "get_details": """
+        select 
+            location_id as "ID", 
+            label as "Name", 
+            "description" as "Description", 
+            default_lat_dd as "Latitude", 
+            default_long_dd as "Longitude"
+        from authority.locations 
+        where location_id = %(id)s
+    """,
+    },
 }
 
 
-class QueryProxy:
+class SiteQueryProxy(QueryProxy):
     def __init__(self, cursor: psycopg.AsyncCursor) -> None:
-        self.cursor: psycopg.AsyncCursor[Tuple[Any]] = cursor
+        super().__init__(SPECIFICATION, cursor)
 
     async def fetch_site_by_national_id(self, national_id: str) -> list[dict[str, Any]]:
-        sql: str = SQL_QUERIES["fetch_site_by_national_id"]
+        sql: str = self.specification["sql_queries"]["fetch_site_by_national_id"]
         await self.cursor.execute(sql, {"identifier": national_id})
         row: Tuple[Any, ...] | None = await self.cursor.fetchone()
         return [dict(row)] if row else []
 
     async def fetch_by_fuzzy_name_search(self, name: str, limit: int = 10) -> list[dict[str, Any]]:
         """Perform fuzzy name search"""
-        sql: str = SQL_QUERIES["fetch_by_fuzzy_name_search"]
+        sql: str = self.specification["sql_queries"]["fetch_by_fuzzy_name_search"]
         await self.cursor.execute(sql, {"q": name, "n": limit})
         rows: list[Tuple[Any]] = await self.cursor.fetchall()
         return [dict(row) for row in rows]
 
     async def fetch_site_distances(self, coordinate: dict[str, float], site_ids: list[int]) -> dict[int, float]:
-        sql: str = SQL_QUERIES["fetch_site_distances"]
+        sql: str = self.specification["sql_queries"]["fetch_site_distances"]
         await self.cursor.execute(sql, coordinate | {"site_ids": site_ids})
         distances: dict[int, float] = {row["site_id"]: row["distance_km"] for row in await self.cursor.fetchall()}
         return distances
@@ -116,7 +117,7 @@ class QueryProxy:
     async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific site."""
         try:
-            sql: str = SQL_QUERIES["get_details"]
+            sql: str = self.specification["sql_queries"]["get_details"]
             await self.cursor.execute(sql, {"id": int(entity_id)})
             row: Tuple[Any] | None = await self.cursor.fetchone()
             return dict(row) if row else None
@@ -128,7 +129,7 @@ class QueryProxy:
         # This could query a places/regions table or use external geocoding
         # For now, simple implementation checking site descriptions
 
-        sql: str = SQL_QUERIES["fetch_site_location_similarity"]
+        sql: str = self.specification["sql_queries"]["fetch_site_location_similarity"]
 
         site_ids: list[int] = [c["site_id"] for c in candidates]
         await self.cursor.execute(sql, {"place": place, "site_ids": site_ids})
@@ -141,28 +142,32 @@ class QueryProxy:
 class SiteReconciliationStrategy(ReconciliationStrategy):
     """Site-specific reconciliation with place names and coordinates"""
 
+    def __init__(self):
+        super().__init__()
+        self.specification = SPECIFICATION
+
     def get_entity_id_field(self) -> str:
-        return SPECIFICATION["id_field"]
+        return self.specification["id_field"]
 
     def get_label_field(self) -> str:
-        return SPECIFICATION["label_field"]
+        return self.specification["label_field"]
 
     def get_id_path(self) -> str:
-        return SPECIFICATION["key"]
+        return self.specification["key"]
 
     def get_properties_meta(self) -> list[dict[str, str]]:
         """Return metadata for site-specific properties used in enhanced reconciliation"""
-        return SPECIFICATION["properties"]
+        return self.specification["properties"]
 
     def get_property_settings(self) -> dict[str, dict[str, Any]]:
         """Return OpenRefine-specific settings for site properties"""
-        return SPECIFICATION["property_settings"]
+        return self.specification["property_settings"]
 
     async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         """Find candidate sites based on name, identifier, and optional geographic context"""
         candidates: list[dict] = []
         properties = properties or {}
-        proxy: QueryProxy = QueryProxy(cursor)
+        proxy: SiteQueryProxy = SiteQueryProxy(cursor)
 
         # 1) Exact match by national site identifier
         if properties.get("national_id"):
@@ -182,7 +187,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
 
         return sorted(candidates, key=lambda x: x.get("name_sim", 0), reverse=True)[:limit]
 
-    async def _apply_geographic_scoring(self, candidates: list[dict], coordinate: dict[str, float], proxy: QueryProxy) -> list[dict]:
+    async def _apply_geographic_scoring(self, candidates: list[dict], coordinate: dict[str, float], proxy: SiteQueryProxy) -> list[dict]:
         """Boost scores based on geographic proximity"""
         if not coordinate or not candidates:
             return candidates
@@ -203,9 +208,9 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
 
     async def get_details(self, entity_id: str, cursor: psycopg.AsyncCursor) -> dict[str, Any] | None:
         """Fetch details for a specific site."""
-        return await QueryProxy(cursor).get_details(entity_id)
+        return await SiteQueryProxy(cursor).get_details(entity_id)
 
-    async def _apply_place_context_scoring(self, candidates: list[dict], place: str, proxy: QueryProxy) -> list[dict]:
+    async def _apply_place_context_scoring(self, candidates: list[dict], place: str, proxy: SiteQueryProxy) -> list[dict]:
         """Boost scores based on place name context"""
 
         place_results = await proxy.fetch_site_location_similarity(candidates, place)
