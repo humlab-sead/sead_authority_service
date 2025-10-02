@@ -45,14 +45,14 @@ async def meta(config: Config = Depends(get_config_dependency)):
 
     default_types: list[dict[str, str]] = [{"id": entity_type, "name": entity_type} for entity_type in Strategies.items]
     id_base: str = ConfigValue("options:id_base").resolve()
-    
+
     # Collect property settings from all registered strategies
     property_settings = []
     for strategy_class in Strategies.items.values():
         strategy_instance = strategy_class()
         properties = strategy_instance.get_properties_meta()
         property_specific_settings = strategy_instance.get_property_settings()
-        
+
         for prop in properties:
             # Convert property metadata to OpenRefine property_settings format
             setting = {
@@ -61,11 +61,11 @@ async def meta(config: Config = Depends(get_config_dependency)):
                 "type": prop["type"],
                 "help_text": prop["description"],
             }
-            
+
             # Add strategy-specific settings if available
             if prop["id"] in property_specific_settings:
                 setting["settings"] = property_specific_settings[prop["id"]]
-            
+
             property_settings.append(setting)
 
     return {

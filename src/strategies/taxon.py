@@ -4,12 +4,11 @@ import psycopg
 
 from .interface import ReconciliationStrategy, Strategies
 
-
 SPECIFICATION: dict[str, str] = {
     "key": "taxon",
     "id_field": "taxon_id",
     "label_field": "label",
-    "properties":  [
+    "properties": [
         {
             "id": "scientific_name",
             "name": "Scientific Name",
@@ -35,8 +34,7 @@ SPECIFICATION: dict[str, str] = {
             "description": "Taxonomic family name",
         },
     ],
-    "property_settings": {
-    },
+    "property_settings": {},
     "sql_queries": {},
 }
 
@@ -47,7 +45,6 @@ class TaxonReconciliationStrategy(ReconciliationStrategy):
 
     def __init__(self):
         super().__init__(SPECIFICATION)
-
 
     async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         # Implement taxon-specific logic here

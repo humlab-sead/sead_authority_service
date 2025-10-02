@@ -1,12 +1,11 @@
 from typing import Any, Tuple
 
 import psycopg
-from src.strategies.query import QueryProxy
 
 from src.configuration.inject import ConfigValue
+from src.strategies.query import QueryProxy
 
 from .interface import ReconciliationStrategy, Strategies
-
 
 SPECIFICATION: dict[str, str] = {
     "key": "site",

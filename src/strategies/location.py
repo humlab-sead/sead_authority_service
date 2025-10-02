@@ -1,10 +1,10 @@
 from typing import Any
 
 import psycopg
+
 from strategies.query import QueryProxy
 
 from .interface import ReconciliationStrategy, Strategies
-
 
 SPECIFICATION: dict[str, str] = {
     "key": "place",

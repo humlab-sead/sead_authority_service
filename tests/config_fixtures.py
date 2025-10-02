@@ -43,6 +43,7 @@ def reset_config() -> Generator[None, Any, None]:
     ConfigStore.reset_instance()
     reset_config_provider()
 
+
 async def mock_connection() -> AsyncMock:
     """Create a mock connection for testing - async function that can be awaited"""
     mock_conn = AsyncMock(spec=psycopg.AsyncConnection)

@@ -21,7 +21,7 @@ ID_BASE = "https://w3id.org/sead/id/"
 
 class MockStrategy:
     """Mock strategy class with get_properties_meta method"""
-    
+
     def get_properties_meta(self):
         return [
             {"id": "latitude", "name": "Latitude", "type": "number", "description": "Geographic latitude"},
@@ -30,7 +30,7 @@ class MockStrategy:
             {"id": "national_id", "name": "National Site ID", "type": "string", "description": "National identifier"},
             {"id": "place_name", "name": "Place Name", "type": "string", "description": "Place name"},
         ]
-    
+
     def get_property_settings(self):
         return {
             "latitude": {"min": -90.0, "max": 90.0, "precision": 6},
@@ -233,13 +233,13 @@ class TestPropertiesEndpoint:
 
         # Check that we have properties from both strategies
         property_ids = [p["id"] for p in properties]
-        
+
         # Site properties
         site_properties: list[str] = ["latitude", "longitude", "country", "national_id", "place_name"]
         for expected_id in site_properties:
             assert expected_id in property_ids
-            
-        # Taxon properties  
+
+        # Taxon properties
         taxon_properties: list[str] = ["scientific_name", "genus", "species", "family"]
         for expected_id in taxon_properties:
             assert expected_id in property_ids
@@ -311,14 +311,14 @@ class TestPropertiesEndpoint:
 
         data = response.json()
         properties = data["properties"]
-        
+
         # Should return only site properties
         assert len(properties) == 5
         property_ids = [p["id"] for p in properties]
         expected_site_ids = ["latitude", "longitude", "country", "national_id", "place_name"]
         for expected_id in expected_site_ids:
             assert expected_id in property_ids
-            
+
         # Should not contain taxon properties
         taxon_ids = ["label", "genus", "species", "family"]
         for taxon_id in taxon_ids:
@@ -332,14 +332,14 @@ class TestPropertiesEndpoint:
 
         data = response.json()
         properties = data["properties"]
-        
+
         # Should return only taxon properties
         assert len(properties) == 4
         property_ids = [p["id"] for p in properties]
         expected_taxon_ids = ["scientific_name", "genus", "species", "family"]
         for expected_id in expected_taxon_ids:
             assert expected_id in property_ids
-            
+
         # Should not contain site properties
         site_ids = ["latitude", "longitude", "country", "national_id", "place_name"]
         for site_id in site_ids:
@@ -363,7 +363,7 @@ class TestPropertiesEndpoint:
 
         data = response.json()
         properties = data["properties"]
-        
+
         # Should return only latitude from site properties
         assert len(properties) == 1
         assert properties[0]["id"] == "latitude"

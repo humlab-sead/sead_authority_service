@@ -1,11 +1,12 @@
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.configuration.inject import MockConfigProvider
 import psycopg
 import pytest
 
-from src.strategies.site import SPECIFICATION, SiteQueryProxy, SiteReconciliationStrategy
+from src.configuration.inject import MockConfigProvider
+from src.strategies.site import (SPECIFICATION, SiteQueryProxy,
+                                 SiteReconciliationStrategy)
 from tests.decorators import with_test_config
 
 # pylint: disable=attribute-defined-outside-init,protected-access
