@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import psycopg
 
@@ -10,39 +10,30 @@ from src.utility import Registry
 class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
-    def __init__(self) -> None:
+    def __init__(self, specification: dict[str, str | dict[str, Any]]) -> None:
         connection_factory = ConfigValue("runtime:connection_factory").resolve()
         self.connection: psycopg.AsyncConnection = connection_factory()
+        self.specification: dict[str, str | dict[str, Any]] = specification or {}
 
-    @abstractmethod
-    async def find_candidates(
-        self, cursor: psycopg.AsyncCursor, query: str, properties: None | list[dict[str, Any]] = None, limit: int = 10
-    ) -> List[Dict[str, Any]]:
-        """Find candidate matches for the given query"""
-
-    @abstractmethod
     def get_entity_id_field(self) -> str:
         """Return the ID field name for this entity type"""
+        return self.specification["id_field"]
 
-    @abstractmethod
-    async def get_details(self, entity_id: str, cursor) -> Optional[Dict[str, Any]]:
-        """Fetch detailed information for a given entity ID."""
-
-    @abstractmethod
     def get_label_field(self) -> str:
         """Return the label field name for this entity type"""
+        return self.specification["label_field"]
 
-    @abstractmethod
     def get_id_path(self) -> str:
         """Return the URL path segment for this entity type"""
+        return self.specification["key"]
 
-    @abstractmethod
-    def get_properties_meta(self) -> List[Dict[str, str]]:
-        """Return metadata for properties supported by this entity type for enhanced reconciliation"""
+    def get_properties_meta(self) -> list[dict[str, str]]:
+        """Return metadata for entity-specific properties used in enhanced reconciliation"""
+        return self.specification["properties"]
 
-    def get_property_settings(self) -> Dict[str, Dict[str, Any]]:
+    def get_property_settings(self) -> dict[str, dict[str, Any]]:
         """Return OpenRefine-specific settings for properties (optional override for type-specific settings)"""
-        return {}
+        return self.specification["property_settings"]
 
     def as_candidate(self, entity_data: dict[str, Any]) -> dict[str, Any]:
         """Convert entity data to OpenRefine candidate format"""
@@ -65,6 +56,16 @@ class ReconciliationStrategy(ABC):
             candidate["distance_km"] = round(entity_data["distance_km"], 2)
 
         return candidate
+
+    @abstractmethod
+    async def find_candidates(
+        self, cursor: psycopg.AsyncCursor, query: str, properties: None | list[dict[str, Any]] = None, limit: int = 10
+    ) -> list[dict[str, Any]]:
+        """Find candidate matches for the given query"""
+
+    @abstractmethod
+    async def get_details(self, entity_id: str, cursor) -> Optional[dict[str, Any]]:
+        """Fetch detailed information for a given entity ID."""
 
 
 class StrategyRegistry(Registry):

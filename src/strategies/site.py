@@ -101,28 +101,11 @@ class SiteQueryProxy(QueryProxy):
         row: Tuple[Any, ...] | None = await self.cursor.fetchone()
         return [dict(row)] if row else []
 
-    async def fetch_by_fuzzy_name_search(self, name: str, limit: int = 10) -> list[dict[str, Any]]:
-        """Perform fuzzy name search"""
-        sql: str = self.specification["sql_queries"]["fetch_by_fuzzy_name_search"]
-        await self.cursor.execute(sql, {"q": name, "n": limit})
-        rows: list[Tuple[Any]] = await self.cursor.fetchall()
-        return [dict(row) for row in rows]
-
     async def fetch_site_distances(self, coordinate: dict[str, float], site_ids: list[int]) -> dict[int, float]:
         sql: str = self.specification["sql_queries"]["fetch_site_distances"]
         await self.cursor.execute(sql, coordinate | {"site_ids": site_ids})
         distances: dict[int, float] = {row["site_id"]: row["distance_km"] for row in await self.cursor.fetchall()}
         return distances
-
-    async def get_details(self, entity_id: str) -> dict[str, Any] | None:
-        """Fetch details for a specific site."""
-        try:
-            sql: str = self.specification["sql_queries"]["get_details"]
-            await self.cursor.execute(sql, {"id": int(entity_id)})
-            row: Tuple[Any] | None = await self.cursor.fetchone()
-            return dict(row) if row else None
-        except (ValueError, psycopg.Error):
-            return None
 
     async def fetch_site_location_similarity(self, candidates: list[dict], place: str) -> list[dict]:
         """Boost scores based on place name context"""
@@ -143,25 +126,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
     """Site-specific reconciliation with place names and coordinates"""
 
     def __init__(self):
-        super().__init__()
-        self.specification = SPECIFICATION
-
-    def get_entity_id_field(self) -> str:
-        return self.specification["id_field"]
-
-    def get_label_field(self) -> str:
-        return self.specification["label_field"]
-
-    def get_id_path(self) -> str:
-        return self.specification["key"]
-
-    def get_properties_meta(self) -> list[dict[str, str]]:
-        """Return metadata for site-specific properties used in enhanced reconciliation"""
-        return self.specification["properties"]
-
-    def get_property_settings(self) -> dict[str, dict[str, Any]]:
-        """Return OpenRefine-specific settings for site properties"""
-        return self.specification["property_settings"]
+        super().__init__(SPECIFICATION)
 
     async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         """Find candidate sites based on name, identifier, and optional geographic context"""
