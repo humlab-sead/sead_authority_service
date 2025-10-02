@@ -3,15 +3,20 @@ Unit tests for the API router endpoints.
 """
 
 import json
-from psycopg import Error
+import os
+from unittest.mock import MagicMock, patch
+
+from configuration.inject import ConfigProvider
+
+from src.configuration.inject import MockConfigProvider
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from fastapi.testclient import TestClient
+from tests.decorators import with_test_config
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from psycopg import Error
 
-from configuration.inject import ConfigStore
 from src.api.router import router
-
+from src.configuration.inject import set_config_provider
 
 ID_BASE = "https://w3id.org/sead/id/"
 
@@ -38,36 +43,25 @@ def client(app):
     """Create test client"""
     return TestClient(app)
 
-
-@pytest.fixture
-def mock_config():
-    """Set up test configuration"""
-    ConfigStore.configure_context(source="./tests/config.yml")
-    yield
-    
+   
 
 class TestHealthCheck:
     """Test health check endpoint"""
-    def setup_method(self):
-        """Set up test fixtures"""
-        ConfigStore.configure_context(source="./tests/config.yml")
     
-    def test_is_alive(self, client, mock_config):
+    @with_test_config
+    def test_is_alive(self, client: TestClient, test_provider: MockConfigProvider):
         """Test the health check endpoint"""
         response = client.get("/is_alive")
         assert response.status_code == 200
         assert response.json() == {"status": "alive"}
 
-
 class TestMetaEndpoint:
     """Test reconciliation metadata endpoint"""
     
-    def setup_method(self):
-        """Set up test fixtures"""
-        ConfigStore.configure_context(source="./tests/config.yml")
     
     @patch('src.api.router.Strategies', MockStrategies())
-    def test_meta_endpoint_structure(self, client):
+    @with_test_config
+    def test_meta_endpoint_structure(self, client, test_provider: MockConfigProvider):
         """Test metadata endpoint returns correct structure"""
         response = client.get("/reconcile")
         assert response.status_code == 200
@@ -85,9 +79,10 @@ class TestMetaEndpoint:
         type_ids = [t["id"] for t in data["defaultTypes"]]
         assert "Site" in type_ids
         assert "Taxon" in type_ids
-    
+
     @patch('src.api.router.Strategies', MockStrategies())
-    def test_meta_endpoint_extensions(self, client):
+    @with_test_config
+    def test_meta_endpoint_extensions(self, client, test_provider: MockConfigProvider):
         """Test metadata endpoint includes property extensions"""
         response = client.get("/reconcile")
         data = response.json()
@@ -117,16 +112,12 @@ class TestMetaEndpoint:
         assert lat_prop["settings"]["min"] == -90.0
         assert lat_prop["settings"]["max"] == 90.0
 
-
 class TestReconcileEndpoint:
     """Test reconciliation endpoint"""
-    
-    def setup_method(self):
-        """Set up test fixtures"""
-        ConfigStore.configure_context(source="./tests/config.yml")
-    
+
     @patch('src.api.router.reconcile_queries')
-    def test_reconcile_successful_query(self, mock_reconcile_queries, client):
+    @with_test_config
+    def test_reconcile_successful_query(self, mock_reconcile_queries, client, test_provider: MockConfigProvider):
         """Test successful reconciliation query"""
         # Mock reconcile_queries response
         mock_reconcile_queries.return_value = {
@@ -173,12 +164,13 @@ class TestReconcileEndpoint:
                 "type": "site"
             }
         })
-    
+
     @patch('src.api.router.reconcile_queries')
-    def test_reconcile_queries_as_string(self, mock_reconcile_queries, client):
+    @with_test_config
+    def test_reconcile_queries_as_string(self, mock_reconcile_queries, client: TestClient, test_provider: MockConfigProvider):
         """Test when queries parameter is a JSON string"""
         mock_reconcile_queries.return_value = {"q0": {"result": []}}
-        
+
         queries_obj = {
             "q0": {
                 "query": "test site",
@@ -196,13 +188,15 @@ class TestReconcileEndpoint:
         # Verify the JSON string was parsed correctly
         mock_reconcile_queries.assert_called_once_with(queries_obj)
     
-    def test_reconcile_missing_queries(self, client):
+    @with_test_config
+    def test_reconcile_missing_queries(self, client: TestClient, test_provider: MockConfigProvider):
         """Test error when queries are missing"""
         response = client.post("/reconcile", json={})
         assert response.status_code == 400
         assert "No queries provided" in response.json()["error"]
     
-    def test_reconcile_invalid_json(self, client):
+    @with_test_config
+    def test_reconcile_invalid_json(self, client: TestClient, test_provider: MockConfigProvider):
         """Test error when request contains invalid JSON"""
         response = client.post(
             "/reconcile",
@@ -211,9 +205,10 @@ class TestReconcileEndpoint:
         )
         assert response.status_code == 400
         assert "Invalid JSON" in response.json()["error"]
-    
+
     @patch('src.api.router.reconcile_queries')
-    def test_reconcile_database_error(self, mock_reconcile_queries, client):
+    @with_test_config
+    def test_reconcile_database_error(self, mock_reconcile_queries, client: TestClient, test_provider: MockConfigProvider):
         """Test database error handling"""
         import psycopg
         mock_reconcile_queries.side_effect = psycopg.Error("Database connection failed")
@@ -230,9 +225,10 @@ class TestReconcileEndpoint:
             response = client.post("/reconcile", json=query_data)
             assert response.status_code == 500
             assert "Database error" in response.json()["error"]
-    
+
     @patch('src.api.router.reconcile_queries')
-    def test_reconcile_general_error(self, mock_reconcile_queries, client):
+    @with_test_config
+    def test_reconcile_general_error(self, mock_reconcile_queries, client, test_provider: MockConfigProvider):
         """Test general error handling"""
         mock_reconcile_queries.side_effect = Exception("Something went wrong")
         
@@ -250,15 +246,11 @@ class TestReconcileEndpoint:
             assert response.status_code == 500
             assert "Internal server error" in response.json()["error"]
 
-
 class TestPropertiesEndpoint:
     """Test property suggestion endpoint"""
-    
-    def setup_method(self):
-        """Set up test fixtures"""
-        ConfigStore.configure_context(source="./tests/config.yml")
-    
-    def test_properties_all(self, client, mock_config):
+
+    @with_test_config
+    def test_properties_all(self, client: TestClient, test_provider: MockConfigProvider):
         """Test getting all properties without filter"""
         response = client.get("/reconcile/properties")
         assert response.status_code == 200
@@ -281,8 +273,9 @@ class TestPropertiesEndpoint:
             assert "name" in prop
             assert "type" in prop
             assert "description" in prop
-    
-    def test_properties_filtered_by_query(self, client, mock_config):
+        
+    @with_test_config
+    def test_properties_filtered_by_query(self, client: TestClient, test_provider: MockConfigProvider):
         """Test filtering properties by query string"""
         response = client.get("/reconcile/properties?query=lat")
         assert response.status_code == 200
@@ -293,8 +286,9 @@ class TestPropertiesEndpoint:
         # Should return latitude (matches "lat" in id)
         assert len(properties) == 1
         assert properties[0]["id"] == "latitude"
-    
-    def test_properties_filtered_by_name(self, client, mock_config):
+
+    @with_test_config
+    def test_properties_filtered_by_name(self, client: TestClient, test_provider: MockConfigProvider):
         """Test filtering properties by name"""
         response = client.get("/reconcile/properties?query=country")
         assert response.status_code == 200
@@ -305,8 +299,9 @@ class TestPropertiesEndpoint:
         # Should return country property
         assert len(properties) == 1
         assert properties[0]["id"] == "country"
-    
-    def test_properties_filtered_by_description(self, client, mock_config):
+
+    @with_test_config
+    def test_properties_filtered_by_description(self, client: TestClient, test_provider: MockConfigProvider):
         """Test filtering properties by description"""
         response = client.get("/reconcile/properties?query=geographic")
         assert response.status_code == 200
@@ -320,8 +315,9 @@ class TestPropertiesEndpoint:
         assert "latitude" in property_ids
         assert "longitude" in property_ids
         assert "place_name" in property_ids
-    
-    def test_properties_no_matches(self, client, mock_config):
+
+    @with_test_config
+    def test_properties_no_matches(self, client: TestClient, test_provider: MockConfigProvider):
         """Test query with no matches"""
         response = client.get("/reconcile/properties?query=nonexistent")
         assert response.status_code == 200
@@ -334,12 +330,9 @@ class TestPropertiesEndpoint:
 class TestPreviewEndpoint:
     """Test preview endpoint"""
     
-    def setup_method(self):
-        """Set up test fixtures"""
-        ConfigStore.configure_context(source="./tests/config.yml")
-    
     @patch('src.api.router.render_preview')
-    def test_preview_valid_id(self, mock_render_preview, client):
+    @with_test_config
+    def test_preview_valid_id(self, mock_render_preview, client: TestClient, test_provider: MockConfigProvider):
         """Test preview with valid ID"""
         mock_render_preview.return_value = "<div>Preview content</div>"
         
@@ -350,26 +343,30 @@ class TestPreviewEndpoint:
         
         mock_render_preview.assert_called_once_with(f"{ID_BASE}site/123")
     
-    def test_preview_invalid_id_format(self, client):
+    @with_test_config
+    def test_preview_invalid_id_format(self, client: TestClient, test_provider: MockConfigProvider):
         """Test preview with invalid ID format"""
         response = client.get("/reconcile/preview?id=https://wrong-domain.org/sead/site/123")
         assert response.status_code == 400
         assert "Invalid ID format" in response.text
     
-    def test_preview_invalid_id_path_too_few_parts(self, client):
+    @with_test_config
+    def test_preview_invalid_id_path_too_few_parts(self, client: TestClient, test_provider: MockConfigProvider):
         """Test preview with insufficient path parts"""
         response = client.get(f"/reconcile/preview?id={ID_BASE}site")
         assert response.status_code == 400
         assert "Invalid ID path" in response.text
     
-    def test_preview_invalid_id_path_too_many_parts(self, client):
+    @with_test_config
+    def test_preview_invalid_id_path_too_many_parts(self, client: TestClient, test_provider: MockConfigProvider):
         """Test preview with too many path parts"""
         response = client.get(f"/reconcile/preview?id={ID_BASE}site/123/extra")
         assert response.status_code == 400
         assert "Invalid ID path" in response.text
     
     @patch('src.api.router.render_preview')
-    def test_preview_render_error(self, mock_render_preview, client):
+    @with_test_config
+    def test_preview_render_error(self, mock_render_preview, client: TestClient, test_provider: MockConfigProvider):
         """Test preview when render_preview raises ValueError"""
         mock_render_preview.side_effect = ValueError("Entity not found")
         
@@ -381,14 +378,11 @@ class TestPreviewEndpoint:
 class TestEndpointIntegration:
     """Integration tests for endpoint interactions"""
     
-    def setup_method(self):
-        """Set up test fixtures"""
-        ConfigStore.configure_context(source="./tests/config.yml")
-    
     @patch('src.api.router.Strategies', MockStrategies())
     @patch('src.api.router.reconcile_queries')
     @patch('src.api.router.render_preview')
-    def test_full_reconciliation_workflow(self, mock_render_preview, mock_reconcile_queries, client):
+    @with_test_config
+    def test_full_reconciliation_workflow(self, mock_render_preview, mock_reconcile_queries, client: TestClient, test_provider: MockConfigProvider):
         """Test a complete reconciliation workflow"""
         # Step 1: Get service metadata
         meta_response = client.get("/reconcile")
@@ -438,39 +432,21 @@ class TestEndpointIntegration:
         assert preview_response.status_code == 200
         assert "Site details" in preview_response.text
 
-class TestSetupConfigStore:
-
-    """Test setup_config_store function"""
-    
-    # @patch('src.api.router.ConfigStore.configure_context')
-    @pytest.mark.asyncio
-    async def test_setup_config_store_success(self): #, mock_configure_context):
-        """Test successful configuration setup"""
-        from src.api.router import setup_config_store
-        
-        await setup_config_store()
-        
-        # mock_configure_context.assert_called_once_with(source="./config.yml")
-
 class TestErrorHandling:
     """Test error handling across endpoints"""
-    
-    def setup_method(self):
-        """Set up test fixtures"""
-        ConfigStore.configure_context(source="./tests/config.yml")
-    
-    def test_malformed_json_requests(self, client):
+
+    @with_test_config
+    def test_malformed_json_requests(self, client: TestClient, test_provider: MockConfigProvider):
         """Test various malformed JSON requests"""
         # Missing content-type
         # Patch get_default_config_filename to return the test config path
-        with patch('src.api.router.get_default_config_filename', return_value="./tests/config.yml"):
-            response = client.post("/reconcile", data='{"invalid": json}')
-            assert response.status_code in [400, 422]  # FastAPI validation error
-        
+        response = client.post("/reconcile", data='{"invalid": json}')
+        assert response.status_code in [400, 422]  # FastAPI validation error
+    
         # Empty JSON object
         response = client.post("/reconcile", json={})
         assert response.status_code in [400, 422]
         assert "No queries provided" in response.json()["error"]
-    
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
