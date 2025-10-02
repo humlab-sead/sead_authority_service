@@ -223,9 +223,8 @@ async def reconcile(request: Request, config: Config = Depends(get_config_depend
 
         return JSONResponse(results)
 
-    except Exception as e:
-        raise e
-        logger.error(f"Exception in reconcile endpoint: {e}", exc_info=True)
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.exception(f"Exception in reconcile endpoint: {e}", exc_info=True)
         return JSONResponse({"error": f"Server error: {str(e)}"}, status_code=500)
 
 

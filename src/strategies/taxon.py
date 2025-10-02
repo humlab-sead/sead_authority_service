@@ -38,6 +38,7 @@ SPECIFICATION: dict[str, str] = {
     "sql_queries": {},
 }
 
+
 class TaxonQueryProxy:
     def __init__(self, specification: dict[str, str | dict[str, Any]], cursor: psycopg.AsyncCursor):
         self.specification: dict[str, str | dict[str, Any]] = specification
@@ -45,6 +46,7 @@ class TaxonQueryProxy:
 
     # Placeholder for future query methods
     # e.g., async def fetch_by_name(self, name: str, limit: int) -> list[dict[str, Any]]: ...
+
 
 @Strategies.register(key="taxon")
 class TaxonReconciliationStrategy(ReconciliationStrategy):

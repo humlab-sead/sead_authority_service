@@ -3,9 +3,9 @@ Unit tests for the API router endpoints.
 """
 
 import json
-import os
 from unittest.mock import patch
 
+import psycopg
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -17,7 +17,7 @@ from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
 
-# pylint: disable=redundant-parens, protected-access, unused-argument, redefined-outer-name
+# pylint: disable=protected-access, unused-argument, redefined-outer-name
 
 
 class MockStrategy:
@@ -43,7 +43,7 @@ class MockStrategies:
     """Mock Strategies class for testing"""
 
     def __init__(self):
-        self.items = {"Site": lambda: MockStrategy(), "Taxon": lambda: MockStrategy()}
+        self.items = {"Site": MockStrategy, "Taxon": MockStrategy}
 
 
 @pytest.fixture
@@ -193,7 +193,6 @@ class TestReconcileEndpoint:
     @with_test_config
     def test_reconcile_database_error(self, mock_reconcile_queries, client: TestClient, test_provider: MockConfigProvider):
         """Test database error handling"""
-        import psycopg
 
         mock_reconcile_queries.side_effect = psycopg.Error("Database connection failed")
 

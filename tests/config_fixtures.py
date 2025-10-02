@@ -13,6 +13,8 @@ from src.configuration.inject import (ConfigProvider, ConfigStore,
                                       reset_config_provider,
                                       set_config_provider)
 
+# pylint: disable=redefined-outer-name
+
 
 @contextmanager
 def patch_config_provider(provider: ConfigProvider) -> Generator[ConfigProvider, None, None]:

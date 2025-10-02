@@ -43,7 +43,7 @@ class TestSiteQueryProxy:
         proxy = SiteQueryProxy(SPECIFICATION, mock_cursor)
         mock_cursor.fetchone.return_value = None
 
-        result = await proxy.fetch_site_by_national_id("NONEXISTENT")
+        result: list[dict[str, Any]] = await proxy.fetch_site_by_national_id("NONEXISTENT")
 
         mock_cursor.execute.assert_called_once()
         mock_cursor.fetchone.assert_called_once()
@@ -508,10 +508,6 @@ class TestSiteReconciliationStrategy:
 class TestSiteStrategyIntegration:
     """Integration tests for the complete site reconciliation workflow."""
 
-    def setup_method(self):
-        """Set up test fixtures."""
-        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-
     @pytest.mark.asyncio
     @patch("src.configuration.inject.ConfigValue")
     @with_test_config
@@ -582,10 +578,6 @@ class TestSiteStrategyIntegration:
 
 class TestSiteStrategyEdgeCases:
     """Edge case tests for SiteReconciliationStrategy."""
-
-    def setup_method(self):
-        """Set up test fixtures."""
-        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
 
     @pytest.mark.asyncio
     @patch("src.configuration.inject.ConfigValue")

@@ -1,5 +1,5 @@
 import os
-from typing import Any, Callable, Generator
+from typing import Any, Generator
 from unittest.mock import AsyncMock
 
 import psycopg
@@ -9,6 +9,8 @@ from src.configuration.config import Config
 from src.configuration.inject import (ConfigStore, MockConfigProvider,
                                       reset_config_provider)
 from src.configuration.setup import setup_config_store
+
+# pylint: disable=unused-argument
 
 
 async def pytest_sessionstart(session) -> None:
@@ -88,6 +90,6 @@ def test_config():
 
 
 @pytest.fixture
-def test_provider(test_config):
+def test_provider(test_config: Config) -> MockConfigProvider:  # pylint: disable=redefined-outer-name
     """Provide TestConfigProvider with test configuration"""
     return MockConfigProvider(test_config)

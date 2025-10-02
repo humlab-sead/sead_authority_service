@@ -14,8 +14,9 @@ from .config import Config
 
 T = TypeVar("T", str, int, float)
 
- # pylint: disable=global-statement
- 
+# pylint: disable=global-statement
+
+
 class ConfigProvider(ABC):
     """Abstract configuration provider for dependency injection"""
 

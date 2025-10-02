@@ -2,9 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional, Type
 
 import psycopg
-from src.strategies.query import QueryProxy
 
 from src.configuration.inject import ConfigValue
+from src.strategies.query import QueryProxy
 from src.utility import Registry
 
 
