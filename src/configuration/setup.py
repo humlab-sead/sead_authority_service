@@ -5,7 +5,7 @@ import psycopg
 from loguru import logger
 
 from src.configuration.config import Config
-from src.configuration.inject import ConfigStore
+from src.configuration.inject import ConfigStore, get_config_provider
 from src.utility import configure_logging, create_db_uri
 
 dotenv.load_dotenv(dotenv_path=os.getenv("ENV_FILE", ".env"))
@@ -14,11 +14,12 @@ dotenv.load_dotenv(dotenv_path=os.getenv("ENV_FILE", ".env"))
 async def setup_config_store(filename: str = "config.yml") -> None:
 
     config_file: str = os.getenv("CONFIG_FILE", filename)
+    store: ConfigStore = ConfigStore.get_instance()
 
-    if ConfigStore.is_configured():
+    if store.is_configured():
         return
 
-    ConfigStore.get_instance().configure_context(source=config_file, env_filename=".env", env_prefix="SEAD_AUTHORITY")
+    store.configure_context(source=config_file, env_filename=".env", env_prefix="SEAD_AUTHORITY")
 
     assert store.is_configured(), "Config Store failed to configure properly"
 
@@ -60,9 +61,9 @@ async def _setup_connection_factory(cfg):
 
 def get_connection() -> psycopg.AsyncConnection:
     """Get a database connection from the config"""
-    cfg: Config = ConfigStore.get_instance().config()
+    cfg: Config = get_config_provider().get_config()
     if not cfg:
-        raise ValueError("ConfigStore is not configured")
+        raise ValueError("Config Store is not configured")
     if not cfg.get("runtime:connection"):
         connection_factory = cfg.get("runtime:connection_factory")
         if not connection_factory:
