@@ -11,7 +11,8 @@ class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
     def __init__(self) -> None:
-        self.connection: psycopg.AsyncConnection = ConfigValue("runtime:connection").resolve()
+        connection_factory = ConfigValue("runtime:connection_factory").resolve()
+        self.connection: psycopg.AsyncConnection = connection_factory()
 
     @abstractmethod
     async def find_candidates(
