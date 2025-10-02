@@ -48,6 +48,48 @@ SQL_QUERIES: dict[str, str] = {
     """,
 }
 
+SPECIFICATION: dict[str, str] = {
+    "key": "site",
+    "id_field": "site_id",
+    "label_field": "label",
+    "properties": [
+        {
+            "id": "latitude",
+            "name": "Latitude",
+            "type": "number",
+            "description": "Geographic latitude in decimal degrees (WGS84)",
+        },
+        {
+            "id": "longitude",
+            "name": "Longitude",
+            "type": "number",
+            "description": "Geographic longitude in decimal degrees (WGS84)",
+        },
+        {
+            "id": "country",
+            "name": "Country",
+            "type": "string",
+            "description": "Country name where the site is located",
+        },
+        {
+            "id": "national_id",
+            "name": "National Site ID",
+            "type": "string",
+            "description": "Official national site identifier or registration number",
+        },
+        {
+            "id": "place_name",
+            "name": "Place Name",
+            "type": "string",
+            "description": "Geographic place, locality, or administrative area name",
+        },
+    ],
+    "property_settings": {
+        "latitude": {"min": -90.0, "max": 90.0, "precision": 6},
+        "longitude": {"min": -180.0, "max": 180.0, "precision": 6},
+    },
+}
+
 
 class QueryProxy:
     def __init__(self, cursor: psycopg.AsyncCursor) -> None:
@@ -111,38 +153,11 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
 
     def get_properties_meta(self) -> list[dict[str, str]]:
         """Return metadata for site-specific properties used in enhanced reconciliation"""
-        return [
-            {
-                "id": "latitude",
-                "name": "Latitude",
-                "type": "number",
-                "description": "Geographic latitude in decimal degrees (WGS84)",
-            },
-            {
-                "id": "longitude",
-                "name": "Longitude",
-                "type": "number",
-                "description": "Geographic longitude in decimal degrees (WGS84)",
-            },
-            {
-                "id": "country",
-                "name": "Country",
-                "type": "string",
-                "description": "Country name where the site is located",
-            },
-            {
-                "id": "national_id",
-                "name": "National Site ID",
-                "type": "string",
-                "description": "Official national site identifier or registration number",
-            },
-            {
-                "id": "place_name",
-                "name": "Place Name",
-                "type": "string",
-                "description": "Geographic place, locality, or administrative area name",
-            },
-        ]
+        return SPECIFICATION["properties"]
+
+    def get_property_settings(self) -> dict[str, dict[str, Any]]:
+        """Return OpenRefine-specific settings for site properties"""
+        return SPECIFICATION["property_settings"]
 
     async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         """Find candidate sites based on name, identifier, and optional geographic context"""

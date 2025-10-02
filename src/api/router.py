@@ -45,6 +45,28 @@ async def meta(config: Config = Depends(get_config_dependency)):
 
     default_types: list[dict[str, str]] = [{"id": entity_type, "name": entity_type} for entity_type in Strategies.items]
     id_base: str = ConfigValue("options:id_base").resolve()
+    
+    # Collect property settings from all registered strategies
+    property_settings = []
+    for strategy_class in Strategies.items.values():
+        strategy_instance = strategy_class()
+        properties = strategy_instance.get_properties_meta()
+        property_specific_settings = strategy_instance.get_property_settings()
+        
+        for prop in properties:
+            # Convert property metadata to OpenRefine property_settings format
+            setting = {
+                "name": prop["id"],
+                "label": prop["name"],
+                "type": prop["type"],
+                "help_text": prop["description"],
+            }
+            
+            # Add strategy-specific settings if available
+            if prop["id"] in property_specific_settings:
+                setting["settings"] = property_specific_settings[prop["id"]]
+            
+            property_settings.append(setting)
 
     return {
         "name": "SEAD Entity Reconciliation",
@@ -53,25 +75,7 @@ async def meta(config: Config = Depends(get_config_dependency)):
         "defaultTypes": default_types,
         "extend": {
             "propose_properties": {"service_url": f"{id_base}reconcile", "service_path": "/properties"},
-            "property_settings": [
-                {
-                    "name": "latitude",
-                    "label": "Latitude",
-                    "type": "number",
-                    "help_text": "Geographic latitude in decimal degrees (WGS84)",
-                    "settings": {"min": -90.0, "max": 90.0, "precision": 6},
-                },
-                {
-                    "name": "longitude",
-                    "label": "Longitude",
-                    "type": "number",
-                    "help_text": "Geographic longitude in decimal degrees (WGS84)",
-                    "settings": {"min": -180.0, "max": 180.0, "precision": 6},
-                },
-                {"name": "country", "label": "Country", "type": "string", "help_text": "Country name where the site is located"},
-                {"name": "national_id", "label": "National Site ID", "type": "string", "help_text": "Official national site identifier or registration number"},
-                {"name": "place_name", "label": "Place Name", "type": "string", "help_text": "Geographic place, locality, or administrative area name"},
-            ],
+            "property_settings": property_settings,
         },
     }
 

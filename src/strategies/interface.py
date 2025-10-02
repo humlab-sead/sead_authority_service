@@ -40,6 +40,10 @@ class ReconciliationStrategy(ABC):
     def get_properties_meta(self) -> List[Dict[str, str]]:
         """Return metadata for properties supported by this entity type for enhanced reconciliation"""
 
+    def get_property_settings(self) -> Dict[str, Dict[str, Any]]:
+        """Return OpenRefine-specific settings for properties (optional override for type-specific settings)"""
+        return {}
+
     def as_candidate(self, entity_data: dict[str, Any]) -> dict[str, Any]:
         """Convert entity data to OpenRefine candidate format"""
         auto_accept_threshold: float = ConfigValue("options:auto_accept_threshold").resolve() or 0.85

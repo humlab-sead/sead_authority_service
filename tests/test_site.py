@@ -185,6 +185,28 @@ class TestSiteReconciliationStrategy:
         assert strategy.get_id_path() == "site"
 
     @with_test_config
+    def test_get_property_settings(self, test_provider: MockConfigProvider):
+        """Test get_property_settings method returns site-specific settings."""
+        strategy = SiteReconciliationStrategy()
+        settings = strategy.get_property_settings()
+        
+        assert isinstance(settings, dict)
+        assert "latitude" in settings
+        assert "longitude" in settings
+        
+        # Check latitude settings
+        lat_settings = settings["latitude"]
+        assert lat_settings["min"] == -90.0
+        assert lat_settings["max"] == 90.0
+        assert lat_settings["precision"] == 6
+        
+        # Check longitude settings
+        lon_settings = settings["longitude"]
+        assert lon_settings["min"] == -180.0
+        assert lon_settings["max"] == 180.0
+        assert lon_settings["precision"] == 6
+
+    @with_test_config
     def test_get_properties_meta(self, test_provider: MockConfigProvider):
         """Test get_properties_meta method returns site-specific properties."""
         strategy = SiteReconciliationStrategy()
