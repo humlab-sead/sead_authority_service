@@ -50,38 +50,6 @@ class MockRow:
         return iter(self._data.items())
 
 
-def mock_connection_factory() -> Callable[[], AsyncMock]:
-    """Create a mock connection factory"""
-
-    async def async_fetchone() -> MockRow:
-        """Async fetchone that returns our mock row"""
-        mock_row_data = {
-            "ID": 123,
-            "Name": "Test Site",
-            "Description": "A test archaeological site",
-            "National ID": "TEST123",
-            "Latitude": 59.8586,
-            "Longitude": 17.6389,
-        }
-        return MockRow(mock_row_data)
-
-    async def async_execute(query, params=None) -> None:
-        """Async execute that does nothing"""
-        pass
-
-    def factory() -> AsyncMock:
-        mock_conn = AsyncMock(spec=psycopg.AsyncConnection)
-        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-
-        # Set up the async methods properly
-        mock_cursor.fetchone.side_effect = async_fetchone
-        mock_cursor.execute.side_effect = async_execute
-        mock_conn.cursor.return_value = mock_cursor
-        return mock_conn
-
-    return factory
-
-
 def mock_strategy_with_get_details(mock_strategies, value: dict[str, str]) -> AsyncMock:
     mock_strategy = AsyncMock()
     mock_strategy.get_details.return_value = value

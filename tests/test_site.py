@@ -106,9 +106,9 @@ class TestQueryProxy:
         mock_row = {"ID": 123, "Name": "Test Site", "Description": "A test site", "National ID": "TEST123", "Latitude": 59.3293, "Longitude": 18.0686}
         mock_cursor.fetchone.return_value = mock_row
 
-        result: dict[str, Any] | None = await proxy.get_site_details("123")
+        result: dict[str, Any] | None = await proxy.get_details("123")
 
-        expected_sql: str = SQL_QUERIES["get_site_details"]
+        expected_sql: str = SQL_QUERIES["get_details"]
         mock_cursor.execute.assert_called_once_with(expected_sql, {"id": 123})
         assert result == mock_row
 
@@ -117,7 +117,7 @@ class TestQueryProxy:
         """Test getting site details with invalid ID."""
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
         proxy = QueryProxy(mock_cursor)
-        result: dict[str, Any] | None = await proxy.get_site_details("not_a_number")
+        result: dict[str, Any] | None = await proxy.get_details("not_a_number")
         assert result is None
         mock_cursor.execute.assert_not_called()
 
@@ -128,7 +128,7 @@ class TestQueryProxy:
         proxy = QueryProxy(mock_cursor)
         mock_cursor.fetchone.return_value = None
 
-        result = await proxy.get_site_details("999")
+        result = await proxy.get_details("999")
 
         assert result is None
         mock_cursor.execute.assert_called_once()
@@ -140,7 +140,7 @@ class TestQueryProxy:
         proxy = QueryProxy(mock_cursor)
         mock_cursor.execute.side_effect = psycopg.Error("Database error")
 
-        result = await proxy.get_site_details("123")
+        result = await proxy.get_details("123")
 
         assert result is None
 
@@ -420,12 +420,12 @@ class TestSiteReconciliationStrategy:
         mock_query_proxy_class.return_value = mock_proxy
 
         expected_details = {"ID": 123, "Name": "Test Site", "Description": "A test site"}
-        mock_proxy.get_site_details.return_value = expected_details
+        mock_proxy.get_details.return_value = expected_details
 
         result = await strategy.get_details("123", mock_cursor)
 
         mock_query_proxy_class.assert_called_once_with(mock_cursor)
-        mock_proxy.get_site_details.assert_called_once_with("123")
+        mock_proxy.get_details.assert_called_once_with("123")
         assert result == expected_details
 
     @pytest.mark.asyncio

@@ -35,16 +35,15 @@ SQL_QUERIES: dict[str, str] = {
           and location_name is not null
         group by site_id
     """,
-    "get_site_details": """
+    "get_details": """
         select 
-            site_id as "ID", 
+            location_id as "ID", 
             label as "Name", 
-            site_description as "Description", 
-            national_site_identifier as "National ID", 
-            latitude_dd as "Latitude", 
-            longitude_dd as "Longitude"
-        from authority.sites 
-        where site_id = %(id)s
+            "description" as "Description", 
+            default_lat_dd as "Latitude", 
+            default_long_dd as "Longitude"
+        from authority.locations 
+        where location_id = %(id)s
     """,
 }
 
@@ -114,10 +113,10 @@ class QueryProxy:
         distances: dict[int, float] = {row["site_id"]: row["distance_km"] for row in await self.cursor.fetchall()}
         return distances
 
-    async def get_site_details(self, entity_id: str) -> dict[str, Any] | None:
+    async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific site."""
         try:
-            sql: str = SQL_QUERIES["get_site_details"]
+            sql: str = SQL_QUERIES["get_details"]
             await self.cursor.execute(sql, {"id": int(entity_id)})
             row: Tuple[Any] | None = await self.cursor.fetchone()
             return dict(row) if row else None
@@ -204,7 +203,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
 
     async def get_details(self, entity_id: str, cursor: psycopg.AsyncCursor) -> dict[str, Any] | None:
         """Fetch details for a specific site."""
-        return await QueryProxy(cursor).get_site_details(entity_id)
+        return await QueryProxy(cursor).get_details(entity_id)
 
     async def _apply_place_context_scoring(self, candidates: list[dict], place: str, proxy: QueryProxy) -> list[dict]:
         """Boost scores based on place name context"""
