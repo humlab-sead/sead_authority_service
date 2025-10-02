@@ -36,7 +36,7 @@ def config_context(config_dict: Dict[str, Any]) -> Generator[Config, None, None]
 
 @pytest.fixture
 def reset_config():
-    """Fixture to reset ConfigStore and provider before each test"""
+    """Fixture to reset Config Store and provider before each test"""
     ConfigStore.reset_instance()
     reset_config_provider()
     yield

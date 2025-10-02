@@ -20,7 +20,7 @@ async def pytest_sessionstart(session) -> None:
 
 @pytest.fixture(autouse=True)
 def setup_reset_config() -> Generator[None, Any, None]:
-    """Reset ConfigStore and provider before each test"""
+    """Reset Config Store and provider before each test"""
     ConfigStore.reset_instance()
     reset_config_provider()
     yield

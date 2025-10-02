@@ -30,7 +30,7 @@ class ConfigProvider(ABC):
 
 
 class SingletonConfigProvider(ConfigProvider):
-    """Production config provider using ConfigStore singleton"""
+    """Production config provider using Config Store singleton"""
 
     def get_config(self, context: str = None) -> Config:
         return ConfigStore.get_instance().config(context)
@@ -154,7 +154,7 @@ class ConfigStore:
         """Reset singleton - useful for testing"""
         with cls._lock:
             cls._instance = None
-            # Also reset the provider to singleton when resetting ConfigStore
+            # Also reset the provider to singleton when resetting Config Store
             reset_config_provider()
 
     def is_configured(self, context: str = None) -> bool:

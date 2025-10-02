@@ -20,11 +20,11 @@ async def setup_config_store(filename: str = "config.yml") -> None:
 
     ConfigStore.get_instance().configure_context(source=config_file, env_filename=".env", env_prefix="SEAD_AUTHORITY")
 
-    assert ConfigStore.get_instance().is_configured(), "ConfigStore failed to configure properly"
+    assert store.is_configured(), "Config Store failed to configure properly"
 
-    cfg: Config = ConfigStore.get_instance().config()
+    cfg: Config = store.config()
     if not cfg:
-        raise ValueError("ConfigStore did not return a config")
+        raise ValueError("Config Store did not return a config")
 
     cfg.update({"runtime:config_file": config_file})
 
@@ -32,7 +32,7 @@ async def setup_config_store(filename: str = "config.yml") -> None:
 
     await _setup_connection_factory(cfg)
 
-    logger.info("ConfigStore initialized successfully.")
+    logger.info("Config Store initialized successfully.")
 
 
 async def _setup_connection_factory(cfg):
