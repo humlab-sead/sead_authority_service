@@ -3,7 +3,6 @@ from typing import Any
 from src.configuration.setup import get_connection
 from psycopg.rows import dict_row
 
-from src.configuration.config import Config
 from src.configuration.inject import get_config_provider
 from src.strategies.interface import ReconciliationStrategy, Strategies
 
