@@ -1,5 +1,3 @@
-from src.configuration.inject import ConfigProvider
-from src.configuration.inject import get_config_provider
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
@@ -7,6 +5,7 @@ from loguru import logger
 # Force import of strategies to register them
 import src.strategies  # pylint: disable=unused-import
 from src.api.router import router
+from src.configuration.inject import ConfigProvider, get_config_provider
 from src.configuration.setup import setup_config_store
 
 app = FastAPI(title="SEAD Entity Reconciliation Service")
@@ -20,12 +19,12 @@ async def startup():
     try:
         logger.info("Starting up application...")
         await setup_config_store()
-        
+
         # Verify configuration is working
         provider: ConfigProvider = get_config_provider()
         if not provider.is_configured():
             raise RuntimeError("Configuration setup failed")
-        
+
         logger.info("Application startup completed successfully")
 
     except Exception as e:
