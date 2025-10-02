@@ -1,15 +1,100 @@
+import os
+from typing import Any, Callable, Generator
 from unittest.mock import AsyncMock
 
+from src.configuration.config import Config
+
+from src.configuration.inject import ConfigStore, MockConfigProvider, reset_config_provider
 import psycopg
 import pytest
 
-from src.configuration.inject import Config, ConfigStore
-
-ConfigStore.configure_context(source="./tests/config.yml", env_filename=None)
-ConfigStore.config().update({"runtime:connection": AsyncMock(spec=psycopg.AsyncConnection)})
+from src.configuration.setup import setup_config_store
 
 
-@pytest.fixture(scope="session")
-def cfg() -> Config:
-    ConfigStore.configure_context(source="./tests/config.yml", env_filename=None)
-    return ConfigStore.config()
+async def pytest_sessionstart(session) -> None:
+    """Hook to run before any tests are executed."""
+    os.environ["CONFIG_FILE"] = "./tests/config.yml"
+    os.environ["ENV_FILE"] = "./tests/.env"
+    await setup_config_store("./tests/config.yml")
+
+@pytest.fixture(autouse=True)
+def setup_reset_config() -> Generator[None, Any, None]:
+    """Reset ConfigStore and provider before each test"""
+    ConfigStore.reset_instance()
+    reset_config_provider()
+    yield
+    ConfigStore.reset_instance()
+    reset_config_provider()
+
+
+class MockRow:
+    """Mock psycopg.Row that can be converted to dict"""
+
+    def __init__(self, data) -> None:
+        self._data: Any = data
+
+    def keys(self) -> Any:
+        return self._data.keys()
+
+    def values(self) -> Any:
+        return self._data.values()
+
+    def items(self) -> Any:
+        return self._data.items()
+
+    def __getitem__(self, key) -> Any:
+        return self._data[key]
+
+    def __iter__(self) -> Any:
+        return iter(self._data.items())
+
+
+def mock_connection_factory() -> Callable[[], AsyncMock]:
+    """Create a mock connection factory"""
+
+    async def async_fetchone() -> MockRow:
+        """Async fetchone that returns our mock row"""
+        mock_row_data = {
+            "ID": 123,
+            "Name": "Test Site",
+            "Description": "A test archaeological site",
+            "National ID": "TEST123",
+            "Latitude": 59.8586,
+            "Longitude": 17.6389,
+        }
+        return MockRow(mock_row_data)
+
+    async def async_execute(query, params=None) -> None:
+        """Async execute that does nothing"""
+        pass
+
+    def factory() -> AsyncMock:
+        mock_conn = AsyncMock(spec=psycopg.AsyncConnection)
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+
+        # Set up the async methods properly
+        mock_cursor.fetchone.side_effect = async_fetchone
+        mock_cursor.execute.side_effect = async_execute
+        mock_conn.cursor.return_value = mock_cursor
+        return mock_conn
+
+    return factory
+
+def mock_strategy_with_get_details(mock_strategies, value: dict[str, str]) -> AsyncMock:
+    mock_strategy = AsyncMock()
+    mock_strategy.get_details.return_value = value
+    mock_strategies.items.get.return_value = lambda: mock_strategy
+    return mock_strategy
+
+
+
+@pytest.fixture
+def test_config():
+    """Provide test configuration"""
+    return Config(data={"options": {"id_base": "https://w3id.org/sead/id/"}, "runtime": {"connection_factory": mock_connection_factory()}})
+
+
+@pytest.fixture
+def test_provider(test_config):
+    """Provide TestConfigProvider with test configuration"""
+    return MockConfigProvider(test_config)
