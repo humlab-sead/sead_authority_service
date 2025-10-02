@@ -77,14 +77,23 @@ SPECIFICATION: dict[str, str] = {
         group by site_id
     """,
         "get_details": """
-        select 
-            location_id as "ID", 
-            label as "Name", 
-            "description" as "Description", 
-            default_lat_dd as "Latitude", 
-            default_long_dd as "Longitude"
-        from authority.locations 
-        where location_id = %(id)s
+            with locations as (
+                select site_id, string_agg(location_name, ', ') as place_names
+                from tbl_site_locations
+                join tbl_locations using (location_id)
+                group by site_id
+            )
+            select 
+                site_id as "ID", 
+                label as "Name", 
+                site_description as "Description", 
+                latitude_dd as "Latitude", 
+                longitude_dd as "Longitude",
+                national_site_identifier as "National ID",
+                place_names
+            from authority.sites
+            left join locations using (site_id)
+        where site_id = %(id)s
     """,
     },
 }

@@ -45,11 +45,10 @@ SPECIFICATION: dict[str, str] = {
         "get_details": """
             select  location_id as "ID",
                     label as "Place Name",
-                    default_lat_dd as "Latitude",
-                    default_long_dd as "Longitude",
+                    latitude as "Latitude",
+                    longitude as "Longitude",
                     location_type as "Location Type",
-                    description as "Description",
-                    geom as "Geometry WKT"
+                    description as "Description"
             from authority.locations
             where location_id = %(id)s::int
     """,
