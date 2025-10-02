@@ -6,65 +6,75 @@ from src.configuration.inject import ConfigValue
 
 from .interface import ReconciliationStrategy, Strategies
 
-
+SQL_QUERIES: dict[str, str] = {
+    "fetch_site_by_national_id": """
+        select site_id, label, 1.0 as name_sim, latitude_dd as latitude, longitude_dd as longitude
+        from authority.sites
+        where national_site_identifier = %(identifier)s
+        limit 1
+    """,
+    "fetch_by_fuzzy_name_search": """
+        SELECT * FROM authority.fuzzy_sites(%(q)s, %(n)s);
+    """,
+    "fetch_site_distances": """
+        select site_id, 
+               ST_Distance(
+                   ST_Transform(ST_SetSRID(ST_MakePoint(longitude_dd, latitude_dd), 4326), 3857),
+                   ST_Transform(ST_SetSRID(ST_MakePoint(%(lon)s, %(lat)s), 4326), 3857)
+               ) / 1000.0 as distance_km
+        from authority.sites 
+        where site_id = ANY(%(site_ids)s) 
+          and latitude_dd is not null 
+          and longitude_dd is not null
+    """,
+    "fetch_site_location_similarity": """
+        select site_id, max(similarity(location_name, %(place)s)) as place_sim
+        from public.tbl_site_locations
+        join public.tbl_locations using(location_id)
+        where site_id = any(%(site_ids)s) 
+          and location_name is not null
+        group by site_id
+    """,
+    "get_site_details": """
+        select 
+            site_id as "ID", 
+            label as "Name", 
+            site_description as "Description", 
+            national_site_identifier as "National ID", 
+            latitude_dd as "Latitude", 
+            longitude_dd as "Longitude"
+        from authority.sites 
+        where site_id = %(id)s
+    """
+}
 class QueryProxy:
     def __init__(self, cursor: psycopg.AsyncCursor) -> None:
         self.cursor: psycopg.AsyncCursor[Tuple[Any]] = cursor
 
     async def fetch_site_by_national_id(self, national_id: str) -> list[dict[str, Any]]:
-        sql: str = """
-            select site_id, label, 1.0 as name_sim, latitude_dd as latitude, longitude_dd as longitude
-            from authority.sites
-            where national_site_identifier = %(identifier)s
-            limit 1
-        """
+        sql: str = SQL_QUERIES["fetch_site_by_national_id"]
         await self.cursor.execute(sql, {"identifier": national_id})
         row: Tuple[Any, ...] | None = await self.cursor.fetchone()
         return [dict(row)] if row else []
 
     async def fetch_by_fuzzy_name_search(self, name: str, limit: int = 10) -> list[dict[str, Any]]:
         """Perform fuzzy name search"""
-        fuzzy_sql = "SELECT * FROM authority.fuzzy_sites(%(q)s, %(n)s);"
-        await self.cursor.execute(fuzzy_sql, {"q": name, "n": limit})
-        rows = await self.cursor.fetchall()
+        sql: str = SQL_QUERIES["fetch_by_fuzzy_name_search"]
+        await self.cursor.execute(sql, {"q": name, "n": limit})
+        rows: list[Tuple[Any]] = await self.cursor.fetchall()
         return [dict(row) for row in rows]
 
     async def fetch_site_distances(self, coordinate: dict[str, float], site_ids: list[int]) -> dict[int, float]:
-        geo_sql = """
-            SELECT site_id, 
-                   ST_Distance(
-                       ST_Transform(ST_SetSRID(ST_MakePoint(longitude_dd, latitude_dd), 4326), 3857),
-                       ST_Transform(ST_SetSRID(ST_MakePoint(%(lon)s, %(lat)s), 4326), 3857)
-                   ) / 1000.0 as distance_km
-            FROM authority.sites 
-            WHERE site_id = ANY(%(site_ids)s) 
-              AND latitude_dd IS NOT NULL 
-              AND longitude_dd IS NOT NULL
-        """
-
-        await self.cursor.execute(geo_sql, coordinate | {"site_ids": site_ids})
-
+        sql: str = SQL_QUERIES["fetch_site_distances"]   
+        await self.cursor.execute(sql, coordinate | {"site_ids": site_ids})
         distances: dict[int, float] = {row["site_id"]: row["distance_km"] for row in await self.cursor.fetchall()}
         return distances
 
     async def get_site_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific site."""
         try:
-            site_id_int = int(entity_id)
-            await self.cursor.execute(
-                """
-                SELECT 
-                    site_id as "ID", 
-                    label as "Name", 
-                    site_description as "Description", 
-                    national_site_identifier as "National ID", 
-                    latitude_dd as "Latitude", 
-                    longitude_dd as "Longitude"
-                FROM authority.sites 
-                WHERE site_id = %(id)s
-                """,
-                {"id": site_id_int},
-            )
+            sql: str = SQL_QUERIES["get_site_details"]  
+            await self.cursor.execute(sql, {"id": int(entity_id)})
             row: Tuple[Any] | None = await self.cursor.fetchone()
             return dict(row) if row else None
         except (ValueError, psycopg.Error):
@@ -75,17 +85,10 @@ class QueryProxy:
         # This could query a places/regions table or use external geocoding
         # For now, simple implementation checking site descriptions
 
-        place_sql = """
-            select site_id, max(similarity(location_name, %(place)s)) as place_sim
-            from public.tbl_site_locations
-            join public.tbl_locations using(location_id)
-            where site_id = any(%(site_ids)s) 
-              and location_name is not null
-            group by site_id
-        """
+        sql: str = SQL_QUERIES["fetch_site_location_similarity"]
 
-        site_ids = [c["site_id"] for c in candidates]
-        await self.cursor.execute(place_sql, {"place": place, "site_ids": site_ids})
+        site_ids: list[int] = [c["site_id"] for c in candidates]
+        await self.cursor.execute(sql, {"place": place, "site_ids": site_ids})
 
         place_results = {row["site_id"]: row["place_sim"] for row in await self.cursor.fetchall()}
         return place_results
