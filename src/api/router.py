@@ -12,7 +12,7 @@ from src.configuration.config import Config
 from src.configuration.inject import ConfigValue, get_config_provider
 from src.configuration.setup import setup_config_store
 from src.reconcile import reconcile_queries
-from src.render import render_preview
+from src.preview import render_preview
 from src.strategies.interface import Strategies
 
 # pylint: disable=unused-argument, redefined-builtin
