@@ -20,6 +20,7 @@ from src.strategies.interface import Strategies
 
 async def get_config_dependency() -> Config:
     if not get_config_provider().is_configured():
+        logger.info("Config Store is not configured, setting up...")
         await setup_config_store()
     return get_config_provider().get_config()
 
