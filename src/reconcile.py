@@ -1,7 +1,6 @@
 from typing import Any
 
-from configuration.setup import get_connection
-from psycopg import AsyncConnection
+from src.configuration.setup import get_connection
 from psycopg.rows import dict_row
 
 from src.configuration.config import Config
