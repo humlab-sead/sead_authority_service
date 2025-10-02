@@ -1,10 +1,13 @@
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from configuration.inject import ConfigProvider
 import psycopg
 import pytest
 
-from src.configuration.inject import ConfigStore
-from src.strategies.site import QueryProxy, SiteReconciliationStrategy
+from src.configuration.inject import MockConfigProvider, set_config_provider
+from tests.decorators import with_test_config
+from src.strategies.site import SQL_QUERIES, QueryProxy, SiteReconciliationStrategy
 
 # pylint: disable=attribute-defined-outside-init,protected-access
 
@@ -12,264 +15,275 @@ from src.strategies.site import QueryProxy, SiteReconciliationStrategy
 class TestQueryProxy:
     """Tests for QueryProxy class."""
 
-    def setup_method(self):
-        """Set up test fixtures."""
-        ConfigStore.configure_context(source="./tests/config.yml")
-        self.mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        self.proxy = QueryProxy(self.mock_cursor)
-
     @pytest.mark.asyncio
-    async def test_fetch_site_by_national_id_found(self):
+    @with_test_config
+    async def test_fetch_site_by_national_id_found(self, test_provider: MockConfigProvider):
         """Test fetching site by national ID when site exists."""
         # Mock data returned from database
-        mock_row = {"site_id": 1, "label": "Test Site", "name_sim": 1.0, "latitude": 59.3293, "longitude": 18.0686}
-        self.mock_cursor.fetchone.return_value = mock_row
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+        proxy = QueryProxy(mock_cursor)
+        mock_row: dict[str, Any] = {"site_id": 1, "label": "Test Site", "name_sim": 1.0, "latitude": 59.3293, "longitude": 18.0686}
+        mock_cursor.fetchone.return_value = mock_row
 
-        result = await self.proxy.fetch_site_by_national_id("TEST123")
+        result: list[dict[str, Any]] = await proxy.fetch_site_by_national_id("TEST123")
 
         # Verify SQL execution
-        expected_sql = """
-            select site_id, label, 1.0 as name_sim, latitude_dd as latitude, longitude_dd as longitude
-            from authority.sites
-            where national_site_identifier = %(identifier)s
-            limit 1
-        """
-        self.mock_cursor.execute.assert_called_once_with(expected_sql, {"identifier": "TEST123"})
-        self.mock_cursor.fetchone.assert_called_once()
+        expected_sql: str = SQL_QUERIES["fetch_site_by_national_id"]
+        mock_cursor.execute.assert_called_once_with(expected_sql, {"identifier": "TEST123"})
+        mock_cursor.fetchone.assert_called_once()
 
         assert result == [mock_row]
 
     @pytest.mark.asyncio
     async def test_fetch_site_by_national_id_not_found(self):
         """Test fetching site by national ID when site doesn't exist."""
-        self.mock_cursor.fetchone.return_value = None
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+        proxy = QueryProxy(mock_cursor)
+        mock_cursor.fetchone.return_value = None
 
-        result = await self.proxy.fetch_site_by_national_id("NONEXISTENT")
+        result = await proxy.fetch_site_by_national_id("NONEXISTENT")
 
-        self.mock_cursor.execute.assert_called_once()
-        self.mock_cursor.fetchone.assert_called_once()
+        mock_cursor.execute.assert_called_once()
+        mock_cursor.fetchone.assert_called_once()
         assert result == []
 
     @pytest.mark.asyncio
     async def test_fetch_by_fuzzy_name_search(self):
         """Test fuzzy name search."""
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+        proxy = QueryProxy(mock_cursor)
         mock_rows = [{"site_id": 1, "label": "Test Site 1", "name_sim": 0.9}, {"site_id": 2, "label": "Test Site 2", "name_sim": 0.8}]
-        self.mock_cursor.fetchall.return_value = mock_rows
+        mock_cursor.fetchall.return_value = mock_rows
 
-        result = await self.proxy.fetch_by_fuzzy_name_search("test site", limit=5)
+        result: list[dict[str, Any]] = await proxy.fetch_by_fuzzy_name_search("test site", limit=5)
 
-        expected_sql = "SELECT * FROM authority.fuzzy_sites(%(q)s, %(n)s);"
-        self.mock_cursor.execute.assert_called_once_with(expected_sql, {"q": "test site", "n": 5})
-        self.mock_cursor.fetchall.assert_called_once()
+        expected_sql: str = SQL_QUERIES["fetch_by_fuzzy_name_search"]
+        mock_cursor.execute.assert_called_once_with(expected_sql, {"q": "test site", "n": 5})
+        mock_cursor.fetchall.assert_called_once()
         assert result == mock_rows
 
     @pytest.mark.asyncio
     async def test_fetch_by_fuzzy_name_search_default_limit(self):
         """Test fuzzy name search with default limit."""
-        self.mock_cursor.fetchall.return_value = []
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+        proxy = QueryProxy(mock_cursor)
 
-        await self.proxy.fetch_by_fuzzy_name_search("test")
+        mock_cursor.fetchall.return_value = []
 
-        self.mock_cursor.execute.assert_called_once_with("SELECT * FROM authority.fuzzy_sites(%(q)s, %(n)s);", {"q": "test", "n": 10})
+        await proxy.fetch_by_fuzzy_name_search("test")
+        expected_sql: str = SQL_QUERIES["fetch_by_fuzzy_name_search"]
+        mock_cursor.execute.assert_called_once_with(expected_sql, {"q": "test", "n": 10})
 
     @pytest.mark.asyncio
     async def test_fetch_site_distances(self):
         """Test fetching site distances."""
-        coordinate = {"lat": 59.3293, "lon": 18.0686}
-        site_ids = [1, 2, 3]
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+        proxy = QueryProxy(mock_cursor)
+        coordinate: dict[str, float] = {"lat": 59.3293, "lon": 18.0686}
+        site_ids: list[int] = [1, 2, 3]
 
         mock_rows = [{"site_id": 1, "distance_km": 1.2}, {"site_id": 2, "distance_km": 5.7}, {"site_id": 3, "distance_km": 12.3}]
-        self.mock_cursor.fetchall.return_value = mock_rows
+        mock_cursor.fetchall.return_value = mock_rows
 
-        result = await self.proxy.fetch_site_distances(coordinate, site_ids)
+        result: dict[int, float] = await proxy.fetch_site_distances(coordinate, site_ids)
 
         # Verify SQL execution with proper parameters
         expected_params = {"lat": 59.3293, "lon": 18.0686, "site_ids": [1, 2, 3]}
-        self.mock_cursor.execute.assert_called_once()
-        args, _ = self.mock_cursor.execute.call_args
+        mock_cursor.execute.assert_called_once()
+        args, _ = mock_cursor.execute.call_args
         assert args[1] == expected_params
 
-        self.mock_cursor.fetchall.assert_called_once()
-        expected_result = {1: 1.2, 2: 5.7, 3: 12.3}
+        mock_cursor.fetchall.assert_called_once()
+        expected_result: dict[int, float] = {1: 1.2, 2: 5.7, 3: 12.3}
         assert result == expected_result
 
     @pytest.mark.asyncio
     async def test_get_site_details_valid_id(self):
         """Test getting site details with valid ID."""
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+        proxy = QueryProxy(mock_cursor)
         mock_row = {"ID": 123, "Name": "Test Site", "Description": "A test site", "National ID": "TEST123", "Latitude": 59.3293, "Longitude": 18.0686}
-        self.mock_cursor.fetchone.return_value = mock_row
+        mock_cursor.fetchone.return_value = mock_row
 
-        result = await self.proxy.get_site_details("123")
+        result: dict[str, Any] | None = await proxy.get_site_details("123")
 
-        expected_sql = """
-                SELECT 
-                    site_id as "ID", 
-                    label as "Name", 
-                    site_description as "Description", 
-                    national_site_identifier as "National ID", 
-                    latitude_dd as "Latitude", 
-                    longitude_dd as "Longitude"
-                FROM authority.sites 
-                WHERE site_id = %(id)s
-                """
-        self.mock_cursor.execute.assert_called_once_with(expected_sql, {"id": 123})
+        expected_sql: str = SQL_QUERIES["get_site_details"]
+        mock_cursor.execute.assert_called_once_with(expected_sql, {"id": 123})
         assert result == mock_row
 
     @pytest.mark.asyncio
     async def test_get_site_details_invalid_id(self):
         """Test getting site details with invalid ID."""
-        result = await self.proxy.get_site_details("not_a_number")
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+        proxy = QueryProxy(mock_cursor)
+        result: dict[str, Any] | None = await proxy.get_site_details("not_a_number")
         assert result is None
-        self.mock_cursor.execute.assert_not_called()
+        mock_cursor.execute.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_get_site_details_not_found(self):
         """Test getting site details when site doesn't exist."""
-        self.mock_cursor.fetchone.return_value = None
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+        proxy = QueryProxy(mock_cursor)
+        mock_cursor.fetchone.return_value = None
 
-        result = await self.proxy.get_site_details("999")
+        result = await proxy.get_site_details("999")
 
         assert result is None
-        self.mock_cursor.execute.assert_called_once()
+        mock_cursor.execute.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_site_details_database_error(self):
         """Test getting site details when database error occurs."""
-        self.mock_cursor.execute.side_effect = psycopg.Error("Database error")
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+        proxy = QueryProxy(mock_cursor)
+        mock_cursor.execute.side_effect = psycopg.Error("Database error")
 
-        result = await self.proxy.get_site_details("123")
+        result = await proxy.get_site_details("123")
 
         assert result is None
 
     @pytest.mark.asyncio
     async def test_fetch_site_location_similarity(self):
         """Test fetching site location similarity."""
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+        proxy = QueryProxy(mock_cursor)
         candidates = [{"site_id": 1, "label": "Site 1"}, {"site_id": 2, "label": "Site 2"}]
 
         mock_rows = [{"site_id": 1, "place_sim": 0.8}, {"site_id": 2, "place_sim": 0.6}]
-        self.mock_cursor.fetchall.return_value = mock_rows
+        mock_cursor.fetchall.return_value = mock_rows
 
-        result = await self.proxy.fetch_site_location_similarity(candidates, "Stockholm")
+        result = await proxy.fetch_site_location_similarity(candidates, "Stockholm")
 
-        expected_sql = """
-            select site_id, max(similarity(location_name, %(place)s)) as place_sim
-            from public.tbl_site_locations
-            join public.tbl_locations using(location_id)
-            where site_id = any(%(site_ids)s) 
-              and location_name is not null
-            group by site_id
-        """
-        self.mock_cursor.execute.assert_called_once_with(expected_sql, {"place": "Stockholm", "site_ids": [1, 2]})
+        expected_sql: str = SQL_QUERIES["fetch_site_location_similarity"]
+        mock_cursor.execute.assert_called_once_with(expected_sql, {"place": "Stockholm", "site_ids": [1, 2]})
 
-        expected_result = {1: 0.8, 2: 0.6}
+        expected_result: dict[int, float] = {1: 0.8, 2: 0.6}
         assert result == expected_result
 
 
 class TestSiteReconciliationStrategy:
     """Tests for SiteReconciliationStrategy class."""
 
-    def setup_method(self):
-        """Set up test fixtures."""
-        ConfigStore.configure_context(source="./tests/config.yml")
-        self.strategy = SiteReconciliationStrategy()
-        self.mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-
-    def test_get_entity_id_field(self):
+    @with_test_config
+    def test_get_entity_id_field(self, test_provider: MockConfigProvider):
         """Test getting entity ID field name."""
-        assert self.strategy.get_entity_id_field() == "site_id"
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
+        assert strategy.get_entity_id_field() == "site_id"
 
-    def test_get_label_field(self):
+    @with_test_config
+    def test_get_label_field(self, test_provider: MockConfigProvider):
         """Test getting label field name."""
-        assert self.strategy.get_label_field() == "label"
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
+        assert strategy.get_label_field() == "label"
 
-    def test_get_id_path(self):
+    @with_test_config
+    def test_get_id_path(self, test_provider: MockConfigProvider):
         """Test getting ID path."""
-        assert self.strategy.get_id_path() == "site"
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
+        assert strategy.get_id_path() == "site"
 
-    @pytest.mark.asyncio
     @patch("src.strategies.site.QueryProxy")
-    async def test_find_candidates_by_national_id(self, mock_query_proxy_class):
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_find_candidates_by_national_id(self, mock_query_proxy_class, test_provider: MockConfigProvider):
         """Test finding candidates by national ID."""
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         mock_proxy = AsyncMock()
         mock_query_proxy_class.return_value = mock_proxy
 
         # Mock national ID search returns results
-        mock_sites = [{"site_id": 1, "label": "Test Site", "name_sim": 1.0}]
+        mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 1.0}]
         mock_proxy.fetch_site_by_national_id.return_value = mock_sites
 
         properties = {"national_id": "TEST123"}
-        result = await self.strategy.find_candidates(self.mock_cursor, "test query", properties, limit=10)
+        result = await strategy.find_candidates(mock_cursor, "test query", properties, limit=10)
 
         mock_proxy.fetch_site_by_national_id.assert_called_once_with("TEST123")
         mock_proxy.fetch_by_fuzzy_name_search.assert_not_called()
         assert result == mock_sites
 
-    @pytest.mark.asyncio
     @patch("src.strategies.site.QueryProxy")
-    async def test_find_candidates_by_fuzzy_search(self, mock_query_proxy_class):
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_find_candidates_by_fuzzy_search(self, mock_query_proxy_class, test_provider: MockConfigProvider):
         """Test finding candidates by fuzzy search when no national ID."""
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
         mock_proxy = AsyncMock()
         mock_query_proxy_class.return_value = mock_proxy
 
         mock_proxy.fetch_site_by_national_id.return_value = []
-        mock_sites = [{"site_id": 1, "label": "Test Site", "name_sim": 0.9}, {"site_id": 2, "label": "Another Site", "name_sim": 0.7}]
+        mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.9}, {"site_id": 2, "label": "Another Site", "name_sim": 0.7}]
         mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
 
-        result = await self.strategy.find_candidates(self.mock_cursor, "test site", {}, limit=5)
+        result = await strategy.find_candidates(mock_cursor, "test site", {}, limit=5)
 
         mock_proxy.fetch_by_fuzzy_name_search.assert_called_once_with("test site", 5)
         # Results should be sorted by name_sim in descending order
         assert result[0]["name_sim"] >= result[1]["name_sim"]
 
-    @pytest.mark.asyncio
     @patch("src.strategies.site.QueryProxy")
-    async def test_find_candidates_with_geographic_scoring(self, mock_query_proxy_class):
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_find_candidates_with_geographic_scoring(self, mock_query_proxy_class, test_provider: MockConfigProvider):
         """Test finding candidates with geographic scoring."""
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
         mock_proxy = AsyncMock()
         mock_query_proxy_class.return_value = mock_proxy
 
         mock_proxy.fetch_site_by_national_id.return_value = []
-        mock_sites = [{"site_id": 1, "label": "Near Site", "name_sim": 0.8}, {"site_id": 2, "label": "Far Site", "name_sim": 0.9}]
+        mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Near Site", "name_sim": 0.8}, {"site_id": 2, "label": "Far Site", "name_sim": 0.9}]
         mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
 
         # Mock the geographic scoring method
-        with patch.object(self.strategy, "_apply_geographic_scoring", new_callable=AsyncMock) as mock_geo_scoring:
+        with patch.object(strategy, "_apply_geographic_scoring", new_callable=AsyncMock) as mock_geo_scoring:
             mock_geo_scoring.return_value = mock_sites
 
             properties: dict[str, float] = {"latitude": 59.3293, "longitude": 18.0686}
-            _ = await self.strategy.find_candidates(self.mock_cursor, "test site", properties, limit=10)
+            _ = await strategy.find_candidates(mock_cursor, "test site", properties, limit=10)
 
             mock_geo_scoring.assert_called_once_with(mock_sites, {"lat": 59.3293, "lon": 18.0686}, mock_proxy)
 
-    @pytest.mark.asyncio
     @patch("src.strategies.site.QueryProxy")
-    async def test_find_candidates_with_place_context_scoring(self, mock_query_proxy_class):
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_find_candidates_with_place_context_scoring(self, mock_query_proxy_class, test_provider: MockConfigProvider):
         """Test finding candidates with place context scoring."""
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
         mock_proxy = AsyncMock()
         mock_query_proxy_class.return_value = mock_proxy
 
         mock_proxy.fetch_site_by_national_id.return_value = []
-        mock_sites = [{"site_id": 1, "label": "Test Site", "name_sim": 0.8}]
+        mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.8}]
         mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
 
-        with patch.object(self.strategy, "_apply_place_context_scoring", new_callable=AsyncMock) as mock_place_scoring:
+        with patch.object(strategy, "_apply_place_context_scoring", new_callable=AsyncMock) as mock_place_scoring:
             mock_place_scoring.return_value = mock_sites
 
             properties: dict[str, str] = {"place": "Stockholm"}
-            _ = await self.strategy.find_candidates(self.mock_cursor, "test site", properties, limit=10)
+            _ = await strategy.find_candidates(mock_cursor, "test site", properties, limit=10)
 
             mock_place_scoring.assert_called_once_with(mock_sites, "Stockholm", mock_proxy)
 
     @pytest.mark.asyncio
     @patch("src.configuration.inject.ConfigValue")
-    async def test_apply_geographic_scoring(self, mock_config_value):
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_apply_geographic_scoring(self, mock_config_value, test_provider: MockConfigProvider):
         """Test geographic scoring application."""
         # Mock configuration values
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         mock_config_instance = MagicMock()
         mock_config_instance.resolve.side_effect = [0.2, 10.0]  # very_near_distance_km, to_far_distance_km
         mock_config_value.return_value = mock_config_instance
 
-        candidates = [{"site_id": 1, "label": "Near Site", "name_sim": 0.7}, {"site_id": 2, "label": "Far Site", "name_sim": 0.8}]
+        candidates: list[dict[str, Any]] = [{"site_id": 1, "label": "Near Site", "name_sim": 0.7}, {"site_id": 2, "label": "Far Site", "name_sim": 0.8}]
 
         coordinate: dict[str, float] = {"lat": 59.3293, "lon": 18.0686}
         distances: dict[int, float] = {1: 0.5, 2: 15.0}  # 0.5km and 15km away
@@ -277,7 +291,7 @@ class TestSiteReconciliationStrategy:
         mock_proxy = AsyncMock()
         mock_proxy.fetch_site_distances.return_value = distances
 
-        result = await self.strategy._apply_geographic_scoring(candidates, coordinate, mock_proxy)
+        result = await strategy._apply_geographic_scoring(candidates, coordinate, mock_proxy)
 
         # Verify distances were fetched
         mock_proxy.fetch_site_distances.assert_called_once_with(coordinate, [1, 2])
@@ -292,32 +306,41 @@ class TestSiteReconciliationStrategy:
         assert result[1]["name_sim"] == 0.8  # No boost, too far
 
     @pytest.mark.asyncio
-    async def test_apply_geographic_scoring_no_coordinates(self):
+    @with_test_config
+    async def test_apply_geographic_scoring_no_coordinates(self, test_provider: MockConfigProvider):
         """Test geographic scoring with no coordinates."""
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         candidates = [{"site_id": 1, "label": "Site", "name_sim": 0.8}]
         mock_proxy = AsyncMock()
 
-        result = await self.strategy._apply_geographic_scoring(candidates, {}, mock_proxy)
+        result = await strategy._apply_geographic_scoring(candidates, {}, mock_proxy)
 
         assert result == candidates
         mock_proxy.fetch_site_distances.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_apply_geographic_scoring_no_candidates(self):
+    @with_test_config
+    async def test_apply_geographic_scoring_no_candidates(self, test_provider: MockConfigProvider):
         """Test geographic scoring with no candidates."""
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         coordinate: dict[str, float] = {"lat": 59.3293, "lon": 18.0686}
         mock_proxy = AsyncMock()
 
-        result = await self.strategy._apply_geographic_scoring([], coordinate, mock_proxy)
+        result = await strategy._apply_geographic_scoring([], coordinate, mock_proxy)
 
         assert result == []
         mock_proxy.fetch_site_distances.assert_not_called()
 
-    @pytest.mark.asyncio
     @patch("src.configuration.inject.ConfigValue")
-    async def test_apply_place_context_scoring(self, mock_config_value):
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_apply_place_context_scoring(self, mock_config_value, test_provider: MockConfigProvider):
         """Test place context scoring application."""
         # Mock configuration values
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         mock_config_instance = MagicMock()
         mock_config_instance.resolve.side_effect = [0.3, 0.1]  # similarity_threshold, max_boost
         mock_config_value.return_value = mock_config_instance
@@ -329,7 +352,7 @@ class TestSiteReconciliationStrategy:
         mock_proxy = AsyncMock()
         mock_proxy.fetch_site_location_similarity.return_value = place_results
 
-        result = await self.strategy._apply_place_context_scoring(candidates, "Stockholm", mock_proxy)
+        result = await strategy._apply_place_context_scoring(candidates, "Stockholm", mock_proxy)
 
         mock_proxy.fetch_site_location_similarity.assert_called_once_with(candidates, "Stockholm")
 
@@ -340,32 +363,40 @@ class TestSiteReconciliationStrategy:
 
     @pytest.mark.asyncio
     @patch("src.strategies.site.QueryProxy")
-    async def test_get_details(self, mock_query_proxy_class):
+    @with_test_config
+    async def test_get_details(self, mock_query_proxy_class, test_provider: MockConfigProvider):
         """Test getting site details."""
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
         mock_proxy = AsyncMock()
         mock_query_proxy_class.return_value = mock_proxy
 
         expected_details = {"ID": 123, "Name": "Test Site", "Description": "A test site"}
         mock_proxy.get_site_details.return_value = expected_details
 
-        result = await self.strategy.get_details("123", self.mock_cursor)
+        result = await strategy.get_details("123", mock_cursor)
 
-        mock_query_proxy_class.assert_called_once_with(self.mock_cursor)
+        mock_query_proxy_class.assert_called_once_with(mock_cursor)
         mock_proxy.get_site_details.assert_called_once_with("123")
         assert result == expected_details
 
     @pytest.mark.asyncio
-    async def test_find_candidates_empty_properties(self):
+    @with_test_config
+    async def test_find_candidates_empty_properties(self, test_provider: MockConfigProvider):
         """Test finding candidates with empty properties."""
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         with patch("src.strategies.site.QueryProxy") as mock_query_proxy_class:
+            mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
             mock_proxy = AsyncMock()
             mock_query_proxy_class.return_value = mock_proxy
 
             mock_proxy.fetch_site_by_national_id.return_value = []
-            mock_sites = [{"site_id": 1, "label": "Test Site", "name_sim": 0.8}]
+            mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.8}]
             mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
 
-            result = await self.strategy.find_candidates(self.mock_cursor, "test query", None, limit=10)
+            result = await strategy.find_candidates(mock_cursor, "test query", None, limit=10)
 
             # Should not call national_id search
             mock_proxy.fetch_site_by_national_id.assert_not_called()
@@ -373,22 +404,26 @@ class TestSiteReconciliationStrategy:
             assert result == mock_sites
 
     @pytest.mark.asyncio
-    async def test_find_candidates_sorting(self):
+    @with_test_config
+    async def test_find_candidates_sorting(self, test_provider: MockConfigProvider):
         """Test that candidates are sorted by name_sim in descending order."""
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         with patch("src.strategies.site.QueryProxy") as mock_query_proxy_class:
+            mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
             mock_proxy = AsyncMock()
             mock_query_proxy_class.return_value = mock_proxy
 
             mock_proxy.fetch_site_by_national_id.return_value = []
             # Unsorted candidates
-            mock_sites = [
+            mock_sites: list[dict[str, Any]] = [
                 {"site_id": 1, "label": "Low Score", "name_sim": 0.3},
                 {"site_id": 2, "label": "High Score", "name_sim": 0.9},
                 {"site_id": 3, "label": "Medium Score", "name_sim": 0.6},
             ]
             mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
 
-            result = await self.strategy.find_candidates(self.mock_cursor, "test query", {}, limit=10)
+            result = await strategy.find_candidates(mock_cursor, "test query", {}, limit=10)
 
             # Should be sorted by name_sim descending
             assert result[0]["name_sim"] == 0.9
@@ -396,18 +431,22 @@ class TestSiteReconciliationStrategy:
             assert result[2]["name_sim"] == 0.3
 
     @pytest.mark.asyncio
-    async def test_find_candidates_limit_applied(self):
+    @with_test_config
+    async def test_find_candidates_limit_applied(self, test_provider: MockConfigProvider):
         """Test that limit is properly applied to results."""
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         with patch("src.strategies.site.QueryProxy") as mock_query_proxy_class:
+            mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
             mock_proxy = AsyncMock()
             mock_query_proxy_class.return_value = mock_proxy
 
             mock_proxy.fetch_site_by_national_id.return_value = []
             # More candidates than limit
-            mock_sites = [{"site_id": i, "label": f"Site {i}", "name_sim": 1.0 - i * 0.1} for i in range(15)]  # 15 candidates
+            mock_sites: list[dict[str, Any]] = [{"site_id": i, "label": f"Site {i}", "name_sim": 1.0 - i * 0.1} for i in range(15)]  # 15 candidates
             mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
 
-            result = await self.strategy.find_candidates(self.mock_cursor, "test query", {}, limit=5)  # Limit to 5
+            result = await strategy.find_candidates(mock_cursor, "test query", {}, limit=5)  # Limit to 5
 
             assert len(result) == 5
             # Should be the top 5 by score
@@ -421,15 +460,16 @@ class TestSiteStrategyIntegration:
 
     def setup_method(self):
         """Set up test fixtures."""
-        ConfigStore.configure_context(source="./tests/config.yml")
-        self.strategy = SiteReconciliationStrategy()
-        self.mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
 
     @pytest.mark.asyncio
     @patch("src.configuration.inject.ConfigValue")
-    async def test_complete_reconciliation_workflow(self, mock_config_value):
+    @with_test_config
+    async def test_complete_reconciliation_workflow(self, mock_config_value, test_provider: MockConfigProvider):
         """Test the complete reconciliation workflow."""
         # Mock configuration values
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         mock_config_instance = MagicMock()
         mock_config_instance.resolve.side_effect = [0.2, 10.0, 0.3, 0.1]
         mock_config_value.return_value = mock_config_instance
@@ -437,6 +477,7 @@ class TestSiteStrategyIntegration:
         with patch("src.strategies.site.QueryProxy") as mock_query_proxy_class:
             mock_proxy = AsyncMock()
             mock_query_proxy_class.return_value = mock_proxy
+            mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
 
             # No national ID match
             mock_proxy.fetch_site_by_national_id.return_value = []
@@ -455,7 +496,7 @@ class TestSiteStrategyIntegration:
 
             properties = {"latitude": 59.3293, "longitude": 18.0686, "place": "Stockholm"}
 
-            result = await self.strategy.find_candidates(self.mock_cursor, "archaeological site", properties, limit=10)
+            result = await strategy.find_candidates(mock_cursor, "archaeological site", properties, limit=10)
 
             # Verify all methods were called
             mock_proxy.fetch_by_fuzzy_name_search.assert_called_once()
@@ -474,8 +515,11 @@ class TestSiteStrategyIntegration:
             assert uppsala_site["name_sim"] >= 0.7  # May have some geographic boost
 
     @pytest.mark.asyncio
-    async def test_error_handling_in_geographic_scoring(self):
+    @with_test_config
+    async def test_error_handling_in_geographic_scoring(self, test_provider: MockConfigProvider):
         """Test error handling when geographic scoring fails."""
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         candidates = [{"site_id": 1, "label": "Test Site", "name_sim": 0.8}]
         coordinate = {"lat": 59.3293, "lon": 18.0686}
 
@@ -483,7 +527,7 @@ class TestSiteStrategyIntegration:
         mock_proxy.fetch_site_distances.side_effect = Exception("Database error")
 
         with pytest.raises(Exception) as _:
-            _ = await self.strategy._apply_geographic_scoring(candidates, coordinate, mock_proxy)
+            _ = await strategy._apply_geographic_scoring(candidates, coordinate, mock_proxy)
 
 
 class TestSiteStrategyEdgeCases:
@@ -491,14 +535,15 @@ class TestSiteStrategyEdgeCases:
 
     def setup_method(self):
         """Set up test fixtures."""
-        ConfigStore.configure_context(source="./tests/config.yml")
-        self.strategy = SiteReconciliationStrategy()
-        self.mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
 
     @pytest.mark.asyncio
     @patch("src.configuration.inject.ConfigValue")
-    async def test_geographic_scoring_with_missing_site_distances(self, mock_config_value):
+    @with_test_config
+    async def test_geographic_scoring_with_missing_site_distances(self, mock_config_value, test_provider: MockConfigProvider):
         """Test geographic scoring when some sites don't have distance data."""
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         mock_config_instance = MagicMock()
         mock_config_instance.resolve.side_effect = [0.2, 10.0]
         mock_config_value.return_value = mock_config_instance
@@ -516,7 +561,7 @@ class TestSiteStrategyEdgeCases:
         mock_proxy = AsyncMock()
         mock_proxy.fetch_site_distances.return_value = distances
 
-        result = await self.strategy._apply_geographic_scoring(candidates, coordinate, mock_proxy)
+        result = await strategy._apply_geographic_scoring(candidates, coordinate, mock_proxy)
 
         # Sites with distances should have distance_km field
         site_1 = next(c for c in result if c["site_id"] == 1)
@@ -529,8 +574,12 @@ class TestSiteStrategyEdgeCases:
 
     @pytest.mark.asyncio
     @patch("src.configuration.inject.ConfigValue")
-    async def test_place_scoring_with_no_matches(self, mock_config_value):
+    @with_test_config
+    async def test_place_scoring_with_no_matches(self, mock_config_value, test_provider: MockConfigProvider):
         """Test place context scoring when no sites match the place."""
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
+
         mock_config_instance = MagicMock()
         mock_config_instance.resolve.side_effect = [0.3, 0.1]
         mock_config_value.return_value = mock_config_instance
@@ -543,7 +592,7 @@ class TestSiteStrategyEdgeCases:
         mock_proxy = AsyncMock()
         mock_proxy.fetch_site_location_similarity.return_value = place_results
 
-        result = await self.strategy._apply_place_context_scoring(candidates, "Unknown Place", mock_proxy)
+        result = await strategy._apply_place_context_scoring(candidates, "Unknown Place", mock_proxy)
 
         # Scores should remain unchanged
         assert result[0]["name_sim"] == 0.8
@@ -551,8 +600,11 @@ class TestSiteStrategyEdgeCases:
 
     @pytest.mark.asyncio
     @patch("src.configuration.inject.ConfigValue")
-    async def test_place_scoring_below_threshold(self, mock_config_value):
+    @with_test_config
+    async def test_place_scoring_below_threshold(self, mock_config_value, test_provider: MockConfigProvider):
         """Test place context scoring with similarities below threshold."""
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         mock_config_instance = MagicMock()
         mock_config_instance.resolve.side_effect = [0.5, 0.1]  # High threshold
         mock_config_value.return_value = mock_config_instance
@@ -565,15 +617,18 @@ class TestSiteStrategyEdgeCases:
         mock_proxy = AsyncMock()
         mock_proxy.fetch_site_location_similarity.return_value = place_results
 
-        result = await self.strategy._apply_place_context_scoring(candidates, "Place", mock_proxy)
+        result = await strategy._apply_place_context_scoring(candidates, "Place", mock_proxy)
 
         # Score should remain unchanged (below threshold)
         assert result[0]["name_sim"] == 0.8
 
     @pytest.mark.asyncio
     @patch("src.configuration.inject.ConfigValue")
-    async def test_geographic_scoring_max_score_cap(self, mock_config_value):
+    @with_test_config
+    async def test_geographic_scoring_max_score_cap(self, mock_config_value, test_provider: MockConfigProvider):
         """Test that geographic scoring doesn't exceed maximum score of 1.0."""
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
         mock_config_instance = MagicMock()
         mock_config_instance.resolve.side_effect = [0.5, 10.0]  # High boost
         mock_config_value.return_value = mock_config_instance
@@ -586,15 +641,19 @@ class TestSiteStrategyEdgeCases:
         mock_proxy = AsyncMock()
         mock_proxy.fetch_site_distances.return_value = distances
 
-        result = await self.strategy._apply_geographic_scoring(candidates, coordinate, mock_proxy)
+        result = await strategy._apply_geographic_scoring(candidates, coordinate, mock_proxy)
 
         # Score should be capped at 1.0
         assert result[0]["name_sim"] == 1.0
 
     @pytest.mark.asyncio
     @patch("src.configuration.inject.ConfigValue")
-    async def test_place_scoring_max_score_cap(self, mock_config_value):
+    @with_test_config
+    async def test_place_scoring_max_score_cap(self, mock_config_value, test_provider: MockConfigProvider):
         """Test that place context scoring doesn't exceed maximum score of 1.0."""
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
+
         mock_config_instance = MagicMock()
         mock_config_instance.resolve.side_effect = [0.3, 0.5]  # High boost
         mock_config_value.return_value = mock_config_instance
@@ -606,27 +665,32 @@ class TestSiteStrategyEdgeCases:
         mock_proxy = AsyncMock()
         mock_proxy.fetch_site_location_similarity.return_value = place_results
 
-        result = await self.strategy._apply_place_context_scoring(candidates, "Place", mock_proxy)
+        result = await strategy._apply_place_context_scoring(candidates, "Place", mock_proxy)
 
         # Score should be capped at 1.0
         assert result[0]["name_sim"] <= 1.0
 
     @pytest.mark.asyncio
-    async def test_find_candidates_all_enhancements_applied(self):
+    @with_test_config
+    async def test_find_candidates_all_enhancements_applied(self, test_provider: MockConfigProvider):
         """Test that all enhancements are applied in the correct order."""
+
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
+
         with patch("src.strategies.site.QueryProxy") as mock_query_proxy_class:
             mock_proxy = AsyncMock()
             mock_query_proxy_class.return_value = mock_proxy
 
             # No national_id provided, so fuzzy search will be used
             mock_proxy.fetch_site_by_national_id.return_value = []
-            mock_sites = [{"site_id": 1, "label": "Test Site", "name_sim": 0.5}]
+            mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.5}]
             mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
+            mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
 
             # Mock both enhancement methods
             with (
-                patch.object(self.strategy, "_apply_geographic_scoring", new_callable=AsyncMock) as mock_geo,
-                patch.object(self.strategy, "_apply_place_context_scoring", new_callable=AsyncMock) as mock_place,
+                patch.object(strategy, "_apply_geographic_scoring", new_callable=AsyncMock) as mock_geo,
+                patch.object(strategy, "_apply_place_context_scoring", new_callable=AsyncMock) as mock_place,
             ):
 
                 enhanced_sites_geo = [{"site_id": 1, "label": "Test Site", "name_sim": 0.7, "distance_km": 1.5}]
@@ -637,7 +701,7 @@ class TestSiteStrategyEdgeCases:
 
                 properties = {"latitude": 59.0, "longitude": 18.0, "place": "Stockholm"}
 
-                result = await self.strategy.find_candidates(self.mock_cursor, "test site", properties, limit=10)
+                result = await strategy.find_candidates(mock_cursor, "test site", properties, limit=10)
 
                 # Verify methods were called in correct order
                 mock_geo.assert_called_once()
@@ -647,32 +711,44 @@ class TestSiteStrategyEdgeCases:
                 assert result == enhanced_sites_place
 
     @pytest.mark.asyncio
-    async def test_empty_query_string(self):
+    @with_test_config
+    async def test_empty_query_string(self, test_provider: MockConfigProvider):
         """Test behavior with empty query string."""
+
         with patch("src.strategies.site.QueryProxy") as mock_query_proxy_class:
+
+            strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
+
+            mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
             mock_proxy = AsyncMock()
             mock_query_proxy_class.return_value = mock_proxy
 
             mock_proxy.fetch_site_by_national_id.return_value = []
             mock_proxy.fetch_by_fuzzy_name_search.return_value = []
 
-            result = await self.strategy.find_candidates(self.mock_cursor, "", {}, limit=10)
+            result = await strategy.find_candidates(mock_cursor, "", {}, limit=10)
 
             mock_proxy.fetch_by_fuzzy_name_search.assert_called_once_with("", 10)
             assert result == []
 
     @pytest.mark.asyncio
-    async def test_zero_limit(self):
+    @with_test_config
+    async def test_zero_limit(self, test_provider: MockConfigProvider):
         """Test behavior with zero limit."""
+
         with patch("src.strategies.site.QueryProxy") as mock_query_proxy_class:
+
+            strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
+
+            mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
             mock_proxy = AsyncMock()
             mock_query_proxy_class.return_value = mock_proxy
 
             mock_proxy.fetch_site_by_national_id.return_value = []
-            mock_sites = [{"site_id": 1, "label": "Site", "name_sim": 0.8}]
+            mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Site", "name_sim": 0.8}]
             mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
 
-            result = await self.strategy.find_candidates(self.mock_cursor, "test", {}, limit=0)
+            result = await strategy.find_candidates(mock_cursor, "test", {}, limit=0)
 
             # Should return empty list due to limit=0
             assert result == []
