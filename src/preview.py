@@ -1,5 +1,6 @@
 from typing import Any, Dict
 
+from loguru import logger
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
@@ -11,6 +12,7 @@ from src.strategies.interface import ReconciliationStrategy, Strategies
 async def render_preview(uri: str) -> ValueError | str:
     """Provides a generic HTML preview for a given entity ID."""
 
+    logger.debug(f"Rendering preview for URI: {uri}")
     id_base: str = ConfigValue("options:id_base").resolve()
     connection: AsyncConnection = await get_connection()
 
@@ -23,6 +25,7 @@ async def render_preview(uri: str) -> ValueError | str:
 
     entity_path, entity_id_str = parts
 
+    logger.debug(f"Entity path: {entity_path}, Entity ID: {entity_id_str}")
     if not Strategies.items.get(entity_path):
         raise ValueError(f"Unknown entity type: {entity_path}")
 
