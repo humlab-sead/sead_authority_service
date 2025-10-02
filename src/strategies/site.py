@@ -90,7 +90,7 @@ class QueryProxy:
         site_ids: list[int] = [c["site_id"] for c in candidates]
         await self.cursor.execute(sql, {"place": place, "site_ids": site_ids})
 
-        place_results = {row["site_id"]: row["place_sim"] for row in await self.cursor.fetchall()}
+        place_results: dict[int, float] = {row["site_id"]: row["place_sim"] for row in await self.cursor.fetchall()}
         return place_results
 
 
