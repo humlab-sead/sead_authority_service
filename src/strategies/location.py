@@ -2,7 +2,7 @@ from typing import Any
 
 import psycopg
 
-from strategies.query import QueryProxy
+from src.strategies.query import QueryProxy
 
 from .interface import ReconciliationStrategy, Strategies
 
@@ -58,8 +58,8 @@ SPECIFICATION: dict[str, str] = {
 
 
 class LocationQueryProxy(QueryProxy):
-    def __init__(self, cursor: psycopg.AsyncCursor) -> None:
-        super().__init__(SPECIFICATION, cursor)
+    def __init__(self, specification: dict, cursor: psycopg.AsyncCursor) -> None:
+        super().__init__(specification, cursor)
 
 
 @Strategies.register(key="location")
