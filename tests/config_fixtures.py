@@ -17,7 +17,7 @@ from src.configuration.inject import (ConfigProvider, ConfigStore,
 @contextmanager
 def patch_config_provider(provider: ConfigProvider) -> Generator[ConfigProvider, None, None]:
     """Context manager to temporarily replace the config provider"""
-    original_provider = set_config_provider(provider)
+    original_provider: ConfigProvider = set_config_provider(provider)
     try:
         yield provider
     finally:
@@ -35,7 +35,7 @@ def config_context(config_dict: Dict[str, Any]) -> Generator[Config, None, None]
 
 
 @pytest.fixture
-def reset_config():
+def reset_config() -> Generator[None, Any, None]:
     """Fixture to reset Config Store and provider before each test"""
     ConfigStore.reset_instance()
     reset_config_provider()
@@ -43,34 +43,33 @@ def reset_config():
     ConfigStore.reset_instance()
     reset_config_provider()
 
-
-def mock_connection():
-    """Create a mock connection for testing"""
+async def mock_connection() -> AsyncMock:
+    """Create a mock connection for testing - async function that can be awaited"""
     mock_conn = AsyncMock(spec=psycopg.AsyncConnection)
     mock_conn.cursor.return_value = AsyncMock(spec=psycopg.AsyncCursor)
     return mock_conn
 
 
 @pytest.fixture
-def test_config_dict():
+def test_config_dict() -> dict[str, Any]:
     """Default test configuration dictionary"""
     return {
         "options": {"id_base": "https://test.example.com/sead/id/"},
         "database": {"host": "localhost", "port": 5432, "database": "test_sead", "user": "test_user", "password": "test_password"},
-        "runtime": {"connection_factory": lambda: mock_connection()},
+        "runtime": {"connection_factory": mock_connection},
         "logging": {"level": "DEBUG"},
     }
 
 
 @pytest.fixture
-def test_config_provider(test_config_dict):
+def test_config_provider(test_config_dict: Dict[str, Any]) -> MockConfigProvider:
     """Fixture that provides a MockConfigProvider with default test config"""
     config = Config(data=test_config_dict)
     return MockConfigProvider(config)
 
 
 @pytest.fixture
-def mock_config_context(test_config_provider):
+def mock_config_context(test_config_provider: MockConfigProvider) -> Generator[MockConfigProvider, Any, None]:
     """Fixture that sets up a test config context for the duration of the test"""
     with patch_config_provider(test_config_provider):
         yield test_config_provider
@@ -88,6 +87,6 @@ def setup_test_config(config_dict: Dict[str, Any] = None) -> MockConfigProvider:
     return provider
 
 
-def restore_production_config():
+def restore_production_config() -> None:
     """Restore production configuration provider"""
     reset_config_provider()
