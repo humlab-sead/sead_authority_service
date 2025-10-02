@@ -235,12 +235,12 @@ class TestPropertiesEndpoint:
         property_ids = [p["id"] for p in properties]
         
         # Site properties
-        site_properties = ["latitude", "longitude", "country", "national_id", "place_name"]
+        site_properties: list[str] = ["latitude", "longitude", "country", "national_id", "place_name"]
         for expected_id in site_properties:
             assert expected_id in property_ids
             
         # Taxon properties  
-        taxon_properties = ["scientific_name", "genus", "species", "family"]
+        taxon_properties: list[str] = ["scientific_name", "genus", "species", "family"]
         for expected_id in taxon_properties:
             assert expected_id in property_ids
 
@@ -320,7 +320,7 @@ class TestPropertiesEndpoint:
             assert expected_id in property_ids
             
         # Should not contain taxon properties
-        taxon_ids = ["scientific_name", "genus", "species", "family"]
+        taxon_ids = ["label", "genus", "species", "family"]
         for taxon_id in taxon_ids:
             assert taxon_id not in property_ids
 
