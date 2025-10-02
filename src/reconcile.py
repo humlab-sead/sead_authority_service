@@ -12,7 +12,8 @@ async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
     default_query_limit: int = get_config_provider().get_config().get("options:default_query_limit") or 10
 
     results: dict[str, Any] = {}
-    async with get_connection().cursor(row_factory=dict_row) as cursor:
+    connection = await get_connection()
+    async with connection.cursor(row_factory=dict_row) as cursor:
         for query_id, query in queries.items():
 
             if not (query.get("query") or "").strip():
