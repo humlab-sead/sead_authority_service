@@ -1,5 +1,6 @@
 from typing import Any
 
+from loguru import logger
 from psycopg.rows import dict_row
 
 from src.configuration.inject import get_config_provider
@@ -13,22 +14,31 @@ async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
 
     results: dict[str, Any] = {}
     connection = await get_connection()
+    
+    logger.info(f"Processing {len(queries)} reconciliation queries")
+    
     async with connection.cursor(row_factory=dict_row) as cursor:
         for query_id, query in queries.items():
+            logger.info(f"Processing query {query_id}: {query}")
 
             if not (query.get("query") or "").strip():
+                logger.info(f"Empty query for {query_id}, returning empty results")
                 results[query_id] = {"result": []}
                 continue
 
             if not query.get("type"):
+                logger.error(f"Missing 'type' in query {query_id}")
                 raise ValueError("Missing 'type' in query")
 
             entity_type: str = query.get("type")
+            logger.info(f"Query {query_id} entity type: {entity_type}")
 
             if not Strategies.items.get(entity_type):
+                logger.error(f"Unknown query type '{entity_type}' in query {query_id}. Available types: {list(Strategies.items.keys())}")
                 raise ValueError(f"Unknown query type '{entity_type}' in query")
 
             strategy: ReconciliationStrategy = Strategies.items.get(entity_type)()
+            logger.info(f"Created strategy for {entity_type}: {type(strategy).__name__}")
 
             candidate_data: list[dict[str, Any]] = await strategy.find_candidates(
                 cursor=cursor,
@@ -37,5 +47,8 @@ async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
                 limit=default_query_limit,
             )
 
+            logger.info(f"Found {len(candidate_data)} candidates for query {query_id}")
             results[query_id] = {"result": [strategy.as_candidate(data) for data in candidate_data]}
+            
+        logger.info(f"Reconciliation completed with {len(results)} results")
         return results
