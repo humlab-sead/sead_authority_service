@@ -14,19 +14,18 @@ from .config import Config
 
 T = TypeVar("T", str, int, float)
 
-
+ # pylint: disable=global-statement
+ 
 class ConfigProvider(ABC):
     """Abstract configuration provider for dependency injection"""
 
     @abstractmethod
     def get_config(self, context: str = None) -> Config:
         """Get configuration for the given context"""
-        pass
 
     @abstractmethod
     def is_configured(self, context: str = None) -> bool:
         """Check if configuration exists for the given context"""
-        pass
 
 
 class SingletonConfigProvider(ConfigProvider):

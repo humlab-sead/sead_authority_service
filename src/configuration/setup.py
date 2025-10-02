@@ -48,8 +48,7 @@ async def _setup_connection_factory(cfg):
             con = await psycopg.AsyncConnection.connect(dsn)
             cfg.update({"runtime:connection": con})
             return con
-        else:
-            return cfg.get("runtime:connection")
+        return cfg.get("runtime:connection")
 
     cfg.update(
         {

@@ -15,7 +15,7 @@ from src.reconcile import reconcile_queries
 from src.render import render_preview
 from src.strategies.interface import Strategies
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument, redefined-builtin
 
 
 async def get_config_dependency() -> Config:
