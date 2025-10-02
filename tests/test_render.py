@@ -170,7 +170,7 @@ class TestRenderPreview:
         assert "<h3 style='margin-top:0;'>Test Site</h3>" in result  # Uses same mock data
         
 
-class TestRenderPreviewEdgeCases:
+class TestConfigProvider:
     """Test edge cases and error conditions"""
 
     @pytest.mark.asyncio
