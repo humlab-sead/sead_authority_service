@@ -2,6 +2,9 @@ SHELL := /bin/bash
 
 serve:       
 	@uv run uvicorn main:app --reload
+	
+debug-serve:       
+	@uv run uvicorn main:app --reload --log-level debug
 
 .PHONY: install
 install:
