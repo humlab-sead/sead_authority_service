@@ -12,9 +12,14 @@ class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
     def __init__(self, specification: dict[str, str | dict[str, Any]], query_proxy_class: Type[QueryProxy]) -> None:
-        connection_factory = ConfigValue("runtime:connection_factory").resolve()
-        self.connection: psycopg.AsyncConnection = connection_factory()
-        self.specification: dict[str, str | dict[str, Any]] = specification or {}
+        self.specification: dict[str, str | dict[str, Any]] = specification or {
+            "key": "unknown",
+            "id_field": "id",
+            "label_field": "name",
+            "properties": [],
+            "property_settings": {},
+            "sql_queries": {},
+        }
         self.query_proxy_class: Type[QueryProxy] = query_proxy_class
 
     def get_entity_id_field(self) -> str:
