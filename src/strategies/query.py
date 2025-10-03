@@ -13,7 +13,7 @@ class QueryProxy:
         """Fetch details for a specific location."""
         try:
             sql: str = self.specification["sql_queries"]["get_details"]
-            logger.debug(f"Executing SQL for get_details: {sql}")
+            # logger.debug(f"Executing SQL for get_details: {sql}")
             await self.cursor.execute(sql, {"id": int(entity_id)})
             row: tuple[Any] | None = await self.cursor.fetchone()
             return dict(row) if row else None
