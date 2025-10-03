@@ -2,7 +2,15 @@
 # Use with VS Code REST Client extension
 # 
 # Usage: Click "Send Request" above any ### request
-# Change the port number if your service runs on a different port
+# Chan### Test Entity Preview (use FULL URI from reconciliation results)
+# Note: The preview endpoint expects the full URI starting with id_base (e.g. https://w3id.org/sead/id/)
+# For locations, the path segment is "location" (NOT "place").
+# Get a real ID by running a reconciliation query first, then use that ID here.
+GET {{baseUrl}}/reconcile/preview?id=https://w3id.org/sead/id/location/4196
+
+### Test Site Preview (use FULL URI from reconciliation results)
+# For sites, the path segment is "site".
+GET {{baseUrl}}/reconcile/preview?id=https://w3id.org/sead/id/site/1234ort number if your service runs on a different port
 
 @baseUrl = http://localhost:8000
 

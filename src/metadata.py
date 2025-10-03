@@ -90,15 +90,18 @@ def get_reconciliation_metadata(strategies: StrategyRegistry, base_url: str) -> 
     # Collect property settings from all registered strategies
     property_settings: list[dict[str, str]] = _compile_property_settings(strategies)
 
+    # Ensure base_url doesn't end with slash to avoid double slashes
+    base_url_clean = str(base_url).rstrip('/')
+
     return {
         "name": "SEAD Entity Reconciliation",
         "identifierSpace": f"{id_base}",
         "schemaSpace": "http://www.w3.org/2004/02/skos/core#",
         "defaultTypes": default_types,
-        "view": {"url": f"{base_url}/reconcile/preview?id={{{{id}}}}"},
+        "view": {"url": f"{base_url_clean}/reconcile/preview?id={{{{id}}}}"},
         "extend": {
             "propose_properties": {
-                "service_url": f"{base_url}/reconcile",
+                "service_url": f"{base_url_clean}/reconcile",
                 "service_path": "/properties",
             },
             "property_settings": property_settings,
