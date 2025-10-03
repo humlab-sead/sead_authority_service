@@ -53,12 +53,12 @@ async def render_flyout_preview(uri: str) -> dict[str, Any]:
     # Create compact HTML for tooltip display
     title = details.get("Name") or details.get("label") or next(iter(details.values()), "Details")
     
-    html = f"""<div style="padding:12px; font-family:sans-serif; font-size:13px; line-height:1.4; max-width:350px;">
-    <div style="font-weight:600; font-size:15px; margin-bottom:8px; color:#1a1a1a; border-bottom:1px solid #e0e0e0; padding-bottom:6px;">
+    html = f"""<div style="padding:6px 8px; font-family:sans-serif; font-size:11px; line-height:1.3; max-width:300px;">
+    <div style="font-weight:600; font-size:12px; margin-bottom:3px; color:#1a1a1a; border-bottom:1px solid #e0e0e0; padding-bottom:2px;">
         {title}
     </div>
-    <div style="background:#f5f5f5; padding:4px 8px; border-radius:3px; display:inline-block; font-size:11px; margin-bottom:8px; color:#666;">
-        {entity_path.upper()}
+    <div style="background:#f5f5f5; padding:2px 6px; border-radius:2px; display:inline-block; font-size:9px; margin-bottom:4px; color:#666; text-transform:uppercase;">
+        {entity_path}
     </div>
 """
     
@@ -71,14 +71,14 @@ async def render_flyout_preview(uri: str) -> dict[str, Any]:
             if detail_count >= max_details:
                 break
             
-            # Truncate long values
+            # Truncate long values more aggressively
             value_str = str(value)
-            if len(value_str) > 100:
-                value_str = value_str[:97] + "..."
+            if len(value_str) > 60:
+                value_str = value_str[:57] + "..."
             
-            html += f"""    <div style="margin:6px 0; padding:4px 0;">
-        <span style="font-weight:500; color:#555; font-size:12px;">{key}:</span>
-        <span style="color:#222; margin-left:4px;">{value_str}</span>
+            html += f"""    <div style="margin:2px 0; padding:1px 0;">
+        <span style="font-weight:500; color:#555; font-size:10px;">{key}:</span>
+        <span style="color:#222; margin-left:3px; font-size:10px;">{value_str}</span>
     </div>
 """
             detail_count += 1
