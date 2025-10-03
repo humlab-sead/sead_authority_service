@@ -36,7 +36,7 @@ async def is_alive(config: Config = Depends(get_config_dependency)) -> dict[str,
 
 
 @router.get("/reconcile")
-async def meta(config: Config = Depends(get_config_dependency)):
+async def meta(config: Config = Depends(get_config_dependency)) -> dict[str, Any]:
     """
     OpenRefine reconciliation service metadata endpoint.
 
