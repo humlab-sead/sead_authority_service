@@ -43,42 +43,7 @@ async def meta(config: Config = Depends(get_config_dependency)):
     that can be used for enhanced reconciliation matching.
     """
 
-    default_types: list[dict[str, str]] = [{"id": entity_type, "name": entity_type} for entity_type in Strategies.items]
-    id_base: str = ConfigValue("options:id_base").resolve()
-
-    # Collect property settings from all registered strategies
-    property_settings = []
-    for strategy_class in Strategies.items.values():
-        strategy_instance = strategy_class()
-        properties = strategy_instance.get_properties_meta()
-        property_specific_settings = strategy_instance.get_property_settings()
-
-        for prop in properties:
-            # Convert property metadata to OpenRefine property_settings format
-            setting = {
-                "name": prop["id"],
-                "label": prop["name"],
-                "type": prop["type"],
-                "help_text": prop["description"],
-            }
-
-            # Add strategy-specific settings if available
-            if prop["id"] in property_specific_settings:
-                setting["settings"] = property_specific_settings[prop["id"]]
-
-            property_settings.append(setting)
-
-    return {
-        "name": "SEAD Entity Reconciliation",
-        "identifierSpace": f"{id_base}",
-        "schemaSpace": "http://www.w3.org/2004/02/skos/core#",
-        "defaultTypes": default_types,
-        "extend": {
-            "propose_properties": {"service_url": f"{id_base}reconcile", "service_path": "/properties"},
-            "property_settings": property_settings,
-        },
-    }
-
+    return Strategies.get_reconciliation_metadata()
 
 @router.post("/reconcile")
 async def reconcile(request: Request, config: Config = Depends(get_config_dependency)) -> JSONResponse:
@@ -244,31 +209,7 @@ async def suggest_properties(query: str = "", type: str = "", config: Config = D
         JSON response with matching properties
     """
     # Get properties from registered strategies
-    if type and type in Strategies.items:
-        # Get properties for the specific entity type
-        strategy_class = Strategies.items[type]
-        strategy_instance = strategy_class()
-        all_properties = strategy_instance.get_properties_meta()
-    elif type and type not in Strategies.items:
-        # Unknown entity type - return empty to avoid confusion
-        all_properties = []
-    else:
-        # No type specified - return properties from all registered strategies
-        all_properties = []
-        for strategy_class in Strategies.items.values():
-            strategy_instance = strategy_class()
-            all_properties.extend(strategy_instance.get_properties_meta())
-
-    # Filter properties based on query if provided
-    if query:
-        query_lower = query.lower()
-        filtered_properties = [
-            prop
-            for prop in all_properties
-            if query_lower in prop["id"].lower() or query_lower in prop["name"].lower() or query_lower in prop["description"].lower()
-        ]
-    else:
-        filtered_properties: list[dict[str, str]] = all_properties
+    filtered_properties: list[dict[str, str]] | Any = Strategies.retrieve_properties(query, type)
 
     return JSONResponse({"properties": filtered_properties})
 

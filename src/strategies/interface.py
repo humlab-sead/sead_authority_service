@@ -76,7 +76,91 @@ class ReconciliationStrategy(ABC):
 
 
 class StrategyRegistry(Registry):
+
     items: dict[str, ReconciliationStrategy] = {}
 
+    def collect_property_settings(self) -> list[dict[str, str]]:
+        property_settings: list[dict[str, str]] = []
+        for strategy_class in self.items.values():
+            strategy: ReconciliationStrategy = strategy_class()
+            properties = strategy.get_properties_meta()
+            property_specific_settings = strategy.get_property_settings()
 
+            for prop in properties:
+                # Convert property metadata to OpenRefine property_settings format
+                setting: dict[str, str] = {
+                    "name": prop["id"],
+                    "label": prop["name"],
+                    "type": prop["type"],
+                    "help_text": prop["description"],
+                }
+
+                # Add strategy-specific settings if available
+                if prop["id"] in property_specific_settings:
+                    setting["settings"] = property_specific_settings[prop["id"]]
+
+                property_settings.append(setting)
+        return property_settings
+
+    def retrieve_properties(self, query: str = None, type: str = None) -> list[dict[str, str]] | Any:
+        """
+        Collects property suggestions returned by the /properties endpoint for OpenRefine.
+
+        Returns available properties that can be used for enhanced reconciliation.
+        OpenRefine calls this endpoint to populate property selection dropdowns.
+
+        Args:
+            query: Optional search term to filter properties
+            type: Optional entity type to filter properties (e.g., "site", "taxon")
+
+        Returns:
+            Dict with matching properties
+        """
+        all_properties: list[dict[str, str]] = []
+        if type and type in self.items:
+            # Get properties for the specific entity type
+            all_properties = self.items[type]().get_properties_meta()
+        elif type and type not in self.items:
+            # Unknown entity type - return empty to avoid confusion
+            all_properties = []
+        else:
+            # No type specified - return properties from all registered strategies
+            all_properties = []
+            for strategy_class in self.items.values():
+                all_properties.extend(strategy_class().get_properties_meta())
+
+        # Filter properties based on query if provided
+        if query:
+            query_lower: str = query.lower()
+            filtered_properties = [
+                prop
+                for prop in all_properties
+                if query_lower in prop["id"].lower() or query_lower in prop["name"].lower() or query_lower in prop["description"].lower()
+            ]
+        else:
+            filtered_properties: list[dict[str, str]] = all_properties
+        return filtered_properties
+
+
+    def get_reconciliation_metadata(self) -> dict[str, Any]:
+        default_types: list[dict[str, str]] = [{"id": entity_type, "name": entity_type} for entity_type in Strategies.items]
+        id_base: str = ConfigValue("options:id_base").resolve()
+
+        # Collect property settings from all registered strategies
+        property_settings: list[dict[str, str]] = Strategies.collect_property_settings()
+
+        return {
+            "name": "SEAD Entity Reconciliation",
+            "identifierSpace": f"{id_base}",
+            "schemaSpace": "http://www.w3.org/2004/02/skos/core#",
+            "defaultTypes": default_types,
+            "extend": {
+                "propose_properties": {
+                    "service_url": f"{id_base}reconcile",
+                    "service_path": "/properties",
+                },
+                "property_settings": property_settings,
+            },
+        }
+    
 Strategies: StrategyRegistry = StrategyRegistry()
