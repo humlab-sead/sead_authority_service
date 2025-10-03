@@ -16,6 +16,12 @@ from src.metadata import get_reconcile_properties, get_reconciliation_metadata
 from src.preview import render_preview
 from src.reconcile import reconcile_queries
 from src.strategies.interface import Strategies
+from src.suggest import (
+    render_flyout_preview,
+    suggest_entities,
+    suggest_properties as suggest_properties_api,
+    suggest_types,
+)
 
 # pylint: disable=unused-argument, redefined-builtin
 
@@ -243,3 +249,149 @@ async def preview(id: str, config: Config = Depends(get_config_dependency)) -> H
         return HTMLResponse(html)
     except ValueError as e:
         return HTMLResponse(f"Error: {str(e)}", status_code=500)
+
+
+# ============================================================================
+# OpenRefine Suggest API Endpoints
+# ============================================================================
+# These endpoints enable autocomplete and inline tooltip previews in OpenRefine
+
+
+@router.get("/suggest/entity")
+async def suggest_entity(
+    prefix: str = "",
+    type: str = "",
+    config: Config = Depends(get_config_dependency)
+) -> JSONResponse:
+    """
+    Entity autocomplete endpoint for OpenRefine Suggest API.
+    
+    Returns entity suggestions as the user types, enabling autocomplete
+    functionality in OpenRefine reconciliation dialogs.
+    
+    Args:
+        prefix: The text prefix to match (minimum 2 characters)
+        type: Optional entity type filter (e.g., 'site', 'location', 'taxon')
+        
+    Returns:
+        JSON response with suggested entities in format:
+        {
+            "result": [
+                {
+                    "id": "https://w3id.org/sead/id/site/123",
+                    "name": "Site Name",
+                    "type": [{"id": "site", "name": "site"}],
+                    "description": "Additional context",
+                    "score": 95.5
+                }
+            ]
+        }
+    """
+    try:
+        result = await suggest_entities(prefix=prefix, entity_type=type, limit=10)
+        return JSONResponse(result)
+    except Exception as e:
+        logger.exception(f"Error in suggest_entity: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.get("/suggest/type")
+async def suggest_type(
+    prefix: str = "",
+    config: Config = Depends(get_config_dependency)
+) -> JSONResponse:
+    """
+    Type autocomplete endpoint for OpenRefine Suggest API.
+    
+    Returns entity type suggestions filtered by prefix.
+    
+    Args:
+        prefix: Optional prefix to filter types
+        
+    Returns:
+        JSON response with type suggestions:
+        {
+            "result": [
+                {"id": "site", "name": "Site"},
+                {"id": "taxon", "name": "Taxon"}
+            ]
+        }
+    """
+    try:
+        result = await suggest_types(prefix=prefix)
+        return JSONResponse(result)
+    except Exception as e:
+        logger.exception(f"Error in suggest_type: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.get("/suggest/property")
+async def suggest_property(
+    prefix: str = "",
+    type: str = "",
+    config: Config = Depends(get_config_dependency)
+) -> JSONResponse:
+    """
+    Property autocomplete endpoint for OpenRefine Suggest API.
+    
+    Returns property suggestions filtered by prefix and optional type.
+    
+    Args:
+        prefix: Optional prefix to filter properties
+        type: Optional entity type to filter properties
+        
+    Returns:
+        JSON response with property suggestions:
+        {
+            "result": [
+                {
+                    "id": "coordinates",
+                    "name": "Coordinates",
+                    "description": "Geographic coordinates"
+                }
+            ]
+        }
+    """
+    try:
+        result = await suggest_properties_api(prefix=prefix, entity_type=type)
+        return JSONResponse(result)
+    except Exception as e:
+        logger.exception(f"Error in suggest_property: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.get("/flyout/entity")
+async def flyout_entity(
+    id: str = "",
+    config: Config = Depends(get_config_dependency)
+) -> JSONResponse:
+    """
+    Flyout/tooltip preview endpoint for OpenRefine Suggest API.
+    
+    Returns compact HTML preview for inline tooltip display when hovering
+    over entity suggestions in OpenRefine. This enables the tooltip preview
+    experience instead of opening a new browser tab.
+    
+    Args:
+        id: Entity URI to preview (e.g., 'https://w3id.org/sead/id/site/123')
+        
+    Returns:
+        JSON response with entity details:
+        {
+            "id": "https://w3id.org/sead/id/site/123",
+            "html": "<div>...formatted HTML preview...</div>"
+        }
+    """
+    try:
+        if not id:
+            return JSONResponse({"error": "Missing 'id' parameter"}, status_code=400)
+        
+        result = await render_flyout_preview(id)
+        return JSONResponse(result)
+    except ValueError as e:
+        logger.warning(f"Invalid flyout request: {e}")
+        return JSONResponse({"error": str(e)}, status_code=400)
+    except Exception as e:
+        logger.exception(f"Error in flyout_entity: {e}")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
