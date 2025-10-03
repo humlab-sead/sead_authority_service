@@ -1,7 +1,7 @@
 from typing import Any, Tuple
 
-from loguru import logger
 import psycopg
+from loguru import logger
 
 
 class QueryProxy:

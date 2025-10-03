@@ -1,8 +1,7 @@
 from typing import Any
 
 from src.configuration.inject import ConfigValue
-
-from src.strategies.interface import ReconciliationStrategy, ReconciliationStrategy, StrategyRegistry
+from src.strategies.interface import ReconciliationStrategy, StrategyRegistry
 
 
 def get_reconcile_properties(strategies: StrategyRegistry, query: str = None, type: str = None) -> list[dict[str, str]] | Any:

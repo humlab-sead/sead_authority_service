@@ -8,14 +8,15 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
-from src.strategies.metadata import get_reconciliation_metadata, get_reconcile_properties
 
 from src.configuration.config import Config
 from src.configuration.inject import ConfigValue, get_config_provider
 from src.configuration.setup import setup_config_store
-from src.reconcile import reconcile_queries
 from src.preview import render_preview
+from src.reconcile import reconcile_queries
 from src.strategies.interface import Strategies
+from src.strategies.metadata import (get_reconcile_properties,
+                                     get_reconciliation_metadata)
 
 # pylint: disable=unused-argument, redefined-builtin
 
@@ -46,6 +47,7 @@ async def meta(config: Config = Depends(get_config_dependency)) -> dict[str, Any
     """
 
     return get_reconciliation_metadata(Strategies)
+
 
 @router.post("/reconcile")
 async def reconcile(request: Request, config: Config = Depends(get_config_dependency)) -> JSONResponse:

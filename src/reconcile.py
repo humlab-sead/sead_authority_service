@@ -14,9 +14,9 @@ async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
 
     results: dict[str, Any] = {}
     connection = await get_connection()
-    
+
     logger.info(f"Processing {len(queries)} reconciliation queries")
-    
+
     async with connection.cursor(row_factory=dict_row) as cursor:
         for query_id, query in queries.items():
             logger.info(f"Processing query {query_id}: {query}")
@@ -49,6 +49,6 @@ async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
 
             logger.info(f"Found {len(candidate_data)} candidates for query {query_id}")
             results[query_id] = {"result": [strategy.as_candidate(data) for data in candidate_data]}
-            
+
         logger.info(f"Reconciliation completed with {len(results)} results")
         return results

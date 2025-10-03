@@ -79,5 +79,5 @@ class StrategyRegistry(Registry):
 
     items: dict[str, ReconciliationStrategy] = {}
 
-    
+
 Strategies: StrategyRegistry = StrategyRegistry()

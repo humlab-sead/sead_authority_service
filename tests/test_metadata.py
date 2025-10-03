@@ -1,11 +1,8 @@
 import pytest
 
-from src.metadata import (
-    get_reconcile_properties,
-    _compile_property_settings,
-    get_reconciliation_metadata,
-)
 from src.configuration.inject import ConfigValue
+from src.metadata import (_compile_property_settings, get_reconcile_properties,
+                          get_reconciliation_metadata)
 
 
 class FakeSiteStrategy:

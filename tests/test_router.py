@@ -9,11 +9,13 @@ from unittest.mock import patch
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from strategies.metadata import _compile_property_settings, get_reconcile_properties, get_reconciliation_metadata
-from src.strategies.interface import Strategies, StrategyRegistry
 
 from src.api.router import router
 from src.configuration.inject import MockConfigProvider
+from src.strategies.interface import Strategies, StrategyRegistry
+from strategies.metadata import (_compile_property_settings,
+                                 get_reconcile_properties,
+                                 get_reconciliation_metadata)
 from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
