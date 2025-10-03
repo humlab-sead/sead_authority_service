@@ -154,6 +154,7 @@ class StrategyRegistry(Registry):
             "identifierSpace": f"{id_base}",
             "schemaSpace": "http://www.w3.org/2004/02/skos/core#",
             "defaultTypes": default_types,
+            "view": {"url": f"{id_base}reconcile/preview?id={{id}}"},
             "extend": {
                 "propose_properties": {
                     "service_url": f"{id_base}reconcile",
