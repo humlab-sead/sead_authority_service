@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
+from src.strategies.metadata import get_reconciliation_metadata, get_reconcile_properties
 
 from src.configuration.config import Config
 from src.configuration.inject import ConfigValue, get_config_provider
@@ -44,7 +45,7 @@ async def meta(config: Config = Depends(get_config_dependency)) -> dict[str, Any
     that can be used for enhanced reconciliation matching.
     """
 
-    return Strategies.get_reconciliation_metadata()
+    return get_reconciliation_metadata(Strategies)
 
 @router.post("/reconcile")
 async def reconcile(request: Request, config: Config = Depends(get_config_dependency)) -> JSONResponse:
@@ -210,7 +211,7 @@ async def suggest_properties(query: str = "", type: str = "", config: Config = D
         JSON response with matching properties
     """
     # Get properties from registered strategies
-    filtered_properties: list[dict[str, str]] | Any = Strategies.retrieve_properties(query, type)
+    filtered_properties: list[dict[str, str]] | Any = get_reconcile_properties(Strategies, query, type)
 
     return JSONResponse({"properties": filtered_properties})
 

@@ -1,0 +1,108 @@
+from typing import Any
+
+from src.configuration.inject import ConfigValue
+
+from src.strategies.interface import ReconciliationStrategy, ReconciliationStrategy, StrategyRegistry
+
+
+def get_reconcile_properties(strategies: StrategyRegistry, query: str = None, type: str = None) -> list[dict[str, str]] | Any:
+    """
+    Collects property suggestions returned by the `/properties endpoint` for OpenRefine.
+
+    Endpoint: /reconcile/properties
+
+    Returns available properties that can be used for enhanced reconciliation.
+    OpenRefine calls this endpoint to populate property selection dropdowns.
+
+    Args:
+        query: Optional search term to filter properties
+        type: Optional entity type to filter properties (e.g., "site", "taxon")
+
+    Returns:
+        Dict with matching properties
+    """
+    all_properties: list[dict[str, str]] = []
+    if type and type in strategies.items:
+        # Get properties for the specific entity type
+        all_properties = strategies.items[type]().get_properties_meta()
+    elif type and type not in strategies.items:
+        # Unknown entity type - return empty to avoid confusion
+        all_properties = []
+    else:
+        # No type specified - return properties from all registered strategies
+        all_properties = []
+        for strategy_class in strategies.items.values():
+            all_properties.extend(strategy_class().get_properties_meta())
+
+    # Filter properties based on query if provided
+    if query:
+        query_lower: str = query.lower()
+        filtered_properties = [
+            prop
+            for prop in all_properties
+            if query_lower in prop["id"].lower() or query_lower in prop["name"].lower() or query_lower in prop.get("description", "").lower()
+        ]
+    else:
+        filtered_properties: list[dict[str, str]] = all_properties
+    return filtered_properties
+
+
+def _compile_property_settings(strategies) -> list[dict[str, str]]:
+    """
+    Collects property settings from all registered strategies for OpenRefine.
+
+    Endpoint: /reconcile (GET)
+    Returns a list of property settings dicts for OpenRefine's property selection UI.
+    """
+    property_settings: list[dict[str, str]] = []
+    for strategy_cls in strategies.items.values():
+        strategy: ReconciliationStrategy = strategy_cls()
+        specific_settings: dict[str, dict[str, Any]] = strategy.get_property_settings() or {}
+
+        for item in strategy.get_properties_meta():
+
+            property_setting: dict[str, str] | None = next((s for s in property_settings if s["name"] == item["id"]), None)
+            if not property_setting:
+                property_setting = {
+                    "name": item["id"],
+                    "label": item["name"],
+                    "type": item["type"],
+                    "help_text": item.get("description", ""),
+                    "entity_types": [strategy.get_id_path()],
+                }
+                property_settings.append(property_setting)
+            else:
+                # Property already exists, so just add this strategy's entity type if not already present
+                if strategy.get_id_path() not in property_setting["entity_types"]:
+                    property_setting["entity_types"].append(strategy.get_id_path())
+
+            if specific_settings:
+                # Add settings if defined for this property (overwrite if already present)
+                if item["id"] in specific_settings:
+                    property_setting["settings"] = specific_settings[item["id"]]
+
+    return property_settings
+
+
+def get_reconciliation_metadata(strategies: StrategyRegistry) -> dict[str, Any]:
+    default_types: list[dict[str, str]] = [{"id": entity_type, "name": entity_type} for entity_type in strategies.items]
+    id_base: str = ConfigValue("options:id_base").resolve()
+
+    # Collect property settings from all registered strategies
+    property_settings: list[dict[str, str]] = _compile_property_settings(strategies)
+
+    return {
+        "name": "SEAD Entity Reconciliation",
+        "identifierSpace": f"{id_base}",
+        "schemaSpace": "http://www.w3.org/2004/02/skos/core#",
+        "defaultTypes": default_types,
+        # Use OpenRefine-style template with double braces for substitution
+        "view": {"url": f"{id_base}reconcile/preview?id={{{{id}}}}"},
+        "extend": {
+            "propose_properties": {
+                "service_url": f"{id_base}reconcile",
+                "service_path": "/properties",
+            },
+            "property_settings": property_settings,
+        },
+    }
