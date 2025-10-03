@@ -361,6 +361,7 @@ async def suggest_property(
 
 
 @router.get("/flyout/entity")
+@router.post("/flyout/entity")
 async def flyout_entity(
     id: str = "",
     config: Config = Depends(get_config_dependency)
