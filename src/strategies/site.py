@@ -104,13 +104,14 @@ class SiteQueryProxy(QueryProxy):
         super().__init__(specification, cursor)
 
     async def fetch_site_by_national_id(self, national_id: str) -> list[dict[str, Any]]:
-        sql: str = self.specification["sql_queries"]["fetch_site_by_national_id"]
+        """Exact match by national site identifier"""
+        sql: str = self.get_sql_queries().get("fetch_site_by_national_id", "")
         await self.cursor.execute(sql, {"identifier": national_id})
         row: Tuple[Any, ...] | None = await self.cursor.fetchone()
         return [dict(row)] if row else []
 
     async def fetch_site_distances(self, coordinate: dict[str, float], site_ids: list[int]) -> dict[int, float]:
-        sql: str = self.specification["sql_queries"]["fetch_site_distances"]
+        sql: str = self.get_sql_queries().get("fetch_site_distances", "")
         await self.cursor.execute(sql, coordinate | {"site_ids": site_ids})
         distances: dict[int, float] = {row["site_id"]: row["distance_km"] for row in await self.cursor.fetchall()}
         return distances
@@ -120,7 +121,7 @@ class SiteQueryProxy(QueryProxy):
         # This could query a places/regions table or use external geocoding
         # For now, simple implementation checking site descriptions
 
-        sql: str = self.specification["sql_queries"]["fetch_site_location_similarity"]
+        sql: str = self.get_sql_queries().get("fetch_site_location_similarity", "")
 
         site_ids: list[int] = [c["site_id"] for c in candidates]
         await self.cursor.execute(sql, {"place": place, "site_ids": site_ids})
