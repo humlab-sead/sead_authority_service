@@ -29,6 +29,16 @@ async def get_config_dependency() -> Config:
 
 router = APIRouter()
 
+@router.get("/whoami")
+async def whoami(request: Request):
+    host = request.url.hostname
+    port = request.url.port
+    base = str(request.base_url)  # e.g. "http://localhost:8000/"
+    # ASGI scope fallback
+    server = request.scope.get("server")
+    if server and (host is None or port is None):
+        host, port = server[0], server[1]
+    return {"host": host, "port": port, "base_url": base}
 
 @router.get("/is_alive")
 async def is_alive(config: Config = Depends(get_config_dependency)) -> dict[str, str]:
@@ -37,15 +47,15 @@ async def is_alive(config: Config = Depends(get_config_dependency)) -> dict[str,
 
 
 @router.get("/reconcile")
-async def meta(config: Config = Depends(get_config_dependency)) -> dict[str, Any]:
+async def meta(request: Request, config: Config = Depends(get_config_dependency)) -> dict[str, Any]:
     """
     OpenRefine reconciliation service metadata endpoint.
 
     Returns service configuration including supported entity types and properties
     that can be used for enhanced reconciliation matching.
     """
-
-    return get_reconciliation_metadata(Strategies)
+    # get hostname and port from request headers or ASGI scope
+    return get_reconciliation_metadata(Strategies, base_url=request.base_url)
 
 
 @router.post("/reconcile")

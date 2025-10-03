@@ -83,7 +83,7 @@ def _compile_property_settings(strategies) -> list[dict[str, str]]:
     return property_settings
 
 
-def get_reconciliation_metadata(strategies: StrategyRegistry) -> dict[str, Any]:
+def get_reconciliation_metadata(strategies: StrategyRegistry, base_url: str) -> dict[str, Any]:
     default_types: list[dict[str, str]] = [{"id": entity_type, "name": entity_type} for entity_type in strategies.items]
     id_base: str = ConfigValue("options:id_base").resolve()
 
@@ -95,11 +95,10 @@ def get_reconciliation_metadata(strategies: StrategyRegistry) -> dict[str, Any]:
         "identifierSpace": f"{id_base}",
         "schemaSpace": "http://www.w3.org/2004/02/skos/core#",
         "defaultTypes": default_types,
-        # Use OpenRefine-style template with double braces for substitution
-        "view": {"url": f"{id_base}reconcile/preview?id={{{{id}}}}"},
+        "view": {"url": f"{base_url}/reconcile/preview?id={{{{id}}}}"},
         "extend": {
             "propose_properties": {
-                "service_url": f"{id_base}reconcile",
+                "service_url": f"{base_url}/reconcile",
                 "service_path": "/properties",
             },
             "property_settings": property_settings,
