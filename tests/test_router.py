@@ -90,8 +90,8 @@ class TestMetaEndpoint:
         # Check entity types
         assert len(data["defaultTypes"]) == 2
         type_ids = [t["id"] for t in data["defaultTypes"]]
-        assert "Site" in type_ids
-        assert "Taxon" in type_ids
+        assert "site" in type_ids
+        assert "taxon" in type_ids
 
     @patch("src.api.router.Strategies", MockStrategies())
     @with_test_config
@@ -163,7 +163,7 @@ class TestReconcileEndpoint:
         """Test when queries parameter is a JSON string"""
         mock_reconcile_queries.return_value = {"q0": {"result": []}}
 
-        queries_obj = {"q0": {"query": "test site", "type": "Site"}}
+        queries_obj = {"q0": {"query": "test site", "type": "site"}}
 
         query_data = {"queries": json.dumps(queries_obj)}
 
@@ -194,7 +194,6 @@ class TestReconcileEndpoint:
 
     #     mock_reconcile_queries.side_effect = psycopg.Error("Database connection failed")
 
-
     #     query_data: dict[str, dict[str, dict[str, str]]] = {"queries": {"q0": {"query": "test site", "type": "site"}}}
     #     with pytest.raises(psycopg.Error):
     #         response: Response = client.post("/reconcile", json=query_data)
@@ -207,7 +206,7 @@ class TestReconcileEndpoint:
         """Test general error handling"""
         mock_reconcile_queries.side_effect = Exception("Something went wrong")
 
-        query_data = {"queries": {"q0": {"query": "test site", "type": "Site"}}}
+        query_data = {"queries": {"q0": {"query": "test site", "type": "site"}}}
 
         with pytest.raises(Exception):
             response = client.post("/reconcile", json=query_data)
@@ -439,11 +438,11 @@ class TestEndpointIntegration:
 
         # Step 3: Perform reconciliation
         mock_reconcile_queries.return_value = {
-            "q0": {"result": [{"id": f"{ID_BASE}site/123", "name": "Test Site", "score": 95.0, "match": True, "type": [{"id": "Site", "name": "Site"}]}]}
+            "q0": {"result": [{"id": f"{ID_BASE}site/123", "name": "Test Site", "score": 95.0, "match": True, "type": [{"id": "site", "name": "Site"}]}]}
         }
 
         reconcile_response = client.post(
-            "/reconcile", json={"queries": {"q0": {"query": "test site", "type": "Site", "properties": [{"pid": "country", "v": "Sweden"}]}}}
+            "/reconcile", json={"queries": {"q0": {"query": "test site", "type": "site", "properties": [{"pid": "country", "v": "Sweden"}]}}}
         )
         assert reconcile_response.status_code == 200
         reconcile_data = reconcile_response.json()
