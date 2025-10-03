@@ -41,7 +41,13 @@ class MockStrategies:
     """Mock Strategies class for testing"""
 
     def __init__(self):
-        self.items = {"Site": MockStrategy, "Taxon": MockStrategy}
+        self.items: dict[str, type[MockStrategy]] = {"site": MockStrategy, "taxon": MockStrategy}
+
+    def collect_property_settings(self) -> list[dict[str, str]]:
+        return []
+
+    def retrieve_properties(self, query: str, type: str) -> list[dict[str, str]] | Any:
+        return []
 
 
 @pytest.fixture
