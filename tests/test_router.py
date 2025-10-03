@@ -12,10 +12,9 @@ from fastapi.testclient import TestClient
 
 from src.api.router import router
 from src.configuration.inject import MockConfigProvider
+from src.metadata import (_compile_property_settings, get_reconcile_properties,
+                          get_reconciliation_metadata)
 from src.strategies.interface import Strategies, StrategyRegistry
-from strategies.metadata import (_compile_property_settings,
-                                 get_reconcile_properties,
-                                 get_reconciliation_metadata)
 from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
@@ -47,12 +46,6 @@ class MockStrategies:
 
     def __init__(self):
         self.items: dict[str, type[MockStrategy]] = {"site": MockStrategy, "taxon": MockStrategy}
-
-    def collect_property_settings(self) -> list[dict[str, str]]:
-        return []
-
-    def retrieve_properties(self, query: str, type: str) -> list[dict[str, str]] | Any:
-        return []
 
 
 @pytest.fixture

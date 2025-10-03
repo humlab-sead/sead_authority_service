@@ -4,7 +4,7 @@ from src.configuration.inject import ConfigValue
 from src.strategies.interface import ReconciliationStrategy, StrategyRegistry
 
 
-def get_reconcile_properties(strategies: StrategyRegistry, query: str = None, type: str = None) -> list[dict[str, str]] | Any:
+def get_reconcile_properties(strategies: StrategyRegistry, query: str = None, entity_type: str = None) -> list[dict[str, str]] | Any:
     """
     Collects property suggestions returned by the `/properties endpoint` for OpenRefine.
 
@@ -21,10 +21,10 @@ def get_reconcile_properties(strategies: StrategyRegistry, query: str = None, ty
         Dict with matching properties
     """
     all_properties: list[dict[str, str]] = []
-    if type and type in strategies.items:
+    if entity_type and entity_type in strategies.items:
         # Get properties for the specific entity type
-        all_properties = strategies.items[type]().get_properties_meta()
-    elif type and type not in strategies.items:
+        all_properties = strategies.items[entity_type]().get_properties_meta()
+    elif entity_type and entity_type not in strategies.items:
         # Unknown entity type - return empty to avoid confusion
         all_properties = []
     else:

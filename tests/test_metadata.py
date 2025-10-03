@@ -1,8 +1,8 @@
 import pytest
 
-from src.configuration.inject import ConfigValue
-from src.metadata import (_compile_property_settings, get_reconcile_properties,
-                          get_reconciliation_metadata)
+from src.metadata import _compile_property_settings, get_reconcile_properties
+
+# pylint: disable=redefined-outer-name, redefined-builtin
 
 
 class FakeSiteStrategy:
@@ -60,14 +60,14 @@ def test_get_reconcile_properties_no_type(strategies):
 
 
 def test_get_reconcile_properties_with_type_site(strategies):
-    props = get_reconcile_properties(strategies, type="site")
+    props = get_reconcile_properties(strategies, entity_type="site")
     # When filtered by site we expect the site's properties only
     ids = {p["id"] for p in props}
     assert ids == {"place_name", "latitude"}
 
 
 def test_get_reconcile_properties_unknown_type_returns_empty(strategies):
-    props = get_reconcile_properties(strategies, type="unknown")
+    props = get_reconcile_properties(strategies, entity_type="unknown")
     assert props == []
 
 

@@ -12,11 +12,10 @@ from loguru import logger
 from src.configuration.config import Config
 from src.configuration.inject import ConfigValue, get_config_provider
 from src.configuration.setup import setup_config_store
+from src.metadata import get_reconcile_properties, get_reconciliation_metadata
 from src.preview import render_preview
 from src.reconcile import reconcile_queries
 from src.strategies.interface import Strategies
-from src.strategies.metadata import (get_reconcile_properties,
-                                     get_reconciliation_metadata)
 
 # pylint: disable=unused-argument, redefined-builtin
 
