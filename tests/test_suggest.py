@@ -148,7 +148,6 @@ async def test_flyout_entity_valid():
         html = data["html"]
         assert "<div" in html
         assert "style=" in html
-        assert "LOCATION" in html  # Entity type badge
 
 
 @pytest.mark.asyncio

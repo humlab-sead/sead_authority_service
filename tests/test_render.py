@@ -48,13 +48,12 @@ class TestRenderPreview:
             result = await render_preview(uri)
 
         assert isinstance(result, str)
-        assert "<h3 style='margin-top:0;'>Test Site</h3>" in result
-        assert "<strong style='color:#333; min-width:100px; display:inline-block;'>Name:</strong>" in result
-        assert "<span>Test Site</span>" in result
-        assert "<strong style='color:#333; min-width:100px; display:inline-block;'>latitude:</strong>" in result
-        assert "<span>59.8586</span>" in result
-        assert "<strong style='color:#333; min-width:100px; display:inline-block;'>country:</strong>" in result
-        assert "<span>Sweden</span>" in result
+        assert "<title>Test Site – Preview</title>" in result
+        assert "<h1>Test Site</h1>" in result
+        assert "<div class=\"label\">longitude:</div>" in result
+        assert "<div class=\"value\">17.6389</div>" in result
+        assert "<div class=\"label\">country:</div>" in result
+        assert "<div class=\"value\">Sweden</div>" in result
 
     @pytest.mark.asyncio
     @with_test_config
@@ -68,7 +67,7 @@ class TestRenderPreview:
             result = await render_preview(uri)
 
         assert isinstance(result, str)
-        assert "<h3 style='margin-top:0;'>Site Without Name</h3>" in result
+        assert "<title>Site Without Name – Preview</title>" in result
 
     @pytest.mark.asyncio
     @with_test_config
@@ -83,10 +82,10 @@ class TestRenderPreview:
 
         assert isinstance(result, str)
         # Should include field1 and field5
-        assert "<strong style='color:#333; min-width:100px; display:inline-block;'>field1:</strong>" in result
-        assert "<span>Value 1</span>" in result
-        assert "<strong style='color:#333; min-width:100px; display:inline-block;'>field5:</strong>" in result
-        assert "<span>Valid Value</span>" in result
+        assert "<div class=\"label\">field1:</div>" in result
+        assert "<div class=\"value\">Value 1</div>" in result
+        assert "<div class=\"label\">field5:</div>" in result
+        assert "<div class=\"value\">Valid Value</div>" in result
 
         # Should NOT include field2 (None), field3 (empty), field4 (whitespace only)
         assert "field2:" not in result
@@ -144,16 +143,10 @@ class TestRenderPreview:
             mock_strategy_with_get_details(mock_strategies, GET_DETAILS_DATA["123"])
             result = await render_preview(uri)
 
-        # Check main container
-        assert result.startswith("<div style='padding:10px; font:14px sans-serif; line-height:1.6;'>")
-        assert result.endswith("</div>")
-
-        # Check that it has proper HTML structure
-        assert "<h3 style='margin-top:0;'>" in result
-        assert "</h3>" in result
-        assert "<strong style='color:#333; min-width:100px; display:inline-block;'>" in result
-        assert "<span>" in result
-        assert "</span>" in result
+        assert result.startswith("<!DOCTYPE html>")
+        assert result.endswith("</html>")
+        assert "<body>" in result
+        assert "</body>" in result
 
     @pytest.mark.asyncio
     @with_test_config
@@ -166,7 +159,7 @@ class TestRenderPreview:
             result = await render_preview(uri)
 
         assert isinstance(result, str)
-        assert "<h3 style='margin-top:0;'>Test Site</h3>" in result  # Uses same mock data
+        assert "<title>Test Site – Preview</title>" in result  # Uses same mock data
 
 
 class TestConfigProvider:

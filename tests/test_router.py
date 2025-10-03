@@ -81,7 +81,7 @@ class TestMetaEndpoint:
     def test_xyz(self, test_provider: MockConfigProvider) -> None:
         x: StrategyRegistry = _compile_property_settings(Strategies)
         y: list[dict[str, str]] | Any = get_reconcile_properties(Strategies, "lat", "site")
-        z: dict[str, Any] = get_reconciliation_metadata(Strategies)
+        z: dict[str, Any] = get_reconciliation_metadata(Strategies, "testserver")
         pass
 
     @patch("src.api.router.Strategies", MockStrategies())
@@ -117,7 +117,7 @@ class TestMetaEndpoint:
         extend = data["extend"]
 
         assert "propose_properties" in extend
-        assert extend["propose_properties"]["service_url"] == f"{ID_BASE}reconcile"
+        assert extend["propose_properties"]["service_url"] == "http://testserver/reconcile"
         assert extend["propose_properties"]["service_path"] == "/properties"
 
         # Check property settings
