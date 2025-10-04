@@ -180,10 +180,6 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
 
         return candidates
 
-    async def get_details(self, entity_id: str, cursor: psycopg.AsyncCursor) -> dict[str, Any] | None:
-        """Fetch details for a specific site."""
-        return await self.query_proxy_class(self.specification, cursor).get_details(entity_id)
-
     async def _apply_place_context_scoring(self, candidates: list[dict], place: str, proxy: SiteQueryProxy) -> list[dict]:
         """Boost scores based on place name context"""
 

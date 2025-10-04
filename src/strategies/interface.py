@@ -80,9 +80,9 @@ class ReconciliationStrategy(ABC):
 
         return sorted(candidates, key=lambda x: x.get("name_sim", 0), reverse=True)[:limit]
 
-    @abstractmethod
-    async def get_details(self, entity_id: str, cursor) -> Optional[dict[str, Any]]:
-        """Fetch detailed information for a given entity ID."""
+    async def get_details(self, entity_id: str, cursor: psycopg.AsyncCursor) -> dict[str, Any] | None:
+        """Fetch details for a specific site."""
+        return await self.query_proxy_class(self.specification, cursor).get_details(entity_id)
 
 
 class StrategyRegistry(Registry):
