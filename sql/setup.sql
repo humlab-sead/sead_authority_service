@@ -116,9 +116,8 @@ $$;
 
 
 /**********************************************************************************************
-**  Location
+**  Feature Type
 **********************************************************************************************/
-
 
 drop view if exists authority.feature_types;
 create or replace view authority.feature_types as
@@ -160,3 +159,117 @@ as $$
     order by name_sim desc, s.label
     limit p_limit;
 $$;
+ 
+ 
+/**********************************************************************************************
+**  Feature Type
+**********************************************************************************************/
+
+drop view if exists authority.bibliographic_references;
+create or replace view authority.bibliographic_references as
+  select  
+    biblio_id,
+    full_reference as label,
+    bugs_reference,
+    doi,
+    isbn,
+    notes,
+    title,
+    year,
+    authors,
+    full_reference,
+    url,
+    authority.immutable_unaccent(lower(full_reference)) as norm_label,
+    authority.immutable_unaccent(lower(bugs_reference)) as norm_bugs_reference,
+    authority.immutable_unaccent(lower(title)) as norm_title,
+    authority.immutable_unaccent(lower(authors)) as norm_authors
+
+  from public.tbl_biblio
+  where full_reference is null
+  ;
+
+create index if not exists tbl_bibliographic_references_full_reference_norm_trgm
+  on public.tbl_biblio
+    using gin ( (authority.immutable_unaccent(lower(full_reference))) gin_trgm_ops );
+
+create index if not exists tbl_bibliographic_references_title_norm_trgm
+  on public.tbl_biblio
+    using gin ( (authority.immutable_unaccent(lower(title))) gin_trgm_ops );
+
+create index if not exists tbl_bibliographic_references_authors_norm_trgm
+  on public.tbl_biblio
+    using gin ( (authority.immutable_unaccent(lower(authors))) gin_trgm_ops );
+
+create index if not exists tbl_bibliographic_references_bugs_reference_norm_trgm
+  on public.tbl_biblio
+    using gin ( (authority.immutable_unaccent(lower(bugs_reference))) gin_trgm_ops );
+
+drop function if exists authority.fuzzy_bibliographic_references(text, integer);
+create or replace function authority.fuzzy_bibliographic_references(
+  p_text         text,
+  p_limit        integer default 10,
+  p_target_field text    default 'full_reference'
+) returns table (
+  entity_id integer,
+  biblio_id integer,
+  label     text,
+  name_sim  double precision
+)
+language plpgsql
+stable
+as $$
+declare
+  v_query_text text;
+  v_column_name text;
+  v_sql text;
+begin
+  if p_target_field not in ('full_reference', 'title', 'authors', 'bugs_reference') then
+    raise exception 'Invalid target field %', p_target_field;
+  end if;
+
+  v_query_text := authority.immutable_unaccent(lower(p_text));
+
+  v_column_name := case p_target_field
+              when 'full_reference'  then 'norm_full_reference'
+              when 'title'           then 'norm_title'
+              when 'authors'         then 'norm_authors'
+              when 'bugs_reference'  then 'norm_bugs_reference'
+           end;
+
+  v_sql := format($f$
+    select
+      s.biblio_id as entity_id,
+      s.biblio_id,
+      s.label::text,
+      greatest(
+        case when s.%1$I = $1 then 1.0
+             else similarity(s.%1$I, $1)
+        end, 0.0001
+      )::double precision as name_sim
+    from (
+        select  
+          biblio_id,
+          %2$I as label,
+          authority.immutable_unaccent(lower(%2$I)) as norm_%2$I
+        from public.tbl_biblio
+    ) s
+    where s.%1$I %% $1       -- trigram candidate filter
+    order by name_sim desc, s.label
+    limit $2
+  $f$, v_column_name, p_target_field);
+
+  return query execute v_sql using v_query_text, p_limit;
+end;
+$$;
+/*
+select * from authority.fuzzy_bibliographic_references(
+  'Smith', 10, 'full_reference'
+);
+select *
+from tbl_biblio
+where unaccent(full_reference) % unaccent('Smith'::text)
+
+select *
+from tbl_biblio
+where tbl_biblio.full_reference like '%Smith%'
+*/
