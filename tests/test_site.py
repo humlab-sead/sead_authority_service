@@ -50,30 +50,30 @@ class TestSiteQueryProxy:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_fetch_by_fuzzy_name_search(self):
+    async def test_fetch_bzy_name_search(self):
         """Test fuzzy name search."""
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
         proxy = SiteQueryProxy(SPECIFICATION, mock_cursor)
         mock_rows = [{"site_id": 1, "label": "Test Site 1", "name_sim": 0.9}, {"site_id": 2, "label": "Test Site 2", "name_sim": 0.8}]
         mock_cursor.fetchall.return_value = mock_rows
 
-        result: list[dict[str, Any]] = await proxy.fetch_by_fuzzy_name_search("test site", limit=5)
+        result: list[dict[str, Any]] = await proxy.fetch_by_fuzzy_search("test site", limit=5)
 
-        expected_sql: str = SQL_QUERIES["fetch_by_fuzzy_name_search"]
+        expected_sql: str = SQL_QUERIES["fetch_by_fuzzy_search"]
         mock_cursor.execute.assert_called_once_with(expected_sql, {"q": "test site", "n": 5})
         mock_cursor.fetchall.assert_called_once()
         assert result == mock_rows
 
     @pytest.mark.asyncio
-    async def test_fetch_by_fuzzy_name_search_default_limit(self):
+    async def test_fetch_bzy_name_search_default_limit(self):
         """Test fuzzy name search with default limit."""
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
         proxy = SiteQueryProxy(SPECIFICATION, mock_cursor)
 
         mock_cursor.fetchall.return_value = []
 
-        await proxy.fetch_by_fuzzy_name_search("test")
-        expected_sql: str = SQL_QUERIES["fetch_by_fuzzy_name_search"]
+        await proxy.fetch_by_fuzzy_search("test")
+        expected_sql: str = SQL_QUERIES["fetch_by_fuzzy_search"]
         mock_cursor.execute.assert_called_once_with(expected_sql, {"q": "test", "n": 10})
 
     @pytest.mark.asyncio
@@ -249,7 +249,7 @@ class TestSiteReconciliationStrategy:
         result = await strategy.find_candidates(mock_cursor, "test query", properties, limit=10)
 
         mock_proxy.fetch_site_by_national_id.assert_called_once_with("TEST123")
-        mock_proxy.fetch_by_fuzzy_name_search.assert_not_called()
+        mock_proxy.fetch_by_fuzzy_search.assert_not_called()
         assert result == mock_sites
 
     @patch("src.strategies.site.SiteQueryProxy")
@@ -264,11 +264,11 @@ class TestSiteReconciliationStrategy:
 
         mock_proxy.fetch_site_by_national_id.return_value = []
         mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.9}, {"site_id": 2, "label": "Another Site", "name_sim": 0.7}]
-        mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
+        mock_proxy.fetch_by_fuzzy_search.return_value = mock_sites
 
         result = await strategy.find_candidates(mock_cursor, "test site", {}, limit=5)
 
-        mock_proxy.fetch_by_fuzzy_name_search.assert_called_once_with("test site", 5)
+        mock_proxy.fetch_by_fuzzy_search.assert_called_once_with("test site", 5)
         # Results should be sorted by name_sim in descending order
         assert result[0]["name_sim"] >= result[1]["name_sim"]
 
@@ -284,7 +284,7 @@ class TestSiteReconciliationStrategy:
 
         mock_proxy.fetch_site_by_national_id.return_value = []
         mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Near Site", "name_sim": 0.8}, {"site_id": 2, "label": "Far Site", "name_sim": 0.9}]
-        mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
+        mock_proxy.fetch_by_fuzzy_search.return_value = mock_sites
 
         # Mock the geographic scoring method
         with patch.object(strategy, "_apply_geographic_scoring", new_callable=AsyncMock) as mock_geo_scoring:
@@ -308,7 +308,7 @@ class TestSiteReconciliationStrategy:
 
         mock_proxy.fetch_site_by_national_id.return_value = []
         mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.8}]
-        mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
+        mock_proxy.fetch_by_fuzzy_search.return_value = mock_sites
 
         with patch.object(strategy, "_apply_place_context_scoring", new_callable=AsyncMock) as mock_place_scoring:
             mock_place_scoring.return_value = mock_sites
@@ -442,14 +442,14 @@ class TestSiteReconciliationStrategy:
 
             mock_proxy.fetch_site_by_national_id.return_value = []
             mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.8}]
-            mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
+            mock_proxy.fetch_by_fuzzy_search.return_value = mock_sites
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
             result = await strategy.find_candidates(mock_cursor, "test query", None, limit=10)
 
             # Should not call national_id search
             mock_proxy.fetch_site_by_national_id.assert_not_called()
-            mock_proxy.fetch_by_fuzzy_name_search.assert_called_once_with("test query", 10)
+            mock_proxy.fetch_by_fuzzy_search.assert_called_once_with("test query", 10)
             assert result == mock_sites
 
     @pytest.mark.asyncio
@@ -469,7 +469,7 @@ class TestSiteReconciliationStrategy:
                 {"site_id": 2, "label": "High Score", "name_sim": 0.9},
                 {"site_id": 3, "label": "Medium Score", "name_sim": 0.6},
             ]
-            mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
+            mock_proxy.fetch_by_fuzzy_search.return_value = mock_sites
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
             result = await strategy.find_candidates(mock_cursor, "test query", {}, limit=10)
@@ -492,7 +492,7 @@ class TestSiteReconciliationStrategy:
             mock_proxy.fetch_site_by_national_id.return_value = []
             # More candidates than limit
             mock_sites: list[dict[str, Any]] = [{"site_id": i, "label": f"Site {i}", "name_sim": 1.0 - i * 0.1} for i in range(15)]  # 15 candidates
-            mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
+            mock_proxy.fetch_by_fuzzy_search.return_value = mock_sites
 
             # Create strategy AFTER patching SiteQueryProxy
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
@@ -529,7 +529,7 @@ class TestSiteStrategyIntegration:
 
             # Fuzzy search results
             candidates = [{"site_id": 1, "label": "Stockholm Archaeological Site", "name_sim": 0.8}, {"site_id": 2, "label": "Uppsala Site", "name_sim": 0.7}]
-            mock_proxy.fetch_by_fuzzy_name_search.return_value = candidates
+            mock_proxy.fetch_by_fuzzy_search.return_value = candidates
 
             # Geographic distances
             distances = {1: 0.1, 2: 5.0}  # Very close and moderately close
@@ -545,7 +545,7 @@ class TestSiteStrategyIntegration:
             result = await strategy.find_candidates(mock_cursor, "archaeological site", properties, limit=10)
 
             # Verify all methods were called
-            mock_proxy.fetch_by_fuzzy_name_search.assert_called_once()
+            mock_proxy.fetch_by_fuzzy_search.assert_called_once()
             mock_proxy.fetch_site_distances.assert_called_once()
             mock_proxy.fetch_site_location_similarity.assert_called_once()
 
@@ -724,7 +724,7 @@ class TestSiteStrategyEdgeCases:
             # No national_id provided, so fuzzy search will be used
             mock_proxy.fetch_site_by_national_id.return_value = []
             mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.5}]
-            mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
+            mock_proxy.fetch_by_fuzzy_search.return_value = mock_sites
             mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
@@ -766,11 +766,11 @@ class TestSiteStrategyEdgeCases:
             mock_query_proxy_class.return_value = mock_proxy
 
             mock_proxy.fetch_site_by_national_id.return_value = []
-            mock_proxy.fetch_by_fuzzy_name_search.return_value = []
+            mock_proxy.fetch_by_fuzzy_search.return_value = []
 
             result = await strategy.find_candidates(mock_cursor, "", {}, limit=10)
 
-            mock_proxy.fetch_by_fuzzy_name_search.assert_called_once_with("", 10)
+            mock_proxy.fetch_by_fuzzy_search.assert_called_once_with("", 10)
             assert result == []
 
     @pytest.mark.asyncio
@@ -788,7 +788,7 @@ class TestSiteStrategyEdgeCases:
 
             mock_proxy.fetch_site_by_national_id.return_value = []
             mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Site", "name_sim": 0.8}]
-            mock_proxy.fetch_by_fuzzy_name_search.return_value = mock_sites
+            mock_proxy.fetch_by_fuzzy_search.return_value = mock_sites
 
             result = await strategy.find_candidates(mock_cursor, "test", {}, limit=0)
 

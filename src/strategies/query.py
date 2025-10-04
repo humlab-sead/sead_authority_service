@@ -29,9 +29,9 @@ class QueryProxy:
             logger.error(f"Error fetching details for entity_id {entity_id}: {e}")
             return None
 
-    async def fetch_by_fuzzy_name_search(self, name: str, limit: int = 10) -> list[dict[str, Any]]:
+    async def fetch_by_fuzzy_search(self, name: str, limit: int = 10) -> list[dict[str, Any]]:
         """Perform fuzzy name search"""
-        sql: str = self.get_sql_queries().get("fetch_by_fuzzy_name_search", "")
+        sql: str = self.get_sql_queries().get("fetch_by_fuzzy_search", "")
         await self.cursor.execute(sql, {"q": name, "n": limit})
         rows: list[Tuple[Any]] = await self.cursor.fetchall()
         return [dict(row) for row in rows]

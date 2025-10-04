@@ -54,7 +54,7 @@ SPECIFICATION: dict[str, str] = {
         where national_site_identifier = %(identifier)s
         limit 1
     """,
-        "fetch_by_fuzzy_name_search": """
+        "fetch_by_fuzzy_search": """
         SELECT * FROM authority.fuzzy_sites(%(q)s, %(n)s);
     """,
         "fetch_site_distances": """
@@ -149,7 +149,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
 
         # 2) Fuzzy name matching with enhanced scoring
         if not candidates:
-            candidates.extend(await proxy.fetch_by_fuzzy_name_search(query, limit))
+            candidates.extend(await proxy.fetch_by_fuzzy_search(query, limit))
 
         # 3) Geographic proximity boost if coordinates provided
         if properties.get("latitude") and properties.get("longitude") and candidates:

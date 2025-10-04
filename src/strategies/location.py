@@ -38,7 +38,7 @@ SPECIFICATION: dict[str, str] = {
     ],
     "property_settings": {},
     "sql_queries": {
-        "fetch_by_fuzzy_name_search": """
+        "fetch_by_fuzzy_search": """
         select * from authority.fuzzy_locations(%(q)s, %(n)s);
     """,
         "get_details": """
@@ -64,8 +64,8 @@ class LocationQueryProxy(QueryProxy):
 class LocationReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 
-    def __init__(self):
-        super().__init__(SPECIFICATION, LocationQueryProxy)
+    def __init__(self, specification: dict[str, str] = SPECIFICATION):
+        super().__init__(specification, LocationQueryProxy)
 
     async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         """Find candidate sites based on name, identifier, and optional geographic context"""
@@ -74,7 +74,7 @@ class LocationReconciliationStrategy(ReconciliationStrategy):
         proxy: QueryProxy = self.query_proxy_class(self.specification, cursor)
 
         # Only fuzzy match on name for now
-        candidates.extend(await proxy.fetch_by_fuzzy_name_search(query, limit))
+        candidates.extend(await proxy.fetch_by_fuzzy_search(query, limit))
 
         return sorted(candidates, key=lambda x: x.get("name_sim", 0), reverse=True)[:limit]
 
