@@ -64,11 +64,21 @@ class ReconciliationStrategy(ABC):
 
         return candidate
 
-    @abstractmethod
-    async def find_candidates(
-        self, cursor: psycopg.AsyncCursor, query: str, properties: None | list[dict[str, Any]] = None, limit: int = 10
-    ) -> list[dict[str, Any]]:
-        """Find candidate matches for the given query"""
+    async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
+        """Find candidate matches for the given query
+        
+            This method should be implemented by subclasses to provide entity-specific
+            candidate retrieval logic.
+
+            Default implementations find candidates based on fuzzy name matching.
+        """
+        candidates: list[dict] = []
+        properties = properties or {}
+        proxy: QueryProxy = self.query_proxy_class(self.specification, cursor)
+
+        candidates.extend(await proxy.fetch_by_fuzzy_search(query, limit))
+
+        return sorted(candidates, key=lambda x: x.get("name_sim", 0), reverse=True)[:limit]
 
     @abstractmethod
     async def get_details(self, entity_id: str, cursor) -> Optional[dict[str, Any]]:
