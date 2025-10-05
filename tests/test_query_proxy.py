@@ -7,6 +7,7 @@ from src.strategies.location import LocationQueryProxy, SPECIFICATION as LOCATIO
 from src.strategies.country import SPECIFICATION as COUNTRY_SPECIFICATION
 from src.strategies.feature_type import SPECIFICATION as FEATURE_TYPE_SPECIFICATION, FeatureTypeQueryProxy
 from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION, SiteQueryProxy
+from src.strategies.data_type import SPECIFICATION as DATA_TYPE_SPECIFICATION, DataTypeQueryProxy
 
 # pylint: disable=attribute-defined-outside-init,protected-access, unused-argument
 
@@ -17,6 +18,7 @@ QUERY_PROXY_TESTS_SETUPS = [
     (COUNTRY_SPECIFICATION, LocationQueryProxy),
     (FEATURE_TYPE_SPECIFICATION, FeatureTypeQueryProxy),
     (SITE_TYPE_SPECIFICATION, SiteQueryProxy),
+    (DATA_TYPE_SPECIFICATION, DataTypeQueryProxy),
 ]
 
 
