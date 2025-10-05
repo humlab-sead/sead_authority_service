@@ -12,10 +12,14 @@ class QueryProxy:
     def get_sql_queries(self) -> dict[str, str]:
         """Return the SQL queries defined in the specification"""
         return self.specification.get("sql_queries", {})
-    
+
+    def get_sql_query(self, key: str) -> str:
+        """Return the SQL query defined in the specification for a given key."""
+        return self.get_sql_queries().get(key, "")
+
     def get_details_sql(self) -> str:
         """Return the SQL query for fetching detailed information for a given entity ID."""
-        return self.get_sql_queries().get("get_details", "")
+        return self.get_sql_query("get_details")
 
     async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific location."""
@@ -31,7 +35,7 @@ class QueryProxy:
 
     async def fetch_by_fuzzy_search(self, name: str, limit: int = 10) -> list[dict[str, Any]]:
         """Perform fuzzy name search"""
-        sql: str = self.get_sql_queries().get("fetch_by_fuzzy_search", "")
+        sql: str = self.get_sql_query("fetch_by_fuzzy_search")
         await self.cursor.execute(sql, {"q": name, "n": limit})
         rows: list[Tuple[Any]] = await self.cursor.fetchall()
         return [dict(row) for row in rows]
