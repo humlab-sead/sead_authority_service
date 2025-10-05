@@ -204,11 +204,15 @@ create index if not exists tbl_bibliographic_references_bugs_reference_norm_trgm
   on public.tbl_biblio
     using gin ( (authority.immutable_unaccent(lower(bugs_reference))) gin_trgm_ops );
 
-drop function if exists authority.fuzzy_bibliographic_references(text, integer);
+drop function if exists authority.fuzzy_bibliographic_references(text, integer, text, text, double precision);
+drop function if exists authority.fuzzy_bibliographic_references(text, integer, text, text, double precision);
+
 create or replace function authority.fuzzy_bibliographic_references(
   p_text         text,
   p_limit        integer default 10,
-  p_target_field text    default 'full_reference'
+  p_target_field text    default 'full_reference',
+  p_mode         text    default 'similarity',         -- 'similarity' | 'word' | 'strict_word'
+  p_threshold    double precision default null         -- optional per-call operator threshold
 ) returns table (
   entity_id integer,
   biblio_id integer,
@@ -219,52 +223,99 @@ language plpgsql
 stable
 as $$
 declare
-  v_query_text text;
-  v_column_name text;
-  v_sql text;
+  v_q       text;
+  v_col     text;
+  v_op      text;
+  v_score   text;
+  v_sql     text;
+  v_guc     text;   -- which pg_trgm GUC to SET LOCAL, based on p_mode
 begin
-  if p_target_field not in ('full_reference', 'title', 'authors', 'bugs_reference') then
+  -- validate inputs
+  if p_target_field not in ('full_reference','title','authors','bugs_reference') then
     raise exception 'Invalid target field %', p_target_field;
   end if;
 
-  v_query_text := authority.immutable_unaccent(lower(p_text));
+  if p_mode not in ('similarity','word','strict_word') then
+    raise exception 'Invalid mode % (expected similarity|word|strict_word)', p_mode;
+  end if;
 
-  v_column_name := case p_target_field
-              when 'full_reference'  then 'norm_full_reference'
-              when 'title'           then 'norm_title'
-              when 'authors'         then 'norm_authors'
-              when 'bugs_reference'  then 'norm_bugs_reference'
+  -- normalize query once
+  v_q := authority.immutable_unaccent(lower(p_text));
+
+  -- pick normalized column to search
+  v_col := case p_target_field
+             when 'full_reference' then 'norm_full_reference'
+             when 'title'          then 'norm_title'
+             when 'authors'        then 'norm_authors'
+             when 'bugs_reference' then 'norm_bugs_reference'
            end;
 
+  -- operator, score expression, and which GUC to set
+  v_op := case p_mode
+             when 'similarity'  then '%'
+             when 'word'        then '<%'
+             when 'strict_word' then '<<%'
+           end;
+
+  v_score := case p_mode
+               when 'similarity'  then format('similarity(s.%I, $1)', v_col)
+               when 'word'        then format('word_similarity(s.%I, $1)', v_col)
+               when 'strict_word' then format('strict_word_similarity(s.%I, $1)', v_col)
+             end;
+
+  v_guc := case p_mode
+             when 'similarity'  then 'pg_trgm.similarity_threshold'
+             when 'word'        then 'pg_trgm.word_similarity_threshold'
+             when 'strict_word' then 'pg_trgm.strict_word_similarity_threshold'
+           end;
+
+  -- Set a per-call (transaction-local) threshold for the chosen operator, if provided.
+  -- This change auto-reverts at transaction end; no manual reset needed.
+  if p_threshold is not null then
+    execute format('SET LOCAL %s = %L', v_guc, p_threshold);
+  end if;
+
+  -- Build one query that uses the chosen operator & score
   v_sql := format($f$
     select
       s.biblio_id as entity_id,
       s.biblio_id,
-      s.label::text,
+      s.%2$I::text as label,
       greatest(
         case when s.%1$I = $1 then 1.0
-             else similarity(s.%1$I, $1)
+             else %3$s
         end, 0.0001
       )::double precision as name_sim
     from (
-        select  
-          biblio_id,
-          %2$I as label,
-          authority.immutable_unaccent(lower(%2$I)) as norm_%2$I
-        from public.tbl_biblio
+      select biblio_id,
+             %2$I,
+             authority.immutable_unaccent(lower(%2$I)) as norm_%2$I
+      from public.tbl_biblio
     ) s
-    where s.%1$I %% $1       -- trigram candidate filter
-    order by name_sim desc, s.label
+    where s.%1$I %4$s $1       -- operator enforces threshold (uses GUC if set)
+    order by name_sim desc, s.%2$I
     limit $2
-  $f$, v_column_name, p_target_field);
+  $f$, v_col, p_target_field, v_score, v_op);
 
-  return query execute v_sql using v_query_text, p_limit;
+  -- Execute (2 params if no threshold, 3rd param not used in SQL anymore)
+  return query execute v_sql using v_q, p_limit;
 end;
 $$;
+
+
+-- optional: restore after success (transaction still open)
+-- create or replace function authority._restore_pgtrgm_thresholds(prev_sim text, prev_word text, prev_sword text) returns void
+-- language plpgsql as $$
+-- begin
+--   if prev_sim   is not null then perform set_config('pg_trgm.similarity_threshold',            prev_sim,   true); end if;
+--   if prev_word  is not null then perform set_config('pg_trgm.word_similarity_threshold',       prev_word,  true); end if;
+--   if prev_sword is not null then perform set_config('pg_trgm.strict_word_similarity_threshold',prev_sword, true); end if;
+-- end; $$;
+
 /*
-select * from authority.fuzzy_bibliographic_references(
-  'Smith', 10, 'full_reference'
-);
+select *
+from authority.fuzzy_bibliographic_references( 'Smith', 10, 'authors', 'word', null );
+
 select *
 from tbl_biblio
 where unaccent(full_reference) % unaccent('Smith'::text)
@@ -273,3 +324,8 @@ select *
 from tbl_biblio
 where tbl_biblio.full_reference like '%Smith%'
 */
+
+select *
+from tbl_biblio
+where bugs_reference is not null
+and POSITION(bugs_reference IN full_reference) = 0 
