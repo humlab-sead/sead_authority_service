@@ -35,6 +35,7 @@ async def get_config_dependency() -> Config:
 
 router = APIRouter()
 
+
 @router.get("/whoami")
 async def whoami(request: Request):
     host = request.url.hostname
@@ -45,6 +46,7 @@ async def whoami(request: Request):
     if server and (host is None or port is None):
         host, port = server[0], server[1]
     return {"host": host, "port": port, "base_url": base}
+
 
 @router.get("/is_alive")
 async def is_alive(config: Config = Depends(get_config_dependency)) -> dict[str, str]:
@@ -258,21 +260,17 @@ async def preview(id: str, config: Config = Depends(get_config_dependency)) -> H
 
 
 @router.get("/suggest/entity")
-async def suggest_entity(
-    prefix: str = "",
-    type: str = "",
-    config: Config = Depends(get_config_dependency)
-) -> JSONResponse:
+async def suggest_entity(prefix: str = "", type: str = "", config: Config = Depends(get_config_dependency)) -> JSONResponse:
     """
     Entity autocomplete endpoint for OpenRefine Suggest API.
-    
+
     Returns entity suggestions as the user types, enabling autocomplete
     functionality in OpenRefine reconciliation dialogs.
-    
+
     Args:
         prefix: The text prefix to match (minimum 2 characters)
         type: Optional entity type filter (e.g., 'site', 'location', 'taxon')
-        
+
     Returns:
         JSON response with suggested entities in format:
         {
@@ -288,26 +286,23 @@ async def suggest_entity(
         }
     """
     try:
-        result = await suggest_entities(prefix=prefix, entity_type=type, limit=10)
-        return JSONResponse(result)
+        items = await suggest_entities(prefix=prefix, entity_type=type, limit=10)
+        return JSONResponse({"result": items})
     except Exception as e:
         logger.exception(f"Error in suggest_entity: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @router.get("/suggest/type")
-async def suggest_type(
-    prefix: str = "",
-    config: Config = Depends(get_config_dependency)
-) -> JSONResponse:
+async def suggest_type(prefix: str = "", config: Config = Depends(get_config_dependency)) -> JSONResponse:
     """
     Type autocomplete endpoint for OpenRefine Suggest API.
-    
+
     Returns entity type suggestions filtered by prefix.
-    
+
     Args:
         prefix: Optional prefix to filter types
-        
+
     Returns:
         JSON response with type suggestions:
         {
@@ -326,20 +321,16 @@ async def suggest_type(
 
 
 @router.get("/suggest/property")
-async def suggest_property(
-    prefix: str = "",
-    type: str = "",
-    config: Config = Depends(get_config_dependency)
-) -> JSONResponse:
+async def suggest_property(prefix: str = "", type: str = "", config: Config = Depends(get_config_dependency)) -> JSONResponse:
     """
     Property autocomplete endpoint for OpenRefine Suggest API.
-    
+
     Returns property suggestions filtered by prefix and optional type.
-    
+
     Args:
         prefix: Optional prefix to filter properties
         type: Optional entity type to filter properties
-        
+
     Returns:
         JSON response with property suggestions:
         {
@@ -362,20 +353,17 @@ async def suggest_property(
 
 @router.get("/flyout/entity")
 @router.post("/flyout/entity")
-async def flyout_entity(
-    id: str = "",
-    config: Config = Depends(get_config_dependency)
-) -> JSONResponse:
+async def flyout_entity(id: str = "", config: Config = Depends(get_config_dependency)) -> JSONResponse:
     """
     Flyout/tooltip preview endpoint for OpenRefine Suggest API.
-    
+
     Returns compact HTML preview for inline tooltip display when hovering
     over entity suggestions in OpenRefine. This enables the tooltip preview
     experience instead of opening a new browser tab.
-    
+
     Args:
         id: Entity URI to preview (e.g., 'https://w3id.org/sead/id/site/123')
-        
+
     Returns:
         JSON response with entity details:
         {
@@ -386,7 +374,7 @@ async def flyout_entity(
     try:
         if not id:
             return JSONResponse({"error": "Missing 'id' parameter"}, status_code=400)
-        
+
         result = await render_flyout_preview(id)
         return JSONResponse(result)
     except ValueError as e:
@@ -395,4 +383,3 @@ async def flyout_entity(
     except Exception as e:
         logger.exception(f"Error in flyout_entity: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
-
