@@ -20,7 +20,7 @@ SPECIFICATION: dict[str, str] = {
     ],
     "property_settings": {},
     "sql_queries": {
-        "fetch_by_fuzzy_search": """
+        "fuzzy_label_sql": """
         select * from authority.fuzzy_feature_types(%(q)s, %(n)s);
     """,
         "get_details": """

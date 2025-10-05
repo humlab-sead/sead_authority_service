@@ -59,7 +59,7 @@ class TestSiteQueryProxy:
 
         result: list[dict[str, Any]] = await proxy.fetch_by_fuzzy_search("test site", limit=5)
 
-        expected_sql: str = SQL_QUERIES["fetch_by_fuzzy_search"]
+        expected_sql: str = SQL_QUERIES["fuzzy_label_sql"]
         mock_cursor.execute.assert_called_once_with(expected_sql, {"q": "test site", "n": 5})
         mock_cursor.fetchall.assert_called_once()
         assert result == mock_rows
@@ -73,7 +73,7 @@ class TestSiteQueryProxy:
         mock_cursor.fetchall.return_value = []
 
         await proxy.fetch_by_fuzzy_search("test")
-        expected_sql: str = SQL_QUERIES["fetch_by_fuzzy_search"]
+        expected_sql: str = SQL_QUERIES["fuzzy_label_sql"]
         mock_cursor.execute.assert_called_once_with(expected_sql, {"q": "test", "n": 10})
 
     @pytest.mark.asyncio

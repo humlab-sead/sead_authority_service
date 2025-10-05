@@ -54,7 +54,7 @@ SPECIFICATION: dict[str, str] = {
         where national_site_identifier = %(identifier)s
         limit 1
     """,
-        "fetch_by_fuzzy_search": """
+        "fuzzy_label_sql": """
         SELECT * FROM authority.fuzzy_sites(%(q)s, %(n)s);
     """,
         "fetch_site_distances": """

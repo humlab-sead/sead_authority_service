@@ -8,7 +8,7 @@ SPECIFICATION: dict[str, str] = {
     "properties": [],
     "property_settings": {},
     "sql_queries": {
-        "fetch_by_fuzzy_search": """ select * from authority.fuzzy_locations(%(q)s, %(n)s, 1) """,
+        "fuzzy_label_sql": """ select * from authority.fuzzy_locations(%(q)s, %(n)s, 1) """,
         "get_details": """
             select  location_id as "ID",
                     label as "Country",

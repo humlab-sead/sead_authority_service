@@ -35,7 +35,7 @@ class QueryProxy:
 
     async def fetch_by_fuzzy_search(self, name: str, limit: int = 10) -> list[dict[str, Any]]:
         """Perform fuzzy name search"""
-        sql: str = self.get_sql_query("fetch_by_fuzzy_search")
+        sql: str = self.get_sql_query("fuzzy_label_sql")
         await self.cursor.execute(sql, {"q": name, "n": limit})
         rows: list[Tuple[Any]] = await self.cursor.fetchall()
         return [dict(row) for row in rows]
