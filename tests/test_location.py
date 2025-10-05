@@ -88,11 +88,11 @@
 #             {"location_id": 1, "label": "Test Location", "name_sim": 0.9},
 #             {"location_id": 2, "label": "Another Location", "name_sim": 0.7},
 #         ]
-#         mock_proxy.fetch_by_fuzzy_search.return_value = mock_locations
+#         mock_proxy.fetch_by_fuzzy_label.return_value = mock_locations
 
 #         result = await strategy.find_candidates(mock_cursor, "test location", {}, limit=5)
 
-#         mock_proxy.fetch_by_fuzzy_search.assert_called_once_with("test location", 5)
+#         mock_proxy.fetch_by_fuzzy_label.assert_called_once_with("test location", 5)
 #         # Results should be sorted by name_sim in descending order
 #         assert result[0]["name_sim"] >= result[1]["name_sim"]
 

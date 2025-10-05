@@ -10,14 +10,7 @@ SPECIFICATION: dict[str, str] = {
     "key": "feature_type",
     "id_field": "feature_type_id",
     "label_field": "label",
-    "properties": [
-        # {
-        #     "id": "feature_type_name",
-        #     "name": "Feature Type Name",
-        #     "type": "string",
-        #     "description": "Name of the feature type",
-        # },
-    ],
+    "properties": [ ],
     "property_settings": {},
     "sql_queries": {
         "fuzzy_label_sql": """

@@ -149,7 +149,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
 
         # 2) Fuzzy name matching with enhanced scoring
         if not candidates:
-            candidates.extend(await proxy.fetch_by_fuzzy_search(query, limit))
+            candidates.extend(await proxy.fetch_by_fuzzy_label(query, limit))
 
         # 3) Geographic proximity boost if coordinates provided
         if properties.get("latitude") and properties.get("longitude") and candidates:

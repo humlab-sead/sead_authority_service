@@ -76,7 +76,7 @@ class ReconciliationStrategy(ABC):
         properties = properties or {}
         proxy: QueryProxy = self.query_proxy_class(self.specification, cursor)
 
-        candidates.extend(await proxy.fetch_by_fuzzy_search(query, limit))
+        candidates.extend(await proxy.fetch_by_fuzzy_label(query, limit))
 
         return sorted(candidates, key=lambda x: x.get("name_sim", 0), reverse=True)[:limit]
 

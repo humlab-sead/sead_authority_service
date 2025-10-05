@@ -33,7 +33,7 @@ class QueryProxy:
             logger.error(f"Error fetching details for entity_id {entity_id}: {e}")
             return None
 
-    async def fetch_by_fuzzy_search(self, name: str, limit: int = 10) -> list[dict[str, Any]]:
+    async def fetch_by_fuzzy_label(self, name: str, limit: int = 10) -> list[dict[str, Any]]:
         """Perform fuzzy name search"""
         sql: str = self.get_sql_query("fuzzy_label_sql")
         await self.cursor.execute(sql, {"q": name, "n": limit})
