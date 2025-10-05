@@ -162,7 +162,7 @@ $$;
  
  
 /**********************************************************************************************
-**  Feature Type
+**  Bibliographic Reference
 **********************************************************************************************/
 
 drop view if exists authority.bibliographic_references;
@@ -302,30 +302,46 @@ begin
 end;
 $$;
 
+/* Data Type: implemented inline in strategy class for simplicity */
 
--- optional: restore after success (transaction still open)
--- create or replace function authority._restore_pgtrgm_thresholds(prev_sim text, prev_word text, prev_sword text) returns void
--- language plpgsql as $$
--- begin
---   if prev_sim   is not null then perform set_config('pg_trgm.similarity_threshold',            prev_sim,   true); end if;
---   if prev_word  is not null then perform set_config('pg_trgm.word_similarity_threshold',       prev_word,  true); end if;
---   if prev_sword is not null then perform set_config('pg_trgm.strict_word_similarity_threshold',prev_sword, true); end if;
--- end; $$;
+-- drop view if exists authority.data_types;
+-- create or replace view authority.data_types as
+--   select  data_type_id,
+--           data_type_name as label,
+--           definition as description,
+--           authority.immutable_unaccent(lower(data_type_name)) as norm_label
+--   from public.tbl_data_types;
 
-/*
-select *
-from authority.fuzzy_bibliographic_references( 'Smith', 10, 'authors', 'word', null );
+-- create index if not exists tbl_data_types_norm_trgm
+--   on public.tbl_data_types
+--     using gin ( (authority.immutable_unaccent(lower(data_type_name))) gin_trgm_ops );
 
-select *
-from tbl_biblio
-where unaccent(full_reference) % unaccent('Smith'::text)
-
-select *
-from tbl_biblio
-where tbl_biblio.full_reference like '%Smith%'
-*/
-
-select *
-from tbl_biblio
-where bugs_reference is not null
-and POSITION(bugs_reference IN full_reference) = 0 
+-- drop function if exists authority.fuzzy_data_types(text, integer);
+-- create or replace function authority.fuzzy_data_types(
+-- 	p_text text,
+-- 	p_limit integer default 10
+-- ) returns table (
+-- 	data_type_id integer,
+-- 	label text,
+-- 	name_sim double precision
+-- )
+-- language sql
+-- stable
+-- as $$
+--     select
+--       s.data_type_id,
+--       s.label,
+--       greatest(
+--           case when s.norm_label = pq.q then 1.0
+--               else similarity(s.norm_label, pq.q)
+--           end, 0.0001
+--       ) as name_sim
+--     from authority.feature_types as s
+--       cross join (
+--       select authority.immutable_unaccent(lower('year'))::text as q
+--     ) as pq
+--     where s.norm_label % pq.q       -- trigram candidate filter
+--     order by name_sim desc, s.label
+--     limit p_limit;
+-- $$;
+ 
