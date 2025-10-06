@@ -1,7 +1,7 @@
 # models_openrefine.py
-from typing import Dict, List, Mapping, Optional, Union
+from typing import Dict, List, Mapping, Optional, Union, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 from typing_extensions import Literal
 
 # ---------- Common ----------
@@ -14,7 +14,6 @@ class TypeRef(BaseModel):
 
 JsonScalar = Union[str, int, float, bool, None]
 JsonValue = Union[JsonScalar, List["JsonValue"], Dict[str, "JsonValue"]]  # recursive
-# pydantic resolves forward refs at bottom
 
 
 # ---------- /reconcile (queries & results) ----------
@@ -38,7 +37,7 @@ class ReconQuery(BaseModel):
     lang: Optional[str] = Field(None, description="BCP47 language code for labels")
 
 
-class ReconBatchRequest(BaseModel):
+class ReconBatchRequest(RootModel[Mapping[str, ReconQuery]]):
     """
     Batch queries: OpenRefine posts a JSON object mapping arbitrary keys to ReconQuery.
     Example:
@@ -47,8 +46,7 @@ class ReconBatchRequest(BaseModel):
         "q1": { "query": "Uppland" }
       }
     """
-
-    __root__: Mapping[str, ReconQuery]
+    root: Mapping[str, ReconQuery]
 
 
 class ReconCandidate(BaseModel):
@@ -67,10 +65,9 @@ class ReconQueryResult(BaseModel):
     result: List[ReconCandidate]
 
 
-class ReconBatchResponse(BaseModel):
+class ReconBatchResponse(RootModel[Mapping[str, ReconQueryResult]]):
     """Batch response mirrors request keys -> {result: [...] }."""
-
-    __root__: Mapping[str, ReconQueryResult]
+    root: Mapping[str, ReconQueryResult]
 
 
 # ---------- /reconcile (service manifest, GET with no params) ----------
@@ -225,5 +222,5 @@ class ExtendResponse(BaseModel):
     rows: Dict[str, Dict[str, List[ExtCell]]]
 
 
-# Resolve forward refs for JsonValue
-# JsonValue.update_forward_refs()
+# Forward reference resolution for recursive JsonValue type
+JsonValue = Union[JsonScalar, List[JsonValue], Dict[str, JsonValue]]
