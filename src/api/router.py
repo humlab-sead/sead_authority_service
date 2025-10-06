@@ -9,10 +9,11 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
 
-from src.api.model import (ReconBatchRequest, ReconBatchResponse,
-                           ReconQueryResult, ReconServiceManifest,
-                           SuggestEntityResponse, SuggestPropertyResponse,
-                           SuggestTypeResponse)
+# from src.api.model import (ReconBatchRequest, ReconBatchResponse,
+#                            ReconQueryResult, ReconServiceManifest,
+#                            SuggestEntityResponse, SuggestPropertyResponse,
+#                            SuggestTypeResponse)
+from src.api.model import ReconBatchResponse, ReconServiceManifest
 from src.configuration.config import Config
 from src.configuration.inject import ConfigValue, get_config_provider
 from src.configuration.setup import setup_config_store
@@ -290,7 +291,7 @@ async def suggest_entity(prefix: str = "", type: str = "", config: Config = Depe
     try:
         items = await suggest_entities(prefix=prefix, entity_type=type, limit=10)
         return JSONResponse({"result": items})
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception(f"Error in suggest_entity: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -317,7 +318,7 @@ async def suggest_type(prefix: str = "", config: Config = Depends(get_config_dep
     try:
         result = await suggest_types(prefix=prefix)
         return JSONResponse(result)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception(f"Error in suggest_type: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -348,7 +349,7 @@ async def suggest_property(prefix: str = "", type: str = "", config: Config = De
     try:
         result = await suggest_properties_api(prefix=prefix, entity_type=type)
         return JSONResponse(result)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception(f"Error in suggest_property: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -379,9 +380,9 @@ async def flyout_entity(id: str = "", config: Config = Depends(get_config_depend
 
         result = await render_flyout_preview(id)
         return JSONResponse(result)
-    except ValueError as e:
+    except ValueError as e:  # pylint: disable=broad-exception-caught
         logger.warning(f"Invalid flyout request: {e}")
         return JSONResponse({"error": str(e)}, status_code=400)
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception(f"Error in flyout_entity: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)

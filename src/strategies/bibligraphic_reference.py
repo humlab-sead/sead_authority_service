@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 import psycopg
@@ -107,7 +108,6 @@ class BibliographicReferenceQueryProxy(QueryProxy):
         if not isbn:
             return None
         # remove non-alphanumerics; uppercase
-        import re
 
         s = re.sub(r"[^0-9Xx]", "", isbn).upper()
         return s or None

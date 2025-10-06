@@ -1,5 +1,3 @@
-from typing import Any
-
 import psycopg
 
 from src.strategies.query import QueryProxy
@@ -58,5 +56,6 @@ class DataTypeQueryProxy(QueryProxy):
 class DataTypeReconciliationStrategy(ReconciliationStrategy):
     """Data Type-specific reconciliation with data type names and descriptions"""
 
-    def __init__(self, specification: dict[str, str] = SPECIFICATION):
+    def __init__(self, specification: dict[str, str] = None) -> None:
+        specification = specification or SPECIFICATION
         super().__init__(specification, DataTypeQueryProxy)

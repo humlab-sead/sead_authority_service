@@ -1,5 +1,5 @@
 from .interface import Strategies
-from .location import LocationQueryProxy, LocationReconciliationStrategy
+from .location import LocationReconciliationStrategy
 
 SPECIFICATION: dict[str, str] = {
     "key": "country",

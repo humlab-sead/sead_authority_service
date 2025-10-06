@@ -36,7 +36,8 @@ class FeatureTypeQueryProxy(QueryProxy):
 class FeatureTypeReconciliationStrategy(ReconciliationStrategy):
     """Feature-specific reconciliation with feature names and descriptions"""
 
-    def __init__(self, specification: dict[str, str] = SPECIFICATION):
+    def __init__(self, specification: dict[str, str] = None):
+        specification = specification or SPECIFICATION
         super().__init__(specification, FeatureTypeQueryProxy)
 
     async def get_details(self, entity_id: str, cursor: psycopg.AsyncCursor) -> dict[str, Any] | None:

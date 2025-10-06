@@ -3,7 +3,6 @@ Unit tests for the API router endpoints.
 """
 
 import json
-from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -12,9 +11,6 @@ from fastapi.testclient import TestClient
 
 from src.api.router import router
 from src.configuration.inject import MockConfigProvider
-from src.metadata import (_compile_property_settings, get_reconcile_properties,
-                          get_reconciliation_metadata)
-from src.strategies.interface import Strategies, StrategyRegistry
 from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
@@ -79,12 +75,12 @@ class TestHealthCheck:
 class TestMetaEndpoint:
     """Test reconciliation metadata endpoint"""
 
-    @with_test_config
-    def test_xyz(self, test_provider: MockConfigProvider) -> None:
-        x: StrategyRegistry = _compile_property_settings(Strategies)
-        y: list[dict[str, str]] | Any = get_reconcile_properties(Strategies, "lat", "site")
-        z: dict[str, Any] = get_reconciliation_metadata(Strategies, "testserver")
-        pass
+    # @with_test_config
+    # def test_xyz(self, test_provider: MockConfigProvider) -> None:
+    #     x: StrategyRegistry = _compile_property_settings(Strategies)
+    #     y: list[dict[str, str]] | Any = get_reconcile_properties(Strategies, "lat", "site")
+    #     z: dict[str, Any] = get_reconciliation_metadata(Strategies, "testserver")
+    #     pass
 
     @patch("src.api.router.Strategies", MockStrategies())
     @with_test_config

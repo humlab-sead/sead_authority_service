@@ -13,6 +13,8 @@ from httpx import ASGITransport, AsyncClient
 
 from src.api.router import router
 
+# pylint: disable=redefined-outer-name
+
 
 @pytest.fixture
 def test_app():

@@ -1,5 +1,3 @@
-from typing import Any
-
 import psycopg
 
 from src.strategies.query import QueryProxy
@@ -64,5 +62,6 @@ class LocationQueryProxy(QueryProxy):
 class LocationReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 
-    def __init__(self, specification: dict[str, str] = SPECIFICATION):
+    def __init__(self, specification: dict[str, str] = None) -> None:
+        specification = specification or SPECIFICATION
         super().__init__(specification, LocationQueryProxy)

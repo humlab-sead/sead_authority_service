@@ -18,6 +18,7 @@ from src.configuration.setup import get_connection
 from src.strategies.interface import ReconciliationStrategy, Strategies
 
 
+# pylint: disable=too-many-locals
 async def render_flyout_preview(uri: str) -> dict[str, Any]:
     """
     Generate compact HTML preview for OpenRefine flyout/tooltip.
@@ -144,7 +145,7 @@ async def suggest_entities(prefix: str, entity_type: str = "", limit: int = 10) 
                 if len(results) >= limit:
                     break
 
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.warning(f"Error suggesting entities from {type_key}: {e}")
                 continue
 
@@ -167,7 +168,7 @@ async def suggest_types(prefix: str = "") -> dict[str, Any]:
     logger.info(f"Type suggest: prefix='{prefix}'")
 
     # Get all registered entity types
-    all_types = [{"id": type_key, "name": type_key.capitalize()} for type_key in Strategies.items.keys()]
+    all_types = [{"id": type_key, "name": type_key.capitalize()} for type_key in Strategies.items]
 
     # Filter by prefix if provided
     if prefix:
