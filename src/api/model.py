@@ -1,8 +1,10 @@
 # models_openrefine.py
-from typing import Dict, List, Mapping, Optional, Union, Any
+from typing import Dict, List, Mapping, Optional, Union, Any, Generic, TypeVar
+from typing import Union
 
-from pydantic import BaseModel, Field, RootModel
+from pydantic import BaseModel, Field, RootModel, ConfigDict, validator, HttpUrl
 from typing_extensions import Literal
+from typing import Annotated
 
 # ---------- Common ----------
 
@@ -29,12 +31,36 @@ class ReconPropertyConstraint(BaseModel):
 class ReconQuery(BaseModel):
     """A single reconciliation query."""
 
-    query: str
-    type: Optional[str] = Field(None, description="Entity/type ID to bias results")
+    query: str = Field(..., description="Search query string", examples=["Uppsala"])
+    type: Optional[str] = Field(None, description="Entity/type ID to bias results", examples=["site"])
     type_strict: Optional[Literal["should", "all", "any"]] = Field(None, description="Type matching policy")
-    limit: Optional[int] = Field(None, description="Max candidates to return")
+    limit: Optional[int] = Field(None, description="Max candidates to return", ge=1, le=500)
     properties: Optional[List[ReconPropertyConstraint]] = None
-    lang: Optional[str] = Field(None, description="BCP47 language code for labels")
+    lang: Optional[str] = Field(None, description="BCP47 language code for labels", examples=["en", "sv"])
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "query": "Uppsala",
+                "type": "site", 
+                "limit": 10
+            }
+        }
+    )
+
+    @validator('query', pre=True)
+    def validate_query(cls, v):
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                raise ValueError('Query cannot be empty')
+        return v
+
+    @validator('type', pre=True) 
+    def validate_type_list(cls, v):
+        if isinstance(v, list) and len(v) == 0:
+            return []
+        return v
 
 
 class ReconBatchRequest(RootModel[Mapping[str, ReconQuery]]):
@@ -52,12 +78,12 @@ class ReconBatchRequest(RootModel[Mapping[str, ReconQuery]]):
 class ReconCandidate(BaseModel):
     """Candidate entity returned by reconciliation."""
 
-    id: str
-    name: str
-    type: List[TypeRef] = []
-    score: Optional[float] = None
+    id: str = Field(..., description="Unique identifier")
+    name: str = Field(..., min_length=1, description="Display name")
+    type: List[TypeRef] = Field(default_factory=list)
+    score: Optional[Annotated[float, Field(ge=0.0, le=100.0)]] = None
     match: Optional[bool] = None
-    description: Optional[str] = None  # optional, but useful
+    description: Optional[str] = Field(None, max_length=500)  # optional, but useful
     # You may also return extra keys like 'uri', 'notable', etc., if you want.
 
 
@@ -82,9 +108,9 @@ class ViewTemplate(BaseModel):
 class PreviewTemplate(BaseModel):
     """Preview (iframe) settings."""
 
-    url: str  # HTML endpoint returning a small preview for an entity
-    width: int = 430
-    height: int = 300
+    url: HttpUrl = Field(..., description="HTML endpoint returning a small preview")
+    width: Annotated[int, Field(gt=0, le=1920)] = 430
+    height: Annotated[int, Field(gt=0, le=1080)] = 300
 
 
 class SuggestSubservice(BaseModel):
@@ -112,15 +138,12 @@ class ExtendDescriptor(BaseModel):
 
 
 class ReconServiceManifest(BaseModel):
-    """
-    The JSON object OpenRefine reads from GET /reconcile (no params).
-    Include capabilities your service supports.
-    """
+    """Service manifest with proper caching hints"""
 
     name: str
-    identifierSpace: str
-    schemaSpace: str
-    defaultTypes: List[TypeRef] = []
+    identifierSpace: HttpUrl
+    schemaSpace: HttpUrl  
+    defaultTypes: List[TypeRef] = Field(default_factory=list)
 
     view: Optional[ViewTemplate] = None
     preview: Optional[PreviewTemplate] = None
@@ -132,6 +155,16 @@ class ReconServiceManifest(BaseModel):
     homepage: Optional[str] = None
     logo: Optional[str] = None
     # You can add 'proposeProperties', 'feature_view', etc., if needed.
+
+    model_config = ConfigDict(
+        # Enable faster serialization
+        validate_assignment=True,
+        use_enum_values=True,
+        # Add caching hints for FastAPI
+        json_schema_extra={
+            "cache_control": "public, max-age=3600"
+        }
+    )
 
 
 # ---------- /suggest/* (entity/property/type) ----------
@@ -159,7 +192,22 @@ class SuggestTypeItem(BaseModel):
 
 
 class SuggestEntityResponse(BaseModel):
-    result: List[SuggestEntityItem]
+    result: List[SuggestEntityItem] = Field(default_factory=list)
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "result": [
+                    {
+                        "id": "https://w3id.org/sead/id/site/123",
+                        "name": "Uppsala Site",
+                        "type": [{"id": "site", "name": "Site"}],
+                        "score": 95.0
+                    }
+                ]
+            }
+        }
+    )
 
 
 class SuggestPropertyResponse(BaseModel):
@@ -191,19 +239,25 @@ class ExtendRequest(BaseModel):
 
 
 class ExtCell(BaseModel):
-    """
-    One value in an extension cell. OpenRefine accepts several shapes:
-      - string-only: {"str": "Uppsala"}
-      - linked entity: {"id":"Q123","name":"Uppsala"}
-      - typed/URL values: {"str":"https://...","url":"https://..."}
-    """
+    """Extension cell value with proper field handling"""
 
-    str: Optional[str] = None
+    str_value: Optional[str] = Field(None, alias="str")
     lang: Optional[str] = None
-    id: Optional[str] = None
+    id: Optional[str] = None  
     name: Optional[str] = None
-    type: Optional[str] = None
-    url: Optional[str] = None
+    type_ref: Optional[str] = Field(None, alias="type")
+    url: Optional[HttpUrl] = None
+
+    model_config = ConfigDict(
+        populate_by_name=True,  # Allow both 'str' and 'str_value'
+        validate_assignment=True
+    )
+
+    @validator('str_value', 'name')
+    def validate_strings(cls, v):
+        if v is not None and isinstance(v, str):
+            return v.strip() if v.strip() else None
+        return v
 
 
 class ExtendResponse(BaseModel):
@@ -224,3 +278,24 @@ class ExtendResponse(BaseModel):
 
 # Forward reference resolution for recursive JsonValue type
 JsonValue = Union[JsonScalar, List[JsonValue], Dict[str, JsonValue]]
+
+T = TypeVar('T')
+
+class APIResponse(BaseModel, Generic[T]):
+    """Standard API response wrapper"""
+    success: bool = True
+    data: Optional[T] = None
+    error: Optional[str] = None
+
+
+# Handle both dict and RootModel for batch requests
+ReconBatchRequestType = Union[Dict[str, ReconQuery], ReconBatchRequest]
+
+class ReconBatchRequestHandler(BaseModel):
+    """Flexible handler for batch requests"""
+    
+    @classmethod
+    def parse_batch(cls, data: Union[dict, ReconBatchRequest]) -> Dict[str, ReconQuery]:
+        if isinstance(data, dict):
+            return {k: ReconQuery.model_validate(v) for k, v in data.items()}
+        return data.root
