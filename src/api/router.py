@@ -22,7 +22,15 @@ from src.suggest import (
     suggest_properties as suggest_properties_api,
     suggest_types,
 )
-
+from src.api.model import (
+    ReconServiceManifest,
+    ReconBatchRequest,
+    ReconBatchResponse,
+    ReconQueryResult,
+    SuggestEntityResponse,
+    SuggestPropertyResponse,
+    SuggestTypeResponse,
+)
 # pylint: disable=unused-argument, redefined-builtin
 
 
@@ -54,8 +62,8 @@ async def is_alive(config: Config = Depends(get_config_dependency)) -> dict[str,
     return {"status": "alive"}
 
 
-@router.get("/reconcile")
-async def meta(request: Request, config: Config = Depends(get_config_dependency)) -> dict[str, Any]:
+@router.get("/reconcile", response_model=ReconServiceManifest, response_model_exclude_none=True)
+async def meta(request: Request, config: Config = Depends(get_config_dependency)) -> ReconServiceManifest:
     """
     OpenRefine reconciliation service metadata endpoint.
 
@@ -66,8 +74,9 @@ async def meta(request: Request, config: Config = Depends(get_config_dependency)
     return get_reconciliation_metadata(Strategies, base_url=request.base_url)
 
 
+#@router.post("/reconcile", response_model=ReconBatchResponse, response_model_exclude_none=True)
 @router.post("/reconcile")
-async def reconcile(request: Request, config: Config = Depends(get_config_dependency)) -> JSONResponse:
+async def reconcile(request: Request, config: Config = Depends(get_config_dependency)) -> ReconBatchResponse:
     """
     OpenRefine reconciliation endpoint for batch queries.
 
@@ -194,7 +203,7 @@ async def reconcile(request: Request, config: Config = Depends(get_config_depend
             logger.info("Queries is string, parsing again...")
             queries = json.loads(queries)
 
-        if not queries:
+        if not isinstance(queries, dict) or not queries:
             logger.error("No queries found after parsing")
             return JSONResponse({"error": "No queries provided"}, status_code=400)
 
