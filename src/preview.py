@@ -178,4 +178,3 @@ async def render_preview(uri: str) -> ValueError | str:
     </html>"""
 
     return html
-

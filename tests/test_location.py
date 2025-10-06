@@ -57,7 +57,7 @@
 #         strategy: ReconciliationStrategy = strategy_class(specification)
 #         assert strategy.get_id_path() == "location"
 
-#     @pytest.mark.parametrize(   
+#     @pytest.mark.parametrize(
 #         "entity_id, specification, strategy_class, query_proxy_class",
 #         TEST_SETUPS,
 #     )

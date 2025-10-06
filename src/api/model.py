@@ -1,8 +1,8 @@
 # models_openrefine.py
 from typing import Any, Dict, List, Mapping, Optional, Union
-from typing_extensions import Literal
-from pydantic import BaseModel, Field
 
+from pydantic import BaseModel, Field
+from typing_extensions import Literal
 
 # ---------- Common ----------
 

@@ -66,11 +66,11 @@ class ReconciliationStrategy(ABC):
 
     async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         """Find candidate matches for the given query
-        
-            This method should be implemented by subclasses to provide entity-specific
-            candidate retrieval logic.
 
-            Default implementations find candidates based on fuzzy name matching.
+        This method should be implemented by subclasses to provide entity-specific
+        candidate retrieval logic.
+
+        Default implementations find candidates based on fuzzy name matching.
         """
         candidates: list[dict] = []
         properties = properties or {}

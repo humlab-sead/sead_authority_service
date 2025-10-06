@@ -50,10 +50,10 @@ class TestRenderPreview:
         assert isinstance(result, str)
         assert "<title>Test Site – Preview</title>" in result
         assert "<h1>Test Site</h1>" in result
-        assert "<div class=\"label\">longitude:</div>" in result
-        assert "<div class=\"value\">17.6389</div>" in result
-        assert "<div class=\"label\">country:</div>" in result
-        assert "<div class=\"value\">Sweden</div>" in result
+        assert '<div class="label">longitude:</div>' in result
+        assert '<div class="value">17.6389</div>' in result
+        assert '<div class="label">country:</div>' in result
+        assert '<div class="value">Sweden</div>' in result
 
     @pytest.mark.asyncio
     @with_test_config
@@ -82,10 +82,10 @@ class TestRenderPreview:
 
         assert isinstance(result, str)
         # Should include field1 and field5
-        assert "<div class=\"label\">field1:</div>" in result
-        assert "<div class=\"value\">Value 1</div>" in result
-        assert "<div class=\"label\">field5:</div>" in result
-        assert "<div class=\"value\">Valid Value</div>" in result
+        assert '<div class="label">field1:</div>' in result
+        assert '<div class="value">Value 1</div>' in result
+        assert '<div class="label">field5:</div>' in result
+        assert '<div class="value">Valid Value</div>' in result
 
         # Should NOT include field2 (None), field3 (empty), field4 (whitespace only)
         assert "field2:" not in result

@@ -3,11 +3,17 @@ from unittest.mock import AsyncMock
 
 import psycopg
 import pytest
-from src.strategies.location import LocationQueryProxy, SPECIFICATION as LOCATION_SPECIFICATION
+
 from src.strategies.country import SPECIFICATION as COUNTRY_SPECIFICATION
-from src.strategies.feature_type import SPECIFICATION as FEATURE_TYPE_SPECIFICATION, FeatureTypeQueryProxy
-from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION, SiteQueryProxy
-from src.strategies.data_type import SPECIFICATION as DATA_TYPE_SPECIFICATION, DataTypeQueryProxy
+from src.strategies.data_type import SPECIFICATION as DATA_TYPE_SPECIFICATION
+from src.strategies.data_type import DataTypeQueryProxy
+from src.strategies.feature_type import \
+    SPECIFICATION as FEATURE_TYPE_SPECIFICATION
+from src.strategies.feature_type import FeatureTypeQueryProxy
+from src.strategies.location import SPECIFICATION as LOCATION_SPECIFICATION
+from src.strategies.location import LocationQueryProxy
+from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION
+from src.strategies.site import SiteQueryProxy
 
 # pylint: disable=attribute-defined-outside-init,protected-access, unused-argument
 

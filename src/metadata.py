@@ -91,7 +91,7 @@ def get_reconciliation_metadata(strategies: StrategyRegistry, base_url: str) -> 
     property_settings: list[dict[str, str]] = _compile_property_settings(strategies)
 
     # Ensure base_url doesn't end with slash to avoid double slashes
-    base_url_clean = str(base_url).rstrip('/')
+    base_url_clean = str(base_url).rstrip("/")
 
     return {
         "name": "SEAD Entity Reconciliation",
@@ -99,26 +99,16 @@ def get_reconciliation_metadata(strategies: StrategyRegistry, base_url: str) -> 
         "schemaSpace": "http://www.w3.org/2004/02/skos/core#",
         "defaultTypes": default_types,
         "view": {"url": f"{base_url_clean}/reconcile/preview?id={{{{id}}}}"},
-        "preview": {
-            "url": f"{base_url_clean}/reconcile/preview?id={{{{id}}}}",
-            "width": 400,
-            "height": 300
-        },
+        "preview": {"url": f"{base_url_clean}/reconcile/preview?id={{{{id}}}}", "width": 400, "height": 300},
         "suggest": {
             "entity": {
                 "service_url": f"{base_url_clean}",
                 "service_path": "/suggest/entity",
                 "flyout_service_url": f"{base_url_clean}",
-                "flyout_service_path": "/flyout/entity?id=${{id}}"
+                "flyout_service_path": "/flyout/entity?id=${{id}}",
             },
-            "type": {
-                "service_url": f"{base_url_clean}",
-                "service_path": "/suggest/type"
-            },
-            "property": {
-                "service_url": f"{base_url_clean}",
-                "service_path": "/suggest/property"
-            }
+            "type": {"service_url": f"{base_url_clean}", "service_path": "/suggest/type"},
+            "property": {"service_url": f"{base_url_clean}", "service_path": "/suggest/property"},
         },
         "extend": {
             "propose_properties": {
@@ -128,4 +118,3 @@ def get_reconciliation_metadata(strategies: StrategyRegistry, base_url: str) -> 
             "property_settings": property_settings,
         },
     }
-

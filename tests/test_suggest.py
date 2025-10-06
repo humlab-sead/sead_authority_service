@@ -6,10 +6,12 @@ for OpenRefine reconciliation.
 """
 
 from unittest.mock import AsyncMock, patch
-from src.api.router import router
-from fastapi import FastAPI
+
 import pytest
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
+
+from src.api.router import router
 
 
 @pytest.fixture

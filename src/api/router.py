@@ -9,6 +9,10 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
 
+from src.api.model import (ReconBatchRequest, ReconBatchResponse,
+                           ReconQueryResult, ReconServiceManifest,
+                           SuggestEntityResponse, SuggestPropertyResponse,
+                           SuggestTypeResponse)
 from src.configuration.config import Config
 from src.configuration.inject import ConfigValue, get_config_provider
 from src.configuration.setup import setup_config_store
@@ -16,21 +20,10 @@ from src.metadata import get_reconcile_properties, get_reconciliation_metadata
 from src.preview import render_preview
 from src.reconcile import reconcile_queries
 from src.strategies.interface import Strategies
-from src.suggest import (
-    render_flyout_preview,
-    suggest_entities,
-    suggest_properties as suggest_properties_api,
-    suggest_types,
-)
-from src.api.model import (
-    ReconServiceManifest,
-    ReconBatchRequest,
-    ReconBatchResponse,
-    ReconQueryResult,
-    SuggestEntityResponse,
-    SuggestPropertyResponse,
-    SuggestTypeResponse,
-)
+from src.suggest import render_flyout_preview, suggest_entities
+from src.suggest import suggest_properties as suggest_properties_api
+from src.suggest import suggest_types
+
 # pylint: disable=unused-argument, redefined-builtin
 
 
@@ -74,7 +67,7 @@ async def meta(request: Request, config: Config = Depends(get_config_dependency)
     return get_reconciliation_metadata(Strategies, base_url=request.base_url)
 
 
-#@router.post("/reconcile", response_model=ReconBatchResponse, response_model_exclude_none=True)
+# @router.post("/reconcile", response_model=ReconBatchResponse, response_model_exclude_none=True)
 @router.post("/reconcile")
 async def reconcile(request: Request, config: Config = Depends(get_config_dependency)) -> ReconBatchResponse:
     """

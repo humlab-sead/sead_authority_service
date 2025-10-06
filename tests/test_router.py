@@ -12,8 +12,9 @@ from fastapi.testclient import TestClient
 
 from src.api.router import router
 from src.configuration.inject import MockConfigProvider
+from src.metadata import (_compile_property_settings, get_reconcile_properties,
+                          get_reconciliation_metadata)
 from src.strategies.interface import Strategies, StrategyRegistry
-from src.metadata import _compile_property_settings, get_reconcile_properties, get_reconciliation_metadata
 from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
@@ -41,7 +42,8 @@ class MockStrategy:
 
     def get_id_path(self):
         return "site"
-    
+
+
 class MockStrategies:
     """Mock Strategies class for testing"""
 
