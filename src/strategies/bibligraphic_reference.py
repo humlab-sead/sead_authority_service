@@ -10,7 +10,6 @@ from .interface import ReconciliationStrategy, Strategies
 SPECIFICATION: dict[str, object] = {
     "key": "bibliographic_reference",
     "display_name": "Bibliographic References",
-    "sort_priority": 30,
     "id_field": "biblio_id",
     "label_field": "full_reference",  # show the whole reference
     "properties": [

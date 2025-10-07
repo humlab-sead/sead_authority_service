@@ -83,23 +83,17 @@ def _compile_property_settings(strategies) -> list[dict[str, str]]:
     return property_settings
 
 
-def _get_default_types(strategies: StrategyRegistry) -> list[dict[str, str | int]]:
-    type_entries: list[dict[str, str | int]] = []
-    for entity_type, strategy_class in strategies.items.items():
-        strategy_instance = strategy_class()
-        type_entries.append(
-            {
-                "id": entity_type,
-                "name": strategy_instance.get_display_name(),
-                "sort_priority": strategy_instance.get_sort_priority(),
-            }
-        )
+def _get_default_types(strategies: StrategyRegistry) -> list[dict[str, str]]:
+    default_types: list[dict[str, str]] = [
+        {
+            "id": entity_type,
+            "name": strategy_class().get_display_name(),
+        }
+        for entity_type, strategy_class in strategies.items.items()
+    ]
 
-    # Sort by priority (lower numbers first), then alphabetically
-    type_entries.sort(key=lambda x: (x["sort_priority"], x["name"]))
+    default_types.sort(key=lambda x: (x["name"]))
 
-    # Remove sort_priority from final output
-    default_types: list[dict[str, str]] = [{"id": t["id"], "name": t["name"]} for t in type_entries]
     return default_types
 
 

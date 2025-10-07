@@ -6,6 +6,7 @@ from .interface import ReconciliationStrategy, Strategies
 
 SPECIFICATION: dict[str, str] = {
     "key": "data_type",
+    "display_name": "Data Types",
     "id_field": "data_type_id",
     "label_field": "label",
     "properties": [],

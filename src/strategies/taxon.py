@@ -7,7 +7,6 @@ from .interface import ReconciliationStrategy, Strategies
 SPECIFICATION: dict[str, str] = {
     "key": "taxon",
     "display_name": "Taxa",
-    "sort_priority": 30,
     "id_field": "taxon_id",
     "label_field": "label",
     "properties": [

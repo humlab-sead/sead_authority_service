@@ -7,28 +7,9 @@ from .interface import ReconciliationStrategy, Strategies
 SPECIFICATION: dict[str, str] = {
     "key": "location",
     "display_name": "Locations & Places", 
-    "sort_priority": 20,
     "id_field": "location_id",
     "label_field": "label",
     "properties": [
-        # {
-        #     "id": "latitude",
-        #     "name": "Latitude",
-        #     "type": "number",
-        #     "description": "Geographic latitude in decimal degrees (WGS84)",
-        # },
-        # {
-        #     "id": "longitude",
-        #     "name": "Longitude",
-        #     "type": "number",
-        #     "description": "Geographic longitude in decimal degrees (WGS84)",
-        # },
-        # {
-        #     "id": "national_id",
-        #     "name": "National Site ID",
-        #     "type": "string",
-        #     "description": "Official national site identifier or registration number",
-        # },
         {
             "id": "place_name",
             "name": "Place Name",
