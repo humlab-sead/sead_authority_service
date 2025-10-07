@@ -111,7 +111,7 @@ def get_reconciliation_metadata(strategies: StrategyRegistry, base_url: str) -> 
     property_settings: list[dict[str, str]] = _compile_property_settings(strategies)
 
     # Ensure base_url doesn't end with slash to avoid double slashes
-    base_url_clean = str(base_url).rstrip("/")
+    base_url_clean: str = str(base_url).rstrip("/")
 
     return {
         "name": "SEAD Entity Reconciliation",
