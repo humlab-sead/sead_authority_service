@@ -40,3 +40,12 @@ class QueryProxy:
         await self.cursor.execute(sql, {"q": name, "n": limit})
         rows: list[Tuple[Any]] = await self.cursor.fetchall()
         return [dict(row) for row in rows]
+
+    async def fetch_by_abbreviation(self, abbreviation: str) -> list[dict[str, Any]]:
+        """Fetch entity by abbreviation"""
+        sql: str = self.get_sql_query("abbreviation_sql")
+        if not sql:
+            return []
+        await self.cursor.execute(sql, {"abbreviation": abbreviation})
+        row: Tuple[Any, ...] | None = await self.cursor.fetchone()
+        return [dict(row)] if row else []
