@@ -1,5 +1,5 @@
-from .interface import Strategies, StrategySpecification
 from .location import LocationReconciliationStrategy
+from .strategy import Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
     "key": "country",

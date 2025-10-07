@@ -6,7 +6,7 @@ from psycopg.rows import dict_row
 
 from src.configuration.inject import ConfigValue
 from src.configuration.setup import get_connection
-from src.strategies.interface import ReconciliationStrategy, Strategies
+from src.strategies.strategy import ReconciliationStrategy, Strategies
 
 
 async def render_preview(uri: str) -> ValueError | str:

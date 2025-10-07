@@ -5,7 +5,7 @@ from psycopg.rows import dict_row
 
 from src.configuration.inject import get_config_provider
 from src.configuration.setup import get_connection
-from src.strategies.interface import ReconciliationStrategy, Strategies
+from src.strategies.strategy import ReconciliationStrategy, Strategies
 
 
 async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:

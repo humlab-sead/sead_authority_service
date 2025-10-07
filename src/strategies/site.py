@@ -4,8 +4,7 @@ import psycopg
 
 from src.configuration.inject import ConfigValue
 from .query import QueryProxy
-
-from .interface import ReconciliationStrategy, Strategies, StrategySpecification
+from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
     "key": "site",

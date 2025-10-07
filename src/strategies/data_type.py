@@ -1,8 +1,7 @@
 import psycopg
 
 from .query import QueryProxy
-
-from .interface import ReconciliationStrategy, Strategies, StrategySpecification
+from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
     "key": "data_type",

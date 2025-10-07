@@ -2,7 +2,7 @@ from typing import Any
 
 import psycopg
 
-from .interface import ReconciliationStrategy, Strategies
+from .strategy import ReconciliationStrategy, Strategies
 
 SPECIFICATION: dict[str, str] = {
     "key": "taxon",

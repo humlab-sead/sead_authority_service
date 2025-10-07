@@ -21,7 +21,8 @@ from src.strategies.dimension import SPECIFICATION as DIMENSION_SPECIFICATION
 from src.strategies.location import SPECIFICATION as LOCATION_SPECIFICATION
 from src.strategies.location import LocationReconciliationStrategy, LocationQueryProxy
 from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION
-from src.strategies.site import SiteReconciliationStrategy, SiteQueryProxy
+from src.strategies.site import SiteQueryProxy, SiteReconciliationStrategy
+from strategies.strategy import ReconciliationStrategy, StrategySpecification
 from tests.decorators import with_test_config
 
 # pylint: disable=attribute-defined-outside-init,protected-access, unused-argument
