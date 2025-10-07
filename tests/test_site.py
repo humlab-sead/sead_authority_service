@@ -50,7 +50,7 @@ class TestSiteQueryProxy:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_fetch_bzy_name_search(self):
+    async def test_fetch_by_name_search(self):
         """Test fuzzy name search."""
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
         proxy = SiteQueryProxy(SPECIFICATION, mock_cursor)
@@ -65,7 +65,7 @@ class TestSiteQueryProxy:
         assert result == mock_rows
 
     @pytest.mark.asyncio
-    async def test_fetch_bzy_name_search_default_limit(self):
+    async def test_fetch_by_name_search_default_limit(self):
         """Test fuzzy name search with default limit."""
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
         proxy = SiteQueryProxy(SPECIFICATION, mock_cursor)
