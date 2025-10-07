@@ -1,11 +1,9 @@
-import psycopg
-
 from .query import QueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
     "key": "location",
-    "display_name": "Locations & Places", 
+    "display_name": "Locations & Places",
     "id_field": "location_id",
     "label_field": "label",
     "properties": [
@@ -36,8 +34,7 @@ SPECIFICATION: StrategySpecification = {
 
 
 class LocationQueryProxy(QueryProxy):
-    def __init__(self, specification: dict, cursor: psycopg.AsyncCursor) -> None:
-        super().__init__(specification, cursor)
+    """Location-specific query proxy"""
 
 
 @Strategies.register(key="location")

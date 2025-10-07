@@ -1,7 +1,3 @@
-from typing import Any, Tuple
-
-import psycopg
-
 from .query import QueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
@@ -47,8 +43,7 @@ SPECIFICATION: StrategySpecification = {
 
 
 class MethodQueryProxy(QueryProxy):
-    def __init__(self, specification: StrategySpecification, cursor: psycopg.AsyncCursor) -> None:
-        super().__init__(specification, cursor)
+    """Method-specific query proxy"""
 
 
 @Strategies.register(key="method")

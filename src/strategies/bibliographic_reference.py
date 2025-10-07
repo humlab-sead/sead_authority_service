@@ -97,17 +97,11 @@ SPECIFICATION: StrategySpecification = {
 
 
 class BibliographicReferenceQueryProxy(QueryProxy):
-    def __init__(self, specification: StrategySpecification, cursor: psycopg.AsyncCursor) -> None:
-        super().__init__(specification, cursor)
-
-    # --- helpers -------------------------------------------------------------
 
     @staticmethod
     def _norm_isbn(isbn: str | None) -> str | None:
         if not isbn:
             return None
-        # remove non-alphanumerics; uppercase
-
         s = re.sub(r"[^0-9Xx]", "", isbn).upper()
         return s or None
 
@@ -118,8 +112,6 @@ class BibliographicReferenceQueryProxy(QueryProxy):
         doi = doi.strip()
         doi = doi.replace("https://doi.org/", "").replace("http://doi.org/", "").strip()
         return doi or None
-
-    # --- exact lookups -------------------------------------------------------
 
     async def fetch_by_isbn(self, isbn: str) -> list[dict]:
         norm = self._norm_isbn(isbn)

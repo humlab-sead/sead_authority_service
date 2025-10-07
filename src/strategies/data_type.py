@@ -1,5 +1,3 @@
-import psycopg
-
 from .query import QueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
@@ -48,8 +46,7 @@ SPECIFICATION: StrategySpecification = {
 
 
 class DataTypeQueryProxy(QueryProxy):
-    def __init__(self, specification: StrategySpecification, cursor: psycopg.AsyncCursor) -> None:
-        super().__init__(specification, cursor)
+    """Data Type-specific query proxy"""
 
 
 @Strategies.register(key="data_type")

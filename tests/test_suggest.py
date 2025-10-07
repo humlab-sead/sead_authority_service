@@ -8,15 +8,17 @@ for OpenRefine reconciliation.
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
-from configuration.inject import MockConfigProvider
+import psycopg
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient, Response
 
+from configuration.inject import MockConfigProvider
 from src.api.router import router
+from tests.conftest import MockRow
 from tests.decorators import with_test_config
 
-# pylint: disable=redefined-outer-name
+# pylint: disable=redefined-outer-name, unused-argument, too-many-locals
 
 
 @pytest.fixture
@@ -105,11 +107,7 @@ async def test_suggest_entity_short_prefix(test_app: FastAPI, mock_results: list
 async def test_suggest_type_all(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: MockConfigProvider):
     """Test type suggest without prefix (returns all types)"""
     # Create proper type suggestion mock data
-    mock_type_results = [
-        {"id": "site", "name": "Site"},
-        {"id": "location", "name": "Location"},
-        {"id": "taxon", "name": "Taxon"}
-    ]
+    mock_type_results = [{"id": "site", "name": "Site"}, {"id": "location", "name": "Location"}, {"id": "taxon", "name": "Taxon"}]
     # Mock suggest_types to return dict format that the real function returns
     with patch("src.api.router.suggest_types", new=AsyncMock(return_value={"result": mock_type_results})):
         async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
@@ -132,10 +130,8 @@ async def test_suggest_type_all(test_app: FastAPI, mock_results: list[dict[str, 
 async def test_suggest_type_with_prefix(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: MockConfigProvider):
     """Test type suggest with prefix filter"""
     # Create proper type suggestion mock data for prefix "loc"
-    mock_type_results = [
-        {"id": "location", "name": "Location"}
-    ]
-    # Mock suggest_types to return dict format that the real function returns  
+    mock_type_results = [{"id": "location", "name": "Location"}]
+    # Mock suggest_types to return dict format that the real function returns
     with patch("src.api.router.suggest_types", new=AsyncMock(return_value={"result": mock_type_results})):
         async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
             response: Response = await client.get("/suggest/type?prefix=loc")
@@ -189,16 +185,13 @@ async def test_suggest_property_with_prefix(test_app: FastAPI, mock_results: lis
 @with_test_config
 async def test_flyout_entity_valid(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: MockConfigProvider):
     """Test flyout preview with valid entity ID"""
-    from unittest.mock import patch, AsyncMock
-    from tests.conftest import MockRow
-    import psycopg
 
     # Mock the get_connection to return a properly mocked connection
     with patch("src.suggest.get_connection") as mock_get_connection:
         # Create a mock connection with proper database row response
         mock_conn = AsyncMock(spec=psycopg.AsyncConnection)
         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        
+
         # Mock location data that would be returned from the database
         location_row_data = {
             "location_id": 806,
@@ -206,18 +199,18 @@ async def test_flyout_entity_valid(test_app: FastAPI, mock_results: list[dict[st
             "place_name": "Uppsala",
             "latitude": 59.8586,
             "longitude": 17.6389,
-            "country": "Sweden"
+            "country": "Sweden",
         }
-        
+
         # Set up the mock to return a MockRow (which behaves like a real database row)
         mock_cursor.fetchone.return_value = MockRow(location_row_data)
         mock_cursor.execute.return_value = None
-        
+
         # Set up the connection context manager
         mock_cursor.__aenter__.return_value = mock_cursor
         mock_cursor.__aexit__.return_value = None
         mock_conn.cursor.return_value = mock_cursor
-        
+
         mock_get_connection.return_value = mock_conn
 
         async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:

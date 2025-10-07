@@ -3,6 +3,7 @@ from typing import Any, Tuple
 import psycopg
 
 from src.configuration.inject import ConfigValue
+
 from .query import QueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
@@ -100,8 +101,6 @@ SPECIFICATION: StrategySpecification = {
 
 
 class SiteQueryProxy(QueryProxy):
-    def __init__(self, specification: StrategySpecification, cursor: psycopg.AsyncCursor) -> None:
-        super().__init__(specification, cursor)
 
     async def fetch_site_by_national_id(self, national_id: str) -> list[dict[str, Any]]:
         """Exact match by national site identifier"""

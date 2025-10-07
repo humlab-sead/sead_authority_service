@@ -4,7 +4,7 @@
 # import psycopg
 # import pytest
 # from src.strategies.query import QueryProxy
-# from src.strategies.interface import ReconciliationStrategy
+# from src.strategies.strategy import ReconciliationStrategy
 # from src.strategies.location import SPECIFICATION as LOCATION_SPECIFICATION, LocationReconciliationStrategy, LocationQueryProxy
 # from src.strategies.country import SPECIFICATION as COUNTRY_SPECIFICATION, CountryReconciliationStrategy
 # from src.strategies.feature_type import SPECIFICATION as FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeQueryProxy

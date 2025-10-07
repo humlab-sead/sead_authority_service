@@ -1,10 +1,10 @@
 # models_openrefine.py
-from typing import Dict, List, Mapping, Optional, Union, Any, Generic, TypeVar
-from typing import ForwardRef
+from typing import (Annotated, Any, Dict, ForwardRef, Generic, List, Mapping,
+                    Optional, TypeVar, Union)
 
-from pydantic import BaseModel, Field, RootModel, ConfigDict, field_validator, HttpUrl
+from pydantic import (BaseModel, ConfigDict, Field, HttpUrl, RootModel,
+                      field_validator)
 from typing_extensions import Literal
-from typing import Annotated
 
 # ---------- Common ----------
 
@@ -18,7 +18,7 @@ class TypeRef(BaseModel):
 JsonScalar = Union[str, int, float, bool, None]
 
 # Use ForwardRef for recursive definition
-JsonValue = Union[JsonScalar, List[ForwardRef('JsonValue')], Dict[str, ForwardRef('JsonValue')]]
+JsonValue = Union[JsonScalar, List[ForwardRef("JsonValue")], Dict[str, ForwardRef("JsonValue")]]
 
 
 # ---------- /reconcile (queries & results) ----------
@@ -41,27 +41,19 @@ class ReconQuery(BaseModel):
     properties: Optional[List[ReconPropertyConstraint]] = None
     lang: Optional[str] = Field(None, description="BCP47 language code for labels", examples=["en", "sv"])
 
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "query": "Uppsala",
-                "type": "site", 
-                "limit": 10
-            }
-        }
-    )
+    model_config = ConfigDict(json_schema_extra={"example": {"query": "Uppsala", "type": "site", "limit": 10}})
 
-    @field_validator('query', mode='before')
+    @field_validator("query", mode="before")
     @classmethod
     def validate_query(cls, v):
         if isinstance(v, str):
             v = v.strip()
             if not v:
-                raise ValueError('Query cannot be empty')
+                raise ValueError("Query cannot be empty")
         return v
 
-    @field_validator('type', mode='before')
-    @classmethod 
+    @field_validator("type", mode="before")
+    @classmethod
     def validate_type_list(cls, v):
         if isinstance(v, list) and len(v) == 0:
             return []
@@ -77,6 +69,7 @@ class ReconBatchRequest(RootModel[Mapping[str, ReconQuery]]):
         "q1": { "query": "Uppland" }
       }
     """
+
     root: Mapping[str, ReconQuery]
 
 
@@ -98,6 +91,7 @@ class ReconQueryResult(BaseModel):
 
 class ReconBatchResponse(RootModel[Mapping[str, ReconQueryResult]]):
     """Batch response mirrors request keys -> {result: [...] }."""
+
     root: Mapping[str, ReconQueryResult]
 
 
@@ -140,11 +134,14 @@ class SuggestDescriptor(BaseModel):
 
 class ProposePropertiesDescriptor(BaseModel):
     """Propose properties endpoint descriptor."""
+
     service_url: str
     service_path: str
 
+
 class PropertySetting(BaseModel):
     """Property setting for OpenRefine."""
+
     name: str
     label: str
     type: str
@@ -152,8 +149,10 @@ class PropertySetting(BaseModel):
     entity_types: List[str]
     settings: Optional[Dict[str, Any]] = None
 
+
 class ExtendDescriptor(BaseModel):
     """Data extension endpoint descriptor."""
+
     propose_properties: ProposePropertiesDescriptor
     property_settings: List[PropertySetting]
 
@@ -182,9 +181,7 @@ class ReconServiceManifest(BaseModel):
         validate_assignment=True,
         use_enum_values=True,
         # Add caching hints for FastAPI
-        json_schema_extra={
-            "cache_control": "public, max-age=3600"
-        }
+        json_schema_extra={"cache_control": "public, max-age=3600"},
     )
 
 
@@ -214,18 +211,11 @@ class SuggestTypeItem(BaseModel):
 
 class SuggestEntityResponse(BaseModel):
     result: List[SuggestEntityItem] = Field(default_factory=list)
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "result": [
-                    {
-                        "id": "https://w3id.org/sead/id/site/123",
-                        "name": "Uppsala Site",
-                        "type": [{"id": "site", "name": "Site"}],
-                        "score": 95.0
-                    }
-                ]
+                "result": [{"id": "https://w3id.org/sead/id/site/123", "name": "Uppsala Site", "type": [{"id": "site", "name": "Site"}], "score": 95.0}]
             }
         }
     )
@@ -264,17 +254,14 @@ class ExtCell(BaseModel):
 
     str_value: Optional[str] = Field(None, alias="str")
     lang: Optional[str] = None
-    id: Optional[str] = None  
+    id: Optional[str] = None
     name: Optional[str] = None
     type_ref: Optional[str] = Field(None, alias="type")
     url: Optional[HttpUrl] = None
 
-    model_config = ConfigDict(
-        populate_by_name=True,  # Allow both 'str' and 'str_value'
-        validate_assignment=True
-    )
+    model_config = ConfigDict(populate_by_name=True, validate_assignment=True)  # Allow both 'str' and 'str_value'
 
-    @field_validator('str_value', 'name', mode='before')
+    @field_validator("str_value", "name", mode="before")
     @classmethod
     def validate_strings(cls, v):
         if v is not None and isinstance(v, str):
@@ -298,10 +285,12 @@ class ExtendResponse(BaseModel):
     rows: Dict[str, Dict[str, List[ExtCell]]]
 
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 class APIResponse(BaseModel, Generic[T]):
     """Standard API response wrapper"""
+
     success: bool = True
     data: Optional[T] = None
     error: Optional[str] = None
@@ -310,9 +299,10 @@ class APIResponse(BaseModel, Generic[T]):
 # Handle both dict and RootModel for batch requests
 ReconBatchRequestType = Union[Dict[str, ReconQuery], ReconBatchRequest]
 
+
 class ReconBatchRequestHandler(BaseModel):
     """Flexible handler for batch requests"""
-    
+
     @classmethod
     def parse_batch(cls, data: Union[dict, ReconBatchRequest]) -> Dict[str, ReconQuery]:
         if isinstance(data, dict):

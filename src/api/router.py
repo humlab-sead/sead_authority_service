@@ -9,17 +9,10 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
 
-from src.api.model import (
-    ReconBatchRequest,
-    ReconBatchResponse,
-    ReconQuery,
-    ReconQueryResult,
-    ReconServiceManifest,
-    SuggestEntityResponse,
-    SuggestPropertyResponse,
-    SuggestTypeResponse,
-    ReconBatchRequestHandler,
-)
+# Not used: ReconBatchRequest, ReconBatchRequestHandler, ReconQueryRequest
+from src.api.model import (ReconBatchResponse, ReconQuery,
+                           ReconServiceManifest, SuggestEntityResponse,
+                           SuggestPropertyResponse, SuggestTypeResponse)
 from src.configuration.config import Config
 from src.configuration.inject import ConfigValue, get_config_provider
 from src.configuration.setup import setup_config_store
@@ -31,7 +24,7 @@ from src.suggest import render_flyout_preview, suggest_entities
 from src.suggest import suggest_properties as suggest_properties_api
 from src.suggest import suggest_types
 
-# pylint: disable=unused-argument, redefined-builtin
+# pylint: disable=unused-argument, redefined-builtin, too-many-locals, too-many-return-statements, too-many-branches
 
 
 async def get_config_dependency() -> Config:
