@@ -9,11 +9,17 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
 
-# from src.api.model import (ReconBatchRequest, ReconBatchResponse,
-#                            ReconQueryResult, ReconServiceManifest,
-#                            SuggestEntityResponse, SuggestPropertyResponse,
-#                            SuggestTypeResponse)
-from src.api.model import ReconBatchResponse, ReconServiceManifest
+from src.api.model import (
+    ReconBatchRequest,
+    ReconBatchResponse,
+    ReconQuery,
+    ReconQueryResult,
+    ReconServiceManifest,
+    SuggestEntityResponse,
+    SuggestPropertyResponse,
+    SuggestTypeResponse,
+    ReconBatchRequestHandler,
+)
 from src.configuration.config import Config
 from src.configuration.inject import ConfigValue, get_config_provider
 from src.configuration.setup import setup_config_store
@@ -68,8 +74,7 @@ async def meta(request: Request, config: Config = Depends(get_config_dependency)
     return get_reconciliation_metadata(Strategies, base_url=request.base_url)
 
 
-# @router.post("/reconcile", response_model=ReconBatchResponse, response_model_exclude_none=True)
-@router.post("/reconcile")
+@router.post("/reconcile", response_model=ReconBatchResponse, response_model_exclude_none=True)
 async def reconcile(request: Request, config: Config = Depends(get_config_dependency)) -> ReconBatchResponse:
     """
     OpenRefine reconciliation endpoint for batch queries.
@@ -169,7 +174,7 @@ async def reconcile(request: Request, config: Config = Depends(get_config_depend
         logger.info(f"Content-Type: {content_type}")
 
         queries: Any = None
-        
+
         # Handle form-encoded data (what OpenRefine sends)
         if "application/x-www-form-urlencoded" in content_type:
             form_data = await request.form()
@@ -203,16 +208,31 @@ async def reconcile(request: Request, config: Config = Depends(get_config_depend
             logger.error("No queries found after parsing")
             return JSONResponse({"error": "No queries provided"}, status_code=400)
 
-        # Check if queries have 'type' field - if not, default to 'site'
+        # Validate and parse queries using Pydantic
+        validated_queries = {}
         for query_id, query_data in queries.items():
-            if "type" not in query_data:
-                logger.info(f"Adding default type 'site' to query {query_id}")
-                query_data["type"] = "site"
+            try:
+                # Set default type if missing
+                if "type" not in query_data:
+                    logger.info(f"Adding default type 'site' to query {query_id}")
+                    query_data["type"] = "site"
 
-        # Call your reconciliation function
-        results = await reconcile_queries(queries)
+                # Validate using Pydantic model
+                validated_query = ReconQuery.model_validate(query_data)
+                validated_queries[query_id] = validated_query
+            except Exception as e:
+                logger.error(f"Invalid query {query_id}: {e}")
+                return JSONResponse({"error": f"Invalid query {query_id}: {str(e)}"}, status_code=400)
 
-        return JSONResponse(results)
+        # Convert Pydantic objects back to dict for compatibility with existing reconcile_queries function
+        queries_dict_for_processing = {}
+        for query_id, validated_query in validated_queries.items():
+            queries_dict_for_processing[query_id] = validated_query.model_dump(exclude_none=True)
+
+        results: dict[str, Any] = await reconcile_queries(queries_dict_for_processing)
+
+        response = ReconBatchResponse(root=results)
+        return response
 
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception(f"Exception in reconcile endpoint: {e}", exc_info=True)
@@ -264,8 +284,8 @@ async def preview(id: str, config: Config = Depends(get_config_dependency)) -> H
 # These endpoints enable autocomplete and inline tooltip previews in OpenRefine
 
 
-@router.get("/suggest/entity")
-async def suggest_entity(prefix: str = "", type: str = "", config: Config = Depends(get_config_dependency)) -> JSONResponse:
+@router.get("/suggest/entity", response_model=SuggestEntityResponse)
+async def suggest_entity(prefix: str = "", type: str = "", config: Config = Depends(get_config_dependency)) -> SuggestEntityResponse:
     """
     Entity autocomplete endpoint for OpenRefine Suggest API.
 
@@ -291,15 +311,15 @@ async def suggest_entity(prefix: str = "", type: str = "", config: Config = Depe
         }
     """
     try:
-        items = await suggest_entities(prefix=prefix, entity_type=type, limit=10)
-        return JSONResponse({"result": items})
+        items: dict[str, Any] = await suggest_entities(prefix=prefix, entity_type=type, limit=10)
+        return SuggestEntityResponse(result=items.get("result", []))
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception(f"Error in suggest_entity: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@router.get("/suggest/type")
-async def suggest_type(prefix: str = "", config: Config = Depends(get_config_dependency)) -> JSONResponse:
+@router.get("/suggest/type", response_model=SuggestTypeResponse)
+async def suggest_type(prefix: str = "", config: Config = Depends(get_config_dependency)) -> SuggestTypeResponse:
     """
     Type autocomplete endpoint for OpenRefine Suggest API.
 
@@ -318,15 +338,15 @@ async def suggest_type(prefix: str = "", config: Config = Depends(get_config_dep
         }
     """
     try:
-        result = await suggest_types(prefix=prefix)
-        return JSONResponse(result)
+        result: dict[str, Any] = await suggest_types(prefix=prefix)
+        return SuggestTypeResponse(result=result.get("result", []))
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception(f"Error in suggest_type: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@router.get("/suggest/property")
-async def suggest_property(prefix: str = "", type: str = "", config: Config = Depends(get_config_dependency)) -> JSONResponse:
+@router.get("/suggest/property", response_model=SuggestPropertyResponse)
+async def suggest_property(prefix: str = "", type: str = "", config: Config = Depends(get_config_dependency)) -> SuggestPropertyResponse:
     """
     Property autocomplete endpoint for OpenRefine Suggest API.
 
@@ -349,8 +369,8 @@ async def suggest_property(prefix: str = "", type: str = "", config: Config = De
         }
     """
     try:
-        result = await suggest_properties_api(prefix=prefix, entity_type=type)
-        return JSONResponse(result)
+        result: dict[str, Any] = await suggest_properties_api(prefix=prefix, entity_type=type)
+        return SuggestPropertyResponse(result=result.get("result", []))
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception(f"Error in suggest_property: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -380,7 +400,7 @@ async def flyout_entity(id: str = "", config: Config = Depends(get_config_depend
         if not id:
             return JSONResponse({"error": "Missing 'id' parameter"}, status_code=400)
 
-        result = await render_flyout_preview(id)
+        result: dict[str, Any] = await render_flyout_preview(id)
         return JSONResponse(result)
     except ValueError as e:  # pylint: disable=broad-exception-caught
         logger.warning(f"Invalid flyout request: {e}")
