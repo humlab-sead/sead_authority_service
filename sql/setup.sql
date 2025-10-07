@@ -345,3 +345,48 @@ $$;
 --     limit p_limit;
 -- $$;
  
+
+/**********************************************************************************************
+**  Feature Type
+**********************************************************************************************/
+
+drop view if exists authority.methods;
+create or replace view authority.methods as
+  select  method_id,
+          method_name as label,
+          description,
+          authority.immutable_unaccent(lower(method_name)) as norm_label
+  from public.tbl_methods;
+
+create index if not exists tbl_methods_norm_trgm
+  on public.tbl_methods
+    using gin ( (authority.immutable_unaccent(lower(method_name))) gin_trgm_ops );
+
+drop function if exists authority.fuzzy_methods(text, integer);
+create or replace function authority.fuzzy_methods(
+	p_text text,
+	p_limit integer default 10
+) returns table (
+	method_id integer,
+	label text,
+	name_sim double precision
+)
+language sql
+stable
+as $$
+  with params as (
+        select authority.immutable_unaccent(lower(p_text))::text as q
+  )
+    select
+      s.method_id,
+      s.label,
+      greatest(
+          case when s.norm_label = (select q from params) then 1.0
+              else similarity(s.norm_label, (select q from params))
+          end, 0.0001
+      ) as name_sim
+    from authority.methods as s
+    where s.norm_label % (select q from params)
+    order by name_sim desc, s.label
+    limit p_limit;
+$$;
