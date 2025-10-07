@@ -8,11 +8,14 @@ from src.strategies.query import QueryProxy
 from src.utility import Registry
 
 
+
+StrategySpecification = dict[str, str | dict[str, Any]]
+
 class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
-    def __init__(self, specification: dict[str, str | dict[str, Any]], query_proxy_class: Type[QueryProxy]) -> None:
-        self.specification: dict[str, str | dict[str, Any]] = specification or {
+    def __init__(self, specification: StrategySpecification, query_proxy_class: Any) -> None:
+        self.specification: StrategySpecification = specification or {
             "key": "unknown",
             "id_field": "id",
             "label_field": "name",

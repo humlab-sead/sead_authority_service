@@ -7,7 +7,7 @@ from .query import QueryProxy
 
 from .interface import ReconciliationStrategy, Strategies, StrategySpecification
 
-SPECIFICATION: dict[str, str] = {
+SPECIFICATION: StrategySpecification = {
     "key": "site",
     "display_name": "Sites",
     "id_field": "site_id",
@@ -101,7 +101,7 @@ SPECIFICATION: dict[str, str] = {
 
 
 class SiteQueryProxy(QueryProxy):
-    def __init__(self, specification: dict[str, str | dict[str, Any]], cursor: psycopg.AsyncCursor) -> None:
+    def __init__(self, specification: StrategySpecification, cursor: psycopg.AsyncCursor) -> None:
         super().__init__(specification, cursor)
 
     async def fetch_site_by_national_id(self, national_id: str) -> list[dict[str, Any]]:

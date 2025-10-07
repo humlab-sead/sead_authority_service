@@ -6,9 +6,9 @@ from .interface import StrategySpecification
 
 
 class QueryProxy:
-    def __init__(self, specification: dict[str, str], cursor: psycopg.AsyncCursor) -> None:
+    def __init__(self, specification: StrategySpecification, cursor: psycopg.AsyncCursor) -> None:
         self.cursor: psycopg.AsyncCursor[tuple[Any]] = cursor
-        self.specification: dict[str, str] = specification
+        self.specification: StrategySpecification = specification
 
     def get_sql_queries(self) -> dict[str, str]:
         """Return the SQL queries defined in the specification"""

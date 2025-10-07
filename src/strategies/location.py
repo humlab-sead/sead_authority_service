@@ -4,7 +4,7 @@ from .query import QueryProxy
 
 from .interface import ReconciliationStrategy, Strategies, StrategySpecification
 
-SPECIFICATION: dict[str, str] = {
+SPECIFICATION: StrategySpecification = {
     "key": "location",
     "display_name": "Locations & Places", 
     "id_field": "location_id",

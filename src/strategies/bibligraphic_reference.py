@@ -7,7 +7,7 @@ from .query import QueryProxy
 
 from .interface import ReconciliationStrategy, Strategies, StrategySpecification
 
-SPECIFICATION: dict[str, object] = {
+SPECIFICATION: StrategySpecification = {
     "key": "bibliographic_reference",
     "display_name": "Bibliographic References",
     "id_field": "biblio_id",
@@ -99,7 +99,7 @@ SPECIFICATION: dict[str, object] = {
 
 
 class BibliographicReferenceQueryProxy(QueryProxy):
-    def __init__(self, specification: dict[str, str | dict[str, Any]], cursor: psycopg.AsyncCursor) -> None:
+    def __init__(self, specification: StrategySpecification, cursor: psycopg.AsyncCursor) -> None:
         super().__init__(specification, cursor)
 
     # --- helpers -------------------------------------------------------------
