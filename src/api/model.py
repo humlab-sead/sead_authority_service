@@ -1,8 +1,8 @@
 # models_openrefine.py
 from typing import Dict, List, Mapping, Optional, Union, Any, Generic, TypeVar
-from typing import Union
+from typing import ForwardRef
 
-from pydantic import BaseModel, Field, RootModel, ConfigDict, validator, HttpUrl
+from pydantic import BaseModel, Field, RootModel, ConfigDict, field_validator, HttpUrl
 from typing_extensions import Literal
 from typing import Annotated
 
@@ -14,8 +14,11 @@ class TypeRef(BaseModel):
     name: str
 
 
+# Fix recursive type definition
 JsonScalar = Union[str, int, float, bool, None]
-JsonValue = Union[JsonScalar, List["JsonValue"], Dict[str, "JsonValue"]]  # recursive
+
+# Use ForwardRef for recursive definition
+JsonValue = Union[JsonScalar, List[ForwardRef('JsonValue')], Dict[str, ForwardRef('JsonValue')]]
 
 
 # ---------- /reconcile (queries & results) ----------
@@ -25,7 +28,7 @@ class ReconPropertyConstraint(BaseModel):
     """Property constraint in a query: property id + value."""
 
     pid: str = Field(..., description="Property ID (e.g., 'P31')")
-    v: JsonValue = Field(..., description="Constraint value (scalar or JSON object)")
+    v: Any = Field(..., description="Constraint value (scalar or JSON object)")  # Use Any instead of JsonValue
 
 
 class ReconQuery(BaseModel):
@@ -48,7 +51,8 @@ class ReconQuery(BaseModel):
         }
     )
 
-    @validator('query', pre=True)
+    @field_validator('query', mode='before')
+    @classmethod
     def validate_query(cls, v):
         if isinstance(v, str):
             v = v.strip()
@@ -56,7 +60,8 @@ class ReconQuery(BaseModel):
                 raise ValueError('Query cannot be empty')
         return v
 
-    @validator('type', pre=True) 
+    @field_validator('type', mode='before')
+    @classmethod 
     def validate_type_list(cls, v):
         if isinstance(v, list) and len(v) == 0:
             return []
@@ -117,10 +122,13 @@ class SuggestSubservice(BaseModel):
     """
     Suggest endpoint descriptor. OpenRefine expects at least:
       { "service_url": "https://...", "service_path": "/suggest/entity" }
+    For entity suggest, may also include flyout service details.
     """
 
     service_url: str
     service_path: str
+    flyout_service_url: Optional[str] = None
+    flyout_service_path: Optional[str] = None
 
 
 class SuggestDescriptor(BaseModel):
@@ -130,19 +138,32 @@ class SuggestDescriptor(BaseModel):
     flyout: Optional[SuggestSubservice] = None  # optional; some tools use this
 
 
-class ExtendDescriptor(BaseModel):
-    """Data extension endpoint descriptor."""
-
+class ProposePropertiesDescriptor(BaseModel):
+    """Propose properties endpoint descriptor."""
     service_url: str
     service_path: str
+
+class PropertySetting(BaseModel):
+    """Property setting for OpenRefine."""
+    name: str
+    label: str
+    type: str
+    help_text: str
+    entity_types: List[str]
+    settings: Optional[Dict[str, Any]] = None
+
+class ExtendDescriptor(BaseModel):
+    """Data extension endpoint descriptor."""
+    propose_properties: ProposePropertiesDescriptor
+    property_settings: List[PropertySetting]
 
 
 class ReconServiceManifest(BaseModel):
     """Service manifest with proper caching hints"""
 
     name: str
-    identifierSpace: HttpUrl
-    schemaSpace: HttpUrl  
+    identifierSpace: str  # Changed from HttpUrl to str to handle the format from metadata
+    schemaSpace: str  # Changed from HttpUrl to str
     defaultTypes: List[TypeRef] = Field(default_factory=list)
 
     view: Optional[ViewTemplate] = None
@@ -173,7 +194,7 @@ class ReconServiceManifest(BaseModel):
 class SuggestEntityItem(BaseModel):
     id: str
     name: str
-    type: List[TypeRef] = []
+    type: List[TypeRef] = Field(default_factory=list)
     score: Optional[float] = None
     match: Optional[bool] = None
     # Optional: 'description' is not in the strict spec, but clients tolerate it.
@@ -211,11 +232,11 @@ class SuggestEntityResponse(BaseModel):
 
 
 class SuggestPropertyResponse(BaseModel):
-    result: List[SuggestPropertyItem]
+    result: List[SuggestPropertyItem] = Field(default_factory=list)
 
 
 class SuggestTypeResponse(BaseModel):
-    result: List[SuggestTypeItem]
+    result: List[SuggestTypeItem] = Field(default_factory=list)
 
 
 # ---------- /reconcile/extend (data extension) ----------
@@ -253,7 +274,8 @@ class ExtCell(BaseModel):
         validate_assignment=True
     )
 
-    @validator('str_value', 'name')
+    @field_validator('str_value', 'name', mode='before')
+    @classmethod
     def validate_strings(cls, v):
         if v is not None and isinstance(v, str):
             return v.strip() if v.strip() else None
@@ -275,9 +297,6 @@ class ExtendResponse(BaseModel):
     meta: List[ExtendRequestProperty]
     rows: Dict[str, Dict[str, List[ExtCell]]]
 
-
-# Forward reference resolution for recursive JsonValue type
-JsonValue = Union[JsonScalar, List[JsonValue], Dict[str, JsonValue]]
 
 T = TypeVar('T')
 
