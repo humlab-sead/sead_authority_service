@@ -1,15 +1,15 @@
 from abc import ABC
-from typing import Any, Type
+from typing import Any
 
 import psycopg
 
 from src.configuration.inject import ConfigValue
-from src.strategies.query import QueryProxy
+
 from src.utility import Registry
 
 
-
 StrategySpecification = dict[str, str | dict[str, Any]]
+
 
 class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
@@ -23,7 +23,7 @@ class ReconciliationStrategy(ABC):
             "property_settings": {},
             "sql_queries": {},
         }
-        self.query_proxy_class: Type[QueryProxy] = query_proxy_class
+        self.query_proxy_class: Any = query_proxy_class
 
     def get_entity_id_field(self) -> str:
         """Return the ID field name for this entity type"""
@@ -43,11 +43,11 @@ class ReconciliationStrategy(ABC):
 
     def get_properties_meta(self) -> list[dict[str, str]]:
         """Return metadata for entity-specific properties used in enhanced reconciliation"""
-        return self.specification["properties"]
+        return self.specification.get("properties", [])
 
     def get_property_settings(self) -> dict[str, dict[str, Any]]:
         """Return OpenRefine-specific settings for properties (optional override for type-specific settings)"""
-        return self.specification["property_settings"]
+        return self.specification.get("property_settings", {})
 
     def as_candidate(self, entity_data: dict[str, Any]) -> dict[str, Any]:
         """Convert entity data to OpenRefine candidate format"""
@@ -81,7 +81,11 @@ class ReconciliationStrategy(ABC):
         """
         candidates: list[dict] = []
         properties = properties or {}
-        proxy: QueryProxy = self.query_proxy_class(self.specification, cursor)
+        proxy: Any = self.query_proxy_class(self.specification, cursor)
+
+        abbreviation_field: str = self.specification.get("abbreviation_field")
+        if abbreviation_field and properties.get(abbreviation_field, None):
+            candidates.extend(await proxy.fetch_by_abbreviation(properties[abbreviation_field]))
 
         candidates.extend(await proxy.fetch_by_fuzzy_label(query, limit))
 
