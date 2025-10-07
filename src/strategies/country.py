@@ -1,12 +1,20 @@
-from .interface import Strategies
+from .interface import Strategies, StrategySpecification
 from .location import LocationReconciliationStrategy
 
-SPECIFICATION: dict[str, str] = {
+SPECIFICATION: StrategySpecification = {
     "key": "country",
     "display_name": "Countries",
     "id_field": "location_id",
     "label_field": "label",
-    "properties": [],
+    # "abbreviation_field": "country_abbreviation",
+    # "properties": [
+    #     {
+    #         "id": "country_abbreviation",
+    #         "name": "Country Abbreviation",
+    #         "type": "string",
+    #         "description": "Abbreviation for the country used",
+    #     }
+    # ],
     "property_settings": {},
     "sql_queries": {
         "fuzzy_label_sql": """ select * from authority.fuzzy_locations(%(q)s, %(n)s, 1) """,

@@ -2,6 +2,7 @@ from typing import Any, Tuple
 
 import psycopg
 from loguru import logger
+from .interface import StrategySpecification
 
 
 class QueryProxy:

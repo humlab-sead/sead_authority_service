@@ -3,9 +3,9 @@ from typing import Any
 
 import psycopg
 
-from src.strategies.query import QueryProxy
+from .query import QueryProxy
 
-from .interface import ReconciliationStrategy, Strategies
+from .interface import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: dict[str, object] = {
     "key": "bibliographic_reference",

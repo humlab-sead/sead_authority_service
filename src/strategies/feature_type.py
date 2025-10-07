@@ -2,11 +2,11 @@ from typing import Any
 
 import psycopg
 
-from src.strategies.query import QueryProxy
+from .query import QueryProxy
 
-from .interface import ReconciliationStrategy, Strategies
+from .interface import ReconciliationStrategy, Strategies, StrategySpecification
 
-SPECIFICATION: dict[str, str] = {
+SPECIFICATION: StrategySpecification = {
     "key": "feature_type",
     "display_name": "Feature Types",
     "id_field": "feature_type_id",
@@ -37,7 +37,7 @@ class FeatureTypeQueryProxy(QueryProxy):
 class FeatureTypeReconciliationStrategy(ReconciliationStrategy):
     """Feature-specific reconciliation with feature names and descriptions"""
 
-    def __init__(self, specification: dict[str, str] = None):
+    def __init__(self, specification: StrategySpecification = None):
         specification = specification or SPECIFICATION
         super().__init__(specification, FeatureTypeQueryProxy)
 
