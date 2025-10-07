@@ -3,6 +3,8 @@ from .location import LocationReconciliationStrategy
 
 SPECIFICATION: dict[str, str] = {
     "key": "country",
+    "display_name": "Countries",
+    "sort_priority": 10,
     "id_field": "location_id",
     "label_field": "label",
     "properties": [],

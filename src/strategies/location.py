@@ -6,6 +6,8 @@ from .interface import ReconciliationStrategy, Strategies
 
 SPECIFICATION: dict[str, str] = {
     "key": "location",
+    "display_name": "Locations & Places", 
+    "sort_priority": 20,
     "id_field": "location_id",
     "label_field": "label",
     "properties": [

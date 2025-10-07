@@ -8,6 +8,8 @@ from .interface import ReconciliationStrategy, Strategies
 
 SPECIFICATION: dict[str, str] = {
     "key": "feature_type",
+    "display_name": "Feature Types",
+    "sort_priority": 30,
     "id_field": "feature_type_id",
     "label_field": "label",
     "properties": [],

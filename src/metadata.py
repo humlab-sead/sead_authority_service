@@ -83,8 +83,28 @@ def _compile_property_settings(strategies) -> list[dict[str, str]]:
     return property_settings
 
 
+def _get_default_types(strategies: StrategyRegistry) -> list[dict[str, str | int]]:
+    type_entries: list[dict[str, str | int]] = []
+    for entity_type, strategy_class in strategies.items.items():
+        strategy_instance = strategy_class()
+        type_entries.append(
+            {
+                "id": entity_type,
+                "name": strategy_instance.get_display_name(),
+                "sort_priority": strategy_instance.get_sort_priority(),
+            }
+        )
+
+    # Sort by priority (lower numbers first), then alphabetically
+    type_entries.sort(key=lambda x: (x["sort_priority"], x["name"]))
+
+    # Remove sort_priority from final output
+    default_types: list[dict[str, str]] = [{"id": t["id"], "name": t["name"]} for t in type_entries]
+    return default_types
+
+
 def get_reconciliation_metadata(strategies: StrategyRegistry, base_url: str) -> dict[str, Any]:
-    default_types: list[dict[str, str]] = [{"id": entity_type, "name": entity_type} for entity_type in strategies.items]
+    default_types: list[dict[str, str]] = _get_default_types(strategies)
     id_base: str = ConfigValue("options:id_base").resolve()
 
     # Collect property settings from all registered strategies

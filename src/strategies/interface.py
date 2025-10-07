@@ -34,6 +34,14 @@ class ReconciliationStrategy(ABC):
         """Return the URL path segment for this entity type"""
         return self.specification["key"]
 
+    def get_display_name(self) -> str:
+        """Return human-readable display name for this entity type"""
+        return self.specification.get("display_name", self.get_id_path().replace("_", " ").title())
+
+    def get_sort_priority(self) -> int:
+        """Return sort priority (lower numbers come first). Default is 100."""
+        return self.specification.get("sort_priority", 100)
+
     def get_properties_meta(self) -> list[dict[str, str]]:
         """Return metadata for entity-specific properties used in enhanced reconciliation"""
         return self.specification["properties"]
