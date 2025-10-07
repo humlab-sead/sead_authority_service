@@ -168,6 +168,8 @@ async def reconcile(request: Request, config: Config = Depends(get_config_depend
         content_type = request.headers.get("content-type", "").lower()
         logger.info(f"Content-Type: {content_type}")
 
+        queries: Any = None
+        
         # Handle form-encoded data (what OpenRefine sends)
         if "application/x-www-form-urlencoded" in content_type:
             form_data = await request.form()
