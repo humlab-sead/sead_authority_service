@@ -6,7 +6,7 @@ SPECIFICATION: StrategySpecification = {
     "display_name": "Countries",
     "id_field": "location_id",
     "label_field": "label",
-    # "abbreviation_field": "country_abbreviation",
+    # "alternate_identity_field": "country_abbreviation",
     # "properties": [
     #     {
     #         "id": "country_abbreviation",

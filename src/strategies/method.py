@@ -11,7 +11,7 @@ SPECIFICATION: StrategySpecification = {
     "display_name": "Methods",
     "id_field": "method_id",
     "label_field": "label",
-    "abbreviation_field": "method_abbreviation",
+    "alternate_identity_field": "method_abbreviation",
     "properties": [
         {
             "id": "method_abbreviation",
@@ -37,10 +37,10 @@ SPECIFICATION: StrategySpecification = {
             join tbl_method_groups mg using (method_group_id)
             where method_id = %(id)s
     """,
-        "fetch_method_by_abbreviation": """
+        "alternate_identity_sql": """
         select method_id, label, 1.0 as name_sim
         from authority.methods
-        where method_abbrev_or_alt_name = %(abbreviation)s
+        where method_abbrev_or_alt_name = %(alternate_identity)s
         limit 1
     """,
     },
@@ -50,13 +50,6 @@ SPECIFICATION: StrategySpecification = {
 class MethodQueryProxy(QueryProxy):
     def __init__(self, specification: StrategySpecification, cursor: psycopg.AsyncCursor) -> None:
         super().__init__(specification, cursor)
-
-    async def fetch_method_by_abbreviation(self, abbreviation: str) -> list[dict]:
-        """Fetch method by abbreviation"""
-        sql: str = self.get_sql_queries().get("fetch_method_by_abbreviation", "")
-        await self.cursor.execute(sql, {"abbreviation": abbreviation})
-        row: Tuple[Any, ...] | None = await self.cursor.fetchone()
-        return [dict(row)] if row else []
 
 
 @Strategies.register(key="method")

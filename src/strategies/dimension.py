@@ -11,7 +11,7 @@ SPECIFICATION: StrategySpecification = {
     "display_name": "Dimensions",
     "id_field": "dimension_id",
     "label_field": "label",
-    "abbreviation_field": "dimension_abbreviation",
+    "alternate_identity_field": "dimension_abbreviation",
     "properties": [
         {
             "id": "dimension_abbreviation",
@@ -56,10 +56,10 @@ SPECIFICATION: StrategySpecification = {
             left join tbl_method_groups mg using (method_group_id)
             where dimension_id = %(id)s
     """,
-        "fetch_dimension_by_abbreviation": """
+        "alternate_identity_sql": """
         select dimension_id, label, 1.0 as name_sim
         from authority.dimensions
-        where dimension_abbreviation = %(abbreviation)s
+        where dimension_abbreviation = %(alternate_identity)s
         limit 1
     """,
     },
@@ -69,13 +69,6 @@ SPECIFICATION: StrategySpecification = {
 class DimensionQueryProxy(QueryProxy):
     def __init__(self, specification: StrategySpecification, cursor: psycopg.AsyncCursor) -> None:
         super().__init__(specification, cursor)
-
-    async def fetch_dimension_by_abbreviation(self, abbreviation: str) -> list[dict]:
-        """Fetch dimension by abbreviation"""
-        sql: str = self.get_sql_queries().get("fetch_dimension_by_abbreviation", "")
-        await self.cursor.execute(sql, {"abbreviation": abbreviation})
-        row: Tuple[Any, ...] | None = await self.cursor.fetchone()
-        return [dict(row)] if row else []
 
 
 @Strategies.register(key="dimension")

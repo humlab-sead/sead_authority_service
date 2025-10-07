@@ -83,9 +83,9 @@ class ReconciliationStrategy(ABC):
         properties = properties or {}
         proxy: Any = self.query_proxy_class(self.specification, cursor)
 
-        abbreviation_field: str = self.specification.get("abbreviation_field")
-        if abbreviation_field and properties.get(abbreviation_field, None):
-            candidates.extend(await proxy.fetch_by_abbreviation(properties[abbreviation_field]))
+        alternate_identity_field: str = self.specification.get("alternate_identity_field")
+        if alternate_identity_field and properties.get(alternate_identity_field, None):
+            candidates.extend(await proxy.fetch_by_alternate_identity(properties[alternate_identity_field]))
 
         candidates.extend(await proxy.fetch_by_fuzzy_label(query, limit))
 
