@@ -9,7 +9,7 @@ from .interface import ReconciliationStrategy, Strategies
 
 SPECIFICATION: dict[str, str] = {
     "key": "site",
-    "display_name": "Archaeological Sites",
+    "display_name": "Sites",
     "id_field": "site_id",
     "label_field": "label",
     "properties": [

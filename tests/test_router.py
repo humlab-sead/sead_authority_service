@@ -3,6 +3,7 @@ Unit tests for the API router endpoints.
 """
 
 import json
+from typing import Literal
 from unittest.mock import patch
 
 import pytest
@@ -39,6 +40,8 @@ class MockStrategy:
     def get_id_path(self):
         return "site"
 
+    def get_display_name(self) -> str:
+        return "Sites"
 
 class MockStrategies:
     """Mock Strategies class for testing"""
