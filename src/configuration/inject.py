@@ -43,8 +43,8 @@ class MockConfigProvider(ConfigProvider):
     """Test config provider with controllable configuration"""
 
     def __init__(self, config: Config, context: str = "default"):
-        self._config = config
-        self._context = context
+        self._config: Config = config
+        self._context: str = context
 
     def get_config(self, context: str = None) -> Config:
         return self._config
