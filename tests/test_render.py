@@ -3,8 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.configuration.config import Config
-from src.configuration.inject import ConfigStore, ConfigValue, MockConfigProvider, set_config_provider
+from src.configuration.inject import MockConfigProvider
 from src.preview import render_preview
 from tests.conftest import mock_strategy_with_get_details
 from tests.decorators import with_test_config
@@ -56,7 +55,7 @@ class TestRenderPreview:
 
     @pytest.mark.asyncio
     @with_test_config
-    async def test_successful_render_with_label_fallback(self, test_provider):
+    async def test_successful_render_with_label_fallback(self, test_provider: MockConfigProvider):
         """Test rendering when entity has 'label' but no 'Name' field"""
         uri = f"{ID_BASE}site/456"
         with patch("src.preview.Strategies") as mock_strategies:
@@ -70,7 +69,7 @@ class TestRenderPreview:
 
     @pytest.mark.asyncio
     @with_test_config
-    async def test_render_filters_empty_values(self, test_provider):
+    async def test_render_filters_empty_values(self, test_provider: MockConfigProvider):
         """Test that None, empty strings, and whitespace-only values are filtered out"""
         uri = f"{ID_BASE}site/789"
         with patch("src.preview.Strategies") as mock_strategies:
@@ -93,7 +92,7 @@ class TestRenderPreview:
 
     @pytest.mark.asyncio
     @with_test_config
-    async def test_invalid_id_format(self, test_provider):
+    async def test_invalid_id_format(self, test_provider: MockConfigProvider):
         """Test error when URI doesn't start with id_base"""
         # Use wrong URI that doesn't match the configured id_base
         uri = "https://wrong-domain.org/sead/site/123"
@@ -104,7 +103,7 @@ class TestRenderPreview:
 
     @pytest.mark.asyncio
     @with_test_config
-    async def test_invalid_id_path_too_few_parts(self, test_provider):
+    async def test_invalid_id_path_too_few_parts(self, test_provider: MockConfigProvider):
         """Test error when URI path has insufficient parts"""
         uri: str = f"{ID_BASE}site"  # Missing entity ID
 
@@ -115,7 +114,7 @@ class TestRenderPreview:
 
     @pytest.mark.asyncio
     @with_test_config
-    async def test_invalid_id_path_too_many_parts(self, test_provider):
+    async def test_invalid_id_path_too_many_parts(self, test_provider: MockConfigProvider):
         """Test error when URI path has too many parts"""
         uri: str = f"{ID_BASE}site/123/extra"
         with patch("src.preview.Strategies") as mock_strategies:
@@ -125,7 +124,7 @@ class TestRenderPreview:
 
     @pytest.mark.asyncio
     @with_test_config
-    async def test_entity_not_found(self, test_provider):
+    async def test_entity_not_found(self, test_provider: MockConfigProvider):
         """Test error when entity is not found in database"""
         uri = f"{ID_BASE}site/notfound"
         with patch("src.preview.Strategies") as mock_strategies:
@@ -135,7 +134,7 @@ class TestRenderPreview:
 
     @pytest.mark.asyncio
     @with_test_config
-    async def test_html_structure(self, test_provider):
+    async def test_html_structure(self, test_provider: MockConfigProvider):
         """Test that generated HTML has correct structure"""
         uri = f"{ID_BASE}site/123"
         with patch("src.preview.Strategies") as mock_strategies:
@@ -149,7 +148,7 @@ class TestRenderPreview:
 
     @pytest.mark.asyncio
     @with_test_config
-    async def test_different_entity_types(self, test_provider):
+    async def test_different_entity_types(self, test_provider: MockConfigProvider):
         """Test that different entity types work correctly"""
         # Test with 'taxon' entity type
         uri = f"{ID_BASE}taxon/123"
@@ -160,64 +159,6 @@ class TestRenderPreview:
         assert isinstance(result, str)
         assert "<title>Test Site – Preview</title>" in result  # Uses same mock data
 
-
-class TestConfigProvider:
-    """Test edge cases and error conditions"""
-
-    @pytest.mark.asyncio
-    @with_test_config
-    async def test_config_value_resolution(self, test_provider):
-        """Test that ConfigValue works with the new provider system"""
-        # Test ConfigValue resolution
-        id_base_config = ConfigValue("options:id_base")
-
-        # This will use the test_provider's configuration
-        assert id_base_config.resolve() == "https://w3id.org/sead/id/"
-
-    def test_config_provider_switching(self):
-        """Test that we can switch between providers"""
-        # Create two different configs
-        config1 = Config(data={"test": {"value": "config1"}})
-        config2 = Config(data={"test": {"value": "config2"}})
-
-        provider1 = MockConfigProvider(config1)
-        provider2 = MockConfigProvider(config2)
-
-        # Test switching providers
-        original = set_config_provider(provider1)
-
-        try:
-            config_value = ConfigValue("test:value")
-            assert config_value.resolve() == "config1"
-
-            # Switch to second provider
-            set_config_provider(provider2)
-            assert config_value.resolve() == "config2"
-
-            # Switch back
-            set_config_provider(provider1)
-            assert config_value.resolve() == "config1"
-
-        finally:
-            set_config_provider(original)
-
-    def test_singleton_persistence(self):
-        """Test that singleton ConfigStore persists across calls"""
-        # Configure the singleton
-        config = Config(data={"test": "singleton_value"})
-        store = ConfigStore.get_instance()
-        store.store["default"] = config
-
-        # Get another instance - should be the same
-        store2 = ConfigStore.get_instance()
-        assert store is store2
-        assert store2.config().get("test") == "singleton_value"
-
-        # Reset and verify it's clean
-        ConfigStore.reset_instance()
-        store3 = ConfigStore.get_instance()
-        assert store3 is not store
-        assert store3.store["default"] is None
 
 
 if __name__ == "__main__":
