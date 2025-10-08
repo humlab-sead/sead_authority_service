@@ -60,7 +60,7 @@ line_length = 162
 # multi_line_output = 3
 profile = "black"
 
-# Naming tweaks (   optional)
+# Naming tweaks (optional)
 [tool.ruff.pep8-naming]
 classmethod-decorators = ["classmethod"]
 
