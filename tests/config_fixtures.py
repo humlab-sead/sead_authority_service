@@ -8,10 +8,7 @@ import psycopg
 import pytest
 
 from src.configuration.config import Config
-from src.configuration.inject import (ConfigProvider, ConfigStore,
-                                      MockConfigProvider,
-                                      reset_config_provider,
-                                      set_config_provider)
+from src.configuration.inject import ConfigProvider, ConfigStore, MockConfigProvider, reset_config_provider, set_config_provider
 
 # pylint: disable=redefined-outer-name
 

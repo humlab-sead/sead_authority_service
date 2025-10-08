@@ -4,8 +4,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.configuration.config import Config
-from src.configuration.inject import (ConfigStore, ConfigValue,
-                                      MockConfigProvider, set_config_provider)
+from src.configuration.inject import ConfigStore, ConfigValue, MockConfigProvider, set_config_provider
 from src.preview import render_preview
 from tests.conftest import mock_strategy_with_get_details
 from tests.decorators import with_test_config

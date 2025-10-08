@@ -10,9 +10,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
 
 # Not used: ReconBatchRequest, ReconBatchRequestHandler, ReconQueryRequest
-from src.api.model import (ReconBatchResponse, ReconQuery,
-                           ReconServiceManifest, SuggestEntityResponse,
-                           SuggestPropertyResponse, SuggestTypeResponse)
+from src.api.model import ReconBatchResponse, ReconQuery, ReconServiceManifest, SuggestEntityResponse, SuggestPropertyResponse, SuggestTypeResponse
 from src.configuration.config import Config
 from src.configuration.inject import ConfigValue, get_config_provider
 from src.configuration.setup import setup_config_store
@@ -213,7 +211,7 @@ async def reconcile(request: Request, config: Config = Depends(get_config_depend
                 # Validate using Pydantic model
                 validated_query = ReconQuery.model_validate(query_data)
                 validated_queries[query_id] = validated_query
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.error(f"Invalid query {query_id}: {e}")
                 return JSONResponse({"error": f"Invalid query {query_id}: {str(e)}"}, status_code=400)
 

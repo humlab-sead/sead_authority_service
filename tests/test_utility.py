@@ -4,10 +4,20 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.utility import (Registry, configure_logging, create_db_uri, dget,
-                         dotexists, dotexpand, dotget, dotset, env2dict,
-                         get_connection_uri, recursive_filter_dict,
-                         recursive_update)
+from src.utility import (
+    Registry,
+    configure_logging,
+    create_db_uri,
+    dget,
+    dotexists,
+    dotexpand,
+    dotget,
+    dotset,
+    env2dict,
+    get_connection_uri,
+    recursive_filter_dict,
+    recursive_update,
+)
 
 
 class TestRecursiveUpdate:

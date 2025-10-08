@@ -1,9 +1,7 @@
 # models_openrefine.py
-from typing import (Annotated, Any, Dict, ForwardRef, Generic, List, Mapping,
-                    Optional, TypeVar, Union)
+from typing import Annotated, Any, Dict, ForwardRef, Generic, List, Mapping, Optional, TypeVar, Union
 
-from pydantic import (BaseModel, ConfigDict, Field, HttpUrl, RootModel,
-                      field_validator)
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, RootModel, field_validator
 from typing_extensions import Literal
 
 # ---------- Common ----------

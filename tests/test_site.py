@@ -5,8 +5,7 @@ import psycopg
 import pytest
 
 from src.configuration.inject import MockConfigProvider
-from src.strategies.site import (SPECIFICATION, SiteQueryProxy,
-                                 SiteReconciliationStrategy)
+from src.strategies.site import SPECIFICATION, SiteQueryProxy, SiteReconciliationStrategy
 from tests.decorators import with_test_config
 
 # pylint: disable=attribute-defined-outside-init,protected-access, unused-argument
