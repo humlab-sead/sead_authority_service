@@ -8,6 +8,7 @@ dependencies = [
     "dotenv>=0.9.9",
     "fastapi>=0.117.1",
     "loguru>=0.7.3",
+    "ollama>=0.6.0",
     "psycopg>=3.2.10",
     "pyaml>=25.7.0",
     "python-multipart>=0.0.20",
