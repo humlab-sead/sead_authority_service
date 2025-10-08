@@ -170,6 +170,16 @@ def import_sub_modules(module_folder: str) -> Any:
             importlib.import_module(f".{module_name}", package=__name__)
 
 
+def _ensure_key_property(cls):
+    if not hasattr(cls, "key"):
+
+        def key(self) -> str:
+            return getattr(self, "_registry_key", "unknown")
+
+        cls.key = property(key)
+    return cls
+
+
 class Registry:
     items: dict = {}
 
@@ -181,11 +191,16 @@ class Registry:
 
     @classmethod
     def register(cls, **args) -> Callable[..., Any]:
-        def decorator(fn):
+        def decorator(fn_or_class):
+            key: str = args.get("key") or fn_or_class.__name__
             if args.get("type") == "function":
-                fn = fn()
-            cls.items[args.get("key") or fn.__name__] = fn
-            return fn
+                fn_or_class = fn_or_class()
+            else:
+                setattr(fn_or_class, "_registry_key", key)
+                fn_or_class = _ensure_key_property(fn_or_class)
+
+            cls.items[key] = fn_or_class
+            return fn_or_class
 
         return decorator
 
