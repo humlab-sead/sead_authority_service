@@ -67,7 +67,7 @@ def set_config_provider(provider: ConfigProvider) -> ConfigProvider:
     """Set the current configuration provider (useful for testing)"""
     global _current_provider
     with _provider_lock:
-        old_provider = _current_provider
+        old_provider: ConfigProvider = _current_provider
         _current_provider = provider
         return old_provider
 
