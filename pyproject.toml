@@ -47,7 +47,7 @@ disable = [
 
 [tool.black]
 line-length = 160
-target-version = ['py313']
+# target-version = ['py313']
 
 
 [tool.pylint]
@@ -55,11 +55,12 @@ max-line-length = 160
 max-args = 10
 
 # Import sorting (handled by Ruff)
-[tool.ruff.isort]
-known-first-party = ["your_project"]
-combine-as-imports = true
+[tool.isort]
+line_length = 162
+# multi_line_output = 3
+profile = "black"
 
-# Naming tweaks (optional)
+# Naming tweaks (   optional)
 [tool.ruff.pep8-naming]
 classmethod-decorators = ["classmethod"]
 
