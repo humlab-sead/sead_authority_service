@@ -1,3 +1,4 @@
+import asyncio
 import os
 from typing import Any, Generator
 from unittest.mock import AsyncMock
@@ -12,11 +13,11 @@ from src.configuration.setup import setup_config_store
 # pylint: disable=unused-argument
 
 
-async def pytest_sessionstart(session) -> None:
+def pytest_sessionstart(session) -> None:
     """Hook to run before any tests are executed."""
     os.environ["CONFIG_FILE"] = "./tests/config.yml"
     os.environ["ENV_FILE"] = "./tests/.env"
-    await setup_config_store("./tests/config.yml")
+    asyncio.run(setup_config_store("./tests/config.yml"))
 
 
 @pytest.fixture(autouse=True)
