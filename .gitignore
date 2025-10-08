@@ -110,3 +110,4 @@ csv_files
 tests/output
 **/.env*
 **/chat*.json
+bin
