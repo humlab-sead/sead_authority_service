@@ -6,8 +6,7 @@ import psycopg
 import pytest
 
 from src.configuration.config import Config
-from src.configuration.inject import (ConfigStore, MockConfigProvider,
-                                      reset_config_provider)
+from src.configuration.inject import ConfigStore, MockConfigProvider, reset_config_provider
 from src.configuration.setup import setup_config_store
 
 # pylint: disable=unused-argument
