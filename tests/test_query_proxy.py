@@ -9,8 +9,7 @@ from src.strategies.data_type import SPECIFICATION as DATA_TYPE_SPECIFICATION
 from src.strategies.data_type import DataTypeQueryProxy
 from src.strategies.dimension import SPECIFICATION as DIMENSION_SPECIFICATION
 from src.strategies.dimension import DimensionQueryProxy
-from src.strategies.feature_type import \
-    SPECIFICATION as FEATURE_TYPE_SPECIFICATION
+from src.strategies.feature_type import SPECIFICATION as FEATURE_TYPE_SPECIFICATION
 from src.strategies.feature_type import FeatureTypeQueryProxy
 from src.strategies.location import SPECIFICATION as LOCATION_SPECIFICATION
 from src.strategies.location import LocationQueryProxy
