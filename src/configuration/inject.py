@@ -252,9 +252,6 @@ class ConfigStore:
         return self.store[context]
 
 
-configure_context = ConfigStore.configure_context
-
-
 def resolve_arguments(fn_or_cls, args, kwargs):
     """Resolve any ConfigValue arguments in a function or class constructor"""
     kwargs = {
