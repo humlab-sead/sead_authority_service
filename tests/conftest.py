@@ -60,7 +60,7 @@ def mock_strategy_with_get_details(mock_strategies, value: dict[str, str]) -> As
 
 
 @pytest.fixture
-def test_config():
+def test_config() -> Config:
     """Provide test configuration"""
 
     async def async_mock_connection():
@@ -86,7 +86,16 @@ def test_config():
         mock_conn.cursor.return_value = mock_cursor
         return mock_conn
 
-    return Config(data={"options": {"id_base": "https://w3id.org/sead/id/"}, "runtime": {"connection_factory": async_mock_connection}})
+    config: Config = Config.load(source="./tests/config.yml", context="default", env_filename="./tests/.env")
+    config.update(
+        {
+            "runtime": {
+                "connection_factory": async_mock_connection,
+            }
+        }
+    )
+    return config
+    # return Config(data={"options": {"id_base": "https://w3id.org/sead/id/"}, "runtime": {"connection_factory": async_mock_connection}})
 
 
 @pytest.fixture
