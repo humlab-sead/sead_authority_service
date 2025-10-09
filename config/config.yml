@@ -13,10 +13,12 @@ policy:
     place_name_similarity_boost:
       similarity_threshold: 0.3
       max_boost: 0.1
+  feature_types:
+    role: You are archaeological specialist with expertise in identifying and classifying archaeological samples based on their features and characteristics.
 
 llm:
   provider: "ollama"  # or "anthropic", "ollama"
-  max_tokens: 1000
+  max_tokens: 10000
   temperature: 0.1
   enable_translation: true
   enable_semantic_matching: true
@@ -36,7 +38,7 @@ llm:
     timeout: 30
     options:
       temperature: 0.1
-      max_tokens: 1000
+      max_tokens: 10000
   anthropic:
     provider_id: "anthropic"
     model: "claude-2"  
