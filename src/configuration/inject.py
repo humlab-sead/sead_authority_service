@@ -14,7 +14,7 @@ from src.utility import dget, recursive_filter_dict, recursive_update
 from .config import Config
 
 # Prevent duplicate module imports
-_module_name = __name__
+_module_name = __name__  # pylint: disable=invalid-name
 if _module_name in sys.modules and hasattr(sys.modules[_module_name], "_current_provider"):
     # This module has already been imported - warn about potential issues
     import warnings
