@@ -28,6 +28,9 @@ class ConfigProvider(ABC):
     def is_configured(self, context: str = None) -> bool:
         """Check if configuration exists for the given context"""
 
+    @abstractmethod
+    def set_config(self, config: Config, context: str = None) -> None:
+        """Set configuration for the given context"""
 
 class SingletonConfigProvider(ConfigProvider):
     """Production config provider using Config Store singleton"""
@@ -38,6 +41,8 @@ class SingletonConfigProvider(ConfigProvider):
     def is_configured(self, context: str = None) -> bool:
         return ConfigStore.get_instance().is_configured(context)
 
+    def set_config(self, config: Config, context: str = None) -> None:
+        ConfigStore.get_instance().set_config(context=context or "default", cfg=config)
 
 class MockConfigProvider(ConfigProvider):
     """Test config provider with controllable configuration"""
@@ -48,6 +53,9 @@ class MockConfigProvider(ConfigProvider):
 
     def get_config(self, context: str = None) -> Config:
         return self._config
+
+    def set_config(self, config: Config, context: str = None) -> None:
+        self._config = config
 
     def is_configured(self, context: str = None) -> bool:
         return self._config is not None
@@ -194,7 +202,7 @@ class ConfigStore:
             raise ValueError(f"Config context {context} undefined, cannot initialize")
 
         if isinstance(source, Config):
-            return self._set_config(context=context, cfg=source)
+            return self.set_config(context=context, cfg=source)
 
         if not source and isinstance(self.store.get(context), Config):
             return self.store.get(context)
@@ -237,7 +245,7 @@ class ConfigStore:
 
         return opts
 
-    def _set_config(
+    def set_config(
         self,
         *,
         context: str = "default",
