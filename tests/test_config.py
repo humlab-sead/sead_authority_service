@@ -10,6 +10,20 @@ from tests.decorators import with_test_config
 class TestConfigProvider:
     """Test edge cases and error conditions"""
 
+    @with_test_config
+    def test_simple_test(self, test_provider: MockConfigProvider) -> None:
+        """A simple test to ensure pytest is working"""
+        value = ConfigValue("llm.max_tokens").resolve()
+        assert value == 1000
+        value = ConfigValue("llm.ollama.options.max_tokens").resolve()
+        assert value == 9999
+        value = ConfigValue("llm.max_tokens,llm.ollama.options.max_tokens").resolve()
+        assert value == 1000
+        value = ConfigValue("llm.ollama.options.max_tokens,llm.max_tokens").resolve()
+        assert value == 9999
+        value = ConfigValue("llm.dummy.options.max_tokens,llm.max_tokens").resolve()
+        assert value == 1000
+
     @pytest.mark.asyncio
     @with_test_config
     async def test_config_value_resolution(self, test_provider: MockConfigProvider):
