@@ -16,6 +16,133 @@ policy:
       similarity_threshold: 0.3
       max_boost: 0.1
 
+llm:
+  provider: "ollama"  # or "anthropic", "ollama"
+  max_tokens: 1000
+  temperature: 0.1
+  enable_translation: true
+  enable_semantic_matching: true
+  translation_target_lang: "en"
+  semantic_batch_size: 50
+  openai:
+    model: "gpt-3.5-turbo"
+    provider_id: "openapi"
+    api_key: "${OPENAI_API_KEY}"
+    options:
+      temperature: 0.1
+      max_tokens: 1000
+  ollama:
+    provider_id: "ollama"
+    model: "gpt-oss:20b"
+    base_url: "${OLLAMA_BASE_URL}"
+    timeout: 30
+    options:
+      temperature: 0.1
+      max_tokens: 1000
+  anthropic:
+    provider_id: "anthropic"
+    model: "claude-2"  
+    api_key: "${ANTHROPIC_API_KEY}"
+    options:
+      temperature: 0.1
+      max_tokens: 1000
+
+  prompts:
+    site_reconciliation: |
+      Given the following query and candidate archaeological/geographic sites, identify the best matching site.
+
+      Query: "{{query}}"
+
+      Candidates:
+      {{candidates}}
+
+      Provide the ID of the best matching site. If none of the candidates are a good match, respond with "No Match".
+
+      Limit your response to just the ID or "No Match".
+      Response:
+    # context: i.e. archaeological/geographic site name
+    language_detection: |
+      Detect the language of the following text. Respond with the ISO 639-1 language code (e.g., "en" for English, "fr" for French, "de" for German, "sv" for Swedish).
+
+      Text:
+      "{text}"
+
+    translation: |
+      Translate the following text line by line from {source_lang} to {target_lang}.
+
+      Context:
+      {context}
+
+      Guidelines:
+      - Keep the translation natural and fluent.
+      - Preserve proper nouns, names, and technical terms when appropriate.
+      - Use the most common or widely recognized form in the target language if one exists.
+      - Maintain the same number of lines as the input.
+
+      Text to translate:
+      {text}
+
+    abbreviation: |
+      Expand the following abbreviations line by line.
+
+      Each line in the input follows the format:
+      "id, abbreviation"
+
+      The text may include multiple languages. The abbreviations belong to the following context:
+      {context}
+
+      Your task:
+      - Expand each abbreviation into its full form based on the given context.
+      - Preserve proper nouns, names, and original capitalization when appropriate.
+      - Output one line per input line, using the format:
+        "id, expanded-abbreviation"
+
+      Input abbreviations:
+      {data}
+
+    reconciliation: |
+      Find and list candidate matches for each input value based on the lookup data. Score each candidate by its relevance to the input within the given context.
+
+      Context:
+      {context}
+
+      Lookup data:
+      Each line contains an "id, value" pair representing a possible encoding.
+      {lookup_data}
+
+      Guidelines:
+      - For each input value, return up to 5 candidates from the lookup data, ordered best to worst.
+      - For each candidate include:
+        - "id": the lookup id (must be one from the lookup data)
+        - "value": the lookup value (verbatim from the lookup data)
+        - "score": a numeric confidence in [0, 1] with two decimals (e.g., 0.92), where 1 is strongest match
+        - "reasons": short array of strings explaining key factors (2–4 bullets)
+      - If no reasonable match exists, return an empty list.
+      - Preserve the input order. Do not invent ids or values not present in the lookup.
+      - Use strict JSON only (no trailing commas; all strings in double quotes).
+
+      Scoring considerations (use when forming the score):
+      - String similarity (including normalization, diacritics, casing)
+      - Abbreviation/alias/lemmatization expansion
+      - Domain/context alignment (terminology fit)
+      - Language variants and most common target-language form
+      - Penalize partial/ambiguous overlaps and mismatched domain terms
+
+      Output JSON schema (array):
+      [
+        {
+          "input_id": "<original input id>",
+          "input_value": "<original input value>",
+          "candidates": [
+            { "id": "<lookup id>", "value": "<lookup value>", "score": 0.00, "reasons": ["...","..."] }
+          ]
+        }
+      ]
+
+      Input values:
+      {data}
+
+
 logging:
   folder: ./logs
   handlers:
