@@ -14,11 +14,11 @@ from .provider import LLMProvider
 class OllamaProvider(LLMProvider):
     """Ollama local LLM provider"""
 
-    def __init__(self, base_url: str = None, model: str = None) -> None:
-        self.base_url: str = base_url or ConfigValue(f"llm.{self.key}.base_url").resolve()
+    def __init__(self, host: str = None, model: str = None) -> None:
+        self.host: str = host or ConfigValue(f"llm.{self.key}.host").resolve()
         self.model: str = model or ConfigValue(f"llm.{self.key}.model").resolve()
         self.timeout: int = ConfigValue(f"llm.{self.key}.timeout", default=30).resolve()
-        self.client: ollama.Client = ollama.Client(host=self.base_url, timeout=self.timeout)
+        self.client: ollama.Client = ollama.Client(host=self.host, timeout=self.timeout)
 
     async def complete(self, prompt: str, *, role: str = None, **kwargs) -> str:
         # prompt: the prompt to generate a response for
@@ -35,8 +35,8 @@ class OllamaProvider(LLMProvider):
         #         specifying a full templated prompt in your request to the API
         #   keep_alive: controls how long the model will stay loaded into memory following the request (default: 5m)
         #   context (deprecated): the context parameter returned from a previous request to /generate, this can be used to keep a short conversational memory
-        is_typed_response: bool = bool(kwargs.get("response_model")) or bool(kwargs.get("format"))
         response_model: type[BaseModel] | None = None
+        response_format: dict | None = None
 
         args: dict[str, Any] = {
             "model": self.model,
@@ -46,21 +46,22 @@ class OllamaProvider(LLMProvider):
                     "content": prompt,
                 },
             ],
-            "options": self.resolve_options(args, kwargs),
+            "options": self.resolve_options(kwargs),
         }
 
-        if is_typed_response:
+        if bool(kwargs.get("response_model")) or bool(kwargs.get("format")):
             if bool(kwargs.get("response_model")):
                 if not issubclass(kwargs["response_model"], BaseModel):
                     raise ValueError("response_model must be a pydantic BaseModel subclass")
-                response_model = kwargs["response_model"].model_json_schema()
+                response_model = kwargs["response_model"]
+                response_format = response_model.model_json_schema()
             elif bool(kwargs.get("format")):
-                response_model = kwargs["format"]
-            args["format"] = response_model
+                response_format = kwargs["format"]
+            args["format"] = response_format
 
         response: httpx.Response = await ollama.AsyncClient().chat(**args)
 
-        if is_typed_response:
+        if response_model:
             return response_model.model_validate_json(response.message.content)
 
         return response.json()["response"]
