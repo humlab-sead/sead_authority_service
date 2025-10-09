@@ -39,12 +39,12 @@ router = APIRouter()
 async def whoami(request: Request):
     host = request.url.hostname
     port = request.url.port
-    base = str(request.base_url)  # e.g. "http://localhost:8000/"
+    base = str(request.host)  # e.g. "http://localhost:8000/"
     # ASGI scope fallback
     server = request.scope.get("server")
     if server and (host is None or port is None):
         host, port = server[0], server[1]
-    return {"host": host, "port": port, "base_url": base}
+    return {"host": host, "port": port, "host": base}
 
 
 @router.get("/is_alive")
@@ -62,7 +62,7 @@ async def meta(request: Request, config: Config = Depends(get_config_dependency)
     that can be used for enhanced reconciliation matching.
     """
     # get hostname and port from request headers or ASGI scope
-    return get_reconciliation_metadata(Strategies, base_url=request.base_url)
+    return get_reconciliation_metadata(Strategies, host=request.host)
 
 
 @router.post("/reconcile", response_model=ReconBatchResponse, response_model_exclude_none=True)

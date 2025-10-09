@@ -14,11 +14,11 @@ from .provider import LLMProvider
 class OllamaProvider(LLMProvider):
     """Ollama local LLM provider"""
 
-    def __init__(self, base_url: str = None, model: str = None) -> None:
-        self.base_url: str = base_url or ConfigValue(f"llm.{self.key}.base_url").resolve()
+    def __init__(self, host: str = None, model: str = None) -> None:
+        self.host: str = host or ConfigValue(f"llm.{self.key}.host").resolve()
         self.model: str = model or ConfigValue(f"llm.{self.key}.model").resolve()
         self.timeout: int = ConfigValue(f"llm.{self.key}.timeout", default=30).resolve()
-        self.client: ollama.Client = ollama.Client(host=self.base_url, timeout=self.timeout)
+        self.client: ollama.Client = ollama.Client(host=self.host, timeout=self.timeout)
 
     async def complete(self, prompt: str, *, role: str = None, **kwargs) -> str:
         # prompt: the prompt to generate a response for
