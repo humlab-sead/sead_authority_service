@@ -4,6 +4,8 @@ import functools
 import inspect
 from typing import Callable
 
+from configuration.inject import ConfigProvider
+
 from src.configuration.inject import MockConfigProvider, set_config_provider
 
 
@@ -30,34 +32,25 @@ def with_test_config(func: Callable) -> Callable:
             assert result == expected
     """
 
+    def _find_provider_args(args, kwargs):
+        if "test_provider" in kwargs:
+            return kwargs["test_provider"]
+        else:
+            # Look for test_provider in args (typically args[1] for class methods)
+            for arg in args:
+                if isinstance(arg, MockConfigProvider):
+                    return arg
+        raise ValueError("Arg `test_provider` not found. Make sure your test function has such a parameter.")
+
     if inspect.iscoroutinefunction(func):
         # Async function
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs):
-            # Find test_provider in the arguments
-            test_provider = None
-
-            # Check if test_provider is in kwargs
-            if "test_provider" in kwargs:
-                test_provider = kwargs["test_provider"]
-            else:
-                # Look for test_provider in args (typically args[1] for class methods)
-                for arg in args:
-                    if isinstance(arg, MockConfigProvider):
-                        test_provider = arg
-                        break
-
-            if test_provider is None:
-                raise ValueError("test_provider not found in function arguments. Make sure your test function has a test_provider parameter.")
-
-            # Set up the provider
-            original_provider = set_config_provider(test_provider)
-
+            test_provider: MockConfigProvider = _find_provider_args(args, kwargs)
+            original_provider: ConfigProvider = set_config_provider(test_provider)
             try:
-                # Call the original function
                 return await func(*args, **kwargs)
             finally:
-                # Always restore the original provider
                 set_config_provider(original_provider)
 
         return async_wrapper
@@ -65,30 +58,11 @@ def with_test_config(func: Callable) -> Callable:
     # Sync function
     @functools.wraps(func)
     def sync_wrapper(*args, **kwargs):
-        # Find test_provider in the arguments
-        test_provider = None
-
-        # Check if test_provider is in kwargs
-        if "test_provider" in kwargs:
-            test_provider = kwargs["test_provider"]
-        else:
-            # Look for test_provider in args (typically args[1] for class methods)
-            for arg in args:
-                if isinstance(arg, MockConfigProvider):
-                    test_provider = arg
-                    break
-
-        if test_provider is None:
-            raise ValueError("test_provider not found in function arguments. Make sure your test function has a test_provider parameter.")
-
-        # Set up the provider
-        original_provider = set_config_provider(test_provider)
-
+        test_provider: MockConfigProvider = _find_provider_args(args, kwargs)
+        original_provider: ConfigProvider = set_config_provider(test_provider)
         try:
-            # Call the original function
             return func(*args, **kwargs)
         finally:
-            # Always restore the original provider
             set_config_provider(original_provider)
 
     return sync_wrapper
