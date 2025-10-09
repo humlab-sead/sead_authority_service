@@ -160,6 +160,5 @@ class TestRenderPreview:
         assert "<title>Test Site – Preview</title>" in result  # Uses same mock data
 
 
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

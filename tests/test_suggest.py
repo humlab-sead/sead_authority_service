@@ -13,8 +13,8 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient, Response
 
-from configuration.inject import MockConfigProvider
 from src.api.router import router
+from src.configuration.inject import MockConfigProvider
 from tests.conftest import MockRow
 from tests.decorators import with_test_config
 

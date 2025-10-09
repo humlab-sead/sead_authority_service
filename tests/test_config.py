@@ -1,10 +1,9 @@
-
-from configuration.inject import ConfigProvider
 import pytest
 
 from src.configuration.config import Config
-from src.configuration.inject import ConfigStore, ConfigValue, MockConfigProvider, set_config_provider
+from src.configuration.inject import ConfigProvider, ConfigStore, ConfigValue, MockConfigProvider, set_config_provider
 from tests.decorators import with_test_config
+
 
 class TestConfigProvider:
     """Test edge cases and error conditions"""
@@ -63,4 +62,3 @@ class TestConfigProvider:
         store3 = ConfigStore.get_instance()
         assert store3 is not store
         assert store3.store["default"] is None
-

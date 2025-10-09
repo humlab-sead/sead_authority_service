@@ -10,8 +10,7 @@ import httpx
 import pytest
 from pydantic import BaseModel
 
-from configuration.setup import setup_config_store
-from src.configuration.inject import MockConfigProvider, get_config_provider
+from src.configuration.inject import MockConfigProvider
 from src.llm.providers.ollama import OllamaProvider
 from tests.conftest import test_provider
 from tests.decorators import with_test_config
