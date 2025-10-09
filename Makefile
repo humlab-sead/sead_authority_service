@@ -29,7 +29,15 @@ pylint:
 	@uv run pylint src tests main.py
 
 .PHONY: lint
-lint: tidy pylint
+lint: tidy pylint check-imports
+
+.PHONY: check-imports
+check-imports:
+	@python scripts/check_imports.py
+
+.PHONY: fix-imports
+fix-imports:
+	@python scripts/fix_imports.py
 
 isort:
 	@uv run isort src tests main.py
