@@ -2,7 +2,6 @@
 Unit tests for OllamaProvider LLM implementation.
 """
 
-import asyncio
 import os
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -12,7 +11,6 @@ from pydantic import BaseModel
 
 from src.configuration.inject import MockConfigProvider
 from src.llm.providers.ollama import OllamaProvider
-from tests.conftest import test_provider
 from tests.decorators import with_test_config
 
 
@@ -28,23 +26,18 @@ class TestOllamaProvider:
     @with_test_config
     def test_init_with_defaults(self, test_provider: MockConfigProvider):
         """Test OllamaProvider initialization with default configuration"""
-        
-        with patch("ollama.Client") as mock_client_class, \
-            patch("src.llm.providers.ollama.ConfigValue") as mock_config_value:
-            
+
+        with patch("ollama.Client") as mock_client_class, patch("src.llm.providers.ollama.ConfigValue") as mock_config_value:
+
             # Mock ConfigValue calls to return test values
             def config_side_effect(key, default=None):
-                config_map = {
-                    "llm.ollama.base_url": "http://localhost:11434",
-                    "llm.ollama.model": "llama2", 
-                    "llm.ollama.timeout": 30
-                }
+                config_map = {"llm.ollama.base_url": "http://localhost:11434", "llm.ollama.model": "llama2", "llm.ollama.timeout": 30}
                 mock_val = Mock()
                 mock_val.resolve.return_value = config_map.get(key, default)
                 return mock_val
-            
+
             mock_config_value.side_effect = config_side_effect
-            
+
             mock_client = Mock()
             mock_client_class.return_value = mock_client
 
@@ -53,30 +46,26 @@ class TestOllamaProvider:
             assert provider.base_url == "http://localhost:11434"
             assert provider.model == "llama2"
             assert provider.client == mock_client
-            mock_client_class.assert_called_once_with(
-                base_url="http://localhost:11434", 
-                timeout=30
-            )
+            mock_client_class.assert_called_once_with(base_url="http://localhost:11434", timeout=30)
 
     @with_test_config
     def test_init_with_defaults2(self, test_provider: MockConfigProvider):
         """Test OllamaProvider initialization with default configuration"""
-        
+
         with patch("ollama.Client") as mock_client_class:
             mock_client = Mock()
             mock_client_class.return_value = mock_client
 
             provider = OllamaProvider()
 
-            # Assert values from your test config
-            assert provider.base_url == "http://130.239.57.55:11434"
-            assert provider.model == "gpt-oss:20b" 
-            assert provider.client == mock_client
-            mock_client_class.assert_called_once_with(
-                base_url="http://130.239.57.55:11434", 
-                timeout=30
-            )
+            environ_base_url: str = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 
+            assert provider.base_url == environ_base_url
+            assert provider.model == "gpt-oss:20b"
+            assert provider.client == mock_client
+            mock_client_class.assert_called_once_with(base_url=environ_base_url, timeout=30)
+
+    @pytest.mark.asyncio  # Add this decorator
     @with_test_config
     def test_init_with_parameters(self, test_provider: MockConfigProvider):
         """Test OllamaProvider initialization with explicit parameters"""
@@ -93,12 +82,11 @@ class TestOllamaProvider:
             assert provider.model == "custom_model"
             mock_client_class.assert_called_once_with(base_url="http://custom:8080", timeout=30)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio  # Add this decorator
     @with_test_config
     async def test_complete_basic(self, test_provider: MockConfigProvider):
         """Test basic completion without typed response"""
-        # Set up mock configuration
-        test_provider.set_config(
+        test_provider.get_config().update(
             {"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
         )
 
@@ -126,7 +114,7 @@ class TestOllamaProvider:
     @with_test_config
     async def test_complete_with_custom_options(self, test_provider: MockConfigProvider):
         """Test completion with custom options passed via kwargs"""
-        test_provider.set_config(
+        test_provider.get_config().update(
             {"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
         )
 
@@ -149,11 +137,11 @@ class TestOllamaProvider:
                 model="llama2", messages=[{"role": "user", "content": "Test prompt"}], options={"max_tokens": 500, "temperature": 0.2}
             )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio  # Add this decorator
     @with_test_config
     async def test_complete_with_explicit_options(self, test_provider: MockConfigProvider):
         """Test completion with explicit options dictionary"""
-        test_provider.set_config({"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
+        test_provider.get_config().update({"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
 
@@ -174,11 +162,11 @@ class TestOllamaProvider:
             # Verify explicit options were used
             mock_async_client.chat.assert_called_once_with(model="llama2", messages=[{"role": "user", "content": "Test prompt"}], options=custom_options)
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio  # Add this decorator
     @with_test_config
     async def test_complete_with_typed_response(self, test_provider: MockConfigProvider):
         """Test completion with Pydantic model for typed response"""
-        test_provider.set_config(
+        test_provider.get_config().update(
             {"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.1}}}}
         )
 
@@ -205,11 +193,11 @@ class TestOllamaProvider:
             call_args = mock_async_client.chat.call_args[1]
             assert call_args["format"] == expected_schema
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio  # Add this decorator
     @with_test_config
     async def test_complete_typed_response_invalid_model(self, test_provider: MockConfigProvider):
         """Test completion with invalid response_model raises ValueError"""
-        test_provider.set_config({"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
+        test_provider.get_config().update({"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
 
         with patch("ollama.Client"):
             provider = OllamaProvider()
@@ -218,11 +206,11 @@ class TestOllamaProvider:
             with pytest.raises(ValueError, match="response_model must be a pydantic BaseModel subclass"):
                 await provider.complete("Test prompt", response_model=dict)  # Invalid: not a BaseModel
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio  # Add this decorator
     @with_test_config
     async def test_complete_network_error_handling(self, test_provider: MockConfigProvider):
         """Test that network errors are properly propagated"""
-        test_provider.set_config(
+        test_provider.get_config().update(
             {"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
         )
 
@@ -239,11 +227,11 @@ class TestOllamaProvider:
             with pytest.raises(httpx.ConnectError):
                 await provider.complete("Test prompt")
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio  # Add this decorator
     @with_test_config
     async def test_complete_malformed_json_response(self, test_provider: MockConfigProvider):
         """Test handling of malformed JSON response"""
-        test_provider.set_config(
+        test_provider.get_config().update(
             {"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
         )
 
@@ -262,10 +250,11 @@ class TestOllamaProvider:
             with pytest.raises(ValueError):
                 await provider.complete("Test prompt")
 
+    @pytest.mark.asyncio  # Add this decorator
     @with_test_config
     def test_key_property(self, test_provider: MockConfigProvider):
         """Test that the provider has the correct key property"""
-        test_provider.set_config({"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
+        test_provider.get_config().update({"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
 
         with patch("ollama.Client"):
             provider = OllamaProvider()
@@ -273,11 +262,11 @@ class TestOllamaProvider:
             assert hasattr(provider, "key")
             # The key should be set by the @Providers.register("ollama") decorator
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio  # Add this decorator
     @with_test_config
     async def test_complete_empty_prompt(self, test_provider: MockConfigProvider):
         """Test completion with empty prompt"""
-        test_provider.set_config(
+        test_provider.get_config().update(
             {"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
         )
 
@@ -300,11 +289,11 @@ class TestOllamaProvider:
                 model="llama2", messages=[{"role": "user", "content": ""}], options={"max_tokens": 1000, "temperature": 0.7}
             )
 
-    @pytest.mark.asyncio
+    @pytest.mark.asyncio  # Add this decorator
     @with_test_config
     async def test_complete_long_prompt(self, test_provider: MockConfigProvider):
         """Test completion with very long prompt"""
-        test_provider.set_config(
+        test_provider.get_config().update(
             {"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
         )
 

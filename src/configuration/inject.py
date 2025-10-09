@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import inspect
+import sys
 import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields
@@ -134,14 +135,20 @@ class ConfigValue(Generic[T]):
     def resolve(self, context: str = None) -> T:
         """Resolve the value from the current store (configuration file)"""
         if isinstance(self.key, Config):
-            return get_config_provider().get_config(context)  # type: ignore
+            provider: ConfigProvider = get_config_provider()
+            return provider.get_config(context)  # type: ignore
         if isclass(self.key):
             return self.key()
         if self.mandatory and not self.default:
-            if not get_config_provider().get_config(context).exists(self.key):
+            provider = get_config_provider()
+            if not provider.get_config(context).exists(self.key):
                 raise ValueError(f"ConfigValue {self.key} is mandatory but missing from config")
 
-        value = get_config_provider().get_config(context).get(*self.key.split(","), default=self.default)
+        provider = get_config_provider()
+        config: Config = provider.get_config(context)
+
+        value = config.get(*self.key.split(","), default=self.default)
+
         if value and self.after:
             return self.after(value)
         return value

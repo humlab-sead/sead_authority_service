@@ -9,7 +9,7 @@ from typing import Any, Type, TypeVar
 import yaml
 from dotenv import load_dotenv
 
-from src.utility import dget, dotexists, dotset, env2dict
+from src.utility import dget, dotexists, dotset, env2dict, replace_env_vars
 
 # pylint: disable=too-many-arguments
 
@@ -90,8 +90,8 @@ class Config:
         env_filename: str | None = None,
         env_prefix: str = None,
     ) -> "Config":
-        if env_prefix:
-            load_dotenv(dotenv_path=env_filename)
+        
+        load_dotenv(dotenv_path=env_filename)
 
         if isinstance(source, Config):
             return source
