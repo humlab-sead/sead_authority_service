@@ -90,7 +90,7 @@ class Config:
         env_filename: str | None = None,
         env_prefix: str = None,
     ) -> "Config":
-        
+
         load_dotenv(dotenv_path=env_filename)
 
         if isinstance(source, Config):
