@@ -214,7 +214,7 @@ class ConfigStore:
             env_prefix=env_prefix,
         )
 
-        return self._set_config(context=context, cfg=cfg, switch_to_context=switch_to_context)
+        return self.set_config(context=context, cfg=cfg, switch_to_context=switch_to_context)
 
     def consolidate(
         self,
