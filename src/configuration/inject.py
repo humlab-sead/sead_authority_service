@@ -12,6 +12,19 @@ from src.utility import dget, recursive_filter_dict, recursive_update
 
 from .config import Config
 
+# Prevent duplicate module imports
+_module_name = __name__
+if _module_name in sys.modules and hasattr(sys.modules[_module_name], "_current_provider"):
+    # This module has already been imported - warn about potential issues
+    import warnings
+
+    warnings.warn(
+        f"Configuration module {_module_name} imported multiple times. "
+        "This can cause singleton provider issues. Use absolute imports: 'from src.configuration.inject import ...'",
+        ImportWarning,
+        stacklevel=2,
+    )
+
 T = TypeVar("T", str, int, float)
 
 # pylint: disable=global-statement
@@ -32,6 +45,7 @@ class ConfigProvider(ABC):
     def set_config(self, config: Config, context: str = None) -> None:
         """Set configuration for the given context"""
 
+
 class SingletonConfigProvider(ConfigProvider):
     """Production config provider using Config Store singleton"""
 
@@ -43,6 +57,7 @@ class SingletonConfigProvider(ConfigProvider):
 
     def set_config(self, config: Config, context: str = None) -> None:
         ConfigStore.get_instance().set_config(context=context or "default", cfg=config)
+
 
 class MockConfigProvider(ConfigProvider):
     """Test config provider with controllable configuration"""

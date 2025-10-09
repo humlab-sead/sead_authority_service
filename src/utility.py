@@ -180,6 +180,18 @@ def _ensure_key_property(cls):
     return cls
 
 
+def replace_env_vars(data: Any) -> Any:
+    """Searches dict data recursively for values that are strings and matches £´${ENV_VAR} and replaces value with os.getenv("ENV_VAR", "")"""
+    if isinstance(data, dict):
+        return {k: replace_env_vars(v) for k, v in data.items()}
+    if isinstance(data, list):
+        return [replace_env_vars(i) for i in data]
+    if isinstance(data, str) and data.startswith("${") and data.endswith("}"):
+        env_var: str = data[2:-1]
+        return os.getenv(env_var, "")
+    return data
+
+
 class Registry:
     items: dict = {}
 

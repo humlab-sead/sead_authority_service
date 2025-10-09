@@ -17,6 +17,7 @@ from src.utility import (
     get_connection_uri,
     recursive_filter_dict,
     recursive_update,
+    replace_env_vars,
 )
 
 
@@ -406,6 +407,292 @@ class TestRegistry:
         assert Registry.is_registered("test_class")
         instance = Registry.get("test_class")()
         assert instance.method() == "class_result"
+
+
+class TestReplaceEnvVars:
+    """Tests for replace_env_vars function."""
+
+    def test_replace_env_vars_simple_string(self):
+        """Test replace_env_vars with simple environment variable."""
+        with patch.dict(os.environ, {"TEST_VAR": "test_value"}):
+            result = replace_env_vars("${TEST_VAR}")
+            assert result == "test_value"
+
+    def test_replace_env_vars_nonexistent_var(self):
+        """Test replace_env_vars with nonexistent environment variable."""
+        # Clear any existing TEST_NONEXISTENT var
+        with patch.dict(os.environ, {}, clear=True):
+            result = replace_env_vars("${TEST_NONEXISTENT}")
+            assert result == ""
+
+    def test_replace_env_vars_regular_string(self):
+        """Test replace_env_vars with regular string (no replacement)."""
+        result = replace_env_vars("regular_string")
+        assert result == "regular_string"
+
+    def test_replace_env_vars_partial_pattern(self):
+        """Test replace_env_vars with partial patterns (no replacement)."""
+        result = replace_env_vars("${INCOMPLETE")
+        assert result == "${INCOMPLETE"
+        
+        result = replace_env_vars("INCOMPLETE}")
+        assert result == "INCOMPLETE}"
+        
+        result = replace_env_vars("$MISSING_BRACES")
+        assert result == "$MISSING_BRACES"
+
+    def test_replace_env_vars_empty_var_name(self):
+        """Test replace_env_vars with empty variable name."""
+        result = replace_env_vars("${}")
+        assert result == ""
+
+    def test_replace_env_vars_dict_simple(self):
+        """Test replace_env_vars with simple dictionary."""
+        with patch.dict(os.environ, {"DB_HOST": "localhost", "DB_PORT": "5432"}):
+            data = {
+                "host": "${DB_HOST}",
+                "port": "${DB_PORT}",
+                "name": "myapp"
+            }
+            result = replace_env_vars(data)
+            expected = {
+                "host": "localhost",
+                "port": "5432", 
+                "name": "myapp"
+            }
+            assert result == expected
+
+    def test_replace_env_vars_nested_dict(self):
+        """Test replace_env_vars with nested dictionary."""
+        with patch.dict(os.environ, {"DB_HOST": "localhost", "API_KEY": "secret123"}):
+            data = {
+                "database": {
+                    "host": "${DB_HOST}",
+                    "credentials": {
+                        "api_key": "${API_KEY}"
+                    }
+                },
+                "app": {
+                    "name": "test_app"
+                }
+            }
+            result = replace_env_vars(data)
+            expected = {
+                "database": {
+                    "host": "localhost",
+                    "credentials": {
+                        "api_key": "secret123"
+                    }
+                },
+                "app": {
+                    "name": "test_app"
+                }
+            }
+            assert result == expected
+
+    def test_replace_env_vars_list_simple(self):
+        """Test replace_env_vars with simple list."""
+        with patch.dict(os.environ, {"SERVER1": "server1.com", "SERVER2": "server2.com"}):
+            data = ["${SERVER1}", "${SERVER2}", "hardcoded.com"]
+            result = replace_env_vars(data)
+            expected = ["server1.com", "server2.com", "hardcoded.com"]
+            assert result == expected
+
+    def test_replace_env_vars_nested_list(self):
+        """Test replace_env_vars with nested list structure."""
+        with patch.dict(os.environ, {"HOST": "localhost", "PORT": "8080"}):
+            data = [
+                {"server": "${HOST}", "port": "${PORT}"},
+                {"server": "remote.com", "port": "9090"},
+                ["${HOST}", "static_value"]
+            ]
+            result = replace_env_vars(data)
+            expected = [
+                {"server": "localhost", "port": "8080"},
+                {"server": "remote.com", "port": "9090"},
+                ["localhost", "static_value"]
+            ]
+            assert result == expected
+
+    def test_replace_env_vars_mixed_data_types(self):
+        """Test replace_env_vars with mixed data types."""
+        with patch.dict(os.environ, {"STRING_VAR": "test_string", "NUMBER_VAR": "42"}):
+            data = {
+                "string": "${STRING_VAR}",
+                "number": 123,
+                "boolean": True,
+                "none_value": None,
+                "env_number": "${NUMBER_VAR}",
+                "list": [1, "${STRING_VAR}", True, None],
+                "nested": {
+                    "env_val": "${STRING_VAR}",
+                    "regular_val": "unchanged"
+                }
+            }
+            result = replace_env_vars(data)
+            expected = {
+                "string": "test_string",
+                "number": 123,
+                "boolean": True,
+                "none_value": None,
+                "env_number": "42",
+                "list": [1, "test_string", True, None],
+                "nested": {
+                    "env_val": "test_string",
+                    "regular_val": "unchanged"
+                }
+            }
+            assert result == expected
+
+    def test_replace_env_vars_complex_nested_structure(self):
+        """Test replace_env_vars with complex nested structure."""
+        with patch.dict(os.environ, {
+            "DB_HOST": "db.example.com",
+            "DB_USER": "admin",
+            "API_TOKEN": "abc123",
+            "LOG_LEVEL": "INFO"
+        }):
+            data = {
+                "services": [
+                    {
+                        "name": "database",
+                        "config": {
+                            "host": "${DB_HOST}",
+                            "auth": {
+                                "username": "${DB_USER}",
+                                "token": "${API_TOKEN}"
+                            }
+                        }
+                    },
+                    {
+                        "name": "logger",
+                        "config": {
+                            "level": "${LOG_LEVEL}",
+                            "outputs": ["console", "file"]
+                        }
+                    }
+                ],
+                "metadata": {
+                    "version": "1.0.0",
+                    "env_info": "${DB_HOST}"
+                }
+            }
+            
+            result = replace_env_vars(data)
+            
+            expected = {
+                "services": [
+                    {
+                        "name": "database",
+                        "config": {
+                            "host": "db.example.com",
+                            "auth": {
+                                "username": "admin",
+                                "token": "abc123"
+                            }
+                        }
+                    },
+                    {
+                        "name": "logger",
+                        "config": {
+                            "level": "INFO",
+                            "outputs": ["console", "file"]
+                        }
+                    }
+                ],
+                "metadata": {
+                    "version": "1.0.0",
+                    "env_info": "db.example.com"
+                }
+            }
+            assert result == expected
+
+    def test_replace_env_vars_empty_containers(self):
+        """Test replace_env_vars with empty containers."""
+        result = replace_env_vars({})
+        assert result == {}
+        
+        result = replace_env_vars([])
+        assert result == []
+        
+        result = replace_env_vars({"empty_dict": {}, "empty_list": []})
+        assert result == {"empty_dict": {}, "empty_list": []}
+
+    def test_replace_env_vars_no_modification_to_original(self):
+        """Test that replace_env_vars doesn't modify the original data."""
+        with patch.dict(os.environ, {"TEST_VAR": "replaced"}):
+            original_data = {
+                "value": "${TEST_VAR}",
+                "nested": {
+                    "list": ["${TEST_VAR}", "static"]
+                }
+            }
+            original_copy = {
+                "value": "${TEST_VAR}",
+                "nested": {
+                    "list": ["${TEST_VAR}", "static"]
+                }
+            }
+            
+            result = replace_env_vars(original_data)
+            
+            # Original data should be unchanged
+            assert original_data == original_copy
+            
+            # Result should have replacements
+            expected = {
+                "value": "replaced",
+                "nested": {
+                    "list": ["replaced", "static"]
+                }
+            }
+            assert result == expected
+
+    def test_replace_env_vars_special_characters_in_env_var(self):
+        """Test replace_env_vars with special characters in environment variable values."""
+        with patch.dict(os.environ, {
+            "SPECIAL_CHARS": "!@#$%^&*()_+-={}[]|\\:;\"'<>?,./"
+        }):
+            result = replace_env_vars("${SPECIAL_CHARS}")
+            assert result == "!@#$%^&*()_+-={}[]|\\:;\"'<>?,./"
+
+    def test_replace_env_vars_unicode_characters(self):
+        """Test replace_env_vars with unicode characters in environment variables."""
+        with patch.dict(os.environ, {
+            "UNICODE_VAR": "Hello 世界 🌍 café naïve résumé"
+        }):
+            result = replace_env_vars("${UNICODE_VAR}")
+            assert result == "Hello 世界 🌍 café naïve résumé"
+
+    def test_replace_env_vars_multiple_vars_in_structure(self):
+        """Test replace_env_vars with multiple environment variables."""
+        with patch.dict(os.environ, {
+            "VAR1": "value1",
+            "VAR2": "value2",
+            "VAR3": "value3",
+            "MISSING_VAR": ""  # This will be missing from environment
+        }, clear=True):
+            # Remove MISSING_VAR to test missing behavior
+            if "MISSING_VAR" in os.environ:
+                del os.environ["MISSING_VAR"]
+                
+            data = {
+                "present1": "${VAR1}",
+                "present2": "${VAR2}",
+                "present3": "${VAR3}",
+                "missing": "${MISSING_VAR}",
+                "mixed_list": ["${VAR1}", "${MISSING_VAR}", "static", "${VAR2}"]
+            }
+            
+            result = replace_env_vars(data)
+            expected = {
+                "present1": "value1",
+                "present2": "value2", 
+                "present3": "value3",
+                "missing": "",  # Missing vars return empty string
+                "mixed_list": ["value1", "", "static", "value2"]
+            }
+            assert result == expected
 
 
 class TestDatabaseUtilities:
