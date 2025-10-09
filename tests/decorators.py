@@ -33,11 +33,9 @@ def with_test_config(func: Callable) -> Callable:
     def _find_provider_args(args, kwargs):
         if "test_provider" in kwargs:
             return kwargs["test_provider"]
-        else:
-            # Look for test_provider in args (typically args[1] for class methods)
-            for arg in args:
-                if isinstance(arg, MockConfigProvider):
-                    return arg
+        for arg in args:
+            if isinstance(arg, MockConfigProvider):
+                return arg
         raise ValueError("Arg `test_provider` not found. Make sure your test function has such a parameter.")
 
     if inspect.iscoroutinefunction(func):
