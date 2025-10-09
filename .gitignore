@@ -111,3 +111,4 @@ tests/output
 **/.env*
 **/chat*.json
 bin
+*.pdf
