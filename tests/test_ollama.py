@@ -26,7 +26,7 @@ class TestResponseModel(BaseModel):
 class TestOllamaProvider:
 
     @with_test_config
-    def test_init_with_defaults(self, test_provider: MockConfigProvider):
+    def test_init_with_defaults(self, test_provider: MockConfigProvider) -> None:
         """Test OllamaProvider initialization with default configuration"""
 
         with patch("ollama.Client") as mock_client_class, patch("src.llm.providers.ollama.ConfigValue") as mock_config_value:
