@@ -1,49 +1,49 @@
-from typing import Any, Type
-from unittest.mock import AsyncMock
+# from typing import Any, Type
+# from unittest.mock import AsyncMock
 
-import psycopg
-import pytest
+# import psycopg
+# import pytest
 
-from configuration.inject import MockConfigProvider
-from src.strategies.country import SPECIFICATION as COUNTRY_SPECIFICATION
-from src.strategies.country import CountryReconciliationStrategy
-from src.strategies.data_type import SPECIFICATION as DATA_TYPE_SPECIFICATION
-from src.strategies.data_type import (DataTypeQueryProxy,
-                                      DataTypeReconciliationStrategy)
-from src.strategies.dimension import SPECIFICATION as DIMENSION_SPECIFICATION
-from src.strategies.dimension import (DimensionQueryProxy,
-                                      DimensionReconciliationStrategy)
-from src.strategies.feature_type import \
-    SPECIFICATION as FEATURE_TYPE_SPECIFICATION
-from src.strategies.feature_type import (FeatureTypeQueryProxy,
-                                         FeatureTypeReconciliationStrategy)
-from src.strategies.location import SPECIFICATION as LOCATION_SPECIFICATION
-from src.strategies.location import (LocationQueryProxy,
-                                     LocationReconciliationStrategy)
-from src.strategies.method import SPECIFICATION as METHOD_SPECIFICATION
-from src.strategies.method import (MethodQueryProxy,
-                                   MethodReconciliationStrategy)
-from src.strategies.query import QueryProxy
-from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION
-from src.strategies.site import SiteQueryProxy, SiteReconciliationStrategy
-from strategies.strategy import ReconciliationStrategy, StrategySpecification
-from tests.decorators import with_test_config
+# from configuration.inject import MockConfigProvider
+# from src.strategies.country import SPECIFICATION as COUNTRY_SPECIFICATION
+# from src.strategies.country import CountryReconciliationStrategy
+# from src.strategies.data_type import SPECIFICATION as DATA_TYPE_SPECIFICATION
+# from src.strategies.data_type import (DataTypeQueryProxy,
+#                                       DataTypeReconciliationStrategy)
+# from src.strategies.dimension import SPECIFICATION as DIMENSION_SPECIFICATION
+# from src.strategies.dimension import (DimensionQueryProxy,
+#                                       DimensionReconciliationStrategy)
+# from src.strategies.feature_type import \
+#     SPECIFICATION as FEATURE_TYPE_SPECIFICATION
+# from src.strategies.feature_type import (FeatureTypeQueryProxy,
+#                                          FeatureTypeReconciliationStrategy)
+# from src.strategies.location import SPECIFICATION as LOCATION_SPECIFICATION
+# from src.strategies.location import (LocationQueryProxy,
+#                                      LocationReconciliationStrategy)
+# from src.strategies.method import SPECIFICATION as METHOD_SPECIFICATION
+# from src.strategies.method import (MethodQueryProxy,
+#                                    MethodReconciliationStrategy)
+# from src.strategies.query import QueryProxy
+# from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION
+# from src.strategies.site import SiteQueryProxy, SiteReconciliationStrategy
+# from strategies.strategy import ReconciliationStrategy, StrategySpecification
+# from tests.decorators import with_test_config
 
-# pylint: disable=attribute-defined-outside-init,protected-access, unused-argument
+# # pylint: disable=attribute-defined-outside-init,protected-access, unused-argument
 
-SQL_QUERIES: dict[str, str] = LOCATION_SPECIFICATION["sql_queries"]
+# SQL_QUERIES: dict[str, str] = LOCATION_SPECIFICATION["sql_queries"]
 
-CountryQueryProxy = LocationQueryProxy  # Country uses the same QueryProxy as Location
+# CountryQueryProxy = LocationQueryProxy  # Country uses the same QueryProxy as Location
 
-RECONCILIATION_STRATEGY_SETUPS: tuple[dict[str, Any], ReconciliationStrategy, QueryProxy] = [
-    (LOCATION_SPECIFICATION, LocationReconciliationStrategy, LocationQueryProxy),
-    (COUNTRY_SPECIFICATION, CountryReconciliationStrategy, CountryQueryProxy),
-    (FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeQueryProxy),
-    (SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteQueryProxy),
-    (DATA_TYPE_SPECIFICATION, DataTypeReconciliationStrategy, DataTypeQueryProxy),
-    (DIMENSION_SPECIFICATION, DimensionReconciliationStrategy, DimensionQueryProxy),
-    (METHOD_SPECIFICATION, MethodReconciliationStrategy, MethodQueryProxy),
-]
+# RECONCILIATION_STRATEGY_SETUPS: tuple[dict[str, Any], ReconciliationStrategy, QueryProxy] = [
+#     (LOCATION_SPECIFICATION, LocationReconciliationStrategy, LocationQueryProxy),
+#     (COUNTRY_SPECIFICATION, CountryReconciliationStrategy, CountryQueryProxy),
+#     (FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeQueryProxy),
+#     (SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteQueryProxy),
+#     (DATA_TYPE_SPECIFICATION, DataTypeReconciliationStrategy, DataTypeQueryProxy),
+#     (DIMENSION_SPECIFICATION, DimensionReconciliationStrategy, DimensionQueryProxy),
+#     (METHOD_SPECIFICATION, MethodReconciliationStrategy, MethodQueryProxy),
+# ]
 
 
 # class TestMultipleReconciliationStrategy:
