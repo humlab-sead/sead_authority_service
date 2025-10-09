@@ -111,6 +111,8 @@ class Config:
         env2dict(env_prefix, data)
         if not isinstance(data, dict):
             raise TypeError(f"expected dict, found {type(data)}")
+
+        data = replace_env_vars(data)
         return Config(
             data=data,
             context=context,
