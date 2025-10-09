@@ -13,8 +13,8 @@ from src.configuration.inject import MockConfigProvider
 from src.llm.providers.ollama import OllamaProvider
 from tests.decorators import with_test_config
 
-
 # pylint: disable=unused-argument
+
 
 class TestResponseModel(BaseModel):
     """Test Pydantic model for typed responses"""

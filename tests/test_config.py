@@ -4,6 +4,8 @@ from src.configuration.config import Config
 from src.configuration.inject import ConfigProvider, ConfigStore, ConfigValue, MockConfigProvider, set_config_provider
 from tests.decorators import with_test_config
 
+# pylint: disable=unused-argument
+
 
 class TestConfigProvider:
     """Test edge cases and error conditions"""
