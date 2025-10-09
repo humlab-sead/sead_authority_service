@@ -6,13 +6,14 @@ import asyncio
 import os
 from unittest.mock import AsyncMock, Mock, patch
 
-from configuration.setup import setup_config_store
 import httpx
 import pytest
 from pydantic import BaseModel
 
+from configuration.setup import setup_config_store
 from src.configuration.inject import MockConfigProvider, get_config_provider
 from src.llm.providers.ollama import OllamaProvider
+from tests.conftest import test_provider
 from tests.decorators import with_test_config
 
 
@@ -25,18 +26,26 @@ class TestResponseModel(BaseModel):
 
 class TestOllamaProvider:
 
-    # @with_test_config
-    def test_init_with_defaults(self): #, test_provider: MockConfigProvider):
+    @with_test_config
+    def test_init_with_defaults(self, test_provider: MockConfigProvider):
         """Test OllamaProvider initialization with default configuration"""
-        # Set up mock configuration
-
-        os.environ["CONFIG_FILE"] = "./tests/config.yml"
-        os.environ["ENV_FILE"] = "./tests/.env"
-        asyncio.run(setup_config_store("./tests/config.yml"))
         
-        #get_config_provider().get_config().update({"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
-
-        with patch("ollama.Client") as mock_client_class:
+        with patch("ollama.Client") as mock_client_class, \
+            patch("src.llm.providers.ollama.ConfigValue") as mock_config_value:
+            
+            # Mock ConfigValue calls to return test values
+            def config_side_effect(key, default=None):
+                config_map = {
+                    "llm.ollama.base_url": "http://localhost:11434",
+                    "llm.ollama.model": "llama2", 
+                    "llm.ollama.timeout": 30
+                }
+                mock_val = Mock()
+                mock_val.resolve.return_value = config_map.get(key, default)
+                return mock_val
+            
+            mock_config_value.side_effect = config_side_effect
+            
             mock_client = Mock()
             mock_client_class.return_value = mock_client
 
@@ -45,13 +54,35 @@ class TestOllamaProvider:
             assert provider.base_url == "http://localhost:11434"
             assert provider.model == "llama2"
             assert provider.client == mock_client
-            mock_client_class.assert_called_once_with(base_url="http://localhost:11434", timeout=30)
+            mock_client_class.assert_called_once_with(
+                base_url="http://localhost:11434", 
+                timeout=30
+            )
+
+    @with_test_config
+    def test_init_with_defaults2(self, test_provider: MockConfigProvider):
+        """Test OllamaProvider initialization with default configuration"""
+        
+        with patch("ollama.Client") as mock_client_class:
+            mock_client = Mock()
+            mock_client_class.return_value = mock_client
+
+            provider = OllamaProvider()
+
+            # Assert values from your test config
+            assert provider.base_url == "http://130.239.57.55:11434"
+            assert provider.model == "gpt-oss:20b" 
+            assert provider.client == mock_client
+            mock_client_class.assert_called_once_with(
+                base_url="http://130.239.57.55:11434", 
+                timeout=30
+            )
 
     @with_test_config
     def test_init_with_parameters(self, test_provider: MockConfigProvider):
         """Test OllamaProvider initialization with explicit parameters"""
         # Set up mock configuration (fallback values)
-        #test_provider.get_config().update({"llm": {"ollama": {"base_url": "http://default:11434", "model": "default_model", "timeout": 30}}})
+        # test_provider.get_config().update({"llm": {"ollama": {"base_url": "http://default:11434", "model": "default_model", "timeout": 30}}})
 
         with patch("ollama.Client") as mock_client_class:
             mock_client = Mock()
