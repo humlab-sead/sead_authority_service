@@ -149,7 +149,7 @@ class ConfigValue(Generic[T]):
 
         value = config.get(*self.key.split(","), default=self.default)
 
-        if value and self.after:
+        if value is not None and self.after:
             return self.after(value)
         return value
 
