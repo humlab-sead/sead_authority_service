@@ -112,3 +112,5 @@ tests/output
 **/chat*.json
 bin
 *.pdf
+*.pid
+*.out
