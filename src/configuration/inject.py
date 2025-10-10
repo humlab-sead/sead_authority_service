@@ -135,6 +135,7 @@ class ConfigValue(Generic[T]):
         provider = get_config_provider()
         config: Config = provider.get_config(context)
 
+        val: T | None
         if isclass(self.key):
             val = self.key(*args, **kwargs)
         else:
