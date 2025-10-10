@@ -120,8 +120,7 @@ class Configurable:
 
 @dataclass
 class ConfigValue(Generic[T]):
-    """A class to represent a value that should be resolved from a configuration file"""
-
+    """A value that can be resolved from a configuration store."""
     key: str | Type[T]
     default: T | None = None
     description: str | None = None
@@ -130,7 +129,6 @@ class ConfigValue(Generic[T]):
 
     @property
     def value(self) -> T:
-        """Resolve the value from the current store (configuration file)"""
         return self.resolve()
 
     def resolve(self, context: str = None, *args: Any, **kwargs: Any) -> T:
