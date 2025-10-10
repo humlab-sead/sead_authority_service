@@ -134,9 +134,6 @@ class ConfigValue(Generic[T]):
 
     def resolve(self, context: str = None, *args: Any, **kwargs: Any) -> T:
         """Resolve the value from the current store (configuration file)"""
-        if isinstance(self.key, Config):
-            provider: ConfigProvider = get_config_provider()
-            return provider.get_config(context)  # type: ignore
         if isclass(self.key):
             return self.key(*args, **kwargs)  # type: ignore
         if self.mandatory and self.default is None:
