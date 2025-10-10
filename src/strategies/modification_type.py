@@ -86,29 +86,15 @@ class LLMModificationTypeReconciliationStrategy(LLMReconciliationStrategy):
 
     def get_context_description(self) -> str:
         """Return context description for modification types"""
-        return self.specification.get("llm_settings", {}).get("context_description", "")
+        return ConfigValue("policy.modification_type.context", default="").resolve()
+
+    def get_lookup_fields(self) -> list[str]:
+        return super().get_lookup_fields() + ["modification_type_description"]
 
     async def get_lookup_data(self, cursor: psycopg.AsyncCursor) -> list[dict[str, Any]]:
         """Fetch modification type lookup data"""
         proxy = ModificationTypeQueryProxy(self.specification, cursor)
         return await proxy.get_lookup_data()
-
-    def format_lookup_data(self, lookup_data: List[Dict[str, Any]]) -> str:
-        """Format lookup data with descriptions for better LLM matching"""
-        lines = []
-
-        for row in lookup_data:
-            modification_id = row["modification_type_id"]
-            name = row["modification_type_name"]
-            description = row.get("modification_type_description", "")
-
-            # Include description in the lookup data for better matching
-            if description:
-                lines.append(f"{modification_id}, {name} - {description}")
-            else:
-                lines.append(f"{modification_id}, {name}")
-
-        return "\n".join(lines)
 
     async def find_candidates(
         self,
