@@ -19,7 +19,7 @@ class LLMProvider(ABC):
         return getattr(self, "_registry_key", "undefined")
 
     @abstractmethod
-    async def complete(self, prompt: str, **kwargs) -> str:
+    async def complete(self, prompt: str, roles: dict[str, str] = None, **kwargs) -> str:
         pass
 
     @abstractmethod
