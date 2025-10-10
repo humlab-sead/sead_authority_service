@@ -4,8 +4,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from src.configuration.inject import MockConfigProvider
 from src.strategies.llm_models import Candidate, ReconciliationResponse, ReconciliationResult
-from src.strategies.modification_type import SPECIFICATION, ModificationTypeReconciliationStrategy
+from src.strategies.modification_type import SPECIFICATION, LLMModificationTypeReconciliationStrategy
+from src.strategies.strategy import ReconciliationStrategy
 from tests.decorators import with_test_config
 
 # pylint: disable=unused-argument
@@ -15,9 +17,9 @@ class TestModificationTypeReconciliationStrategy:
     """Test LLM-based modification type reconciliation"""
 
     @with_test_config
-    def test_initialization(self, test_provider):
+    def test_initialization(self, test_provider: MockConfigProvider):
         """Test strategy initialization"""
-        strategy = ModificationTypeReconciliationStrategy()
+        strategy = LLMModificationTypeReconciliationStrategy()
 
         assert strategy.specification == SPECIFICATION
         assert strategy.get_entity_id_field() == "modification_type_id"
@@ -25,18 +27,16 @@ class TestModificationTypeReconciliationStrategy:
         assert strategy.get_id_path() == "modification_type"
 
     @with_test_config
-    def test_context_description(self, test_provider):
+    def test_context_description(self, test_provider: MockConfigProvider):
         """Test context description for LLM"""
-        strategy = ModificationTypeReconciliationStrategy()
-        context = strategy.get_context_description()
+        strategy: LLMModificationTypeReconciliationStrategy = LLMModificationTypeReconciliationStrategy()
+        context: str = strategy.get_context_description()
 
-        assert "paleontology" in context.lower()
-        assert "modification" in context.lower()
-        assert "preservation" in context.lower()
+        assert context.startswith("You are provided with a list of known modification types, ")
 
     @with_test_config
     @pytest.mark.asyncio
-    async def test_get_lookup_data(self, test_provider):
+    async def test_get_lookup_data(self, test_provider: MockConfigProvider):
         """Test fetching lookup data from database"""
         mock_cursor = AsyncMock()
         mock_cursor.fetchall.return_value = [
@@ -44,7 +44,7 @@ class TestModificationTypeReconciliationStrategy:
             {"modification_type_id": 2, "modification_type_name": "Calcified", "modification_type_description": "Organic matter replaced by calcium"},
         ]
 
-        strategy = ModificationTypeReconciliationStrategy()
+        strategy: ReconciliationStrategy = LLMModificationTypeReconciliationStrategy()
         lookup_data = await strategy.get_lookup_data(mock_cursor)
 
         assert len(lookup_data) == 2
@@ -52,25 +52,25 @@ class TestModificationTypeReconciliationStrategy:
         assert lookup_data[1]["modification_type_name"] == "Calcified"
 
     @with_test_config
-    def test_format_lookup_data(self, test_provider):
+    def test_format_lookup_data(self, test_provider: MockConfigProvider):
         """Test formatting lookup data for LLM prompt"""
-        strategy = ModificationTypeReconciliationStrategy()
+        strategy = LLMModificationTypeReconciliationStrategy()
 
         lookup_data = [
             {"modification_type_id": 1, "modification_type_name": "Carbonised", "modification_type_description": "Organic matter converted to carbon"},
             {"modification_type_id": 2, "modification_type_name": "Calcified", "modification_type_description": "Organic matter replaced by calcium"},
         ]
 
-        formatted = strategy.format_lookup_data(lookup_data)
-        lines = formatted.split("\n")
+        formatted: str = strategy.format_lookup_data(lookup_data)
+        lines: list[str] = formatted.split("\n")
 
         assert len(lines) == 2
-        assert "1, Carbonised - Organic matter converted to carbon" in lines[0]
-        assert "2, Calcified - Organic matter replaced by calcium" in lines[1]
+        assert "1, Carbonised, Organic matter converted to carbon" in lines[0]
+        assert "2, Calcified, Organic matter replaced by calcium" in lines[1]
 
     @with_test_config
     @pytest.mark.asyncio
-    async def test_find_candidates_with_llm_success(self, test_provider):
+    async def test_find_candidates_with_llm_success(self, test_provider: MockConfigProvider):
         """Test successful LLM-based candidate finding"""
 
         # Mock the LLM response
@@ -98,7 +98,7 @@ class TestModificationTypeReconciliationStrategy:
             mock_llm.complete.return_value = mock_response
             mock_providers.items = {"ollama": lambda: mock_llm}
 
-            strategy = ModificationTypeReconciliationStrategy()
+            strategy = LLMModificationTypeReconciliationStrategy()
             candidates = await strategy.find_candidates(mock_cursor, "charred")
 
             assert len(candidates) == 2
@@ -109,7 +109,7 @@ class TestModificationTypeReconciliationStrategy:
 
     @with_test_config
     @pytest.mark.asyncio
-    async def test_find_candidates_with_llm_fallback(self, test_provider):
+    async def test_find_candidates_with_llm_fallback(self, test_provider: MockConfigProvider):
         """Test fallback to traditional matching when LLM fails"""
 
         mock_cursor = AsyncMock()
@@ -123,10 +123,10 @@ class TestModificationTypeReconciliationStrategy:
             mock_providers.items = {"ollama": lambda: mock_llm}
 
             # Mock the parent class method
-            with patch.object(ModificationTypeReconciliationStrategy.__bases__[0], "find_candidates") as mock_parent:
+            with patch.object(LLMModificationTypeReconciliationStrategy.__bases__[0], "find_candidates") as mock_parent:
                 mock_parent.return_value = [{"modification_type_id": 1, "modification_type_name": "Carbonised", "name_sim": 0.8}]
 
-                strategy = ModificationTypeReconciliationStrategy()
+                strategy = LLMModificationTypeReconciliationStrategy()
                 candidates = await strategy.find_candidates(mock_cursor, "charred")
 
                 # Should fall back to parent implementation
