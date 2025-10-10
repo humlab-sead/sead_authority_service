@@ -265,7 +265,7 @@ class ConfigStore:
 
         self.store[context].data[section] = opts
 
-        return opts
+        return self
 
     def set_config(
         self,
