@@ -132,14 +132,14 @@ class ConfigValue(Generic[T]):
         """Resolve the value from the current store (configuration file)"""
         return self.resolve()
 
-    def resolve(self, context: str = None) -> T:
+    def resolve(self, context: str = None, *args: Any, **kwargs: Any) -> T:
         """Resolve the value from the current store (configuration file)"""
         if isinstance(self.key, Config):
             provider: ConfigProvider = get_config_provider()
             return provider.get_config(context)  # type: ignore
         if isclass(self.key):
-            return self.key()
-        if self.mandatory and not self.default:
+            return self.key(*args, **kwargs)  # type: ignore
+        if self.mandatory and self.default is None:
             provider = get_config_provider()
             if not provider.get_config(context).exists(self.key):
                 raise ValueError(f"ConfigValue {self.key} is mandatory but missing from config")
