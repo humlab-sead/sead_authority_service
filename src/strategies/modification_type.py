@@ -68,11 +68,11 @@ SPECIFICATION: StrategySpecification = {
 class ModificationTypeQueryProxy(QueryProxy):
     """Modification type-specific query proxy"""
 
-    async def get_lookup_data(self) -> List[Dict[str, Any]]:
+    async def get_lookup_data(self) -> list[dict[str, Any]]:
         """Fetch all modification types for LLM lookup"""
         sql: str | Any = self.specification["sql_queries"]["get_lookup_data"]
         await self.cursor.execute(sql)
-        rows: List[tuple[Any]] = await self.cursor.fetchall()
+        rows: list[tuple[Any]] = await self.cursor.fetchall()
         return [dict(row) for row in rows] if rows else []
 
 
@@ -88,7 +88,7 @@ class ModificationTypeReconciliationStrategy(LLMReconciliationStrategy):
         """Return context description for modification types"""
         return self.specification.get("llm_settings", {}).get("context_description", "")
 
-    async def get_lookup_data(self, cursor: psycopg.AsyncCursor) -> List[Dict[str, Any]]:
+    async def get_lookup_data(self, cursor: psycopg.AsyncCursor) -> list[dict[str, Any]]:
         """Fetch modification type lookup data"""
         proxy = ModificationTypeQueryProxy(self.specification, cursor)
         return await proxy.get_lookup_data()
@@ -114,15 +114,15 @@ class ModificationTypeReconciliationStrategy(LLMReconciliationStrategy):
         self,
         cursor: psycopg.AsyncCursor,
         query: str,
-        properties: Dict[str, Any] = None,
+        properties: dict[str, Any] = None,
         limit: int = 10,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Find modification type candidates using LLM"""
 
         logger.info("Finding modification type candidates for: '%s'", query)
 
         # Use the LLM-powered approach
-        candidates: List[Dict[str, Any]] = await super().find_candidates(cursor, query, properties, limit)
+        candidates: list[dict[str, Any]] = await super().find_candidates(cursor, query, properties, limit)
 
         # Log some details about the results
         if candidates:
