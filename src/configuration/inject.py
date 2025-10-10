@@ -61,7 +61,8 @@ class SingletonConfigProvider(ConfigProvider):
 
 
 class MockConfigProvider(ConfigProvider):
-    """Test config provider with controllable configuration"""
+    """Test config provider with controllable configuration.
+    Note that the context parameter is ignored in this implementation."""
 
     def __init__(self, config: Config, context: str = "default"):
         self._config: Config = config
