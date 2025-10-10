@@ -168,7 +168,7 @@ class ConfigStore:
     def __init__(self):
         if ConfigStore._instance is not None:
             raise RuntimeError("ConfigStore is a singleton. Use get_instance()")
-        self.store: dict[str, Config] = {"default": None}
+        self.store: dict[str, Config | None] = {"default": None}
         self.context: str = "default"
 
     @classmethod
