@@ -77,7 +77,7 @@ class ModificationTypeQueryProxy(QueryProxy):
 
 
 @Strategies.register(key="modification_type")
-class ModificationTypeReconciliationStrategy(LLMReconciliationStrategy):
+class LLMModificationTypeReconciliationStrategy(LLMReconciliationStrategy):
     """LLM-powered modification type reconciliation strategy"""
 
     def __init__(self):
