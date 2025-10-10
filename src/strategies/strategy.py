@@ -23,6 +23,11 @@ class ReconciliationStrategy(ABC):
         }
         self.query_proxy_class: Any = query_proxy_class
 
+    @property
+    def key(self) -> str:
+        """Return the unique key for this strategy"""
+        return self.specification["key"]
+
     def get_entity_id_field(self) -> str:
         """Return the ID field name for this entity type"""
         return self.specification["id_field"]
