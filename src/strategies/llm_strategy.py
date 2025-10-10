@@ -35,26 +35,22 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         """Return a description of the lookup domain for the LLM context"""
 
     @abstractmethod
-    async def get_lookup_data(self, cursor: psycopg.AsyncCursor) -> List[Dict[str, Any]]:
+    async def get_lookup_data(self, cursor: psycopg.AsyncCursor) -> list[dict[str, Any]]:
         """Fetch the lookup data from the database"""
 
-    def format_lookup_data(self, lookup_data: List[Dict[str, Any]]) -> str:
+    def get_lookup_fields(self) -> list[str]:
+        """Return the fields to include in the lookup data"""
+        return [self.get_entity_id_field(), self.get_label_field()]
+
+    def format_lookup_data(self, lookup_data: list[dict[str, Any]]) -> str:
         """Format lookup data as 'id, value' pairs for the prompt"""
-        lines = []
-        id_field = self.get_entity_id_field()
-        label_field = self.get_label_field()
-
-        for row in lookup_data:
-            lines.append(f"{row[id_field]}, {row[label_field]}")
-
+        fields: list[str] = self.get_lookup_fields()
+        lines: list[str] = [", ".join(f"{row[f]}" for f in fields) for row in lookup_data]
         return "\n".join(lines)
 
-    def format_input_data(self, queries: List[str]) -> str:
+    def format_input_data(self, queries: list[str]) -> str:
         """Format input queries as 'id, value' pairs for the prompt"""
-        lines = []
-        for i, query in enumerate(queries, 1):
-            lines.append(f"{i}, {query}")
-        return "\n".join(lines)
+        return "\n".join(f"{i}, {query}" for i, query in enumerate(queries, 1))
 
     async def find_candidates(
         self,
@@ -71,23 +67,26 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
             lookup_data: list[dict[str, Any]] = await self.get_lookup_data(cursor)
             logger.info(f"Retrieved {len(lookup_data)} lookup entries")
 
-            # Format data for prompt
-            context = self.get_context_description()
-            formatted_lookup = self.format_lookup_data(lookup_data)
-            formatted_input = self.format_input_data([query])
+            template_data: dict[str, str] = {
+                "context": self.get_context_description(),
+                "lookup_data": self.format_lookup_data(lookup_data),
+                "data": self.format_input_data([query]),
+            }
 
-            # Build prompt
-            prompt = self.prompt_template.format(context=context, lookup_data=formatted_lookup, data=formatted_input)
+            prompt: str = self.prompt_template.format(**template_data)
 
             logger.debug(f"Generated prompt length: {len(prompt)} characters")
 
-            # Call LLM with structured output
-            response = await self.llm_provider.complete(
+            extra_roles: dict[str, str] = ConfigValue(f"policies.{self.key}.roles,policy.roles").resolve() or {}
+            max_tokens: int = ConfigValue(f"llm.{self.llm_provider.key}.max_tokens,llm.max_tokens").resolve() or 20000
+            temperature: float = ConfigValue(f"llm.{self.llm_provider.key}.temperature,llm.temperature").resolve() or 0.1
+
+            response: str = await self.llm_provider.complete(
                 prompt=prompt,
                 roles=extra_roles,
                 response_model=ReconciliationResponse,
-                max_tokens=ConfigValue("llm.max_tokens").resolve() or 2000,
-                temperature=ConfigValue("llm.temperature").resolve() or 0.1,
+                max_tokens=max_tokens,
+                temperature=temperature,
             )
 
             logger.info(f"LLM returned response with {len(response.results)} results")
@@ -111,7 +110,6 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
 
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("LLM reconciliation failed: %s", e)
-            # Fallback to traditional fuzzy matching
             logger.info("Falling back to traditional fuzzy matching")
             return await super().find_candidates(cursor, query, properties, limit)
 
