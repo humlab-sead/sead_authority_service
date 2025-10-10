@@ -33,7 +33,7 @@ class TestOllamaProvider:
 
             # Mock ConfigValue calls to return test values
             def config_side_effect(key, default=None):
-                config_map = {"llm.ollama.base_url": "http://localhost:11434", "llm.ollama.model": "llama2", "llm.ollama.timeout": 30}
+                config_map = {"llm.ollama.host": "http://localhost:11434", "llm.ollama.model": "llama2", "llm.ollama.timeout": 30}
                 mock_val = Mock()
                 mock_val.resolve.return_value = config_map.get(key, default)
                 return mock_val
@@ -45,10 +45,10 @@ class TestOllamaProvider:
 
             provider = OllamaProvider()
 
-            assert provider.base_url == "http://localhost:11434"
+            assert provider.host == "http://localhost:11434"
             assert provider.model == "llama2"
             assert provider.client == mock_client
-            mock_client_class.assert_called_once_with(base_url="http://localhost:11434", timeout=30)
+            mock_client_class.assert_called_once_with(host="http://localhost:11434", timeout=30)
 
     @with_test_config
     def test_init_with_defaults2(self, test_provider: MockConfigProvider):
@@ -62,34 +62,34 @@ class TestOllamaProvider:
 
             environ_base_url: str = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 
-            assert provider.base_url == environ_base_url
+            assert provider.host == environ_base_url
             assert provider.model == "gpt-oss:20b"
             assert provider.client == mock_client
-            mock_client_class.assert_called_once_with(base_url=environ_base_url, timeout=30)
+            mock_client_class.assert_called_once_with(host=environ_base_url, timeout=30)
 
     @pytest.mark.asyncio  # Add this decorator
     @with_test_config
     def test_init_with_parameters(self, test_provider: MockConfigProvider):
         """Test OllamaProvider initialization with explicit parameters"""
         # Set up mock configuration (fallback values)
-        # test_provider.get_config().update({"llm": {"ollama": {"base_url": "http://default:11434", "model": "default_model", "timeout": 30}}})
+        # test_provider.get_config().update({"llm": {"ollama": {"host": "http://default:11434", "model": "default_model", "timeout": 30}}})
 
         with patch("ollama.Client") as mock_client_class:
             mock_client = Mock()
             mock_client_class.return_value = mock_client
 
-            provider = OllamaProvider(base_url="http://custom:8080", model="custom_model")
+            provider = OllamaProvider(host="http://custom:8080", model="custom_model")
 
-            assert provider.base_url == "http://custom:8080"
+            assert provider.host == "http://custom:8080"
             assert provider.model == "custom_model"
-            mock_client_class.assert_called_once_with(base_url="http://custom:8080", timeout=30)
+            mock_client_class.assert_called_once_with(host="http://custom:8080", timeout=30)
 
     @pytest.mark.asyncio  # Add this decorator
     @with_test_config
     async def test_complete_basic(self, test_provider: MockConfigProvider):
         """Test basic completion without typed response"""
         test_provider.get_config().update(
-            {"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
         )
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
@@ -117,7 +117,7 @@ class TestOllamaProvider:
     async def test_complete_with_custom_options(self, test_provider: MockConfigProvider):
         """Test completion with custom options passed via kwargs"""
         test_provider.get_config().update(
-            {"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
         )
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
@@ -143,7 +143,7 @@ class TestOllamaProvider:
     @with_test_config
     async def test_complete_with_explicit_options(self, test_provider: MockConfigProvider):
         """Test completion with explicit options dictionary"""
-        test_provider.get_config().update({"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
+        test_provider.get_config().update({"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
 
@@ -169,7 +169,7 @@ class TestOllamaProvider:
     async def test_complete_with_typed_response(self, test_provider: MockConfigProvider):
         """Test completion with Pydantic model for typed response"""
         test_provider.get_config().update(
-            {"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.1}}}}
+            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.1}}}}
         )
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
@@ -199,7 +199,7 @@ class TestOllamaProvider:
     @with_test_config
     async def test_complete_typed_response_invalid_model(self, test_provider: MockConfigProvider):
         """Test completion with invalid response_model raises ValueError"""
-        test_provider.get_config().update({"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
+        test_provider.get_config().update({"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
 
         with patch("ollama.Client"):
             provider = OllamaProvider()
@@ -213,7 +213,7 @@ class TestOllamaProvider:
     async def test_complete_network_error_handling(self, test_provider: MockConfigProvider):
         """Test that network errors are properly propagated"""
         test_provider.get_config().update(
-            {"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
         )
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
@@ -234,7 +234,7 @@ class TestOllamaProvider:
     async def test_complete_malformed_json_response(self, test_provider: MockConfigProvider):
         """Test handling of malformed JSON response"""
         test_provider.get_config().update(
-            {"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
         )
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
@@ -256,7 +256,7 @@ class TestOllamaProvider:
     @with_test_config
     def test_key_property(self, test_provider: MockConfigProvider):
         """Test that the provider has the correct key property"""
-        test_provider.get_config().update({"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
+        test_provider.get_config().update({"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
 
         with patch("ollama.Client"):
             provider = OllamaProvider()
@@ -269,7 +269,7 @@ class TestOllamaProvider:
     async def test_complete_empty_prompt(self, test_provider: MockConfigProvider):
         """Test completion with empty prompt"""
         test_provider.get_config().update(
-            {"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
         )
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
