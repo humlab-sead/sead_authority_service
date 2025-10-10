@@ -20,7 +20,7 @@ class OllamaProvider(LLMProvider):
         self.timeout: int = ConfigValue(f"llm.{self.key}.timeout", default=30).resolve()
         self.client: ollama.Client = ollama.Client(host=self.host, timeout=self.timeout)
 
-    async def complete(self, prompt: str, *, role: str = None, **kwargs) -> str:
+    async def complete(self, prompt: str, roles: dict[str, str] = None, **kwargs) -> str:
         # prompt: the prompt to generate a response for
         # suffix: the text after the model response
         # images: (optional) a list of base64-encoded images (for multimodal models such as llava)
@@ -42,9 +42,10 @@ class OllamaProvider(LLMProvider):
             "model": self.model,
             "messages": [
                 {
-                    "role": role or "user",
+                    "role": "user",
                     "content": prompt,
-                },
+                }
+                | (roles or {}),
             ],
             "options": self.resolve_options(kwargs),
         }

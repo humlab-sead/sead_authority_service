@@ -15,7 +15,12 @@ policy:
     place_name_similarity_boost:
       similarity_threshold: 0.3
       max_boost: 0.1
-
+  modification_type:
+    roles:
+      user: system
+      content: You are archaeological specialist with expertise in identifying and classifying archaeological samples based on their features and characteristics.
+    context: |
+      You are provided with a list of known modification types, each with an id, a name and a description. Your task is to classify the input sample into one of these modification types based on its features and characteristics.
 llm:
   provider: "ollama"  # or "anthropic", "ollama"
   max_tokens: 1000
@@ -88,7 +93,8 @@ llm:
       Each line in the input follows the format:
       "id, abbreviation"
 
-      The text may include multiple languages. The abbreviations belong to the following context:
+      The text may include multiple languages.
+      
       {context}
 
       Your task:
@@ -101,13 +107,15 @@ llm:
       {data}
 
     reconciliation: |
-      Find and list candidate matches for each input value based on the lookup data. Score each candidate by its relevance to the input within the given context.
+      Find and list candidate matches for each input value based on the lookup data.
+      Score each candidate by its relevance to the input within the given context.
+      Each line contains an "id, name [, description]" representing a possible encoding.
+      Not all input values will have a description.
 
       Context:
       {context}
 
-      Lookup data:
-      Each line contains an "id, value" pair representing a possible encoding.
+      Known lookup data:
       {lookup_data}
 
       Guidelines:
@@ -130,13 +138,13 @@ llm:
 
       Output JSON schema (array):
       [
-        {
+        {{
           "input_id": "<original input id>",
           "input_value": "<original input value>",
           "candidates": [
-            { "id": "<lookup id>", "value": "<lookup value>", "score": 0.00, "reasons": ["...","..."] }
+            {{ "id": "<lookup id>", "value": "<lookup value>", "score": 0.00, "reasons": ["...","..."] }}
           ]
-        }
+        }}
       ]
 
       Input values:
