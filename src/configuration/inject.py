@@ -131,23 +131,25 @@ class ConfigValue(Generic[T]):
     def value(self) -> T:
         return self.resolve()
 
-    def resolve(self, context: str = None, *args: Any, **kwargs: Any) -> T:
-        """Resolve the value from the current store (configuration file)"""
-        if isclass(self.key):
-            return self.key(*args, **kwargs)  # type: ignore
-        if self.mandatory and self.default is None:
-            provider = get_config_provider()
-            if not provider.get_config(context).exists(self.key):
-                raise ValueError(f"ConfigValue {self.key} is mandatory but missing from config")
-
+    def resolve(self, context: str | None = None, *args: Any, **kwargs: Any) -> T:
         provider = get_config_provider()
         config: Config = provider.get_config(context)
 
-        value = config.get(*self.key.split(","), default=self.default)
+        if isclass(self.key):
+            val = self.key(*args, **kwargs)
+        else:
+            path = [p.strip() for p in str(self.key).split(",")]
+            val = config.get(*path, default=self.default)
 
-        if value is not None and self.after:
-            return self.after(value)
-        return value
+        if val is None:
+            if self.mandatory:
+                raise ValueError(f"ConfigValue '{self.key}' is mandatory but missing from config")
+            return val  # type: ignore[return-value]
+
+        if self.after is not None:
+            val = self.after(val)  # do not gate on truthiness
+
+        return val  # type: ignore[return-value]
 
     @staticmethod
     def create_field(key: str, default: Any = None, description: str = None) -> Any:
