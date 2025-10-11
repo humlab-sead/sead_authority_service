@@ -1,5 +1,8 @@
 from __future__ import annotations
-import csv, io, json
+
+import csv
+import io
+import json
 from dataclasses import dataclass
 from typing import Any, List, Mapping, Protocol, Tuple
 
@@ -52,7 +55,7 @@ class CSVFormatter:
 class JSONFormatter:
     name = "json"
 
-    def format(self, rows: List[Mapping[str, Any]], columns: List[str]) -> str:
+    def format(self, rows: List[Mapping[str, Any]], columns: List[str]) -> str:  # pylint: disable=unused-argument
         return json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
 
 
@@ -93,7 +96,7 @@ def _total_chars(rows: List[Mapping[str, Any]]) -> int:
 # ---------- Main orchestrator ----------
 
 
-def format_rows_for_llm(
+def format_rows_for_llm(  # pylint: disable=too-many-arguments, too-many-locals
     rows: List[Mapping[str, Any]],
     *,
     entity_type: str,
@@ -113,7 +116,7 @@ def format_rows_for_llm(
     - column_map: maps logical keys {'id', 'label', 'description'?} to actual field names in the rows
                   If None → assumes {'id': 'id', 'label': 'label'} (description optional)
     """
-    registry = registry or FormatRegistry()
+    registry: FormatRegistry = registry or FormatRegistry()
 
     # Default map, with description optional
     default_map = {"id": "id", "label": "label"}
@@ -130,10 +133,10 @@ def format_rows_for_llm(
                 new_r[alias] = r.get(real_key)
         normalized.append(new_r)
 
-    columns = [k for k in column_map.keys() if any(k in row for row in normalized)]
+    columns: list[str] = [k for k in column_map if any(k in row for row in normalized)]
 
     # Auto format selection
-    fmt = (target_format or "auto").lower()
+    fmt: str = (target_format or "auto").lower()
     if fmt == "auto":
         if _has_non_scalar(normalized) or len(rows) > 200:
             fmt = "json"
@@ -141,8 +144,8 @@ def format_rows_for_llm(
             payload = _total_chars(normalized)
             fmt = "markdown" if (len(rows) <= 50 and payload <= 20_000) else "csv"
 
-    formatter = registry.get(fmt, csv_sep=csv_separator)
-    table = formatter.format(normalized, columns)
+    formatter: RowFormatter = registry.get(fmt, csv_sep=csv_separator)
+    table: str = formatter.format(normalized, columns)
 
     # Build blurb dynamically
     col_str = ", ".join(columns)
@@ -153,7 +156,7 @@ def format_rows_for_llm(
         f"Return the `{columns[0]}` of the best match and a similarity score between 0 and 1.\n"
     )
     if "label" in columns:
-        blurb += f"Use `label` for name matching"
+        blurb += "Use `label` for name matching"
         if "description" in columns:
             blurb += " and `description` for context"
         blurb += ". "
