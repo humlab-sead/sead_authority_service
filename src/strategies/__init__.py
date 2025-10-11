@@ -2,13 +2,24 @@ import importlib
 import pkgutil
 from pathlib import Path
 
-# Get the directory where this __init__.py file is located
 package_dir = Path(__file__).parent
 
-# Automatically import all Python modules in this directory
-for module_info in pkgutil.iter_modules([str(package_dir)]):
-    if module_info.name not in ["__init__", "strategy"]:
-        try:
-            importlib.import_module(f".{module_info.name}", package=__name__)
-        except ImportError as e:
-            print(f"Warning: Could not import strategy module {module_info.name}: {e}")
+def _import_submodules(package_name: str, package_path: str):
+    """Recursively import all submodules of a package."""
+    for module_info in pkgutil.iter_modules([package_path]):
+        full_name = f"{package_name}.{module_info.name}"
+        if module_info.ispkg:
+            # Import the package and recurse
+            try:
+                pkg = importlib.import_module(full_name)
+                _import_submodules(full_name, str(Path(package_path) / module_info.name))
+            except Exception as e:
+                print(f"⚠️ Warning: Could not import subpackage {full_name}: {e}")
+        else:
+            if module_info.name not in ["__init__", "strategy"]:
+                try:
+                    importlib.import_module(full_name)
+                except Exception as e:
+                    print(f"⚠️ Warning: Could not import module {full_name}: {e}")
+
+_import_submodules(__name__, str(package_dir))
