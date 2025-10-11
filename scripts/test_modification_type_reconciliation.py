@@ -16,8 +16,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from unittest.mock import AsyncMock
 
-from src.strategies.modification_type import LLMModificationTypeReconciliationStrategy
-from src.strategies.llm_models import ReconciliationResponse, ReconciliationResult, Candidate
+from strategies.llm.modification_type import LLMModificationTypeReconciliationStrategy
+from strategies.llm.llm_models import ReconciliationResponse, ReconciliationResult, Candidate
 
 
 async def test_modification_type_reconciliation():
