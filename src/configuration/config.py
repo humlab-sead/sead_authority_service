@@ -76,6 +76,10 @@ class Config:
         if value is not None:
             return value
 
+        if callable(default) and not isinstance(default, type):
+            return default()
+
+        # Allow instance of class to be returned by calling default (parameterless) constructor
         return default() if isclass(default) else default
 
     def update(self, data: tuple[str, Any] | dict[str, Any] | list[tuple[str, Any]]) -> None:
