@@ -4,7 +4,7 @@ import io
 from inspect import isclass
 from os.path import join, normpath
 from pathlib import Path
-from typing import Any, Type, TypeVar
+from typing import Any, Type
 
 import yaml
 from dotenv import load_dotenv
@@ -12,8 +12,6 @@ from dotenv import load_dotenv
 from src.utility import dget, dotexists, dotset, env2dict, replace_env_vars
 
 # pylint: disable=too-many-arguments
-
-T = TypeVar("T", str, int, float)
 
 
 def yaml_str_join(loader: yaml.Loader, node: yaml.SequenceNode) -> str:
@@ -59,10 +57,6 @@ class Config:
         self.data: dict = data
         self.context: str = context
         self.filename: str | None = filename
-
-    # @cached_property
-    # def data_folder(self) -> str:
-    #     return self.get("data_folder", "root_folder")
 
     def get(self, *keys: str, default: Any | Type[Any] = None, mandatory: bool = False) -> Any:
         if self.data is None:
