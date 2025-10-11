@@ -37,16 +37,13 @@ class OllamaProvider(LLMProvider):
         #   context (deprecated): the context parameter returned from a previous request to /generate, this can be used to keep a short conversational memory
         response_model: type[BaseModel] | None = None
         response_format: dict | None = None
-
+        user_message: dict[str, str] = {
+            "role": "user",
+            "content": prompt,
+        }
         args: dict[str, Any] = {
             "model": self.model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-                | (roles or {}),
-            ],
+            "messages": [user_message] + (roles or []),
             "options": self.resolve_options(kwargs),
         }
 
