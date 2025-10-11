@@ -1,6 +1,4 @@
-from typing import Any, Protocol, Type,runtime_checkable
-
-from pytest import Config
+from typing import Any, Protocol, Type, runtime_checkable
 
 # pylint: disable=unused-argument
 
