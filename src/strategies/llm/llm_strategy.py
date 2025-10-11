@@ -10,9 +10,10 @@ from src.configuration import ConfigValue
 from src.llm.providers import Providers
 from src.llm.providers.provider import LLMProvider
 from src.strategies.query import QueryProxy
+from src.strategies.strategy import ReconciliationStrategy, StrategySpecification
 
+from .format_data import format_rows_for_llm
 from .llm_models import ReconciliationResponse
-from ..strategy import ReconciliationStrategy, StrategySpecification
 
 # pylint: disable=too-many-locals
 
@@ -76,12 +77,21 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         lookup_data: list[dict[str, Any]] = await self.get_lookup_data(cursor)
         logger.info(f"Retrieved {len(lookup_data)} lookup entries")
 
+        lookup_data_formatted, lookup_data_blurb = format_rows_for_llm(
+            lookup_data,
+            entity_type=self.get_entity_type_description(),
+            target_format=self.get_lookup_format(),
+            column_map=self.get_lookup_fields_map() or None,
+            csv_separator=None,
+            registry=None,
+        )
         template_data: dict[str, str] = {
-            "context": self.get_context_description(),
-            "lookup_data": self.format_lookup_data(lookup_data),
+            "context": self.get_context_description() + "\n" + (lookup_data_blurb or ""),
+            "lookup_data": lookup_data_formatted,
             "data": self.format_input_data([query]),
         }
-
+        # TODO What to do with properties? For now we ignore them
+        
         prompt: str = self.prompt_template.format(**template_data)
 
         logger.debug(f"Generated prompt length: {len(prompt)} characters")
