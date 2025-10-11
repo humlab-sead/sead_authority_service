@@ -282,23 +282,32 @@ class ConfigStore:
 
 
 def resolve_arguments(fn_or_cls, args, kwargs):
-    """Resolve any ConfigValue arguments in a function or class constructor"""
-    kwargs = {
-        k: v.default
-        for k, v in inspect.signature(fn_or_cls).parameters.items()
-        if isinstance(v.default, ConfigValue) and v.default is not inspect.Parameter.empty
-    } | kwargs
-    args = (a.resolve() if isinstance(a, ConfigValue) else a for a in args)
-    for k, v in kwargs.items():
-        if isinstance(v, ConfigValue):
-            kwargs[k] = v.resolve()
-    return args, kwargs
+    """
+    Replace any ConfigValue arguments (positional or keyword) with their resolved values.
+    If a parameter has a default that is a ConfigValue and the caller didn't supply it,
+    resolve that default.
+    """
+    
+    sig = inspect.signature(fn_or_cls)
+    ba = sig.bind_partial(*args, **kwargs)
+
+    # Resolve provided arguments
+    for name, value in list(ba.arguments.items()):
+        if isinstance(value, ConfigValue):
+            ba.arguments[name] = value.resolve()
+
+    # Resolve default ConfigValue for missing args
+    for name, param in sig.parameters.items():
+        if name not in ba.arguments and isinstance(param.default, ConfigValue):
+            ba.arguments[name] = param.default.resolve()
+
+    return ba.args, ba.kwargs
 
 
-def inject_config(fn_or_cls: T) -> Callable[..., T]:
+def inject_config(fn_or_cls):
     @functools.wraps(fn_or_cls)
     def decorated(*args, **kwargs):
         args, kwargs = resolve_arguments(fn_or_cls, args, kwargs)
         return fn_or_cls(*args, **kwargs)
-
     return decorated
+
