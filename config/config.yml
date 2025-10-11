@@ -14,9 +14,9 @@ policy:
       similarity_threshold: 0.3
       max_boost: 0.1
   modification_type:
-    roles:
-      user: system
-      content: You are archaeological specialist with expertise in identifying and classifying archaeological samples based on their features and characteristics.
+    roles: 
+      - role: system
+        content: You are archaeological specialist with expertise in identifying and classifying archaeological samples based on their features and characteristics.
     context: |
       You are provided with a list of known modification types, each with an id, a name and a description. Your task is to classify the input sample into one of these modification types based on its features and characteristics.
 llm:
