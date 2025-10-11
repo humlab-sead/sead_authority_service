@@ -30,6 +30,13 @@ def nj(*paths: str | None) -> str | None:
 
 class SafeLoaderIgnoreUnknown(yaml.SafeLoader):  # pylint: disable=too-many-ancestors
     def let_unknown_through(self, node):  # pylint: disable=unused-argument
+        """Ignore unknown tags silently"""
+        if isinstance(node, yaml.ScalarNode):
+            return self.construct_scalar(node)
+        if isinstance(node, yaml.SequenceNode):
+            return self.construct_sequence(node)
+        if isinstance(node, yaml.MappingNode):
+            return self.construct_mapping(node)
         return None
 
 
