@@ -69,7 +69,7 @@ class Config:
             raise ValueError("Configuration not initialized")
 
         if mandatory and not self.exists(*keys):
-            raise ValueError(f"Missing mandatory key: {keys}")
+            raise ValueError(f"Missing mandatory key: {'/'.join(keys)}")
 
         value: Any = dget(self.data, *keys)
 
