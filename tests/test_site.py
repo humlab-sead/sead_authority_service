@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import psycopg
 import pytest
 
-from src.configuration.inject import MockConfigProvider
+from src.configuration import MockConfigProvider
 from src.strategies.site import SPECIFICATION, SiteQueryProxy, SiteReconciliationStrategy
 from tests.decorators import with_test_config
 
@@ -318,7 +318,7 @@ class TestSiteReconciliationStrategy:
             mock_place_scoring.assert_called_once_with(mock_sites, "Stockholm", mock_proxy)
 
     @pytest.mark.asyncio
-    @patch("src.configuration.inject.ConfigValue")
+    @patch("src.configuration.ConfigValue")
     @pytest.mark.asyncio
     @with_test_config
     async def test_apply_geographic_scoring(self, mock_config_value, test_provider: MockConfigProvider):
@@ -380,7 +380,7 @@ class TestSiteReconciliationStrategy:
         assert result == []
         mock_proxy.fetch_site_distances.assert_not_called()
 
-    @patch("src.configuration.inject.ConfigValue")
+    @patch("src.configuration.ConfigValue")
     @pytest.mark.asyncio
     @with_test_config
     async def test_apply_place_context_scoring(self, mock_config_value, test_provider: MockConfigProvider):
@@ -508,7 +508,7 @@ class TestSiteStrategyIntegration:
     """Integration tests for the complete site reconciliation workflow."""
 
     @pytest.mark.asyncio
-    @patch("src.configuration.inject.ConfigValue")
+    @patch("src.configuration.ConfigValue")
     @with_test_config
     async def test_complete_reconciliation_workflow(self, mock_config_value, test_provider: MockConfigProvider):
         """Test the complete reconciliation workflow."""
@@ -579,7 +579,7 @@ class TestSiteStrategyEdgeCases:
     """Edge case tests for SiteReconciliationStrategy."""
 
     @pytest.mark.asyncio
-    @patch("src.configuration.inject.ConfigValue")
+    @patch("src.configuration.ConfigValue")
     @with_test_config
     async def test_geographic_scoring_with_missing_site_distances(self, mock_config_value, test_provider: MockConfigProvider):
         """Test geographic scoring when some sites don't have distance data."""
@@ -614,7 +614,7 @@ class TestSiteStrategyEdgeCases:
         assert "distance_km" in site_3
 
     @pytest.mark.asyncio
-    @patch("src.configuration.inject.ConfigValue")
+    @patch("src.configuration.ConfigValue")
     @with_test_config
     async def test_place_scoring_with_no_matches(self, mock_config_value, test_provider: MockConfigProvider):
         """Test place context scoring when no sites match the place."""
@@ -640,7 +640,7 @@ class TestSiteStrategyEdgeCases:
         assert result[1]["name_sim"] == 0.7
 
     @pytest.mark.asyncio
-    @patch("src.configuration.inject.ConfigValue")
+    @patch("src.configuration.ConfigValue")
     @with_test_config
     async def test_place_scoring_below_threshold(self, mock_config_value, test_provider: MockConfigProvider):
         """Test place context scoring with similarities below threshold."""
@@ -664,7 +664,7 @@ class TestSiteStrategyEdgeCases:
         assert result[0]["name_sim"] == 0.8
 
     @pytest.mark.asyncio
-    @patch("src.configuration.inject.ConfigValue")
+    @patch("src.configuration.ConfigValue")
     @with_test_config
     async def test_geographic_scoring_max_score_cap(self, mock_config_value, test_provider: MockConfigProvider):
         """Test that geographic scoring doesn't exceed maximum score of 1.0."""
@@ -688,7 +688,7 @@ class TestSiteStrategyEdgeCases:
         assert result[0]["name_sim"] == 1.0
 
     @pytest.mark.asyncio
-    @patch("src.configuration.inject.ConfigValue")
+    @patch("src.configuration.ConfigValue")
     @with_test_config
     async def test_place_scoring_max_score_cap(self, mock_config_value, test_provider: MockConfigProvider):
         """Test that place context scoring doesn't exceed maximum score of 1.0."""

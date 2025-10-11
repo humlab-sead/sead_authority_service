@@ -4,9 +4,10 @@ import dotenv
 import psycopg
 from loguru import logger
 
-from src.configuration.config import Config
-from src.configuration.inject import ConfigStore, get_config_provider
 from src.utility import configure_logging, create_db_uri
+
+from .config import Config
+from .provider import ConfigStore, get_config_provider
 
 dotenv.load_dotenv(dotenv_path=os.getenv("ENV_FILE", ".env"))
 

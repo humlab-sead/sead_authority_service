@@ -10,7 +10,7 @@
 # from src.strategies.feature_type import SPECIFICATION as FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeQueryProxy
 # from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteQueryProxy
 
-# from src.configuration.inject import MockConfigProvider
+# from src.configuration import MockConfigProvider
 # from tests.decorators import with_test_config
 
 # # pylint: disable=attribute-defined-outside-init,protected-access, unused-argument

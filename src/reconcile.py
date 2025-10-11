@@ -3,8 +3,7 @@ from typing import Any
 from loguru import logger
 from psycopg.rows import dict_row
 
-from src.configuration.inject import get_config_provider
-from src.configuration.setup import get_connection
+from src.configuration import get_config_provider, get_connection
 from src.strategies.strategy import ReconciliationStrategy, Strategies
 
 

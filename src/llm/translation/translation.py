@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from loguru import logger
 
 # from llm.providers.client import LLMClient
-from src.configuration.inject import ConfigValue
+from src.configuration import ConfigValue
 
 
 @dataclass

@@ -4,7 +4,7 @@ import httpx
 import ollama
 from pydantic import BaseModel
 
-from src.configuration.inject import ConfigValue
+from src.configuration import ConfigValue
 
 from . import Providers
 from .provider import LLMProvider

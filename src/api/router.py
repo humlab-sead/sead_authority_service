@@ -11,9 +11,7 @@ from loguru import logger
 
 # Not used: ReconBatchRequest, ReconBatchRequestHandler, ReconQueryRequest
 from src.api.model import ReconBatchResponse, ReconQuery, ReconServiceManifest, SuggestEntityResponse, SuggestPropertyResponse, SuggestTypeResponse
-from src.configuration.config import Config
-from src.configuration.inject import ConfigValue, get_config_provider
-from src.configuration.setup import setup_config_store
+from src.configuration import Config, ConfigValue, get_config_provider, setup_config_store
 from src.metadata import get_reconcile_properties, get_reconciliation_metadata
 from src.preview import render_preview
 from src.reconcile import reconcile_queries

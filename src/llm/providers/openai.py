@@ -9,7 +9,7 @@
 #             raise ImportError("openai package not installed, cannot use OpenAIProvider")
 
 
-# from src.configuration.inject import ConfigValue
+# from src.configuration import ConfigValue
 
 # from . import Providers
 # from .provider import LLMProvider

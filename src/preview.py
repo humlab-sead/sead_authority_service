@@ -4,8 +4,7 @@ from loguru import logger
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 
-from src.configuration.inject import ConfigValue
-from src.configuration.setup import get_connection
+from src.configuration import ConfigValue, get_connection
 from src.strategies.strategy import ReconciliationStrategy, Strategies
 
 

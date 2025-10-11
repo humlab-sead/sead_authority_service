@@ -5,7 +5,7 @@ LLM Client abstraction supporting multiple providers
 from abc import ABC, abstractmethod
 from typing import Any
 
-from src.configuration.inject import ConfigValue
+from src.configuration import ConfigValue
 from src.utility import Registry
 
 

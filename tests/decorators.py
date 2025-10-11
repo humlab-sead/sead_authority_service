@@ -4,7 +4,7 @@ import functools
 import inspect
 from typing import Callable
 
-from src.configuration.inject import ConfigProvider, MockConfigProvider, set_config_provider
+from src.configuration import ConfigProvider, MockConfigProvider, set_config_provider
 
 
 def with_test_config(func: Callable) -> Callable:

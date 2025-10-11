@@ -5,8 +5,7 @@ from loguru import logger
 # Force import of strategies to register them
 import src.strategies  # pylint: disable=unused-import
 from src.api.router import router
-from src.configuration.inject import ConfigProvider, get_config_provider
-from src.configuration.setup import setup_config_store
+from src.configuration import ConfigProvider, get_config_provider, setup_config_store
 
 app = FastAPI(title="SEAD Entity Reconciliation Service")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])

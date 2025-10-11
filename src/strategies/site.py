@@ -2,7 +2,7 @@ from typing import Any, Tuple
 
 import psycopg
 
-from src.configuration.inject import ConfigValue
+from src.configuration import ConfigValue
 
 from .query import QueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification

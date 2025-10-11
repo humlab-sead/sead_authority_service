@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from unittest.mock import AsyncMock
 
-from src.strategies.modification_type import ModificationTypeReconciliationStrategy
+from src.strategies.modification_type import LLMModificationTypeReconciliationStrategy
 from src.strategies.llm_models import ReconciliationResponse, ReconciliationResult, Candidate
 
 
@@ -61,7 +61,7 @@ async def test_modification_type_reconciliation():
     
     try:
         # Create strategy instance
-        strategy = ModificationTypeReconciliationStrategy()
+        strategy = LLMModificationTypeReconciliationStrategy()
         print(f"✓ Created strategy: {strategy.__class__.__name__}")
         print(f"✓ Context: {strategy.get_context_description()[:100]}...")
         

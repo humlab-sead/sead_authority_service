@@ -22,8 +22,8 @@ def fix_imports_in_file(file_path: Path, project_root: Path):
         # Convert specific problematic imports
         fixes = [
             # configuration.inject -> src.configuration.inject
-            (r'from\s+configuration\.inject\s+import', 'from src.configuration.inject import'),
-            (r'import\s+configuration\.inject', 'import src.configuration.inject'),
+            (r'from\s+configuration\s+import', 'from src.configuration import'),
+            (r'import\s+configuration', 'import src.configuration'),
             
             # Add more patterns as needed
             (r'from\s+llm\.providers\s+import', 'from src.llm.providers import'),

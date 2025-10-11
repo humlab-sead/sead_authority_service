@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.api.router import router
-from src.configuration.inject import MockConfigProvider
+from src.configuration import MockConfigProvider
 from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"

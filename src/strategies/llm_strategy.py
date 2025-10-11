@@ -6,7 +6,7 @@ from typing import Any
 import psycopg
 from loguru import logger
 
-from src.configuration.inject import ConfigValue
+from src.configuration import ConfigValue
 from src.llm.providers import Providers
 from src.llm.providers.provider import LLMProvider
 from src.strategies.query import QueryProxy

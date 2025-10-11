@@ -3,7 +3,7 @@ from typing import Any
 
 import psycopg
 
-from src.configuration.inject import ConfigValue
+from src.configuration import ConfigValue
 from src.utility import Registry
 
 StrategySpecification = dict[str, str | dict[str, Any]]

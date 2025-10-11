@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from src.configuration.inject import MockConfigProvider
+from src.configuration import MockConfigProvider
 from src.preview import render_preview
 from tests.conftest import mock_strategy_with_get_details
 from tests.decorators import with_test_config

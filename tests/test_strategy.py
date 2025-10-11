@@ -4,7 +4,7 @@
 # import psycopg
 # import pytest
 
-# from src.configuration.inject import MockConfigProvider
+# from src.configuration import MockConfigProvider
 # from src.strategies.country import SPECIFICATION as COUNTRY_SPECIFICATION
 # from src.strategies.country import CountryReconciliationStrategy
 # from src.strategies.data_type import SPECIFICATION as DATA_TYPE_SPECIFICATION

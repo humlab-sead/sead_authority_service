@@ -1,6 +1,6 @@
 from typing import Any
 
-from src.configuration.inject import ConfigValue
+from src.configuration import ConfigValue
 from src.strategies.strategy import ReconciliationStrategy, StrategyRegistry
 
 

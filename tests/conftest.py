@@ -6,9 +6,7 @@ from unittest.mock import AsyncMock
 import psycopg
 import pytest
 
-from src.configuration.config import Config
-from src.configuration.inject import ConfigStore, MockConfigProvider, reset_config_provider
-from src.configuration.setup import setup_config_store
+from src.configuration import Config, ConfigFactory, ConfigStore, MockConfigProvider, reset_config_provider, setup_config_store
 
 # pylint: disable=unused-argument
 
@@ -86,7 +84,8 @@ def test_config() -> Config:
         mock_conn.cursor.return_value = mock_cursor
         return mock_conn
 
-    config: Config = Config.load(source="./tests/config.yml", context="default", env_filename="./tests/.env")
+    factory: ConfigFactory = ConfigFactory()
+    config: Config = factory.load(source="./tests/config.yml", context="default", env_filename="./tests/.env")
     config.update(
         {
             "runtime": {
