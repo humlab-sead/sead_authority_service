@@ -30,6 +30,15 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
 
         logger.info(f"Initialized {self.__class__.__name__} with provider: {provider_name}")
 
+    def get_entity_type_description(self) -> str:
+        return ConfigValue(f"policy.{self.key}.entity_type_description").resolve() or self.key.replace("_", " ")
+
+    def get_lookup_format(self) -> str:
+        return ConfigValue(f"policy.{self.key}.lookup_format", default="auto").resolve() or "auto"
+
+    def get_lookup_fields_map(self) -> dict[str, str]:
+        return ConfigValue(f"policy.{self.key}.lookup_fields_map", default={}).resolve() or {}
+
     @abstractmethod
     def get_context_description(self) -> str:
         """Return a description of the lookup domain for the LLM context"""
