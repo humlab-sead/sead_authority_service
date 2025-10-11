@@ -5,39 +5,44 @@ from typing import Any, List, Mapping, Protocol, Tuple
 
 # ---------- Strategy interface ----------
 
+
 class RowFormatter(Protocol):
     name: str
+
     def format(self, rows: List[Mapping[str, Any]], columns: List[str]) -> str: ...
 
 
 # ---------- Concrete formatters ----------
 
+
 class MarkdownFormatter:
     name = "markdown"
+
     def format(self, rows: List[Mapping[str, Any]], columns: List[str]) -> str:
         if not columns:
             return "_(no rows)_"
+
         def esc(v: Any) -> str:
             s = "" if v is None else str(v)
             return s.replace("|", r"\|").replace("\n", "↩")
+
         head = "| " + " | ".join(columns) + " |"
-        sep  = "| " + " | ".join("---" for _ in columns) + " |"
+        sep = "| " + " | ".join("---" for _ in columns) + " |"
         body = "\n".join("| " + " | ".join(esc(r.get(c, "")) for c in columns) + " |" for r in rows)
         return "\n".join([head, sep, body]) if body else "\n".join([head, sep])
 
 
 class CSVFormatter:
     name = "csv"
+
     def __init__(self, sep: str = "|"):
         self.sep = sep
+
     def format(self, rows: List[Mapping[str, Any]], columns: List[str]) -> str:
         if not columns:
             return ""
         buf = io.StringIO()
-        writer = csv.writer(
-            buf, delimiter=self.sep, quotechar='"',
-            lineterminator="\n", quoting=csv.QUOTE_MINIMAL, escapechar="\\"
-        )
+        writer = csv.writer(buf, delimiter=self.sep, quotechar='"', lineterminator="\n", quoting=csv.QUOTE_MINIMAL, escapechar="\\")
         writer.writerow(columns)
         for r in rows:
             writer.writerow([("" if r.get(c) is None else r.get(c, "")) for c in columns])
@@ -46,31 +51,40 @@ class CSVFormatter:
 
 class JSONFormatter:
     name = "json"
+
     def format(self, rows: List[Mapping[str, Any]], columns: List[str]) -> str:
         return json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
 
 
 # ---------- Registry ----------
 
+
 @dataclass
 class FormatRegistry:
     markdown: RowFormatter = MarkdownFormatter()
     json: RowFormatter = JSONFormatter()
+
     def get(self, key: str, *, csv_sep: str = "|") -> RowFormatter:
         k = key.lower()
-        if k == "markdown": return self.markdown
-        if k == "json": return self.json
-        if k == "csv": return CSVFormatter(csv_sep)
+        if k == "markdown":
+            return self.markdown
+        if k == "json":
+            return self.json
+        if k == "csv":
+            return CSVFormatter(csv_sep)
         raise ValueError(f"Unknown formatter: {key!r}")
 
 
 # ---------- Helpers ----------
 
+
 def _is_scalar(x: Any) -> bool:
     return isinstance(x, (str, int, float, bool)) or x is None
 
+
 def _has_non_scalar(rows: List[Mapping[str, Any]]) -> bool:
     return any(not _is_scalar(v) for r in rows for v in r.values())
+
 
 def _total_chars(rows: List[Mapping[str, Any]]) -> int:
     return sum(len(str(v)) if v is not None else 4 for r in rows for v in r.values())
@@ -78,11 +92,12 @@ def _total_chars(rows: List[Mapping[str, Any]]) -> int:
 
 # ---------- Main orchestrator ----------
 
+
 def format_rows_for_llm(
     rows: List[Mapping[str, Any]],
     *,
     entity_type: str,
-    target_format: str = "auto",         # 'markdown' | 'csv' | 'json' | 'auto'
+    target_format: str = "auto",  # 'markdown' | 'csv' | 'json' | 'auto'
     csv_separator: str = "|",
     column_map: dict[str, str] | None = None,  # e.g. {"id": "biblio_id", "label": "title", "description": "authors"}
     registry: FormatRegistry | None = None,
