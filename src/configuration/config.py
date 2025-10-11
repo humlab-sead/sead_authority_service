@@ -86,8 +86,12 @@ class Config:
     def exists(self, *keys: str) -> bool:
         return False if self.data is None else dotexists(self.data, *keys)
 
-    @staticmethod
+
+class ConfigFactory:
+    """Factory for creating Config instances."""
+
     def load(
+        self,
         *,
         source: str | dict | Config = None,
         context: str = None,
@@ -100,36 +104,44 @@ class Config:
         if isinstance(source, Config):
             return source
 
-        data: str | dict | Config | None = (
+        if source is None:
+            source = {}
+
+        data: dict = (
             (
                 yaml.load(
                     Path(source).read_text(encoding="utf-8"),
                     Loader=SafeLoaderIgnoreUnknown,
                 )
-                if Config.is_config_path(source)
+                if self.is_config_path(source, raise_if_missing=True)
                 else yaml.load(io.StringIO(source), Loader=SafeLoaderIgnoreUnknown)
             )
             if isinstance(source, str)
             else source
         )
-        env2dict(env_prefix, data)
-        if not isinstance(data, dict):
-            raise TypeError(f"expected dict, found {type(data)}")
 
+        if not isinstance(data, dict):
+            raise TypeError(f"expected dict, found '{type(data)}'")
+
+        # Update data based on environment variables with a name that starts with `env_prefix`
+        data = env2dict(env_prefix, data)
+
+        # Do a recursive replace of values with pattern "${ENV_NAME}" with value of environment
         data = replace_env_vars(data)
+
         return Config(
             data=data,
-            context=context,
-            filename=source if Config.is_config_path(source) else None,
+            context=context or "default",
+            filename=source if self.is_config_path(source) else None,
         )
 
     @staticmethod
-    def is_config_path(source: Any) -> bool:
+    def is_config_path(source: Any, raise_if_missing: bool = True) -> bool:
         """Test if the source is a valid path to a configuration file."""
         if not isinstance(source, str):
             return False
-        return source.endswith(".yaml") or source.endswith(".yml")  # or pathvalidate.is_valid_filepath(source)
-
-    def add(self, data: dict) -> None:
-        """Recursively add data to the configuration."""
-        self.data.update(data)
+        if not source.endswith(".yaml") and not source.endswith(".yml"):
+            return False
+        if raise_if_missing and not Path(source).exists():
+            raise FileNotFoundError(f"Configuration file not found: {source}")
+        return True
