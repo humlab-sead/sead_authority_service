@@ -83,15 +83,14 @@ class Config:
         return default() if isclass(default) else default
 
     def update(self, data: tuple[str, Any] | dict[str, Any] | list[tuple[str, Any]]) -> None:
-        if isinstance(data, tuple):
-            data = [data]
-        if isinstance(data, dict):
-            data = data.items()
-        for key, value in data:
+        if self.data is None:
+            self.data = {}
+        items = [data] if isinstance(data, tuple) else data.items() if isinstance(data, dict) else data
+        for key, value in items:
             dotset(self.data, key, value)
 
-    def exists(self, *keys) -> bool:
-        return dotexists(self.data, *keys)
+    def exists(self, *keys: str) -> bool:
+        return False if self.data is None else dotexists(self.data, *keys)
 
     @staticmethod
     def load(
