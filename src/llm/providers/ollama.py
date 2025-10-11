@@ -18,7 +18,7 @@ class OllamaProvider(LLMProvider):
         self.host: str = host or ConfigValue(f"llm.{self.key}.host").resolve()
         self.model: str = model or ConfigValue(f"llm.{self.key}.model").resolve()
         self.timeout: int = ConfigValue(f"llm.{self.key}.timeout", default=30).resolve()
-        self.client: ollama.Client = ollama.Client(host=self.host, timeout=self.timeout)
+        self.client: ollama.Client = ollama.Client(host=self.host, timeout=self.timeout, follow_redirects=True)
 
     async def complete(self, prompt: str, roles: dict[str, str] = None, **kwargs) -> str:
         # prompt: the prompt to generate a response for
