@@ -48,7 +48,7 @@ class TestOllamaProvider:
             assert provider.host == "http://localhost:11434"
             assert provider.model == "llama2"
             assert provider.client == mock_client
-            mock_client_class.assert_called_once_with(host="http://localhost:11434", timeout=30)
+            mock_client_class.assert_called_once_with(host="http://localhost:11434", timeout=30, follow_redirects=True)
 
     @with_test_config
     def test_init_with_defaults2(self, test_provider: MockConfigProvider):
@@ -65,7 +65,7 @@ class TestOllamaProvider:
             assert provider.host == environ_base_url
             assert provider.model == "gpt-oss:20b"
             assert provider.client == mock_client
-            mock_client_class.assert_called_once_with(host=environ_base_url, timeout=30)
+            mock_client_class.assert_called_once_with(host=environ_base_url, timeout=30, follow_redirects=True)
 
     @pytest.mark.asyncio  # Add this decorator
     @with_test_config
@@ -82,7 +82,7 @@ class TestOllamaProvider:
 
             assert provider.host == "http://custom:8080"
             assert provider.model == "custom_model"
-            mock_client_class.assert_called_once_with(host="http://custom:8080", timeout=30)
+            mock_client_class.assert_called_once_with(host="http://custom:8080", timeout=30, follow_redirects=True)
 
     @pytest.mark.asyncio  # Add this decorator
     @with_test_config
