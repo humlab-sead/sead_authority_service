@@ -7,9 +7,9 @@ from loguru import logger
 
 from src.configuration import ConfigValue
 
-from .llm_strategy import LLMReconciliationStrategy
 from ..query import QueryProxy
 from ..strategy import Strategies, StrategySpecification
+from .llm_strategy import LLMReconciliationStrategy
 
 # Specification for modification types
 SPECIFICATION: StrategySpecification = {
