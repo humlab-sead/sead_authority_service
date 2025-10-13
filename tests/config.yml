@@ -16,14 +16,22 @@ policy:
       similarity_threshold: 0.3
       max_boost: 0.1
   modification_type:
+    lookup_format: "json"
+    lookup_fields_map:
+      id: "modification_type_id"
+      label: "modification_type_name"
+      description: "modification_type_description"
+    entity_type_description: "modification type"
     roles: 
       - role: system
         content: You are archaeological specialist with expertise in identifying and classifying archaeological samples based on their features and characteristics.
     context: |
-      You are provided with a list of known modification types, each with an id, a name and a description. Your task is to classify the input sample into one of these modification types based on its features and characteristics.
+      You are provided with known modification types, each with an id, a label and a description.
+    output:
+      format: json
 llm:
   provider: "ollama"  # or "anthropic", "ollama"
-  max_tokens: 1000
+  max_tokens: 10000
   temperature: 0.1
   enable_translation: true
   enable_semantic_matching: true
@@ -35,7 +43,7 @@ llm:
     api_key: "${OPENAI_API_KEY}"
     options:
       temperature: 0.1
-      max_tokens: 1000
+      max_tokens: 10000
   ollama:
     provider_id: "ollama"
     model: "gpt-oss:20b"
@@ -43,7 +51,8 @@ llm:
     timeout: 30
     options:
       temperature: 0.1
-      max_tokens: 9999
+      # max_tokens: 9999
+      num_predict: 512
   anthropic:
     provider_id: "anthropic"
     model: "claude-2"  
@@ -51,21 +60,7 @@ llm:
     options:
       temperature: 0.1
       max_tokens: 1000
-
   prompts:
-    site_reconciliation: |
-      Given the following query and candidate archaeological/geographic sites, identify the best matching site.
-
-      Query: "{{query}}"
-
-      Candidates:
-      {{candidates}}
-
-      Provide the ID of the best matching site. If none of the candidates are a good match, respond with "No Match".
-
-      Limit your response to just the ID or "No Match".
-      Response:
-    # context: i.e. archaeological/geographic site name
     language_detection: |
       Detect the language of the following text. Respond with the ISO 639-1 language code (e.g., "en" for English, "fr" for French, "de" for German, "sv" for Swedish).
 
@@ -107,49 +102,45 @@ llm:
       {data}
 
     reconciliation: |
-      Find and list candidate matches for each input value based on the lookup data.
-      Score each candidate by its relevance to the input within the given context.
-      Each line contains an "id, name [, description]" representing a possible encoding.
-      Not all input values will have a description.
+      You are reconciling input values against a controlled list of {{ entity_type }}.
+      Return ONLY strict JSON. No prose.
 
       Context:
-      {context}
+      {{ context }}
 
-      Known lookup data:
-      {lookup_data}
+      Lookup data ({{ lookup_format }} objects with fields: id, label, description):
+      {{ lookup_data }}
 
-      Guidelines:
-      - For each input value, return up to 5 candidates from the lookup data, ordered best to worst.
-      - For each candidate include:
-        - "id": the lookup id (must be one from the lookup data)
-        - "value": the lookup value (verbatim from the lookup data)
-        - "score": a numeric confidence in [0, 1] with two decimals (e.g., 0.92), where 1 is strongest match
-        - "reasons": short array of strings explaining key factors (2–4 bullets)
-      - If no reasonable match exists, return an empty list.
-      - Preserve the input order. Do not invent ids or values not present in the lookup.
-      - Use strict JSON only (no trailing commas; all strings in double quotes).
+      Input values ({{ lookup_format }}, preserve order):
+      {{ data }}
 
-      Scoring considerations (use when forming the score):
-      - String similarity (including normalization, diacritics, casing)
+      Task:
+      For each input, return up to 5 candidate matches from the lookup, ordered best→worst.
+
+      Output JSON must be an array where each element is:
+      {
+        "input_id": "<string>",
+        "input_value": "<string>",
+        "candidates": [
+          { "id": "<lookup id as string>", "value": "<lookup label verbatim>", "score": 0.00, "reasons": ["...","..."] }
+        ]
+      }
+
+      Rules:
+      - Use ONLY ids/labels from the lookup (do not invent).
+      - Copy the lookup's **label** into the candidate **value** verbatim.
+      - If no reasonable match, return "candidates": [].
+      - Scores are in [0,1], **rounded to two decimals**.
+      - Provide **2–4 short** reason bullets per candidate.
+      - Treat text comparison as **case- and diacritic-insensitive**.
+      - Return **ONLY** valid JSON (no comments, no trailing commas, no extra text).
+
+      Scoring considerations:
+      - String similarity (normalization, diacritics, casing)
       - Abbreviation/alias/lemmatization expansion
       - Domain/context alignment (terminology fit)
       - Language variants and most common target-language form
       - Penalize partial/ambiguous overlaps and mismatched domain terms
-
-      Output JSON schema (array):
-      [
-        {{
-          "input_id": "<original input id>",
-          "input_value": "<original input value>",
-          "candidates": [
-            {{ "id": "<lookup id>", "value": "<lookup value>", "score": 0.00, "reasons": ["...","..."] }}
-          ]
-        }}
-      ]
-
-      Input values:
-      {data}
-
 
 logging:
   folder: ./logs
