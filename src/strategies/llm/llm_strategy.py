@@ -8,12 +8,11 @@ from loguru import logger
 from jinja2 import Environment, BaseLoader
 
 from src.configuration import ConfigValue
-from src.llm.providers import Providers
-from src.llm.providers.provider import LLMProvider
+from src.llm.providers import LLMProvider, Providers
 from src.strategies.query import QueryProxy
 from src.strategies.strategy import ReconciliationStrategy, StrategySpecification
 
-from .format_data import format_rows_for_llm
+from .input_format import format_rows_for_llm
 from .llm_models import ReconciliationResponse
 
 # pylint: disable=too-many-locals
