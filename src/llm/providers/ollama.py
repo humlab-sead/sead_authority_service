@@ -43,7 +43,7 @@ class OllamaProvider(LLMProvider):
         }
         args: dict[str, Any] = {
             "model": self.model,
-            "messages": [user_message] + (roles or []),
+            "messages": (roles or []) + [user_message],
             "options": self.resolve_options(kwargs),
             "stream": False,
         }
