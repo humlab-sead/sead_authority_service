@@ -64,5 +64,5 @@ class OllamaProvider(LLMProvider):
         return message.model_dump_json()
 
     def get_options_keys(self) -> list[str]:
-        return [("temperature", 0.1), ("num_predict", 9999)]
+        return [("temperature", 0.1), ("num_predict", 4096)]
         # ("max_tokens", 1024), ("top_k", 40), ("top_p", 0.7), ("repeat_penalty", 1.1)]
