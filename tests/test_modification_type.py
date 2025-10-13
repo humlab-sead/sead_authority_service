@@ -144,15 +144,15 @@ class TestModificationTypeReconciliationStrategy:
         mock_llm.complete.return_value = mock_response
         mock_llm.key = "ollama"
 
-        from src.llm.providers import Providers # pylint: disable=import-outside-toplevel
+        from src.llm.providers import Providers  # pylint: disable=import-outside-toplevel
 
-        #with patch.object(Providers, "items", {"ollama": lambda: mock_llm}): # this works as well
+        # with patch.object(Providers, "items", {"ollama": lambda: mock_llm}): # this works as well
         original_items = Providers.items.copy()
-        
+
         try:
             # Directly modify the registry
             Providers.items["ollama"] = lambda: mock_llm
-        
+
             strategy = LLMModificationTypeReconciliationStrategy()
             candidates = await strategy.find_candidates(mock_cursor, "charred")
 

@@ -9,6 +9,7 @@ from src.utility import Registry
 
 # pylint: disable=unused-argument, pointless-string-statement
 
+
 class FormatterRegistry(Registry):
     items: dict[str, RowFormatter] = {}
 
@@ -112,7 +113,8 @@ class JSONFormatter:
         if pretty:
             return json.dumps(ordered, ensure_ascii=False, allow_nan=False, indent=2)
         return json.dumps(ordered, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
-    
+
+
 def _is_scalar(x: Any) -> bool:
     return isinstance(x, (str, int, float, bool)) or x is None
 

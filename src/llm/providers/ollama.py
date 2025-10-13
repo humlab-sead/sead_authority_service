@@ -64,4 +64,4 @@ class OllamaProvider(LLMProvider):
 
     def get_options_keys(self) -> list[str]:
         return [("temperature", 0.1), ("num_predict", 9999)]
-        #("max_tokens", 1024), ("top_k", 40), ("top_p", 0.7), ("repeat_penalty", 1.1)]
+        # ("max_tokens", 1024), ("top_k", 40), ("top_p", 0.7), ("repeat_penalty", 1.1)]
