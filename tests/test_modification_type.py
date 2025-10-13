@@ -16,6 +16,47 @@ from tests.decorators import with_test_config
 class TestModificationTypeReconciliationStrategy:
     """Test LLM-based modification type reconciliation"""
 
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_using_production(self):
+        """Test that production config is not used in tests"""
+        import os
+
+        from psycopg.rows import dict_row
+
+        from src.configuration import setup_config_store
+
+        os.environ["CONFIG_FILE"] = "./config/config.yml"
+        os.environ["ENV_FILE"] = ".env"
+        await setup_config_store("./config/config.yml", force=True)
+
+        strategy = LLMModificationTypeReconciliationStrategy()
+        assert strategy.specification.get("key") == "modification_type"
+        assert strategy.key == "modification_type"
+
+        provider = get_config_provider()
+        assert isinstance(provider, SingletonConfigProvider)
+
+        assert provider.is_configured()
+        config = provider.get_config()
+
+        assert config.exists("runtime")
+        assert not config.exists("connection_factory")
+
+        connection = await get_connection()
+
+        assert config.exists("runtime.connection")
+
+        os.environ["OLLAMA_HOST"] = config.get("llm.ollama.host")
+        os.environ["OLLAMA_MODEL"] = config.get("llm.ollama.model")
+        os.environ["OLLAMA_TIMEOUT"] = str(config.get("llm.ollama.timeout", default=30))
+
+        async with connection.cursor(row_factory=dict_row) as cursor:
+            candidates = await strategy.find_candidates(
+                cursor=cursor, query="Carbonised", properties={"description": "Organic matter converted to carbon"}, limit=5
+            )
+        assert isinstance(candidates, list)
+
     @with_test_config
     def test_initialization(self, test_provider: MockConfigProvider):
         """Test strategy initialization"""
