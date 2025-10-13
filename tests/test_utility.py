@@ -389,7 +389,7 @@ class TestRegistry:
 
     def test_get_nonexistent_key(self):
         """Test getting nonexistent key raises ValueError."""
-        with pytest.raises(ValueError, match="preprocessor nonexistent is not registered"):
+        with pytest.raises(KeyError, match="preprocessor nonexistent is not registered"):
             Registry.get("nonexistent")
 
     def test_is_registered_false(self):
