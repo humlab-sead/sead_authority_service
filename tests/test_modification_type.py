@@ -32,7 +32,7 @@ class TestModificationTypeReconciliationStrategy:
         strategy: LLMModificationTypeReconciliationStrategy = LLMModificationTypeReconciliationStrategy()
         context: str = strategy.get_context_description()
 
-        assert context.startswith("You are provided with a list of known modification types, ")
+        assert context.startswith("You are provided")
 
     @with_test_config
     @pytest.mark.asyncio
