@@ -120,7 +120,7 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
 
         # Convert LLM response to reconciliation format
         candidates = []
-        if isinstance(response.get("content"), str):
+        if isinstance(response, str):
             try:
                 response_json: dict[str, Any] = json.loads(response["content"])
                 for candidate in response_json.get("candidates", [])[:limit]:
