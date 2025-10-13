@@ -136,66 +136,66 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         #     logger.info("Falling back to traditional fuzzy matching")
         #     return await super().find_candidates(cursor, query, properties, limit)
 
-    async def find_batch_candidates(
-        self,
-        cursor: psycopg.AsyncCursor,
-        queries: list[str],
-        limit: int = 10,
-    ) -> dict[str, list[dict[str, Any]]]:
-        """Find candidates for multiple queries in a single LLM call"""
+    # async def find_batch_candidates(
+    #     self,
+    #     cursor: psycopg.AsyncCursor,
+    #     queries: list[str],
+    #     limit: int = 10,
+    # ) -> dict[str, list[dict[str, Any]]]:
+    #     """Find candidates for multiple queries in a single LLM call"""
 
-        logger.info("Starting batch LLM reconciliation for %d queries", len(queries))
+    #     logger.info("Starting batch LLM reconciliation for %d queries", len(queries))
 
-        try:
-            # Get lookup data
-            lookup_data: list[dict[str, Any]] = await self.get_lookup_data(cursor)
-            logger.info("Retrieved %d lookup entries", len(lookup_data))
+    #     try:
+    #         # Get lookup data
+    #         lookup_data: list[dict[str, Any]] = await self.get_lookup_data(cursor)
+    #         logger.info("Retrieved %d lookup entries", len(lookup_data))
 
-            # Format data for prompt
-            context: str = self.get_context_description()
-            formatted_lookup: str = self.format_lookup_data(lookup_data)
-            formatted_input: str = self.format_input_data(queries)
+    #         # Format data for prompt
+    #         context: str = self.get_context_description()
+    #         formatted_lookup: str = self.format_lookup_data(lookup_data)
+    #         formatted_input: str = self.format_input_data(queries)
 
-            # Build prompt
-            prompt: str = self.prompt_template.format(context=context, lookup_data=formatted_lookup, data=formatted_input)
+    #         # Build prompt
+    #         prompt: str = self.prompt_template.format(context=context, lookup_data=formatted_lookup, data=formatted_input)
 
-            logger.debug(f"Generated batch prompt length: {len(prompt)} characters")
+    #         logger.debug(f"Generated batch prompt length: {len(prompt)} characters")
 
-            # Call LLM with structured output
-            response = await self.llm_provider.complete(
-                prompt=prompt,
-                response_model=ReconciliationResponse,
-                max_tokens=ConfigValue("llm.max_tokens").resolve() or 4000,
-                temperature=ConfigValue("llm.temperature").resolve() or 0.1,
-            )
+    #         # Call LLM with structured output
+    #         response = await self.llm_provider.complete(
+    #             prompt=prompt,
+    #             response_model=ReconciliationResponse,
+    #             max_tokens=ConfigValue("llm.max_tokens").resolve() or 4000,
+    #             temperature=ConfigValue("llm.temperature").resolve() or 0.1,
+    #         )
 
-            logger.info("LLM returned batch response with %d results", len(response.results))
+    #         logger.info("LLM returned batch response with %d results", len(response.results))
 
-            # Convert LLM response to reconciliation format
-            results = {}
-            for result in response.results:
-                query_index: int = int(result.input_id) - 1  # Convert back to 0-based index
-                if 0 <= query_index < len(queries):
-                    query: str = queries[query_index]
-                    candidates = []
-                    for candidate in result.candidates[:limit]:
-                        candidates.append(
-                            {
-                                self.get_entity_id_field(): candidate.id,
-                                self.get_label_field(): candidate.value,
-                                "name_sim": candidate.score,
-                                "llm_reasons": candidate.reasons,
-                            }
-                        )
-                    results[query] = candidates
+    #         # Convert LLM response to reconciliation format
+    #         results = {}
+    #         for result in response.results:
+    #             query_index: int = int(result.input_id) - 1  # Convert back to 0-based index
+    #             if 0 <= query_index < len(queries):
+    #                 query: str = queries[query_index]
+    #                 candidates = []
+    #                 for candidate in result.candidates[:limit]:
+    #                     candidates.append(
+    #                         {
+    #                             self.get_entity_id_field(): candidate.id,
+    #                             self.get_label_field(): candidate.value,
+    #                             "name_sim": candidate.score,
+    #                             "llm_reasons": candidate.reasons,
+    #                         }
+    #                     )
+    #                 results[query] = candidates
 
-            logger.info("Returning batch results for %d queries", len(results))
-            return results
+    #         logger.info("Returning batch results for %d queries", len(results))
+    #         return results
 
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            logger.error("Batch LLM reconciliation failed: %s", e)
-            # Fallback to individual calls
-            results = {}
-            for query in queries:
-                results[query] = await self.find_candidates(cursor, query, limit=limit)
-            return results
+    #     except Exception as e:  # pylint: disable=broad-exception-caught
+    #         logger.error("Batch LLM reconciliation failed: %s", e)
+    #         # Fallback to individual calls
+    #         results = {}
+    #         for query in queries:
+    #             results[query] = await self.find_candidates(cursor, query, limit=limit)
+    #         return results
