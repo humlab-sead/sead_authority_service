@@ -52,7 +52,7 @@ llm:
     options:
       temperature: 0.1
       # max_tokens: 9999
-      num_predict: 512
+      num_predict: 4096
   anthropic:
     provider_id: "anthropic"
     model: "claude-2"  
