@@ -108,7 +108,7 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         max_tokens: int = ConfigValue(f"llm.{self.llm_provider.key}.max_tokens,llm.max_tokens").resolve() or 20000
         temperature: float = ConfigValue(f"llm.{self.llm_provider.key}.temperature,llm.temperature").resolve() or 0.1
 
-        response: dict[str, Any] = await self.llm_provider.complete(
+        response: str = await self.llm_provider.complete(
             prompt=prompt,
             roles=extra_roles,
             response_model=ReconciliationResponse,
@@ -117,7 +117,7 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         )
 
         # logger.info(f"LLM returned response with {len(response)} results")
-        
+
         # Convert LLM response to reconciliation format
         candidates = []
         if isinstance(response.get("content"), str):
