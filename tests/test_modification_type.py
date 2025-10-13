@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from loguru import logger
 
 from src.configuration.inject import MockConfigProvider
 from src.strategies.llm_models import Candidate, ReconciliationResponse, ReconciliationResult
@@ -10,7 +11,10 @@ from src.strategies.modification_type import SPECIFICATION, LLMModificationTypeR
 from src.strategies.strategy import ReconciliationStrategy
 from tests.decorators import with_test_config
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument, import-outside-toplevel
+
+logger.remove()
+logger.add(sys.stderr, diagnose=True)
 
 
 class TestModificationTypeReconciliationStrategy:
