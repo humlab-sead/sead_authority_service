@@ -128,7 +128,8 @@ class TestModificationTypeReconciliationStrategy:
         # Mock database lookup data call to fail (simulating LLM failure)
         mock_cursor.fetchall.side_effect = [Exception("LLM failed"), [{"modification_type_id": 1, "modification_type_name": "Carbonised", "name_sim": 0.8}]]
 
-        with patch("src.strategies.llm_strategy.Providers") as mock_providers:
+        # with patch("src.strategies.llm.llm_strategy.Providers") as mock_providers:
+        with patch("src.llm.providers.Providers") as mock_providers:
             mock_llm = AsyncMock()
             mock_llm.complete.side_effect = Exception("LLM service unavailable")
             mock_providers.items = {"ollama": lambda: mock_llm}
