@@ -200,13 +200,13 @@ class TestJSONFormatter:
 
     def test_empty_rows(self):
         """Test formatting empty rows"""
-        result = self.formatter.format([], ["name", "age"])
+        result = self.formatter.format([], columns=["name", "age"])
         assert result == "[]"
 
     def test_single_row(self):
         """Test formatting a single row"""
         rows = [{"name": "John", "age": 30}]
-        columns = ["name", "age"]  # columns parameter is ignored in JSON formatter
+        columns: list[str] = ["name", "age"]  # columns parameter is ignored in JSON formatter
         result = self.formatter.format(rows, columns=columns)
 
         parsed = json.loads(result)

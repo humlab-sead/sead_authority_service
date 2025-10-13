@@ -105,7 +105,7 @@ class TestOllamaProvider:
             provider = OllamaProvider()
             result = await provider.complete("Test prompt")
 
-            assert result == {"response": "Test completion result"}
+            assert result == "Test completion result"
 
             # Verify the chat call
             mock_async_client.chat.assert_called_once_with(
@@ -136,7 +136,7 @@ class TestOllamaProvider:
             provider = OllamaProvider()
             result = await provider.complete("Test prompt", max_tokens=500, temperature=0.2)
 
-            assert result == {"response": "Custom result"}
+            assert result == "Custom result"
 
             # Verify custom options were used
             mock_async_client.chat.assert_called_once_with(
@@ -167,7 +167,7 @@ class TestOllamaProvider:
 
             result = await provider.complete("Test prompt", options=custom_options)
 
-            assert result == {"response": "Explicit options result"}
+            assert result == "Explicit options result"
 
             # Verify explicit options were used
             mock_async_client.chat.assert_called_once_with(
@@ -299,7 +299,7 @@ class TestOllamaProvider:
             provider = OllamaProvider()
             result = await provider.complete("")
 
-            assert result == {"response": "Empty response"}
+            assert result == "Empty response"
 
             # Verify empty prompt was passed correctly
             mock_async_client.chat.assert_called_once_with(
@@ -328,7 +328,7 @@ class TestOllamaProvider:
 
             result = await provider.complete(long_prompt)
 
-            assert result == {"response": "Long response"}
+            assert result == "Long response"
 
             # Verify long prompt was handled correctly
             call_args = mock_async_client.chat.call_args[1]

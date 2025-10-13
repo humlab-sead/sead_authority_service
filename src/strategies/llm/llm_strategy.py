@@ -8,7 +8,8 @@ from jinja2 import BaseLoader, Environment
 from loguru import logger
 
 from src.configuration import ConfigValue
-from src.llm.providers import LLMProvider, Providers
+from src.llm.providers import Providers
+from src.llm.providers.provider import LLMProvider
 from src.strategies.query import QueryProxy
 from src.strategies.strategy import ReconciliationStrategy, StrategySpecification
 

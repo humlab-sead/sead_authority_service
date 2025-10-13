@@ -3,7 +3,6 @@ from typing import Any
 
 import httpx
 import ollama
-from pydantic import BaseModel
 
 from src.configuration import ConfigValue
 
