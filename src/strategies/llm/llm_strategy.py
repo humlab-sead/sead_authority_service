@@ -111,7 +111,7 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
             temperature=temperature,
         )
 
-        logger.info(f"LLM returned response with {len(response.results)} results")
+        # logger.info(f"LLM returned response with {len(response)} results")
 
         # Convert LLM response to reconciliation format
         candidates = []
