@@ -58,9 +58,32 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         lines: list[str] = [", ".join(f"{row[f]}" for f in fields) for row in lookup_data]
         return "\n".join(lines)
 
-    def format_input_data(self, queries: list[str]) -> str:
-        """Format input queries as 'id, value' pairs for the prompt"""
-        return "\n".join(f"{i}, {query}" for i, query in enumerate(queries, 1))
+    async def generate_llm_prompt(self, cursor, query):
+        lookup_data: list[dict[str, Any]] = await self.get_lookup_data(cursor)
+        logger.info(f"Retrieved {len(lookup_data)} lookup entries")
+
+        lookup_format, lookup_text = format_rows_for_llm(
+            lookup_data,
+            target_format=self.get_lookup_format(),
+            column_map=self.get_lookup_fields_map() or None,
+        )
+        _, data_text = format_rows_for_llm(
+            [{"input_id": 1, "input_value": query}],
+            target_format=lookup_format,
+            logical_keys=["input_id", "input_value"],
+        )
+        # What to do with properties? For now we ignore them
+
+        template = JINJA.from_string(self.prompt_template)
+        prompt = template.render(
+            entity_type=self.get_entity_type_description(),
+            context=self.get_context_description(),
+            lookup_format=lookup_format.upper(),
+            lookup_data=lookup_text,
+            data=data_text,
+        )
+        logger.debug(f"Generated prompt length: {len(prompt)} characters")
+        return prompt
 
     async def find_candidates(
         self,
@@ -74,27 +97,7 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         logger.info(f"Starting LLM reconciliation for query: '{query}'")
 
         # try:
-        lookup_data: list[dict[str, Any]] = await self.get_lookup_data(cursor)
-        logger.info(f"Retrieved {len(lookup_data)} lookup entries")
-
-        lookup_data_formatted, lookup_data_blurb = format_rows_for_llm(
-            lookup_data,
-            entity_type=self.get_entity_type_description(),
-            target_format=self.get_lookup_format(),
-            column_map=self.get_lookup_fields_map() or None,
-            csv_separator=None,
-            registry=None,
-        )
-        template_data: dict[str, str] = {
-            "context": self.get_context_description() + "\n" + (lookup_data_blurb or ""),
-            "lookup_data": lookup_data_formatted,
-            "data": self.format_input_data([query]),
-        }
-        # TODO What to do with properties? For now we ignore them
-        
-        prompt: str = self.prompt_template.format(**template_data)
-
-        logger.debug(f"Generated prompt length: {len(prompt)} characters")
+        prompt: str = await self.generate_llm_prompt(cursor, query)
 
         extra_roles: dict[str, str] = ConfigValue(f"policy.{self.key}.roles,policy.roles").resolve() or {}
         max_tokens: int = ConfigValue(f"llm.{self.llm_provider.key}.max_tokens,llm.max_tokens").resolve() or 20000
