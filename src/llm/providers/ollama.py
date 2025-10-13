@@ -49,17 +49,16 @@ class OllamaProvider(LLMProvider):
         with open("tmp/ollama_args.json", "w", encoding="utf-8") as f:
             json.dump(args, f, indent=2)
 
-        response: httpx.Response = await ollama.AsyncClient().chat(**args)
+        response: ollama.ChatResponse = await ollama.AsyncClient().chat(**args)
+        message: ollama.Message = response.message
 
         with open("tmp/ollama_response.json", "w", encoding="utf-8") as f:
-            json.dump(response.json(), f, indent=2)
+            json.dump(response.model_dump_json(), f, indent=2)
 
         # if response_model:
         #     return response_model.model_validate_json(response.message.content)
-        with open("tmp/ollama_result.json", "w", encoding="utf-8") as f:
-            json.dump(response.json()["response"], f, indent=2)
 
-        return response.json()["response"]
+        return message.model_dump_json()
 
     def get_options_keys(self) -> list[str]:
         return [("temperature", 0.1), ("num_predict", 9999)]
