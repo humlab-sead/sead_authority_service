@@ -1,14 +1,16 @@
 """Test for modification type LLM reconciliation strategy"""
 
+import sys
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from loguru import logger
 
-from src.configuration.inject import MockConfigProvider
-from src.strategies.llm_models import Candidate, ReconciliationResponse, ReconciliationResult
-from src.strategies.modification_type import SPECIFICATION, LLMModificationTypeReconciliationStrategy
+from llm.providers import Providers
+from src.configuration import MockConfigProvider, SingletonConfigProvider, get_config_provider, get_connection
 from src.strategies.strategy import ReconciliationStrategy
+from strategies.llm.llm_models import Candidate, ReconciliationResponse, ReconciliationResult
+from strategies.llm.modification_type import SPECIFICATION, LLMModificationTypeReconciliationStrategy
 from tests.decorators import with_test_config
 
 # pylint: disable=unused-argument, import-outside-toplevel
