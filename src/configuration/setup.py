@@ -12,12 +12,12 @@ from .provider import ConfigStore, get_config_provider
 dotenv.load_dotenv(dotenv_path=os.getenv("ENV_FILE", ".env"))
 
 
-async def setup_config_store(filename: str = "config.yml") -> None:
+async def setup_config_store(filename: str = "config.yml", force: bool = False) -> None:
 
     config_file: str = os.getenv("CONFIG_FILE", filename)
     store: ConfigStore = ConfigStore.get_instance()
 
-    if store.is_configured():
+    if store.is_configured() and not force:
         return
 
     store.configure_context(source=config_file, env_filename=".env", env_prefix="SEAD_AUTHORITY")
