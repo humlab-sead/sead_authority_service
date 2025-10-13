@@ -65,8 +65,13 @@ class OllamaProvider(LLMProvider):
 
         response: httpx.Response = await ollama.AsyncClient().chat(**args)
 
-        if response_model:
-            return response_model.model_validate_json(response.message.content)
+        with open("tmp/ollama_response.json", "w", encoding="utf-8") as f:
+            json.dump(response.json(), f, indent=2)
+
+        # if response_model:
+        #     return response_model.model_validate_json(response.message.content)
+        with open("tmp/ollama_result.json", "w", encoding="utf-8") as f:
+            json.dump(response.json()["response"], f, indent=2)
 
         return response.json()["response"]
 
