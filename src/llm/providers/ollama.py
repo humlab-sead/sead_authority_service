@@ -47,15 +47,20 @@ class OllamaProvider(LLMProvider):
             "options": self.resolve_options(kwargs),
         }
 
-        if bool(kwargs.get("response_model")) or bool(kwargs.get("format")):
-            if bool(kwargs.get("response_model")):
-                if not issubclass(kwargs["response_model"], BaseModel):
-                    raise ValueError("response_model must be a pydantic BaseModel subclass")
-                response_model = kwargs["response_model"]
-                response_format = response_model.model_json_schema()
-            elif bool(kwargs.get("format")):
-                response_format = kwargs["format"]
-            args["format"] = response_format
+        # if bool(kwargs.get("response_model")) or bool(kwargs.get("format")):
+        #     if bool(kwargs.get("response_model")):
+        #         if not issubclass(kwargs["response_model"], BaseModel):
+        #             raise ValueError("response_model must be a pydantic BaseModel subclass")
+        #         response_model = kwargs["response_model"]
+        #         response_format = response_model.model_json_schema()
+        #     elif bool(kwargs.get("format")):
+        #         response_format = kwargs["format"]
+        #     args["format"] = response_format
+
+        args["format"] = "json"
+
+        with open("tmp/ollama_args.json", "w", encoding="utf-8") as f:
+            json.dump(args, f, indent=2)
 
         response: httpx.Response = await ollama.AsyncClient().chat(**args)
 
@@ -65,4 +70,5 @@ class OllamaProvider(LLMProvider):
         return response.json()["response"]
 
     def get_options_keys(self) -> list[str]:
-        return [("max_tokens", 1024), ("temperature", 0.1)]
+        return [("temperature", 0.1), ("num_predict", 9999)]
+        #("max_tokens", 1024), ("top_k", 40), ("top_p", 0.7), ("repeat_penalty", 1.1)]
