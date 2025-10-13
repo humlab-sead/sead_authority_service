@@ -49,6 +49,9 @@ class OllamaProvider(LLMProvider):
         with open("tmp/ollama_args.json", "w", encoding="utf-8") as f:
             json.dump(args, f, indent=2)
 
+        with open("tmp/ollama_prompt.txt", "w", encoding="utf-8") as f:
+            f.write(prompt)
+
         response: ollama.ChatResponse = await ollama.AsyncClient().chat(**args)
         message: ollama.Message = response.message
 
