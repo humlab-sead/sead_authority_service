@@ -13,15 +13,15 @@ class TestConfigProvider:
     def test_simple_test(self, test_provider: MockConfigProvider) -> None:
         """A simple test to ensure pytest is working"""
         value = ConfigValue("llm.max_tokens").resolve()
-        assert value == 1000
+        assert value == 10000
         value = ConfigValue("llm.ollama.options.max_tokens").resolve()
-        assert value == 9999
-        value = ConfigValue("llm.max_tokens,llm.ollama.options.max_tokens").resolve()
-        assert value == 1000
-        value = ConfigValue("llm.ollama.options.max_tokens,llm.max_tokens").resolve()
-        assert value == 9999
-        value = ConfigValue("llm.dummy.options.max_tokens,llm.max_tokens").resolve()
-        assert value == 1000
+        assert value is None
+        value = ConfigValue("llm.num_predict,llm.ollama.options.num_predict").resolve()
+        assert value == 512
+        value = ConfigValue("llm.ollama.options.num_predict,llm.num_predict").resolve()
+        assert value == 512
+        value = ConfigValue("llm.dummy.options.num_predict,llm.num_predict").resolve()
+        assert value is None
 
     @pytest.mark.asyncio
     @with_test_config
