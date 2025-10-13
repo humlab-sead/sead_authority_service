@@ -93,11 +93,19 @@ class TestModificationTypeReconciliationStrategy:
             {"modification_type_id": 1, "modification_type_name": "Carbonised", "modification_type_description": "Organic matter converted to carbon"}
         ]
 
-        with patch("src.strategies.llm_strategy.Providers") as mock_providers:
-            mock_llm = AsyncMock()
-            mock_llm.complete.return_value = mock_response
-            mock_providers.items = {"ollama": lambda: mock_llm}
+        mock_llm = AsyncMock()
+        mock_llm.complete.return_value = mock_response
+        mock_llm.key = "ollama"
 
+        from src.llm.providers import Providers # pylint: disable=import-outside-toplevel
+
+        #with patch.object(Providers, "items", {"ollama": lambda: mock_llm}): # this works as well
+        original_items = Providers.items.copy()
+        
+        try:
+            # Directly modify the registry
+            Providers.items["ollama"] = lambda: mock_llm
+        
             strategy = LLMModificationTypeReconciliationStrategy()
             candidates = await strategy.find_candidates(mock_cursor, "charred")
 
@@ -106,6 +114,9 @@ class TestModificationTypeReconciliationStrategy:
             assert candidates[0]["modification_type_name"] == "Carbonised"
             assert candidates[0]["name_sim"] == 0.92
             assert candidates[0]["llm_reasons"] == ["Similar process", "Both involve heating", "Carbon formation"]
+        finally:
+            # Restore original items
+            Providers.items = original_items
 
     @with_test_config
     @pytest.mark.asyncio
