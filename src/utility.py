@@ -198,7 +198,7 @@ class Registry:
     @classmethod
     def get(cls, key: str) -> Any | None:
         if key not in cls.items:
-            raise ValueError(f"preprocessor {key} is not registered")
+            raise KeyError(f"preprocessor {key} is not registered")
         return cls.items.get(key)
 
     @classmethod
