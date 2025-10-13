@@ -5,6 +5,7 @@ from typing import Any
 
 import psycopg
 from loguru import logger
+from jinja2 import Environment, BaseLoader
 
 from src.configuration import ConfigValue
 from src.llm.providers import Providers
@@ -17,6 +18,7 @@ from .llm_models import ReconciliationResponse
 
 # pylint: disable=too-many-locals
 
+JINJA = Environment(loader=BaseLoader(), autoescape=False)
 
 class LLMReconciliationStrategy(ReconciliationStrategy):
     """Base class for LLM-powered reconciliation strategies"""
