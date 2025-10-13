@@ -1,10 +1,12 @@
 """Base LLM-powered reconciliation strategy"""
 
 from abc import abstractmethod
+import json
 from typing import Any
+from unittest import result
 
 import psycopg
-from jinja2 import BaseLoader, Environment
+from jinja2 import BaseLoader, Environment, Template
 from loguru import logger
 
 from src.configuration import ConfigValue
@@ -77,8 +79,8 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         )
         # What to do with properties? For now we ignore them
 
-        template = JINJA.from_string(self.prompt_template)
-        prompt = template.render(
+        template: Template = JINJA.from_string(self.prompt_template)
+        prompt: str = template.render(
             entity_type=self.get_entity_type_description(),
             context=self.get_context_description(),
             lookup_format=lookup_format.upper(),
@@ -106,7 +108,7 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         max_tokens: int = ConfigValue(f"llm.{self.llm_provider.key}.max_tokens,llm.max_tokens").resolve() or 20000
         temperature: float = ConfigValue(f"llm.{self.llm_provider.key}.temperature,llm.temperature").resolve() or 0.1
 
-        response: str = await self.llm_provider.complete(
+        response: dict[str, Any] = await self.llm_provider.complete(
             prompt=prompt,
             roles=extra_roles,
             response_model=ReconciliationResponse,
@@ -115,20 +117,23 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         )
 
         # logger.info(f"LLM returned response with {len(response)} results")
-
+        
         # Convert LLM response to reconciliation format
         candidates = []
-        if response.results:
-            result = response.results[0]  # We only sent one query
-            for candidate in result.candidates[:limit]:
-                candidates.append(
-                    {
-                        self.get_entity_id_field(): candidate.id,
-                        self.get_label_field(): candidate.value,
-                        "name_sim": candidate.score,
-                        "llm_reasons": candidate.reasons,
-                    }
-                )
+        if isinstance(response.get("content"), str):
+            try:
+                response_json: dict[str, Any] = json.loads(response["content"])
+                for candidate in response_json.get("candidates", [])[:limit]:
+                    candidates.append(
+                        {
+                            self.get_entity_id_field(): candidate.id,
+                            self.get_label_field(): candidate.value,
+                            "name_sim": candidate.score,
+                            "llm_reasons": candidate.reasons,
+                        }
+                    )
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to decode LLM response content as JSON: {e}")
 
         logger.info(f"Returning {len(candidates)} candidates")
         return candidates
