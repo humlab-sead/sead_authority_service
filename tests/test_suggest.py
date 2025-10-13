@@ -50,7 +50,7 @@ async def test_suggest_entity_with_prefix(test_app: FastAPI, mock_results: list[
     # Mock the suggest function or database query - return dict format
     with patch("src.api.router.suggest_entities", new=AsyncMock(return_value={"result": mock_results})):
 
-        async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=test_app), host="http://test") as client:
             response: Response = await client.get("/suggest/entity?prefix=upp")
 
             assert response.status_code == 200
@@ -75,7 +75,7 @@ async def test_suggest_entity_with_prefix(test_app: FastAPI, mock_results: list[
 async def test_suggest_entity_with_type_filter(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: MockConfigProvider):
     """Test entity autocomplete with type filter"""
     with patch("src.api.router.suggest_entities", new=AsyncMock(return_value={"result": mock_results})):
-        async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=test_app), host="http://test") as client:
             response: Response = await client.get("/suggest/entity?prefix=upp&type=site")
 
             assert response.status_code == 200
@@ -92,7 +92,7 @@ async def test_suggest_entity_with_type_filter(test_app: FastAPI, mock_results: 
 async def test_suggest_entity_short_prefix(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: MockConfigProvider):
     """Test entity autocomplete with short prefix (should return empty)"""
     with patch("src.api.router.suggest_entities", new=AsyncMock(return_value={"result": []})):
-        async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=test_app), host="http://test") as client:
             response: Response = await client.get("/suggest/entity?prefix=u")
 
             assert response.status_code == 200
@@ -110,7 +110,7 @@ async def test_suggest_type_all(test_app: FastAPI, mock_results: list[dict[str, 
     mock_type_results = [{"id": "site", "name": "Site"}, {"id": "location", "name": "Location"}, {"id": "taxon", "name": "Taxon"}]
     # Mock suggest_types to return dict format that the real function returns
     with patch("src.api.router.suggest_types", new=AsyncMock(return_value={"result": mock_type_results})):
-        async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=test_app), host="http://test") as client:
             response: Response = await client.get("/suggest/type")
 
             assert response.status_code == 200
@@ -133,7 +133,7 @@ async def test_suggest_type_with_prefix(test_app: FastAPI, mock_results: list[di
     mock_type_results = [{"id": "location", "name": "Location"}]
     # Mock suggest_types to return dict format that the real function returns
     with patch("src.api.router.suggest_types", new=AsyncMock(return_value={"result": mock_type_results})):
-        async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=test_app), host="http://test") as client:
             response: Response = await client.get("/suggest/type?prefix=loc")
 
             assert response.status_code == 200
@@ -149,7 +149,7 @@ async def test_suggest_type_with_prefix(test_app: FastAPI, mock_results: list[di
 @with_test_config
 async def test_suggest_property_by_type(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: MockConfigProvider):
     """Test property suggest filtered by entity type"""
-    async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=test_app), host="http://test") as client:
         response: Response = await client.get("/suggest/property?type=site")
 
         assert response.status_code == 200
@@ -169,7 +169,7 @@ async def test_suggest_property_by_type(test_app: FastAPI, mock_results: list[di
 @with_test_config
 async def test_suggest_property_with_prefix(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: MockConfigProvider):
     """Test property suggest with prefix filter"""
-    async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=test_app), host="http://test") as client:
         response: Response = await client.get("/suggest/property?prefix=lat")
 
         assert response.status_code == 200
@@ -213,7 +213,7 @@ async def test_flyout_entity_valid(test_app: FastAPI, mock_results: list[dict[st
 
         mock_get_connection.return_value = mock_conn
 
-        async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=test_app), host="http://test") as client:
             # Use a known entity ID (location)
             entity_id = "https://w3id.org/sead/id/location/806"
             response: Response = await client.get(f"/flyout/entity?id={entity_id}")
@@ -236,7 +236,7 @@ async def test_flyout_entity_valid(test_app: FastAPI, mock_results: list[dict[st
 @with_test_config
 async def test_flyout_entity_missing_id(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: MockConfigProvider):
     """Test flyout preview without ID parameter"""
-    async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=test_app), host="http://test") as client:
         response: Response = await client.get("/flyout/entity")
 
         assert response.status_code == 400
@@ -248,7 +248,7 @@ async def test_flyout_entity_missing_id(test_app: FastAPI, mock_results: list[di
 @with_test_config
 async def test_flyout_entity_invalid_id(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: MockConfigProvider):
     """Test flyout preview with invalid entity ID"""
-    async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=test_app), host="http://test") as client:
         response: Response = await client.get("/flyout/entity?id=invalid-id")
 
         assert response.status_code == 400
@@ -260,7 +260,7 @@ async def test_flyout_entity_invalid_id(test_app: FastAPI, mock_results: list[di
 @with_test_config
 async def test_metadata_includes_suggest_config(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: MockConfigProvider):
     """Test that metadata endpoint includes Suggest API configuration"""
-    async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=test_app), host="http://test") as client:
         response: Response = await client.get("/reconcile")
 
         assert response.status_code == 200
@@ -298,7 +298,7 @@ async def test_suggest_entity_result_limit(test_app: FastAPI, mock_results: list
     # Create a mock with exactly 5 results to test the limit
     limited_results = mock_results[:2]  # Use first 2 results
     with patch("src.api.router.suggest_entities", new=AsyncMock(return_value={"result": limited_results})):
-        async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
+        async with AsyncClient(transport=ASGITransport(app=test_app), host="http://test") as client:
             response: Response = await client.get("/suggest/entity?prefix=sw")
 
         assert response.status_code == 200

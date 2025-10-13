@@ -58,7 +58,7 @@ Last tested: 2025-10-03
 
 | Issue | Status | Fix |
 |-------|--------|-----|
-| Double slashes in URLs (`//reconcile`) | ✅ Fixed | Strip trailing slash from base_url |
+| Double slashes in URLs (`//reconcile`) | ✅ Fixed | Strip trailing slash from host |
 | Location key mismatch (place vs location) | ✅ Fixed | Updated to use "location" consistently |
 | Preview template format | ✅ Fixed | Using `{{id}}` (double braces) |
 | Property response format | ✅ Working | Returns `{"properties": [...]}` |

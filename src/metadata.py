@@ -97,15 +97,15 @@ def _get_default_types(strategies: StrategyRegistry) -> list[dict[str, str]]:
     return default_types
 
 
-def get_reconciliation_metadata(strategies: StrategyRegistry, base_url: str) -> dict[str, Any]:
+def get_reconciliation_metadata(strategies: StrategyRegistry, host: str) -> dict[str, Any]:
     default_types: list[dict[str, str]] = _get_default_types(strategies)
     id_base: str = ConfigValue("options:id_base").resolve()
 
     # Collect property settings from all registered strategies
     property_settings: list[dict[str, str]] = _compile_property_settings(strategies)
 
-    # Ensure base_url doesn't end with slash to avoid double slashes
-    base_url_clean: str = str(base_url).rstrip("/")
+    # Ensure host doesn't end with slash to avoid double slashes
+    base_url_clean: str = str(host).rstrip("/")
 
     return {
         "name": "SEAD Entity Reconciliation",

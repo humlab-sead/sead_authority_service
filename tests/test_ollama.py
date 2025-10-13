@@ -311,7 +311,7 @@ class TestOllamaProvider:
     async def test_complete_long_prompt(self, test_provider: MockConfigProvider):
         """Test completion with very long prompt"""
         test_provider.get_config().update(
-            {"llm": {"ollama": {"base_url": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
         )
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
