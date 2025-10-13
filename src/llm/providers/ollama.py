@@ -45,6 +45,7 @@ class OllamaProvider(LLMProvider):
             "model": self.model,
             "messages": [user_message] + (roles or []),
             "options": self.resolve_options(kwargs),
+            "stream": False,
         }
 
         # if bool(kwargs.get("response_model")) or bool(kwargs.get("format")):
