@@ -148,12 +148,8 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
 
         logger.info(f"Starting LLM reconciliation for query: '{query}'")
 
-        # try:
-        prompt: str = await self.generate_llm_prompt(cursor, query)
-
-        extra_roles: dict[str, str] = ConfigValue(f"policy.{self.key}.roles,policy.roles").resolve() or {}
-        max_tokens: int = ConfigValue(f"llm.{self.llm_provider.key}.max_tokens,llm.max_tokens").resolve() or 20000
-        temperature: float = ConfigValue(f"llm.{self.llm_provider.key}.temperature,llm.temperature").resolve() or 0.1
+        try:
+            prompt: str = await self.generate_llm_prompt(cursor, query)
 
             response: str = await self.llm_provider.complete(
                 prompt=prompt,
@@ -167,13 +163,13 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
             # if not candidates:
             #     return await super().find_candidates(cursor, query, properties, limit)
 
-        logger.info(f"Returning {len(candidates)} candidates")
-        return candidates
+            logger.info(f"Returning {len(candidates)} candidates")
+            return candidates
 
-        # except Exception as e:  # pylint: disable=broad-exception-caught
-        #     logger.error("LLM reconciliation failed: %s", e)
-        #     logger.info("Falling back to traditional fuzzy matching")
-        #     return await super().find_candidates(cursor, query, properties, limit)
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.error("LLM reconciliation failed: %s", e)
+            logger.info("Falling back to traditional fuzzy matching")
+            return await super().find_candidates(cursor, query, properties, limit)
 
     # async def find_batch_candidates(
     #     self,
