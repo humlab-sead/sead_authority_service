@@ -1,11 +1,15 @@
 """Test for modification type LLM reconciliation strategy"""
 
 import sys
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from loguru import logger
+from psycopg import AsyncConnection
 
+from configuration.interface import ConfigLike
+from configuration.provider import ConfigProvider
 from src.configuration import MockConfigProvider, SingletonConfigProvider, get_config_provider, get_connection
 from src.strategies.strategy import ReconciliationStrategy
 from strategies.llm.llm_models import Candidate, ReconciliationResponse, ReconciliationResult
@@ -35,26 +39,47 @@ class TestModificationTypeReconciliationStrategy:
         os.environ["ENV_FILE"] = ".env"
         await setup_config_store("./config/config.yml", force=True)
 
-        strategy = LLMModificationTypeReconciliationStrategy()
+        strategy: ReconciliationStrategy = LLMModificationTypeReconciliationStrategy()
         assert strategy.specification.get("key") == "modification_type"
         assert strategy.key == "modification_type"
 
-        provider = get_config_provider()
+        provider: ConfigProvider = get_config_provider()
         assert isinstance(provider, SingletonConfigProvider)
 
         assert provider.is_configured()
-        config = provider.get_config()
+        config: ConfigLike = provider.get_config()
 
         assert config.exists("runtime")
         assert not config.exists("connection_factory")
 
-        connection = await get_connection()
+        connection: AsyncConnection[tuple[Any, ...]] = await get_connection()
 
         assert config.exists("runtime.connection")
 
         os.environ["OLLAMA_HOST"] = config.get("llm.ollama.host")
         os.environ["OLLAMA_MODEL"] = config.get("llm.ollama.model")
         os.environ["OLLAMA_TIMEOUT"] = str(config.get("llm.ollama.timeout", default=30))
+
+        #         # Test with a simple direct LLM call to debug JSON generation
+        #         from src.llm.providers import Providers
+        #         provider_class = Providers.get("ollama")
+        #         provider = provider_class()  # Create instance
+
+        #         simple_prompt = '''Generate JSON array for reconciliation task.
+
+        # INPUT: "Carbonised"
+        # OUTPUT (JSON only, no text): [{"input_id": "1", "input_value": "Carbonised", "candidates": [{"id": "1", "value": "Carbonised", "score": 1.0, "reasons": ["Exact match"]}]}]'''
+
+        #         simple_response = await provider.complete(simple_prompt)
+        #         print(f"Simple response: {simple_response}")
+
+        #         import json
+        #         try:
+        #             json.loads(simple_response)
+        #             print("Simple JSON parsing: SUCCESS")
+        #         except json.JSONDecodeError as e:
+        #             print(f"Simple JSON parsing: FAILED - {e}")
+        #             print(f"Response was: {simple_response[:200]}...")
 
         async with connection.cursor(row_factory=dict_row) as cursor:
             candidates = await strategy.find_candidates(
