@@ -28,20 +28,38 @@ policy:
     output:
       format: json
 llm:
-  provider: "ollama"  # or "anthropic", "ollama"
-  max_tokens: 10000
-  temperature: 0.1
+  provider: "openai"  # "openai" or "anthropic", "ollama"
+  options:
+    max_tokens: 10000
+    temperature: 0.1
   enable_translation: true
   enable_semantic_matching: true
   translation_target_lang: "en"
   semantic_batch_size: 50
   openai:
-    model: "gpt-3.5-turbo"
+    model: "gpt-4o-mini" # "gpt-4o-mini"
     provider_id: "openapi"
     api_key: "${OPENAI_API_KEY}"
     options:
       temperature: 0.1
-      max_tokens: 10000
+      max_tokens: 4096
+      stream: false
+      # messages: Iterable[ChatCompletionMessageParam],
+      # max_completion_tokens: Optional[int] | Omit = omit,
+      # max_tokens: Optional[int] | Omit = omit,
+      # metadata: Optional[Metadata] | Omit = omit,
+      # modalities: Optional[List[Literal["text", "audio"]]] | Omit = omit,
+      # n: Optional[int] | Omit = omit,
+      # prediction: Optional[ChatCompletionPredictionContentParam] | Omit = omit,
+      # response_format: completion_create_params.ResponseFormat | Omit = omit,
+      # seed: Optional[int] | Omit = omit,
+      # stream: Optional[Literal[False]] | Omit = omit,
+      # stream_options: Optional[ChatCompletionStreamOptionsParam] | Omit = omit,
+      # temperature: Optional[float] | Omit = omit,
+      # top_p: Optional[float] | Omit = omit,
+      # user: str | Omit = omit,
+      # verbosity: Optional[Literal["low", "medium", "high"]] | Omit = omit,
+      # web_search_options: completion_create_params.WebSearchOptions | Omit = omit,
   ollama:
     provider_id: "ollama"
     model: "gpt-oss:20b"
@@ -51,6 +69,7 @@ llm:
       temperature: 0.1
       # max_tokens: 9999
       num_predict: 4096
+      #num_ctx
   anthropic:
     provider_id: "anthropic"
     model: "claude-2"  
@@ -123,6 +142,8 @@ llm:
           { "id": "<lookup id as string>", "value": "<lookup label verbatim>", "score": 0.00, "reasons": ["...","..."] }
         ]
       }
+
+      {{ examples | safe }}
 
       Rules:
       - Use ONLY ids/labels from the lookup (do not invent).
