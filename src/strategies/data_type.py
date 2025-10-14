@@ -26,7 +26,7 @@ SPECIFICATION: StrategySpecification = {
             cross join (
                 select authority.immutable_unaccent(lower(%(q)s))::text as q
             ) as pq
-            where s.norm_label % pq.q
+            where s.norm_label %% pq.q
             order by name_sim desc, 2
             limit %(n)s;
     """,
