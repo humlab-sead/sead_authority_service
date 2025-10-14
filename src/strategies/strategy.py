@@ -52,7 +52,7 @@ class ReconciliationStrategy(ABC):
         """Return OpenRefine-specific settings for properties (optional override for type-specific settings)"""
         return self.specification.get("property_settings", {})
 
-    def as_candidate(self, entity_data: dict[str, Any]) -> dict[str, Any]:
+    def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:
         """Convert entity data to OpenRefine candidate format"""
         auto_accept_threshold: float = ConfigValue("options:auto_accept_threshold").resolve() or 0.85
         id_base: str = ConfigValue("options:id_base").resolve()
@@ -64,7 +64,7 @@ class ReconciliationStrategy(ABC):
             "id": f"{id_base}{self.get_id_path()}/{entity_id}",
             "name": label,
             "score": min(100.0, round(score * 100, 2)),
-            "match": bool(score >= auto_accept_threshold),
+            "match": bool(label.lower() == query.lower() or score >= auto_accept_threshold),
             "type": [{"id": self.get_id_path(), "name": label}],
         }
 

@@ -47,7 +47,7 @@ async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
             )
 
             logger.info(f"Found {len(candidate_data)} candidates for query {query_id}")
-            results[query_id] = {"result": [strategy.as_candidate(data) for data in candidate_data]}
+            results[query_id] = {"result": [strategy.as_candidate(data, query.get("query", "")) for data in candidate_data]}
 
         logger.info(f"Reconciliation completed with {len(results)} results")
         return results
