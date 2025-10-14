@@ -33,7 +33,7 @@ SPECIFICATION: StrategySpecification = {
                 modification_type_name as label,
                 similarity(modification_type_name, %(q)s) as name_sim
             FROM tbl_modification_types
-            WHERE modification_type_name % %(q)s
+            WHERE modification_type_name %% %(q)s
             ORDER BY name_sim DESC
             LIMIT %(n)s
         """,
@@ -80,7 +80,7 @@ class ModificationTypeQueryProxy(QueryProxy):
 class LLMModificationTypeReconciliationStrategy(LLMReconciliationStrategy):
     """LLM-powered modification type reconciliation strategy"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(SPECIFICATION, ModificationTypeQueryProxy)
         logger.info("Initialized ModificationTypeReconciliationStrategy with LLM support")
 
