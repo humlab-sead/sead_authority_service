@@ -27,14 +27,14 @@ class LLMProvider(ABC):
         """Return a list of supported option keys and their default values"""
 
     def resolve_options(self, kwargs) -> dict[str, Any]:
-        opts = kwargs.get("options", {})
-        for key, default in self.get_options_keys():
-            if key in opts:
+        opts: dict[str, Any] = kwargs.get("options", {})
+        for k, default in self.get_options_keys():
+            if k in opts:
                 continue
-            if key in kwargs:
-                opts[key] = kwargs[key]
+            if k in kwargs:
+                opts[k] = kwargs[k]
                 continue
-            opts[key] = ConfigValue(f"llm.{self.key}.options.{key},llm.options.{key}", default=default).resolve()
+            opts[k] = ConfigValue(f"llm.{self.key}.options.{k},llm.options.{k}", default=default).resolve()
         return opts
 
 
