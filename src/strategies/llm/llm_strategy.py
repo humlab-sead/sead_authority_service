@@ -1,9 +1,9 @@
 """Base LLM-powered reconciliation strategy"""
 
-from abc import abstractmethod
 import json
+import re
+from abc import abstractmethod
 from typing import Any
-from unittest import result
 
 import psycopg
 from jinja2 import BaseLoader, Environment, Template
@@ -63,7 +63,7 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         lines: list[str] = [", ".join(f"{row[f]}" for f in fields) for row in lookup_data]
         return "\n".join(lines)
 
-    async def generate_llm_prompt(self, cursor, query):
+    async def generate_llm_prompt(self, cursor: psycopg.AsyncCursor, query: str):
         lookup_data: list[dict[str, Any]] = await self.get_lookup_data(cursor)
         logger.info(f"Retrieved {len(lookup_data)} lookup entries")
 
@@ -200,8 +200,8 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
     #         response = await self.llm_provider.complete(
     #             prompt=prompt,
     #             response_model=ReconciliationResponse,
-    #             max_tokens=ConfigValue("llm.max_tokens").resolve() or 4000,
-    #             temperature=ConfigValue("llm.temperature").resolve() or 0.1,
+    #             max_tokens=ConfigValue("llm.options.max_tokens").resolve() or 4000,
+    #             temperature=ConfigValue("llm.options.temperature").resolve() or 0.1,
     #         )
 
     #         logger.info("LLM returned batch response with %d results", len(response.results))
