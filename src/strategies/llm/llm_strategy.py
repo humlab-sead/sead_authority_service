@@ -90,6 +90,53 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         logger.debug(f"Generated prompt length: {len(prompt)} characters")
         return prompt
 
+    def _response_to_json(self, response: str) -> Any:
+        """Attempt to convert LLM response to JSON, handling common formatting issues"""
+        if not response:
+            return None
+        try:
+            json_data = json.loads(response)
+            return json_data if isinstance(json_data, list) else [json_data]
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to decode LLM response as JSON: {e}")
+            logger.info("Trying to extract JSON from conversational response using regex")
+            json_match: re.Match[str] | None = re.search(r"\[.*\]", response, re.DOTALL)
+            if json_match:
+                try:
+                    json_data = json.loads(json_match.group(0))
+                    return json_data if isinstance(json_data, list) else [json_data]
+                except json.JSONDecodeError:
+                    logger.error("JSON extraction from conversational response also failed")
+        return None
+    
+    def _response_to_candidates(self, response: Any, limit: int) -> list[dict[str, Any]]:
+        """Convert LLM response to reconciliation candidate format"""
+        candidates: list[dict[str, Any]] = []
+        if not isinstance(response, str):
+            logger.error(f"LLM response is not a string (as expected): {type(response)} - {response}")
+            return []
+
+        json_response: Any = self._response_to_json(response)
+
+        if not json_response:
+            logger.error("LLM response could not be parsed as JSON")
+            return []
+        
+        for query_result in json_response:
+            if not (isinstance(query_result, dict) and "candidates" in query_result):
+                logger.error("LLM response item is not a dict with 'candidates' key")
+                continue
+            for candidate in query_result["candidates"][:limit]:
+                candidates.append(
+                    {
+                        self.get_entity_id_field(): candidate.get("input_id") or candidate.get("id"),
+                        self.get_label_field(): candidate.get("input_value") or candidate.get("value"),
+                        "name_sim": candidate.get("score", 0.0),
+                        "llm_reasons": candidate.get("reasons") or candidate.get("reasons", []),
+                    }
+                )
+        return candidates
+
     async def find_candidates(
         self,
         cursor: psycopg.AsyncCursor,
@@ -108,32 +155,17 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         max_tokens: int = ConfigValue(f"llm.{self.llm_provider.key}.max_tokens,llm.max_tokens").resolve() or 20000
         temperature: float = ConfigValue(f"llm.{self.llm_provider.key}.temperature,llm.temperature").resolve() or 0.1
 
-        response: str = await self.llm_provider.complete(
-            prompt=prompt,
-            roles=extra_roles,
-            response_model=ReconciliationResponse,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
+            response: str = await self.llm_provider.complete(
+                prompt=prompt,
+                roles=ConfigValue(f"policy.{self.key}.roles,policy.roles").resolve() or {},
+                response_model=ReconciliationResponse,
+                **ConfigValue(f"llm.{self.llm_provider.key}.options,llm.options", default={}).resolve(),
+            )
 
-        # logger.info(f"LLM returned response with {len(response)} results")
+            candidates: list[dict[str, Any]] = self._response_to_candidates(response, limit)
 
-        # Convert LLM response to reconciliation format
-        candidates = []
-        if isinstance(response, str):
-            try:
-                response_json: dict[str, Any] = json.loads(response["content"])
-                for candidate in response_json.get("candidates", [])[:limit]:
-                    candidates.append(
-                        {
-                            self.get_entity_id_field(): candidate.id,
-                            self.get_label_field(): candidate.value,
-                            "name_sim": candidate.score,
-                            "llm_reasons": candidate.reasons,
-                        }
-                    )
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to decode LLM response content as JSON: {e}")
+            # if not candidates:
+            #     return await super().find_candidates(cursor, query, properties, limit)
 
         logger.info(f"Returning {len(candidates)} candidates")
         return candidates
