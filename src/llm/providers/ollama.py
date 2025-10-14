@@ -1,7 +1,6 @@
 import json
 from typing import Any
 
-import httpx
 import ollama
 
 from src.configuration import ConfigValue
