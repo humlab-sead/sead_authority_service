@@ -1,8 +1,11 @@
 import importlib
 import pkgutil
 from pathlib import Path
+from typing import Any
 
 package_dir = Path(__file__).parent
+
+StrategySpecification = dict[str, str | dict[str, Any]]
 
 
 def _import_submodules(package_name: str, package_path: str):
