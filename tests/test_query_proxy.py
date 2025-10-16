@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock
 
 import psycopg
 import pytest
+from strategies.query import QueryProxy
 
 from src.strategies.country import SPECIFICATION as COUNTRY_SPECIFICATION
 from src.strategies.data_type import SPECIFICATION as DATA_TYPE_SPECIFICATION
@@ -17,6 +18,8 @@ from src.strategies.method import SPECIFICATION as METHOD_SPECIFICATION
 from src.strategies.method import MethodQueryProxy
 from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION
 from src.strategies.site import SiteQueryProxy
+from tests.conftest import ExtendedMockConfigProvider
+from tests.decorators import with_test_config
 
 # pylint: disable=attribute-defined-outside-init,protected-access, unused-argument
 
@@ -41,21 +44,21 @@ class TestMultipleQueryProxy:
         QUERY_PROXY_TESTS_SETUPS,
     )
     @pytest.mark.asyncio
-    async def test_fetch_by_fuzzy_search(self, specification, query_proxy_class):
+    @with_test_config
+    async def test_fetch_by_fuzzy_search(self, specification, query_proxy_class, test_provider: ExtendedMockConfigProvider):
         """Test fuzzy name search."""
-        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        proxy = query_proxy_class(specification, mock_cursor)
-
         id_name: str = specification["id_field"]
         mock_rows = [{id_name: 1, "label": "Test Entity 1", "name_sim": 0.9}, {id_name: 2, "label": "Test Entity 2", "name_sim": 0.8}]
-        mock_cursor.fetchall.return_value = mock_rows
+
+        test_provider.create_connection_mock(fetchall=mock_rows, execute=None)
+        proxy: QueryProxy = query_proxy_class(specification)
 
         result: list[dict[str, Any]] = await proxy.fetch_by_fuzzy_label("test entity", limit=5)
-
+    
         sql_queries: dict[str, str] = specification["sql_queries"]
         expected_sql: str = sql_queries["fuzzy_label_sql"]
-        mock_cursor.execute.assert_called_once_with(expected_sql, {"q": "test entity", "n": 5})
-        mock_cursor.fetchall.assert_called_once()
+        test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"q": "test entity", "n": 5})
+        test_provider.cursor_mock.fetchall.assert_called_once()
         assert result == mock_rows
 
     @pytest.mark.parametrize(
@@ -63,36 +66,35 @@ class TestMultipleQueryProxy:
         QUERY_PROXY_TESTS_SETUPS,
     )
     @pytest.mark.asyncio
-    async def test_fetch_by_fuzzy_search_default_limit(self, specification, query_proxy_class):
+    @with_test_config
+    async def test_fetch_by_fuzzy_search_default_limit(self, specification, query_proxy_class, test_provider: ExtendedMockConfigProvider):
         """Test fuzzy name search with default limit."""
-        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        proxy = query_proxy_class(specification, mock_cursor)
-
-        mock_cursor.fetchall.return_value = []
+        test_provider.create_connection_mock(fetchall=[], execute=None)
+        proxy = query_proxy_class(specification)
 
         await proxy.fetch_by_fuzzy_label("test")
         sql_queries: dict[str, str] = specification["sql_queries"]
         expected_sql: str = sql_queries["fuzzy_label_sql"]
-        mock_cursor.execute.assert_called_once_with(expected_sql, {"q": "test", "n": 10})
+        test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"q": "test", "n": 10})
 
     @pytest.mark.parametrize(
         "specification, query_proxy_class",
         QUERY_PROXY_TESTS_SETUPS,
     )
     @pytest.mark.asyncio
-    async def test_get_details_valid_id(self, specification, query_proxy_class):
+    @with_test_config
+    async def test_get_details_valid_id(self, specification, query_proxy_class, test_provider: ExtendedMockConfigProvider):
         """Test getting details with valid ID."""
-        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        proxy = query_proxy_class(specification, mock_cursor)
+        proxy = query_proxy_class(specification)
         id_name: str = specification["id_field"]
         mock_row = {id_name: 123, "label": "Test", "description": "A test location", "dummpy1": 59.3293, "dummy2": 18.0686}
-        mock_cursor.fetchone.return_value = mock_row
+        test_provider.create_connection_mock(fetchone=mock_row, execute=None)
 
         result: dict[str, Any] | None = await proxy.get_details("123")
 
         sql_queries: dict[str, str] = specification["sql_queries"]
         expected_sql: str = sql_queries["get_details"]
-        mock_cursor.execute.assert_called_once_with(expected_sql, {"id": 123})
+        test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"id": 123})
         assert result == mock_row
 
     @pytest.mark.parametrize(
@@ -100,26 +102,27 @@ class TestMultipleQueryProxy:
         QUERY_PROXY_TESTS_SETUPS,
     )
     @pytest.mark.asyncio
-    async def test_get_details_invalid_id(self, specification, query_proxy_class):
+    @with_test_config
+    async def test_get_details_invalid_id(self, specification, query_proxy_class, test_provider: ExtendedMockConfigProvider):
         """Test getting details with invalid ID."""
-        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        proxy = query_proxy_class(specification, mock_cursor)
+        test_provider.create_connection_mock(execute=None)
+        proxy = query_proxy_class(specification)
         result: dict[str, Any] | None = await proxy.get_details("not_a_number")
         assert result is None
-        mock_cursor.execute.assert_not_called()
+        test_provider.cursor_mock.execute.assert_not_called()
 
     @pytest.mark.parametrize(
         "specification, query_proxy_class",
         QUERY_PROXY_TESTS_SETUPS,
     )
     @pytest.mark.asyncio
-    async def test_get_details_not_found(self, specification, query_proxy_class):
+    @with_test_config
+    async def test_get_details_not_found(self, specification, query_proxy_class, test_provider: ExtendedMockConfigProvider):
         """Test getting details when not found."""
-        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-        proxy = query_proxy_class(specification, mock_cursor)
-        mock_cursor.fetchone.return_value = None
+        test_provider.create_connection_mock(fetchone=None, execute=None)
+        proxy = query_proxy_class(specification)
 
         result = await proxy.get_details("999")
 
         assert result is None
-        mock_cursor.execute.assert_called_once()
+        test_provider.cursor_mock.execute.assert_called_once()
