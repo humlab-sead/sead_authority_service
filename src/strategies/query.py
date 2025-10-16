@@ -1,15 +1,54 @@
-from typing import Any, Tuple
+import asyncio
+from typing import Any, Literal, Mapping, Sequence, Tuple, TypeAlias, Union
 
 import psycopg
 from loguru import logger
+from psycopg.rows import dict_row, tuple_row
 
-from .strategy import StrategySpecification
+from src.configuration.setup import get_connection
+
+from . import StrategySpecification
+
+Params: TypeAlias = Union[Sequence[Any], Mapping[str, Any]]
 
 
 class QueryProxy:
-    def __init__(self, specification: StrategySpecification, cursor: psycopg.AsyncCursor) -> None:
-        self.cursor: psycopg.AsyncCursor[tuple[Any]] = cursor
+    def __init__(self, specification: StrategySpecification, **kwargs) -> None:
+        self.connection: psycopg.AsyncConnection | None = kwargs.get("connection")
         self.specification: StrategySpecification = specification
+        self.row_factories: dict[str, Any] = {
+            "dict": dict_row,
+            "tuple": tuple_row,
+        }
+
+    # async def __aenter__(self) -> "QueryProxy":
+    #     if not self.connection:
+    #         self.connection = await get_connection()
+    #     return self
+    
+    # async def __aexit__(self, exc_type, exc_value, traceback) -> None:
+    #     if self.connection:
+    #         await self.connection.close()
+    #         self.connection = None 
+
+    async def get_connection(self) -> psycopg.AsyncConnection:
+        if not self.connection:
+            self.connection = await get_connection()
+        return self.connection
+    
+    async def fetch_all(self, sql: str, params: Params | None = None, *, row_factory: Literal["dict", "tuple"] = "dict") -> list[dict[str, Any]]:
+        connection: psycopg.AsyncConnection[Tuple[Any, ...]] = await self.get_connection()
+        async with connection.cursor(row_factory=self.row_factories[row_factory]) as cursor:
+            await cursor.execute(sql, params)
+            rows: list[dict[str, Any]] = await cursor.fetchall()
+            return [d if isinstance(d, dict) else dict(d) for d in rows]
+
+    async def fetch_one(self, sql: str, params: Params | None = None, *, row_factory: Literal["dict", "tuple"] = "dict") -> dict[str, Any]:
+        connection: psycopg.AsyncConnection[Tuple[Any, ...]] = await self.get_connection()
+        async with connection.cursor(row_factory=row_factory) as cursor:
+            await cursor.execute(sql, params)
+            row: dict[str, Any] | None = await cursor.fetchone()
+            return dict(row) if row else None
 
     def get_sql_queries(self) -> dict[str, str]:
         """Return the SQL queries defined in the specification"""
@@ -26,27 +65,18 @@ class QueryProxy:
     async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific location."""
         try:
-            sql: str = self.get_details_sql()
-            # logger.debug(f"Executing SQL for get_details: {sql}")
-            await self.cursor.execute(sql, {"id": int(entity_id)})
-            row: tuple[Any] | None = await self.cursor.fetchone()
-            return dict(row) if row else None
+            return await self.fetch_one(self.get_details_sql(), {"id": int(entity_id)})
         except (ValueError, psycopg.Error) as e:
             logger.error(f"Error fetching details for entity_id {entity_id}: {e}")
             return None
 
     async def fetch_by_fuzzy_label(self, name: str, limit: int = 10) -> list[dict[str, Any]]:
         """Perform fuzzy name search"""
-        sql: str = self.get_sql_query("fuzzy_label_sql")
-        await self.cursor.execute(sql, {"q": name, "n": limit})
-        rows: list[Tuple[Any]] = await self.cursor.fetchall()
-        return [dict(row) for row in rows]
+        return await self.fetch_all(self.get_sql_query("fuzzy_label_sql"), {"q": name, "n": limit})
 
     async def fetch_by_alternate_identity(self, alternate_identity: str) -> list[dict[str, Any]]:
         """Fetch entity by alternate identity"""
         sql: str = self.get_sql_query("alternate_identity_sql")
         if not sql:
             return []
-        await self.cursor.execute(sql, {"alternate_identity": alternate_identity})
-        row: Tuple[Any, ...] | None = await self.cursor.fetchone()
-        return [dict(row)] if row else []
+        return self.fetch_all(sql, {"alternate_identity": alternate_identity})
