@@ -149,8 +149,8 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
             candidates = await self._apply_geographic_scoring(candidates, {"lat": properties["latitude"], "lon": properties["longitude"]}, proxy)
 
         # 4) Place name context boost
-        if properties.get("place") and candidates:
-            candidates = await self._apply_place_context_scoring(candidates, properties["place"], proxy)
+        if properties.get("place_name") and candidates:
+            candidates = await self._apply_place_context_scoring(candidates, properties["place_name"], proxy)
 
         return sorted(candidates, key=lambda x: x.get("name_sim", 0), reverse=True)[:limit]
 
