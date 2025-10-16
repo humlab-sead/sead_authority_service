@@ -12,14 +12,14 @@ class TestConfigProvider:
     @with_test_config
     def test_simple_test(self, test_provider: MockConfigProvider) -> None:
         """A simple test to ensure pytest is working"""
-        value = ConfigValue("llm.max_tokens").resolve()
+        value = ConfigValue("llm.options.max_tokens").resolve()
         assert value == 10000
         value = ConfigValue("llm.ollama.options.max_tokens").resolve()
         assert value is None
         value = ConfigValue("llm.num_predict,llm.ollama.options.num_predict").resolve()
-        assert value == 512
+        assert value == 4096
         value = ConfigValue("llm.ollama.options.num_predict,llm.num_predict").resolve()
-        assert value == 512
+        assert value == 4096
         value = ConfigValue("llm.dummy.options.num_predict,llm.num_predict").resolve()
         assert value is None
 
