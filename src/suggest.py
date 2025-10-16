@@ -10,10 +10,8 @@ This module provides the Suggest API endpoints that enable:
 from typing import Any
 
 from loguru import logger
-from psycopg import AsyncConnection
-from psycopg.rows import dict_row
 
-from src.configuration import ConfigValue, get_connection
+from src.configuration import ConfigValue
 from src.strategies.strategy import ReconciliationStrategy, Strategies
 
 
@@ -26,7 +24,6 @@ async def render_flyout_preview(uri: str) -> dict[str, Any]:
     """
     logger.info(f"Rendering flyout preview for URI: {uri}")
     id_base: str = ConfigValue("options:id_base").resolve()
-    connection: AsyncConnection = await get_connection()
 
     if not uri.startswith(id_base):
         raise ValueError("Invalid ID format")
@@ -44,8 +41,7 @@ async def render_flyout_preview(uri: str) -> dict[str, Any]:
 
     strategy: ReconciliationStrategy = Strategies.items.get(entity_path)()
 
-    async with connection.cursor(row_factory=dict_row) as cur:
-        details: dict[str, Any] | None = await strategy.get_details(entity_id_str, cur)
+    details: dict[str, Any] | None = await strategy.get_details(entity_id_str)
 
     if not details:
         raise ValueError(f"Entity with ID {entity_id_str} not found")
@@ -105,7 +101,6 @@ async def suggest_entities(prefix: str, entity_type: str = "", limit: int = 10) 
     if not prefix or len(prefix) < 2:
         return {"result": []}
 
-    connection: AsyncConnection = await get_connection()
     id_base: str = ConfigValue("options:id_base").resolve()
 
     results = []
@@ -117,36 +112,35 @@ async def suggest_entities(prefix: str, entity_type: str = "", limit: int = 10) 
     else:
         strategies_to_query = dict(Strategies.items)
 
-    async with connection.cursor(row_factory=dict_row) as cursor:
-        for type_key, strategy_class in strategies_to_query.items():
-            strategy: ReconciliationStrategy = strategy_class()
+    for type_key, strategy_class in strategies_to_query.items():
+        strategy: ReconciliationStrategy = strategy_class()
 
-            # Use the existing find_candidates method with limit
-            try:
-                candidates = await strategy.find_candidates(cursor=cursor, query=prefix, properties={}, limit=limit)
+        # Use the existing find_candidates method with limit
+        try:
+            candidates = await strategy.find_candidates(query=prefix, properties={}, limit=limit)
 
-                # Convert to suggest API format
-                for candidate in candidates[:limit]:
-                    entity_id = candidate.get(strategy.get_entity_id_field())
-                    label = candidate.get(strategy.get_label_field())
+            # Convert to suggest API format
+            for candidate in candidates[:limit]:
+                entity_id = candidate.get(strategy.get_entity_id_field())
+                label = candidate.get(strategy.get_label_field())
 
-                    if entity_id and label:
-                        results.append(
-                            {
-                                "id": f"{id_base}{type_key}/{entity_id}",
-                                "name": label,
-                                "type": [{"id": type_key, "name": type_key}],
-                                "description": candidate.get("description", ""),
-                                "score": candidate.get("name_sim", 0),
-                            }
-                        )
+                if entity_id and label:
+                    results.append(
+                        {
+                            "id": f"{id_base}{type_key}/{entity_id}",
+                            "name": label,
+                            "type": [{"id": type_key, "name": type_key}],
+                            "description": candidate.get("description", ""),
+                            "score": candidate.get("name_sim", 0),
+                        }
+                    )
 
-                if len(results) >= limit:
-                    break
+            if len(results) >= limit:
+                break
 
-            except Exception as e:  # pylint: disable=broad-exception-caught
-                logger.warning(f"Error suggesting entities from {type_key}: {e}")
-                continue
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            logger.warning(f"Error suggesting entities from {type_key}: {e}")
+            continue
 
     # Sort by score and limit
     results.sort(key=lambda x: x.get("score", 0), reverse=True)
