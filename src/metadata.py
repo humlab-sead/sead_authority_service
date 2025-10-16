@@ -20,18 +20,11 @@ def get_reconcile_properties(strategies: StrategyRegistry, query: str = None, en
     Returns:
         Dict with matching properties
     """
-    all_properties: list[dict[str, str]] = []
-    if entity_type and entity_type in strategies.items:
-        # Get properties for the specific entity type
-        all_properties = strategies.items[entity_type]().get_properties_meta()
-    elif entity_type and entity_type not in strategies.items:
-        # Unknown entity type - return empty to avoid confusion
-        all_properties = []
-    else:
-        # No type specified - return properties from all registered strategies
-        all_properties = []
-        for strategy_class in strategies.items.values():
-            all_properties.extend(strategy_class().get_properties_meta())
+    all_properties = _get_properties(strategies, entity_type)
+
+    # Remove duplicates based on property "id". This keeps last property occurrence.
+    # This assumes that properties with the same ID are identical across strategies.
+    all_properties = unique = list({d["id"]: d for d in all_properties}.values())
 
     # Filter properties based on query if provided
     if query:
@@ -44,6 +37,19 @@ def get_reconcile_properties(strategies: StrategyRegistry, query: str = None, en
     else:
         filtered_properties: list[dict[str, str]] = all_properties
     return filtered_properties
+
+
+def _get_properties(strategies, entity_type):
+    """Collects properties from all registered strategies or a specific strategy if entity_type is provided."""
+    if entity_type and entity_type in strategies.items:
+        # Get properties for the specific entity type
+        return strategies.items[entity_type]().get_properties_meta()
+
+    if entity_type and entity_type not in strategies.items:
+        # Unknown entity type - return empty to avoid confusion
+        return []
+    # Return properties from all strategies
+    return [p for strategy_class in strategies.items.values() for p in strategy_class().get_properties_meta()]
 
 
 def _compile_property_settings(strategies) -> list[dict[str, str]]:
