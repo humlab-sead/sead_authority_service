@@ -1,6 +1,6 @@
 from typing import Any
 
-from .query import QueryProxy
+from .query import DatabaseQueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -25,7 +25,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class FeatureTypeQueryProxy(QueryProxy):
+class FeatureTypeQueryProxy(DatabaseQueryProxy):
     def __init__(self, specification: StrategySpecification) -> None:  # pylint: disable=useless-parent-delegation
         super().__init__(specification)
 

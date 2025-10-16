@@ -12,7 +12,7 @@ from . import StrategySpecification
 Params: TypeAlias = Union[Sequence[Any], Mapping[str, Any]]
 
 
-class QueryProxy:
+class DatabaseQueryProxy:
     def __init__(self, specification: StrategySpecification, **kwargs) -> None:
         self.connection: psycopg.AsyncConnection | None = kwargs.get("connection")
         self.specification: StrategySpecification = specification
@@ -21,7 +21,7 @@ class QueryProxy:
             "tuple": tuple_row,
         }
 
-    # async def __aenter__(self) -> "QueryProxy":
+    # async def __aenter__(self) -> Self:
     #     if not self.connection:
     #         self.connection = await get_connection()
     #     return self

@@ -2,7 +2,7 @@ from typing import Any
 
 from src.configuration import ConfigValue
 
-from .query import QueryProxy
+from .query import DatabaseQueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -98,7 +98,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class SiteQueryProxy(QueryProxy):
+class SiteQueryProxy(DatabaseQueryProxy):
 
     async def fetch_site_by_national_id(self, national_id: str) -> list[dict[str, Any]]:
         """Exact match by national site identifier"""

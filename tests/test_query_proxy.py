@@ -15,7 +15,7 @@ from src.strategies.method import SPECIFICATION as METHOD_SPECIFICATION
 from src.strategies.method import MethodQueryProxy
 from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION
 from src.strategies.site import SiteQueryProxy
-from strategies.query import QueryProxy
+from strategies.query import DatabaseQueryProxy
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 
@@ -49,7 +49,7 @@ class TestMultipleQueryProxy:
         mock_rows = [{id_name: 1, "label": "Test Entity 1", "name_sim": 0.9}, {id_name: 2, "label": "Test Entity 2", "name_sim": 0.8}]
 
         test_provider.create_connection_mock(fetchall=mock_rows, execute=None)
-        proxy: QueryProxy = query_proxy_class(specification)
+        proxy: DatabaseQueryProxy = query_proxy_class(specification)
 
         result: list[dict[str, Any]] = await proxy.fetch_by_fuzzy_label("test entity", limit=5)
 

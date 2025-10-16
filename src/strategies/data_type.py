@@ -1,4 +1,4 @@
-from .query import QueryProxy
+from .query import DatabaseQueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -45,7 +45,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class DataTypeQueryProxy(QueryProxy):
+class DataTypeQueryProxy(DatabaseQueryProxy):
     """Data Type-specific query proxy"""
 
 

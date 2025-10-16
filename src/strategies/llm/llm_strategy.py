@@ -11,7 +11,7 @@ from loguru import logger
 from src.configuration import ConfigValue
 from src.llm.providers import Providers
 from src.llm.providers.provider import LLMProvider
-from src.strategies.query import QueryProxy
+from src.strategies.query import DatabaseQueryProxy
 from src.strategies.strategy import ReconciliationStrategy, StrategySpecification
 
 from .input_format import format_rows_for_llm
@@ -25,7 +25,7 @@ JINJA = Environment(loader=BaseLoader(), autoescape=False)
 class LLMReconciliationStrategy(ReconciliationStrategy):
     """Base class for LLM-powered reconciliation strategies"""
 
-    def __init__(self, specification: StrategySpecification, query_proxy_class: QueryProxy) -> None:
+    def __init__(self, specification: StrategySpecification, query_proxy_class: DatabaseQueryProxy) -> None:
         super().__init__(specification, query_proxy_class)
 
         provider_name: str = ConfigValue("llm.provider").resolve() or "ollama"

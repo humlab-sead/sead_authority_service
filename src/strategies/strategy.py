@@ -5,13 +5,13 @@ from src.configuration import ConfigValue
 from src.utility import Registry
 
 from . import StrategySpecification
-from .query import QueryProxy
+from .query import DatabaseQueryProxy
 
 
 class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
-    def __init__(self, specification: StrategySpecification, query_proxy_class: Type[QueryProxy]) -> None:
+    def __init__(self, specification: StrategySpecification, query_proxy_class: Type[DatabaseQueryProxy]) -> None:
         self.specification: StrategySpecification = specification or {
             "key": "unknown",
             "id_field": "id",
@@ -20,7 +20,7 @@ class ReconciliationStrategy(ABC):
             "property_settings": {},
             "sql_queries": {},
         }
-        self.query_proxy_class: Type[QueryProxy] = query_proxy_class
+        self.query_proxy_class: Type[DatabaseQueryProxy] = query_proxy_class
 
     @property
     def key(self) -> str:

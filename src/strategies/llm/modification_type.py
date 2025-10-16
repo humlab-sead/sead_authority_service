@@ -6,7 +6,7 @@ from loguru import logger
 
 from src.configuration import ConfigValue
 
-from ..query import QueryProxy
+from ..query import DatabaseQueryProxy
 from ..strategy import Strategies, StrategySpecification
 from .llm_strategy import LLMReconciliationStrategy
 
@@ -64,7 +64,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class ModificationTypeQueryProxy(QueryProxy):
+class ModificationTypeQueryProxy(DatabaseQueryProxy):
     """Modification type-specific query proxy"""
 
     async def get_lookup_data(self) -> list[dict[str, Any]]:

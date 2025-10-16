@@ -1,4 +1,4 @@
-from .query import QueryProxy
+from .query import DatabaseQueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -54,4 +54,4 @@ class SamplingContextReconciliationStrategy(ReconciliationStrategy):
 
     def __init__(self, specification: StrategySpecification = None) -> None:
         specification = specification or SPECIFICATION
-        super().__init__(specification, QueryProxy)
+        super().__init__(specification, DatabaseQueryProxy)
