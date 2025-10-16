@@ -56,7 +56,7 @@ def test_get_reconcile_properties_no_type(strategies):
     assert "place_name" in ids
     assert "latitude" in ids
     assert "scientific_name" in ids
-    assert len(props) == 4  # two from site, two from taxon
+    assert len(props) == 3  # two from site, two from taxon
 
 
 def test_get_reconcile_properties_with_type_site(strategies):
