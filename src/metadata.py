@@ -84,6 +84,7 @@ def _compile_property_settings(strategies) -> list[dict[str, str]]:
 
 
 def _get_default_types(strategies: StrategyRegistry) -> list[dict[str, str]]:
+    """Collects default types from all registered strategies for OpenRefine."""
     default_types: list[dict[str, str]] = [
         {
             "id": entity_type,
@@ -98,6 +99,9 @@ def _get_default_types(strategies: StrategyRegistry) -> list[dict[str, str]]:
 
 
 def get_reconciliation_metadata(strategies: StrategyRegistry, host: str) -> dict[str, Any]:
+    """
+    Collects reconciliation metadata from all registered strategies.
+    """
     default_types: list[dict[str, str]] = _get_default_types(strategies)
     id_base: str = ConfigValue("options:id_base").resolve()
 
