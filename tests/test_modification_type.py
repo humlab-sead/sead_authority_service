@@ -8,9 +8,9 @@ import pytest
 from loguru import logger
 from psycopg import AsyncConnection
 
+from src.configuration import SingletonConfigProvider, get_config_provider, get_connection
 from src.configuration.interface import ConfigLike
 from src.configuration.provider import ConfigProvider
-from src.configuration import SingletonConfigProvider, get_config_provider, get_connection
 from src.strategies.strategy import ReconciliationStrategy
 from strategies.llm.llm_models import Candidate, ReconciliationResponse, ReconciliationResult
 from strategies.llm.modification_type import SPECIFICATION, LLMModificationTypeReconciliationStrategy
@@ -142,14 +142,7 @@ class TestModificationTypeReconciliationStrategy:
         """Test successful LLM-based candidate finding"""
 
         # Configure the test to use ollama provider with required settings
-        test_provider.get_config().update({
-            "llm": {
-                "provider": "ollama",
-                "prompts": {
-                    "reconciliation": "Find matches for {{ query }} in: {{ lookup_data }}"
-                }
-            }
-        })
+        test_provider.get_config().update({"llm": {"provider": "ollama", "prompts": {"reconciliation": "Find matches for {{ query }} in: {{ lookup_data }}"}}})
 
         # Mock the LLM response
         mock_response = ReconciliationResponse(
@@ -178,6 +171,7 @@ class TestModificationTypeReconciliationStrategy:
         mock_llm = AsyncMock()
         # Return just the results array as expected by the _response_to_candidates method
         import json
+
         mock_llm.complete.return_value = json.dumps([result.model_dump() for result in mock_response.results])
         mock_llm.key = "ollama"
 
@@ -200,8 +194,7 @@ class TestModificationTypeReconciliationStrategy:
         """Test fallback to traditional matching when LLM fails"""
 
         test_provider.create_connection_mock(
-            fetchone=Exception("LLM failed"),
-            fetchall=[{"modification_type_id": 1, "modification_type_name": "Carbonised", "name_sim": 0.8}]
+            fetchone=Exception("LLM failed"), fetchall=[{"modification_type_id": 1, "modification_type_name": "Carbonised", "name_sim": 0.8}]
         )
 
         # with patch("src.strategies.llm.llm_strategy.Providers") as mock_providers:

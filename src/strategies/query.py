@@ -25,17 +25,17 @@ class QueryProxy:
     #     if not self.connection:
     #         self.connection = await get_connection()
     #     return self
-    
+
     # async def __aexit__(self, exc_type, exc_value, traceback) -> None:
     #     if self.connection:
     #         await self.connection.close()
-    #         self.connection = None 
+    #         self.connection = None
 
     async def get_connection(self) -> psycopg.AsyncConnection:
         if not self.connection:
             self.connection = await get_connection()
         return self.connection
-    
+
     async def fetch_all(self, sql: str, params: Params | None = None, *, row_factory: Literal["dict", "tuple"] = "dict") -> list[dict[str, Any]]:
         connection: psycopg.AsyncConnection[Tuple[Any, ...]] = await self.get_connection()
         async with connection.cursor(row_factory=self.row_factories[row_factory]) as cursor:

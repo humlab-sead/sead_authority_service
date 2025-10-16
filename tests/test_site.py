@@ -16,6 +16,7 @@ from tests.decorators import with_test_config
 
 SQL_QUERIES: dict[str, str] = SPECIFICATION["sql_queries"]
 
+
 class TestSiteQueryProxy:
     """Tests for SiteQueryProxy class."""
 
@@ -127,7 +128,7 @@ class TestSiteQueryProxy:
 
         expected_sql: str = SQL_QUERIES["get_details"]
         test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"id": 123})
-        
+
         assert result == mock_row
 
     @pytest.mark.asyncio

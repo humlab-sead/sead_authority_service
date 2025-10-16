@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock
 
 import psycopg
 import pytest
-from strategies.query import QueryProxy
 
 from src.strategies.country import SPECIFICATION as COUNTRY_SPECIFICATION
 from src.strategies.data_type import SPECIFICATION as DATA_TYPE_SPECIFICATION
@@ -18,6 +17,7 @@ from src.strategies.method import SPECIFICATION as METHOD_SPECIFICATION
 from src.strategies.method import MethodQueryProxy
 from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION
 from src.strategies.site import SiteQueryProxy
+from strategies.query import QueryProxy
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 
@@ -54,7 +54,7 @@ class TestMultipleQueryProxy:
         proxy: QueryProxy = query_proxy_class(specification)
 
         result: list[dict[str, Any]] = await proxy.fetch_by_fuzzy_label("test entity", limit=5)
-    
+
         sql_queries: dict[str, str] = specification["sql_queries"]
         expected_sql: str = sql_queries["fuzzy_label_sql"]
         test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"q": "test entity", "n": 5})

@@ -54,11 +54,11 @@ class MockRow:
 
     def __bool__(self):
         return bool(self._data)
-        
+
     # Add these methods to make it more dict-like
     def get(self, key, default=None):
         return self._data.get(key, default)
-        
+
     def __contains__(self, key):
         return key in self._data
 
@@ -114,7 +114,7 @@ class ExtendedMockConfigProvider(MockConfigProvider):
     """Extended MockConfigProvider that allows setting config after initialization"""
 
     def create_connection_mock(self, **kwargs) -> None:
-        connection = create_connection_mock(**({'execute': None} | kwargs))
+        connection = create_connection_mock(**({"execute": None} | kwargs))
         self.get_config().update({"runtime:connection": connection})
 
     @property
@@ -125,9 +125,10 @@ class ExtendedMockConfigProvider(MockConfigProvider):
     def cursor_mock(self) -> MagicMock:
         if not self.connection_mock:
             raise ValueError("Connection mock not set up. Call create_connection_mock first.")
-        
+
         return self.connection_mock.cursor.return_value.__aenter__.return_value
-    
+
+
 @pytest.fixture
 def test_provider(test_config: Config) -> ExtendedMockConfigProvider:  # pylint: disable=redefined-outer-name
     """Provide TestConfigProvider with test configuration"""
