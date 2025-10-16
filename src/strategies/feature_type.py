@@ -1,7 +1,5 @@
 from typing import Any
 
-import psycopg
-
 from .query import QueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 

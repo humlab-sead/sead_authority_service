@@ -2,7 +2,6 @@
 
 from typing import Any
 
-import psycopg
 from loguru import logger
 
 from src.configuration import ConfigValue
@@ -88,14 +87,13 @@ class LLMModificationTypeReconciliationStrategy(LLMReconciliationStrategy):
     def get_lookup_fields(self) -> list[str]:
         return super().get_lookup_fields() + ["modification_type_description"]
 
-    async def get_lookup_data(self, cursor: psycopg.AsyncCursor) -> list[dict[str, Any]]:
+    async def get_lookup_data(self) -> list[dict[str, Any]]:
         """Fetch modification type lookup data"""
-        proxy = ModificationTypeQueryProxy(self.specification, cursor)
+        proxy = ModificationTypeQueryProxy(self.specification)
         return await proxy.get_lookup_data()
 
     async def find_candidates(
         self,
-        cursor: psycopg.AsyncCursor,
         query: str,
         properties: dict[str, Any] = None,
         limit: int = 10,
@@ -105,7 +103,7 @@ class LLMModificationTypeReconciliationStrategy(LLMReconciliationStrategy):
         logger.info("Finding modification type candidates for: '%s'", query)
 
         # Use the LLM-powered approach
-        candidates: list[dict[str, Any]] = await super().find_candidates(cursor, query, properties, limit)
+        candidates: list[dict[str, Any]] = await super().find_candidates(query, properties, limit)
 
         # Log some details about the results
         if candidates:

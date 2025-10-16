@@ -1,7 +1,5 @@
 from typing import Any
 
-import psycopg
-
 from .strategy import ReconciliationStrategy, Strategies
 
 SPECIFICATION: dict[str, str] = {
@@ -55,12 +53,12 @@ class TaxonReconciliationStrategy(ReconciliationStrategy):
     def __init__(self):
         super().__init__(SPECIFICATION, TaxonQueryProxy)
 
-    async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
+    async def find_candidates(self, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         # Implement taxon-specific logic here
         # Could handle genus/species parsing, synonym matching, etc.
         pass
 
-    async def get_details(self, entity_id: str, cursor) -> dict[str, Any] | None:
+    async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific taxon (placeholder)."""
         # When implemented, this would query the taxon authority tables.
         return None

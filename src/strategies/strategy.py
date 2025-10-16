@@ -1,18 +1,17 @@
 from abc import ABC
-from typing import Any
-
-import psycopg
+from typing import Any, Type
 
 from src.configuration import ConfigValue
 from src.utility import Registry
 
-StrategySpecification = dict[str, str | dict[str, Any]]
+from . import StrategySpecification
+from .query import QueryProxy
 
 
 class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
-    def __init__(self, specification: StrategySpecification, query_proxy_class: Any) -> None:
+    def __init__(self, specification: StrategySpecification, query_proxy_class: Type[QueryProxy]) -> None:
         self.specification: StrategySpecification = specification or {
             "key": "unknown",
             "id_field": "id",
@@ -21,7 +20,7 @@ class ReconciliationStrategy(ABC):
             "property_settings": {},
             "sql_queries": {},
         }
-        self.query_proxy_class: Any = query_proxy_class
+        self.query_proxy_class: Type[QueryProxy] = query_proxy_class
 
     @property
     def key(self) -> str:
@@ -74,7 +73,7 @@ class ReconciliationStrategy(ABC):
 
         return candidate
 
-    async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
+    async def find_candidates(self, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         """Find candidate matches for the given query
 
         This method should be implemented by subclasses to provide entity-specific
@@ -82,21 +81,27 @@ class ReconciliationStrategy(ABC):
 
         Default implementations find candidates based on fuzzy name matching.
         """
-        candidates: list[dict] = []
         properties = properties or {}
-        proxy: Any = self.query_proxy_class(self.specification, cursor)
+        proxy: Any = self.query_proxy_class(self.specification)
 
+        candidates: list[dict] = await self._find_candidates(query, properties, limit, proxy)
+
+        return sorted(candidates, key=lambda x: x.get("name_sim", x.get("score", 0)), reverse=True)[:limit]
+
+    async def _find_candidates(self, query, properties, limit, proxy) -> list[dict]:
+        """Internal method to find candidates, can be overridden by subclasses"""
+        candidates: list[dict] = []
         alternate_identity_field: str = self.specification.get("alternate_identity_field")
+
         if alternate_identity_field and properties.get(alternate_identity_field, None):
             candidates.extend(await proxy.fetch_by_alternate_identity(properties[alternate_identity_field]))
 
         candidates.extend(await proxy.fetch_by_fuzzy_label(query, limit))
+        return candidates
 
-        return sorted(candidates, key=lambda x: x.get("name_sim", 0), reverse=True)[:limit]
-
-    async def get_details(self, entity_id: str, cursor: psycopg.AsyncCursor) -> dict[str, Any] | None:
+    async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific entity."""
-        return await self.query_proxy_class(self.specification, cursor).get_details(entity_id)
+        return await self.query_proxy_class(self.specification).get_details(entity_id)
 
 
 class StrategyRegistry(Registry):

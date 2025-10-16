@@ -5,7 +5,6 @@ import re
 from abc import abstractmethod
 from typing import Any
 
-import psycopg
 from jinja2 import BaseLoader, Environment, Template
 from loguru import logger
 
@@ -50,7 +49,7 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         """Return a description of the lookup domain for the LLM context"""
 
     @abstractmethod
-    async def get_lookup_data(self, cursor: psycopg.AsyncCursor) -> list[dict[str, Any]]:
+    async def get_lookup_data(self) -> list[dict[str, Any]]:
         """Fetch the lookup data from the database"""
 
     def get_lookup_fields(self) -> list[str]:
@@ -63,8 +62,8 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         lines: list[str] = [", ".join(f"{row[f]}" for f in fields) for row in lookup_data]
         return "\n".join(lines)
 
-    async def generate_llm_prompt(self, cursor: psycopg.AsyncCursor, query: str):
-        lookup_data: list[dict[str, Any]] = await self.get_lookup_data(cursor)
+    async def generate_llm_prompt(self, query: str) -> str:
+        lookup_data: list[dict[str, Any]] = await self.get_lookup_data()
         logger.info(f"Retrieved {len(lookup_data)} lookup entries")
 
         lookup_format, lookup_text = format_rows_for_llm(
@@ -108,7 +107,7 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
                 except json.JSONDecodeError:
                     logger.error("JSON extraction from conversational response also failed")
         return None
-    
+
     def _response_to_candidates(self, response: Any, limit: int) -> list[dict[str, Any]]:
         """Convert LLM response to reconciliation candidate format"""
         candidates: list[dict[str, Any]] = []
@@ -121,7 +120,7 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         if not json_response:
             logger.error("LLM response could not be parsed as JSON")
             return []
-        
+
         for query_result in json_response:
             if not (isinstance(query_result, dict) and "candidates" in query_result):
                 logger.error("LLM response item is not a dict with 'candidates' key")
@@ -139,7 +138,6 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
 
     async def find_candidates(
         self,
-        cursor: psycopg.AsyncCursor,
         query: str,
         properties: dict[str, Any] | None = None,
         limit: int = 10,
@@ -149,7 +147,7 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         logger.info(f"Starting LLM reconciliation for query: '{query}'")
 
         try:
-            prompt: str = await self.generate_llm_prompt(cursor, query)
+            prompt: str = await self.generate_llm_prompt(query)
 
             response: str = await self.llm_provider.complete(
                 prompt=prompt,
@@ -161,7 +159,7 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
             candidates: list[dict[str, Any]] = self._response_to_candidates(response, limit)
 
             # if not candidates:
-            #     return await super().find_candidates(cursor, query, properties, limit)
+            #     return await super().find_candidates(query, properties, limit)
 
             logger.info(f"Returning {len(candidates)} candidates")
             return candidates
@@ -169,11 +167,10 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.error("LLM reconciliation failed: %s", e)
             logger.info("Falling back to traditional fuzzy matching")
-            return await super().find_candidates(cursor, query, properties, limit)
+            return await super().find_candidates(query, properties, limit)
 
     # async def find_batch_candidates(
     #     self,
-    #     cursor: psycopg.AsyncCursor,
     #     queries: list[str],
     #     limit: int = 10,
     # ) -> dict[str, list[dict[str, Any]]]:
@@ -183,7 +180,7 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
 
     #     try:
     #         # Get lookup data
-    #         lookup_data: list[dict[str, Any]] = await self.get_lookup_data(cursor)
+    #         lookup_data: list[dict[str, Any]] = await self.get_lookup_data()
     #         logger.info("Retrieved %d lookup entries", len(lookup_data))
 
     #         # Format data for prompt
@@ -232,5 +229,5 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
     #         # Fallback to individual calls
     #         results = {}
     #         for query in queries:
-    #             results[query] = await self.find_candidates(cursor, query, limit=limit)
+    #             results[query] = await self.find_candidates(query, limit=limit)
     #         return results
