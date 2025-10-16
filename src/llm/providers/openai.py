@@ -1,10 +1,9 @@
-import json
 from openai import AsyncOpenAI
 from openai.types.chat.chat_completion import ChatCompletion  # type: ignore
 
-from . import Providers
 from src.configuration import ConfigValue
 
+from . import Providers
 from .provider import LLMProvider
 
 # try:
@@ -28,10 +27,6 @@ class OpenAIProvider(LLMProvider):
     async def complete(self, prompt: str, roles: dict[str, str] = None, **kwargs) -> str:
         opts: str = kwargs.get("options", {})
         opts = opts | (ConfigValue(f"llm.{self.key}.options").resolve() or {})
-        user_message: dict[str, str] = {
-            "role": "user",
-            "content": prompt,
-        }
         messages: list[dict[str, str]] = (roles or []) + [
             {
                 "role": "user",
