@@ -390,3 +390,309 @@ as $$
     order by name_sim desc, s.label
     limit p_limit;
 $$;
+
+-- call sead_utility.create_full_text_search_materialized_view()
+create or replace procedure sead_utility.create_full_text_search_materialized_view()
+  as $udf$
+  declare
+  v_sql text;
+  begin
+  -- Optional: ensure unaccent is available
+  -- EXECUTE 'CREATE EXTENSION IF NOT EXISTS unaccent';
+
+  drop materialized view if exists sead_utility.full_text_search cascade;
+
+  with sead_tables ("table_name", "pk_name") as (
+      select "table_name", "column_name" as pk_name
+      from sead_utility.table_columns
+      where is_pk = 'YES'
+  ),
+  lookup_columns("table_name", "column_name", "column_type") as (values
+    ('tbl_sample_group_sampling_contexts', 'sampling_context', 'description'),
+    ('tbl_sample_description_types', 'type_description', 'description'),
+    ('tbl_value_types', 'base_type', 'label'),
+    ('tbl_dating_labs', 'international_lab_id', 'label'),
+    ('tbl_seasons', 'season_name', 'label'),
+    ('tbl_data_type_groups', 'data_type_group_name', 'label'),
+    ('tbl_taxa_tree_authors', 'author_name', 'label'),
+    ('tbl_dataset_submission_types', 'description', 'description'),
+    ('tbl_ceramics_lookup', 'description', 'description'),
+    ('tbl_location_types', 'location_type', 'label'),
+    ('tbl_data_type_groups', 'description', 'description'),
+    ('tbl_project_types', 'project_type_name', 'label'),
+    ('tbl_value_classes', 'name', 'label'),
+    ('tbl_method_groups', 'description', 'description'),
+    ('tbl_value_type_items', 'description', 'description'),
+    ('tbl_years_types', 'description', 'description'),
+    ('tbl_contact_types', 'contact_type_name', 'label'),
+    ('tbl_taxa_common_names', 'common_name', 'label'),
+    ('tbl_relative_ages', 'relative_age_name', 'label'),
+    ('tbl_sample_types', 'description', 'description'),
+    ('tbl_taxa_tree_orders', 'order_name', 'label'),
+    ('tbl_locations', 'location_name', 'label'),
+    ('tbl_sample_group_description_types', 'type_description', 'description'),
+    ('tbl_value_classes', 'description', 'description'),
+    ('tbl_age_types', 'description', 'description'),
+    ('tbl_taxonomic_order_systems', 'system_name', 'label'),
+    ('tbl_text_identification_keys', 'key_text', 'description'),
+    ('tbl_feature_types', 'feature_type_description', 'description'),
+    ('tbl_dating_uncertainty', 'description', 'description'),
+    ('tbl_sample_group_sampling_contexts', 'description', 'description'),
+    ('tbl_taxa_tree_genera', 'genus_name', 'label'),
+    ('tbl_sample_location_types', 'location_type_description', 'description'),
+    ('tbl_rdb_codes', 'rdb_category', 'label'),
+    ('tbl_record_types', 'record_type_description', 'description'),
+    ('tbl_value_types', 'name', 'label'),
+    ('tbl_taxa_tree_families', 'family_name', 'label'),
+    ('tbl_project_stages', 'description', 'description'),
+    ('tbl_sample_types', 'type_name', 'label'),
+    ('tbl_rdb_systems', 'rdb_version', 'label'),
+    ('tbl_units', 'unit_name', 'label'),
+    ('tbl_relative_age_types', 'description', 'description'),
+    ('tbl_activity_types', 'description', 'description'),
+    ('tbl_dimensions', 'dimension_description', 'description'),
+    ('tbl_dimensions', 'dimension_abbrev', 'abbreviation'),
+    ('tbl_dating_labs', 'lab_name', 'label'),
+    ('tbl_location_types', 'description', 'description'),
+    ('tbl_ceramics_lookup', 'name', 'label'),
+    ('tbl_relative_ages', 'abbreviation', 'abbreviation'),
+    ('tbl_value_qualifiers', 'symbol', 'abbreviation'),
+    ('tbl_taxonomic_order_systems', 'system_description', 'description'),
+    ('tbl_value_qualifier_symbols', 'symbol', 'abbreviation'),
+    ('tbl_taxa_tree_master', 'species', 'label'),
+    ('tbl_relative_ages', 'description', 'description'),
+    ('tbl_feature_types', 'feature_type_name', 'label'),
+    ('tbl_alt_ref_types', 'alt_ref_type', 'label'),
+    ('tbl_modification_types', 'modification_type_name', 'label'),
+    ('tbl_alt_ref_types', 'description', 'description'),
+    ('tbl_data_types', 'definition', 'description'),
+    ('tbl_identification_levels', 'identification_level_name', 'label'),
+    ('tbl_abundance_elements', 'element_name', 'label'),
+    ('tbl_dating_uncertainty', 'uncertainty', 'label'),
+    ('tbl_languages', 'language_name_english', 'label'),
+    ('tbl_method_groups', 'group_name', 'label'),
+    ('tbl_record_types', 'record_type_name', 'label'),
+    ('tbl_age_types', 'age_type', 'label'),
+    ('tbl_units', 'unit_abbrev', 'abbreviation'),
+    ('tbl_modification_types', 'modification_type_description', 'description'),
+    ('tbl_years_types', 'name', 'label'),
+    ('tbl_methods', 'description', 'description'),
+    ('tbl_season_types', 'description', 'description'),
+    ('tbl_languages', 'language_name_native', 'label'),
+    ('tbl_dataset_submission_types', 'submission_type', 'label'),
+    ('tbl_identification_levels', 'notes', 'description'),
+    ('tbl_project_types', 'description', 'description'),
+    ('tbl_value_types', 'description', 'description'),
+    ('tbl_species_association_types', 'association_type_name', 'label'),
+    ('tbl_rdb_systems', 'rdb_system', 'label'),
+    ('tbl_value_type_items', 'name', 'label'),
+    ('tbl_units', 'description', 'description'),
+    ('tbl_value_qualifiers', 'description', 'description'),
+    ('tbl_species_association_types', 'association_description', 'description'),
+    ('tbl_dimensions', 'dimension_name', 'label'),
+    ('tbl_methods', 'method_name', 'label'),
+    ('tbl_season_types', 'season_type', 'label'),
+    ('tbl_abundance_elements', 'element_description', 'description'),
+    ('tbl_project_stages', 'stage_name', 'label'),
+    ('tbl_sample_location_types', 'location_type', 'label'),
+    ('tbl_sample_group_description_types', 'type_name', 'label'),
+    ('tbl_activity_types', 'activity_type', 'label'),
+    ('tbl_contact_types', 'description', 'description'),
+    ('tbl_data_types', 'data_type_name', 'label'),
+    ('tbl_rdb_codes', 'rdb_definition', 'description'),
+    ('tbl_relative_age_types', 'age_type', 'label'),
+    ('tbl_methods', 'method_abbrev_or_alt_name', 'label'),
+    ('tbl_sample_description_types', 'type_name', 'label')
+  ),
+  column_sql AS (
+      SELECT format(
+		  'select %1$L AS table_name,
+				  %2$L AS column_name,
+				  %3$I::text AS system_id,
+				  %2$I::text AS value,
+				  ''%4$s''::text as "column_type",
+				  authority.immutable_unaccent(lower(%2$I::text))::text AS value_norm,
+          -- weight columns: names > abbreviations > descriptions
+          case ''%4$s''
+            when ''label''        then setweight(to_tsvector(''simple'', authority.immutable_unaccent(%2$I)), ''a'')
+            when ''abbreviation'' then setweight(to_tsvector(''simple'', authority.immutable_unaccent(%2$I)), ''b'')
+            else                     setweight(to_tsvector(''simple'', authority.immutable_unaccent(%2$I)), ''c'')
+          end as tsv
+			from %1$I
+			where %2$I is not null', "table_name", "column_name", "pk_name", "column_type") AS column_sql
+      from lookup_columns
+      join sead_tables using (table_name)
+  )
+  select 'create materialized view sead_utility.full_text_search as ' || chr(10) ||
+          string_agg(column_sql, e'\nunion\n')
+  into v_sql
+  from column_sql;
+  --raise info '%', v_sql;
+  execute v_sql;
+  -- gin index on the precomputed tsv column -> useful for fuzzy full text search
+
+  v_sql := 'create index idx_full_text_search_tsv
+      on sead_utility.full_text_search
+        using gin (tsv)';
+
+  execute v_sql;
+
+  -- Also gin_trgm_ops index on the value column for fast trigram similarity/semantic searches
+  -- requires pg_trgm extension
+  -- Use ts_toquery() for boolean AND/OR/NOT searches
+  -- Use plainto_tsquery() for simple AND searches
+  -- Use phraseto_tsquery() for phrase searches
+  -- Use websearch_to_tsquery() for Google-like searches
+
+  v_sql := 'create index idx_full_text_search_value_trgm
+    on sead_utility.full_text_search
+      using gin (authority.immutable_unaccent(value) gin_trgm_ops)';
+
+  execute v_sql;
+
+  end;
+  $udf$ language plpgsql;
+
+-- call sead_utility.create_full_text_search_materialized_view();
+
+create or replace function authority.fuzzy_find_entity_type_candidates(
+	p_text text,
+	p_limit integer default 10
+) returns table (
+	table_name text,
+	column_name text,
+	value text,
+  fts_rank double precision,
+  trigram_sim double precision,
+  row_score double precision
+)
+language sql
+stable
+as $$
+    with params as (
+      select p_text::text as q,
+            websearch_to_tsquery('simple', p_text) as tsq
+    ),
+    candidates AS (
+      select
+        sead_utility.table_name_to_entity_name(t.table_name) as entity_name,
+        t.table_name,
+        t.column_name,
+        t.value,
+        t.value_norm,
+        t.tsv,
+        ts_rank_cd(t.tsv, p.tsq)                         AS fts_rank,
+        similarity(t.value_norm, p.q)                    AS trigram_sim,
+        -- combined row score (FTS dominates if it hits)
+        (case when t.tsv @@ p.tsq then 1.0 else 0.0 end) * ts_rank_cd(t.tsv, p.tsq)
+          + 0.35 * similarity(t.value_norm, p.q)         as row_score
+      from sead_utility.full_text_search t
+      cross join params p
+      where t.tsv @@ p.tsq or t.value_norm % p.q
+    )
+    select distinct on (table_name)
+      table_name, column_name, value, fts_rank, trigram_sim, row_score
+    from candidates
+    order by table_name, row_score desc
+    limit p_limit;
+$$;
+
+
+commit;
+
+/**********************************************************/
+
+select *
+from authority.fuzzy_find_entity_type_candidates('burial ground', 5);
+
+-- find "träkol" in full text search using fuzzy matching
+select *, ts_rank_cd(tsv, plainto_tsquery('english', unaccent(pq.q))) as rank, sead_utility.table_name_to_entity_name(table_name) as entity_name
+from sead_utility.full_text_search
+cross join (
+    select authority.immutable_unaccent(lower('Pithole'))::text as q
+) as pq
+--where value % pq.q
+where value::tsvector @@ to_tsquery('Pithole')
+order by ts_rank_cd(tsv, plainto_tsquery('english', unaccent(pq.q))) desc
+limit 20;
+
+select *, sead_utility.table_name_to_entity_name(table_name) as entity_name
+from sead_utility.full_text_search
+cross join (
+    select plainto_tsquery('insect') as q, authority.immutable_unaccent(:user_query) as uq
+) as pq
+where tsv @@ pq.q
+limit 20;
+
+select * from sead_utility.full_text_search
+
+-- Fuzzy full text search threshold tuning:
+/*
+SHOW pg_trgm.similarity_threshold;
+SET pg_trgm.similarity_threshold = 0.25;
+| Method                              | Description                          | Strengths                              | Weaknesses                                                        |
+| ----------------------------------- | ------------------------------------ | -------------------------------------- | ----------------------------------------------------------------- |
+| **`%` (trigram)**                   | Boolean fuzzy match using `pg_trgm`  | Fast, indexable, tunable               | Threshold-based (no numeric result unless you use `similarity()`) |
+| **`similarity(a,b)`**               | Returns float 0–1                    | Precise scoring, rank results          | Slower if no index, you must filter manually                      |
+| **`<->`**                           | “Distance” operator (1 − similarity) | Works for `ORDER BY value <-> 'query'` | Threshold must be applied separately                              |
+| **`ILIKE`**                         | Case-insensitive substring           | Simple, deterministic                  | No fuzziness, no index use (usually)                              |
+| **`Levenshtein(a,b)`**              | Edit distance from `fuzzystrmatch`   | Exact edit count                       | No index support, slower for big datasets                         |
+| **`dmetaphone(a) = dmetaphone(b)`** | Phonetic match (`fuzzystrmatch`)     | Good for names/speech                  | Not useful for general text                                       |
+| **`to_tsvector @@ to_tsquery`**     | Full-text search                     | Semantic/stem-based                    | No typo tolerance                                                 |
+
+| Operator | Meaning                   | Typical use                     |
+| -------- | ------------------------- | ------------------------------- |
+| `%`      | fuzzy match (basic)       | general-purpose fuzzy search    |
+| `<->`    | similarity distance       | ranking / ordering              |
+| `<%>`    | fuzzy match at word level | matching subwords in long text  |
+| `<<%>>`  | strict word fuzzy match   | when words must match exactly   |
+| `<<->`   | word-level distance       | ranking for token-level matches |
+| `<<<->`  | strict word distance      | ranking stricter matches        |
+| Function                                 | Description                                                                                          | Return type | Example                                                                    | Notes                            |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------- | -------------------------------- |
+| **`similarity(text, text)`**             | Returns a number between **0 and 1** showing how similar two strings are (based on trigram overlap). | `float4`    | `SELECT similarity('cat', 'cats');` → `0.75`                               | Used for ranking.                |
+| **`show_trgm(text)`**                    | Returns the set of trigrams (three-character sequences) that make up the text.                       | `text[]`    | `SELECT show_trgm('pithole');` → `{  p, pi, pit, ith, tho, hol, ole, le }` | Diagnostic tool.                 |
+| **`word_similarity(text, text)`**        | Measures trigram similarity between words within the two strings.                                    | `float4`    | `SELECT word_similarity('postgres', 'postgreSQL database');`               | Focuses on word boundaries.      |
+| **`strict_word_similarity(text, text)`** | Like `word_similarity` but requires entire words to match.                                           | `float4`    |                                                                            | Useful for token-aware matching. |
+| **`word_similarity_op(text, text)`**     | Same as `word_similarity`, used internally by `<%%>` operator.                                       | `float4`    |                                                                            | Normally not called directly.    |
+| Category                   | Function / Operator                         | Output         | Indexed | Notes                   |
+| -------------------------- | ------------------------------------------- | -------------- | ------- | ----------------------- |
+| **Similarity**             | `similarity(a,b)`                           | Float 0–1      | ✅       | core measure            |
+| **Boolean fuzzy**          | `%`                                         | Boolean        | ✅       | default threshold       |
+| **Distance**               | `<->`                                       | Float distance | ✅       | use for ORDER BY        |
+| **Word similarity**        | `word_similarity(a,b)`                      | Float 0–1      | ✅       | word-based              |
+| **Strict word similarity** | `strict_word_similarity(a,b)`               | Float 0–1      | ✅       | stricter token match    |
+| **Word boolean fuzzy**     | `<%>`, `<<%>>`                              | Boolean        | ✅       | word-level thresholds   |
+| **Word distance**          | `<<->`, `<<<->`                             | Float          | ✅       | word-level ORDER BY     |
+| **Debugging**              | `show_trgm(a)`                              | Text array     | ❌       | reveals actual trigrams |
+| **Tuning**                 | `SET pg_trgm.similarity_threshold = n`      | —              | —       | affects `%` ops         |
+| **Tuning (word)**          | `SET pg_trgm.word_similarity_threshold = n` | —              | —       | affects word ops        |
+*/
+
+
+with params as (
+  select 'brandgrav'::text as q,
+         websearch_to_tsquery('simple', 'brandgrav') as tsq
+)
+select
+  t.table_name,
+  -- take the best fts score among that table's rows (only when fts matched)
+  coalesce(max(ts_rank_cd(t.tsv, p.tsq)) filter (where t.tsv @@ p.tsq), 0) as fts_rank,
+  -- best trigram similarity among that table's rows (only when trigram matched)
+  coalesce(max(similarity(t.value_norm, p.q)) filter (where t.value_norm % p.q), 0) as trigram_sim,
+  -- combined score: weight fts higher than trigram fuzziness
+  (coalesce(max(ts_rank_cd(t.tsv, p.tsq)) filter (where t.tsv @@ p.tsq), 0)
+   + 0.35 * coalesce(max(similarity(t.value_norm, p.q)) filter (where t.value_norm % p.q), 0)
+  ) as score
+from sead_utility.full_text_search t
+cross join params p
+where t.tsv @@ p.tsq
+   or t.value_norm % p.q
+group by t.table_name
+order by score desc
+limit 5;
+
+select * from sead_utility.full_text_search
+where table_name = 'tbl_taxa_tree_master'
+
+drop function authority.fuzzy_find_entity_type_candidates( p_text text, p_limit integer);
