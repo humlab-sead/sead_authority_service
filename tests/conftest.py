@@ -96,7 +96,17 @@ def test_config() -> Config:
     return config
     # return Config(data={"options": {"id_base": "https://w3id.org/sead/id/"}, "runtime": {"connection_factory": async_mock_connection}})
 
+class ExtendedMockConfigProvider(MockConfigProvider):
+    """Extended MockConfigProvider that allows setting config after initialization"""
 
+    def create_connection_mock(self, **kwargs) -> None:
+        connection = create_connection_mock(**({'execute': None} | kwargs))
+        self.get_config().update({"runtime.connection": connection})
+
+    @property
+    def connection_mock(self) -> MagicMock:
+        return self.get_config().get("runtime.connection")
+    
 @pytest.fixture
 def test_provider(test_config: Config) -> MockConfigProvider:  # pylint: disable=redefined-outer-name
     """Provide TestConfigProvider with test configuration"""
