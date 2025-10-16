@@ -70,10 +70,7 @@ class ModificationTypeQueryProxy(QueryProxy):
 
     async def get_lookup_data(self) -> list[dict[str, Any]]:
         """Fetch all modification types for LLM lookup"""
-        sql: str | Any = self.specification["sql_queries"]["get_lookup_data"]
-        await self.cursor.execute(sql)
-        rows: list[tuple[Any]] = await self.cursor.fetchall()
-        return [dict(row) for row in rows] if rows else []
+        return await self.fetch_all(self.specification["sql_queries"]["get_lookup_data"])
 
 
 @Strategies.register(key="modification_type")

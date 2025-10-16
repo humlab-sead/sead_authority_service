@@ -1,6 +1,4 @@
-from typing import Any, Tuple
-
-import psycopg
+from typing import Any
 
 from src.configuration import ConfigValue
 
@@ -105,27 +103,23 @@ class SiteQueryProxy(QueryProxy):
     async def fetch_site_by_national_id(self, national_id: str) -> list[dict[str, Any]]:
         """Exact match by national site identifier"""
         sql: str = self.get_sql_queries().get("fetch_site_by_national_id", "")
-        await self.cursor.execute(sql, {"identifier": national_id})
-        row: Tuple[Any, ...] | None = await self.cursor.fetchone()
-        return [dict(row)] if row else []
+        row: dict[str, Any] | None = await self.fetch_one(sql, {"identifier": national_id})
+        return [row] if row else []
 
     async def fetch_site_distances(self, coordinate: dict[str, float], site_ids: list[int]) -> dict[int, float]:
         sql: str = self.get_sql_queries().get("fetch_site_distances", "")
-        await self.cursor.execute(sql, coordinate | {"site_ids": site_ids})
-        distances: dict[int, float] = {row["site_id"]: row["distance_km"] for row in await self.cursor.fetchall()}
+        rows: list[dict[str, Any]] = await self.fetch_all(sql, {"lat": coordinate["lat"], "lon": coordinate["lon"], "site_ids": site_ids})
+        distances: dict[int, float] = {row["site_id"]: row["distance_km"] for row in rows}
         return distances
 
     async def fetch_site_location_similarity(self, candidates: list[dict], place: str) -> list[dict]:
         """Boost scores based on place name context"""
         # This could query a places/regions table or use external geocoding
         # For now, simple implementation checking site descriptions
-
         sql: str = self.get_sql_queries().get("fetch_site_location_similarity", "")
-
         site_ids: list[int] = [c["site_id"] for c in candidates]
-        await self.cursor.execute(sql, {"place": place, "site_ids": site_ids})
-
-        place_results: dict[int, float] = {row["site_id"]: row["place_sim"] for row in await self.cursor.fetchall()}
+        rows: list[dict[str, Any]] = await self.fetch_all(sql, {"place": place, "site_ids": site_ids})
+        place_results: dict[int, float] = {row["site_id"]: row["place_sim"] for row in rows}
         return place_results
 
 
@@ -136,11 +130,11 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
     def __init__(self):
         super().__init__(SPECIFICATION, SiteQueryProxy)
 
-    async def find_candidates(self, cursor: psycopg.AsyncCursor, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
+    async def find_candidates(self, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         """Find candidate sites based on name, identifier, and optional geographic context"""
         candidates: list[dict] = []
         properties = properties or {}
-        proxy: SiteQueryProxy = self.query_proxy_class(self.specification, cursor)
+        proxy: SiteQueryProxy = self.query_proxy_class(self.specification)
 
         # 1) Exact match by national site identifier
         if properties.get("national_id"):

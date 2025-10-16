@@ -28,8 +28,8 @@ SPECIFICATION: StrategySpecification = {
 
 
 class FeatureTypeQueryProxy(QueryProxy):
-    def __init__(self, specification: dict, cursor: psycopg.AsyncCursor) -> None:
-        super().__init__(specification, cursor)
+    def __init__(self, specification: StrategySpecification) -> None:  # pylint: disable=useless-parent-delegation
+        super().__init__(specification)
 
 
 @Strategies.register(key="feature_type")
@@ -40,6 +40,6 @@ class FeatureTypeReconciliationStrategy(ReconciliationStrategy):
         specification = specification or SPECIFICATION
         super().__init__(specification, FeatureTypeQueryProxy)
 
-    async def get_details(self, entity_id: str, cursor: psycopg.AsyncCursor) -> dict[str, Any] | None:
+    async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific site."""
-        return await self.query_proxy_class(self.specification, cursor).get_details(entity_id)
+        return await self.query_proxy_class(self.specification).get_details(entity_id)

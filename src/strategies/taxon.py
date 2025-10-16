@@ -41,9 +41,8 @@ SPECIFICATION: dict[str, str] = {
 
 
 class TaxonQueryProxy:
-    def __init__(self, specification: dict[str, str | dict[str, Any]], cursor: psycopg.AsyncCursor):
+    def __init__(self, specification: dict[str, str | dict[str, Any]]):
         self.specification: dict[str, str | dict[str, Any]] = specification
-        self.cursor = cursor
 
     # Placeholder for future query methods
     # e.g., async def fetch_by_name(self, name: str, limit: int) -> list[dict[str, Any]]: ...

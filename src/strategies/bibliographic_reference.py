@@ -1,6 +1,5 @@
 import re
-
-import psycopg
+from typing import Any
 
 from .query import QueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
@@ -114,53 +113,45 @@ class BibliographicReferenceQueryProxy(QueryProxy):
         return doi or None
 
     async def fetch_by_isbn(self, isbn: str) -> list[dict]:
-        norm = self._norm_isbn(isbn)
+        norm: str | None = self._norm_isbn(isbn)
         if not norm:
             return []
-        await self.cursor.execute(self.get_sql_query("isbn_sql"), (norm,))
-        rows = await self.cursor.fetchall()
-        return [{"biblio_id": r[0], "label": r[1], "name_sim": 1.0} for r in rows]
+        rows: list[dict[str, Any]] = await self.fetch_all(self.get_sql_query("isbn_sql"), (norm,))
+        return [r | {"name_sim": 1.0} for r in rows]
 
     async def fetch_by_doi(self, doi: str) -> list[dict]:
-        norm = self._norm_doi(doi)
+        norm: str | None = self._norm_doi(doi)
         if not norm:
             return []
-        await self.cursor.execute(self.get_sql_query("doi_sql"), (norm, norm))
-        rows = await self.cursor.fetchall()
-        return [{"biblio_id": r[0], "label": r[1], "name_sim": 1.0} for r in rows]
+        rows: list[dict[str, Any]] = await self.fetch_all(self.get_sql_query("doi_sql"), (norm, norm))
+        return [r | {"name_sim": 1.0} for r in rows]
 
     async def fetch_by_exact_full_reference(self, full_reference: str) -> list[dict]:
-        await self.cursor.execute(self.get_sql_query("full_reference_sql"), (full_reference,))
-        rows = await self.cursor.fetchall()
-        return [{"biblio_id": r[0], "label": r[1], "name_sim": 1.0} for r in rows]
+        rows: list[dict[str, Any]] = await self.fetch_all(self.get_sql_query("full_reference_sql"), (full_reference,))
+        return [r | {"name_sim": 1.0} for r in rows]
 
     async def fetch_by_exact_title_year(self, title: str, year: str | int) -> list[dict]:
-        await self.cursor.execute(self.get_sql_query("title_year_sql"), (title, str(year)))
-        rows = await self.cursor.fetchall()
-        return [{"biblio_id": r[0], "label": r[1], "name_sim": 1.0} for r in rows]
+        rows: list[dict[str, Any]] = await self.fetch_all(self.get_sql_query("title_year_sql"), (title, str(year)))
+        return [r | {"name_sim": 1.0} for r in rows]
 
     async def fetch_by_exact_bugs_reference(self, bugs: str) -> list[dict]:
-        await self.cursor.execute(self.get_sql_query("bugs_reference_sql"), (bugs,))
-        rows = await self.cursor.fetchall()
-        return [{"biblio_id": r[0], "label": r[1], "name_sim": 0.8} for r in rows]
+        rows: list[dict[str, Any]] = await self.fetch_all(self.get_sql_query("bugs_reference_sql"), (bugs,))
+        return [r | {"name_sim": 1.0} for r in rows]
 
     # --- fuzzy lookups -------------------------------------------
 
     async def fuzzy_full_reference_partial(self, text: str, limit: int, threshold: float = 0.45) -> list[dict]:
         # best-substring match on full_reference
-        await self.cursor.execute(self.get_sql_query("full_reference_fuzzy_word_similarity_sql"), (text, limit, threshold))
-        rows = await self.cursor.fetchall()
-        return [{"biblio_id": r[1], "label": r[2], "name_sim": max(0.8, float(r[3]))} for r in rows]
+        rows: list[dict[str, Any]] = await self.fetch_all(self.get_sql_query("full_reference_fuzzy_word_similarity_sql"), (text, limit, threshold))
+        return [r | {"name_sim": max(0.8, float(r["name_sim"]))} for r in rows]
 
     async def fuzzy_authors_partial_and_year(self, authors: str, year: str | int, limit: int, threshold: float = 0.45) -> list[dict]:
-        await self.cursor.execute(self.get_sql_query("authors_fuzzy_sql"), (authors, limit, threshold))
-        rows = await self.cursor.fetchall()
+        rows: list[dict[str, Any]] = await self.fetch_all(self.get_sql_query("authors_fuzzy_sql"), params=(authors, limit, threshold), row_factory="tuple")
         # filter to exact year; promote to 0.8 if matches
-        ids = [r[1] for r in rows]
+        ids: list[int] = [r[1] for r in rows]
         if not ids:
             return []
-        await self.cursor.execute(self.get_sql_query("biblio_ids_sql"), (ids, str(year)))
-        year_ok = {r[0]: r[1] for r in await self.cursor.fetchall()}
+        year_ok: dict[str, int] = await self.fetch_all(self.get_sql_query("biblio_ids_sql"), params=(ids, str(year)), row_factory="tuple")
         out = []
         for r in rows:
             bid, label, sim = r[1], r[2], float(r[3])
@@ -170,7 +161,7 @@ class BibliographicReferenceQueryProxy(QueryProxy):
 
     # async def fuzzy_title_partial_and_year(self, title: str, year: str | int, limit: int,
     #                                        threshold: float = 0.45) -> list[dict]:
-    #     await self.cursor.execute(
+    #     rows = await self.fetch_all(
     #         """
     #         SELECT entity_id, biblio_id, label, name_sim
     #         FROM authority.fuzzy_bibliographic_references(
@@ -178,9 +169,8 @@ class BibliographicReferenceQueryProxy(QueryProxy):
     #           p_mode => 'word', p_threshold => %s
     #         )
     #         """,
-    #         (title, limit, threshold),
+    #         (title, limit, threshold), row_factory='tuple
     #     )
-    #     rows = await self.cursor.fetchall()
     #     ids = [r[1] for r in rows]
     #     if not ids:
     #         return []
@@ -194,12 +184,8 @@ class BibliographicReferenceQueryProxy(QueryProxy):
     #     return out
 
     async def fuzzy_full_reference_fallback(self, text: str, limit: int, threshold: float = 0.30) -> list[dict]:
-        await self.cursor.execute(
-            self.get_sql_query("full_reference_fuzzy_similarity_sql"),
-            (text, limit, threshold),
-        )
-        rows = await self.cursor.fetchall()
-        return [{"biblio_id": r[1], "label": r[2], "name_sim": min(0.7, float(r[3]))} for r in rows]
+        rows: list[dict[str, Any]] = await self.fetch_all(self.get_sql_query("full_reference_fuzzy_similarity_sql"), (text, limit, threshold))
+        return [r | {"name_sim": min(0.7, float(r["name_sim"]))} for r in rows]
 
 
 @Strategies.register(key="bibliographic_reference")
@@ -234,13 +220,12 @@ class BibliographicReferenceReconciliationStrategy(ReconciliationStrategy):
 
     async def find_candidates(
         self,
-        cursor: "psycopg.AsyncCursor",
         query: str,
         properties: dict[str, object] | None = None,
         limit: int = 10,
     ) -> list[dict]:
         props = properties or {}
-        proxy = self.query_proxy_class(self.specification, cursor)
+        proxy = self.query_proxy_class(self.specification)
         candidates: list[dict] = []
 
         # 1) High-confidence exact identifiers
