@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import asyncio
 from typing import Any, Literal, Mapping, Sequence, Tuple, TypeAlias, Union
 
@@ -11,8 +12,37 @@ from . import StrategySpecification
 
 Params: TypeAlias = Union[Sequence[Any], Mapping[str, Any]]
 
+class QueryProxy(ABC):
+    """Abstract base class for entity-specific query proxies"""
 
-class DatabaseQueryProxy:
+    def __init__(self, specification: StrategySpecification, **kwargs) -> None:
+        self.specification: StrategySpecification = specification or {
+            "key": "unknown",
+            "id_field": "id",
+            "label_field": "name",
+            "properties": [],
+            "property_settings": {},
+            "sql_queries": {},
+        }
+
+    @property
+    def key(self) -> str:
+        """Return the unique key for this query proxy"""
+        return self.specification["key"]
+
+    @abstractmethod
+    async def fetch_by_fuzzy_label(self, name: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Perform fuzzy name search"""
+
+    @abstractmethod
+    async def get_details(self, entity_id: str) -> dict[str, Any] | None:
+        """Fetch details for a specific entity by ID"""
+
+    @abstractmethod
+    async def fetch_by_alternate_identity(self, alternate_identity: str) -> list[dict[str, Any]]:
+        """Fetch entity by alternate identity"""
+
+class DatabaseQueryProxy(QueryProxy):
     def __init__(self, specification: StrategySpecification, **kwargs) -> None:
         self.connection: psycopg.AsyncConnection | None = kwargs.get("connection")
         self.specification: StrategySpecification = specification
