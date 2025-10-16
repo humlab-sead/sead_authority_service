@@ -1,7 +1,5 @@
 from typing import Any
-from unittest.mock import AsyncMock
 
-import psycopg
 import pytest
 
 from src.strategies.country import SPECIFICATION as COUNTRY_SPECIFICATION

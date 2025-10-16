@@ -8,14 +8,12 @@ for OpenRefine reconciliation.
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
-import psycopg
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient, Response
 
 from src.api.router import router
 from src.configuration import MockConfigProvider
-from tests.conftest import MockRow
 from tests.decorators import with_test_config
 
 # pylint: disable=redefined-outer-name, unused-argument, too-many-locals
