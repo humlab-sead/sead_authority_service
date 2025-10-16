@@ -185,51 +185,33 @@ async def test_suggest_property_with_prefix(test_app: FastAPI, mock_results: lis
 @with_test_config
 async def test_flyout_entity_valid(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: MockConfigProvider):
     """Test flyout preview with valid entity ID"""
+    location_row_data = {
+        "location_id": 806,
+        "label": "Test Location",
+        "place_name": "Uppsala",
+        "latitude": 59.8586,
+        "longitude": 17.6389,
+        "country": "Sweden",
+    }
+    test_provider.create_connection_mock(fetchone=location_row_data, execute=None)
 
-    # Mock the get_connection to return a properly mocked connection
-    with patch("src.suggest.get_connection") as mock_get_connection:
-        # Create a mock connection with proper database row response
-        mock_conn = AsyncMock(spec=psycopg.AsyncConnection)
-        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+    async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
+        # Use a known entity ID (location)
+        entity_id = "https://w3id.org/sead/id/location/806"
+        response: Response = await client.get(f"/flyout/entity?id={entity_id}")
 
-        # Mock location data that would be returned from the database
-        location_row_data = {
-            "location_id": 806,
-            "label": "Test Location",
-            "place_name": "Uppsala",
-            "latitude": 59.8586,
-            "longitude": 17.6389,
-            "country": "Sweden",
-        }
+        assert response.status_code == 200
+        data = response.json()
 
-        # Set up the mock to return a MockRow (which behaves like a real database row)
-        mock_cursor.fetchone.return_value = MockRow(location_row_data)
-        mock_cursor.execute.return_value = None
+        # Check response format
+        assert "id" in data
+        assert "html" in data
+        assert data["id"] == entity_id
 
-        # Set up the connection context manager
-        mock_cursor.__aenter__.return_value = mock_cursor
-        mock_cursor.__aexit__.return_value = None
-        mock_conn.cursor.return_value = mock_cursor
-
-        mock_get_connection.return_value = mock_conn
-
-        async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
-            # Use a known entity ID (location)
-            entity_id = "https://w3id.org/sead/id/location/806"
-            response: Response = await client.get(f"/flyout/entity?id={entity_id}")
-
-            assert response.status_code == 200
-            data = response.json()
-
-            # Check response format
-            assert "id" in data
-            assert "html" in data
-            assert data["id"] == entity_id
-
-            # Check HTML contains expected content
-            html = data["html"]
-            assert "<div" in html
-            assert "style=" in html
+        # Check HTML contains expected content
+        html = data["html"]
+        assert "<div" in html
+        assert "style=" in html
 
 
 @pytest.mark.asyncio
