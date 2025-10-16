@@ -1,10 +1,8 @@
 from typing import Any, Dict
 
 from loguru import logger
-from psycopg import AsyncConnection
-from psycopg.rows import dict_row
 
-from src.configuration import ConfigValue, get_connection
+from src.configuration import ConfigValue
 from src.strategies.strategy import ReconciliationStrategy, Strategies
 
 
@@ -13,7 +11,6 @@ async def render_preview(uri: str) -> ValueError | str:
 
     logger.info(f"Rendering preview for URI: {uri}")
     id_base: str = ConfigValue("options:id_base").resolve()
-    connection: AsyncConnection = await get_connection()
 
     if not uri.startswith(id_base):
         raise ValueError("Invalid ID format")
@@ -33,8 +30,7 @@ async def render_preview(uri: str) -> ValueError | str:
     if not strategy:
         raise ValueError(f"Unknown entity type: {entity_path}")
 
-    async with connection.cursor(row_factory=dict_row) as cur:
-        details: Dict[str, Any] | None = await strategy.get_details(entity_id_str, cur)
+    details: Dict[str, Any] | None = await strategy.get_details(entity_id_str)
 
     if not details:
         raise ValueError(f"Entity with ID {entity_id_str} not found or preview not implemented.")
