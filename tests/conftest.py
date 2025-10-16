@@ -1,7 +1,7 @@
 import asyncio
 import os
 from typing import Any, Generator
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import psycopg
 import pytest
@@ -108,6 +108,38 @@ class ExtendedMockConfigProvider(MockConfigProvider):
         return self.get_config().get("runtime.connection")
     
 @pytest.fixture
-def test_provider(test_config: Config) -> MockConfigProvider:  # pylint: disable=redefined-outer-name
+def test_provider(test_config: Config) -> ExtendedMockConfigProvider:  # pylint: disable=redefined-outer-name
     """Provide TestConfigProvider with test configuration"""
-    return MockConfigProvider(test_config)
+    provider = ExtendedMockConfigProvider(test_config)
+    return provider
+
+def create_connection_mock(**method_returns: Any) -> AsyncMock:
+    """
+    Create an async psycopg connection mock whose cursor methods return given values.
+
+    Example:
+        mock_conn = create_connection_mock(
+            fetchall=[{"id": 1, "name": "Alice"}],
+            execute=None,
+            fetchone={"id": 2, "name": "Bob"},
+        )
+    """
+    mock_conn = AsyncMock(spec=psycopg.AsyncConnection)
+    mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+
+    # Set up each requested async method to return the specified value
+    for method_name, return_value in method_returns.items():
+        method = getattr(mock_cursor, method_name)
+        # Wrap lists of dicts into MockRow for convenience
+        if isinstance(return_value, list) and return_value and isinstance(return_value[0], dict):
+            return_value = [MockRow(r) for r in return_value]
+        elif isinstance(return_value, dict):
+            return_value = MockRow(return_value)
+        method.return_value = return_value
+
+    # Default: ensure context manager behavior works
+    mock_conn.cursor().return_value = mock_cursor
+    mock_conn.cursor().return_value.__aenter__.return_value = mock_cursor
+    mock_conn.cursor().return_value.__aexit__.return_value = None
+
+    return mock_conn
