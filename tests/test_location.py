@@ -32,8 +32,7 @@
 #     @with_test_config
 #     def test_get_entity_id_field(self, entity_id, specification, strategy_class, query_proxy_class, test_provider: MockConfigProvider):
 #         """Test getting entity ID field name."""
-#         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-#         proxy: QueryProxy = query_proxy_class(specification, mock_cursor)
+#         proxy: QueryProxy = query_proxy_class(specification)
 #         strategy: ReconciliationStrategy = strategy_class(specification, proxy)
 #         assert strategy.get_entity_id_field() == specification["id_field"]
 
@@ -114,9 +113,8 @@
 #         expected_details = {"ID": 123, "Name": "Test Site", "Description": "A test site"}
 #         mock_proxy.get_details.return_value = expected_details
 
-#         result = await strategy.get_details("123", mock_cursor)
+#         result = await strategy.get_details("123")
 
-#         # The LocationQueryProxy is called with the LOCATION_SPECIFICATION and cursor
-#         mock_query_proxy_class.assert_called_once_with(LOCATION_SPECIFICATION, mock_cursor)
+#         mock_query_proxy_class.assert_called_once_with(LOCATION_SPECIFICATION)
 #         mock_proxy.get_details.assert_called_once_with("123")
 #         assert result == expected_details
