@@ -147,6 +147,7 @@ class GeoNamesProxy:
             raise RuntimeError(f"GeoNames error {code}: {msg}")
         return data
 
+
 # ---------- OpenRefine reconciliation helpers (optional, unchanged API) ----------
 
 
