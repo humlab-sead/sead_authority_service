@@ -8,7 +8,7 @@ from typing import Any, Dict, List
 
 import httpx
 
-from src.geonames.proxy import GeoNamesProxy, NotSupportedError
+from strategies.geonames.proxy import GeoNamesProxy, NotSupportedError
 
 
 class TestGeoNamesProxy:

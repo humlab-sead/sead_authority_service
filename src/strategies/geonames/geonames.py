@@ -2,10 +2,10 @@ import math
 from typing import Any
 
 from src.configuration.resolve import ConfigValue
-from src.geonames.proxy import GeoNamesProxy
+from strategies.geonames.proxy import GeoNamesProxy
 
-from .query import QueryProxy
-from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
+from ..query import QueryProxy
+from ..strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
     "key": "geonames",
