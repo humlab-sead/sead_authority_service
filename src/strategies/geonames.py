@@ -1,8 +1,10 @@
 import math
 from typing import Any
 
-from src.geonames.proxy import GeoNamesQueryProxy
+from src.configuration.resolve import ConfigValue
+from src.geonames.proxy import GeoNamesProxy
 
+from .query import QueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
