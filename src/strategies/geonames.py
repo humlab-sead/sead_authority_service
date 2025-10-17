@@ -78,9 +78,13 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
 
         return sorted(candidates, key=lambda x: x.get("name_sim", 0), reverse=True)[:limit]
 
-    async def get_details(self, entity_id: str) -> dict[str, Any] | None:
+    async def get_details(self, entity_id: str, **kwargs) -> dict[str, Any] | None:
         """Fetch details for a specific entity."""
-        return await self.query_proxy_class(self.specification).get_details(entity_id)
+        return await self.query_proxy_class(self.specification).get_details(
+            geoname_id=entity_id,
+            lang=kwargs.get("lang", self.lang),
+            style=kwargs.get("style", self.style),
+        )
 
     def geonames_type_for_refine(self, g: dict[str, Any]) -> dict[str, str]:
         fc = g.get("fcl")
