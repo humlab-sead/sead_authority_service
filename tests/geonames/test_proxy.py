@@ -4,11 +4,10 @@ Unit tests for GeoNames API proxy.
 import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from typing import Any, Dict, List
 
 import httpx
 
-from strategies.geonames.proxy import GeoNamesProxy, NotSupportedError
+from src.geonames.proxy import GeoNamesProxy
 
 
 class TestGeoNamesProxy:

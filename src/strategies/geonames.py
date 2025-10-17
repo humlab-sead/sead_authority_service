@@ -2,10 +2,10 @@ import math
 from typing import Any
 
 from src.configuration.resolve import ConfigValue
-from strategies.geonames.proxy import GeoNamesProxy
+from src.geonames.proxy import GeoNamesProxy
 
-from ..query import QueryProxy
-from ..strategy import ReconciliationStrategy, Strategies, StrategySpecification
+from .query import QueryProxy
+from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
     "key": "geonames",
@@ -105,7 +105,7 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
     async def get_details(self, entity_id: str, **kwargs) -> dict[str, Any] | None:
         """Fetch details for a specific entity."""
         options: dict[str, Any] = {k: v for k, v in kwargs.items() if k in ("lang", "style")}
-        return await self.get_proxy().get_details(geoname_id=entity_id, **options)
+        return await self.get_proxy().get_details(entity_id=entity_id, **options)
 
     def _geonames_type_for_refine(self, g: dict[str, Any]) -> dict[str, str]:
         fc = g.get("fcl")

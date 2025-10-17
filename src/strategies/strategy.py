@@ -32,10 +32,10 @@ class ReconciliationStrategy(ABC):
                 self._proxy = self._proxy_or_cls(self.specification)
         return self._proxy
 
-    @property
-    def key(self) -> str:
-        """Return the unique key for this strategy"""
-        return self.specification["key"]
+    # @property
+    # def key(self) -> str:
+    #     """Return the unique key for this strategy"""
+    #     return self.specification["key"]
 
     def get_entity_id_field(self) -> str:
         """Return the ID field name for this entity type"""
