@@ -32,22 +32,23 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
         candidate: dict[str, Any] = {
             "id": entity_id,
             "name": label,
-            "score": self.calculate_score(entity_data),
+            "score": self._calculate_score(entity_data),
             "match": label.lower() == query.lower(),
-            "type": [self.geonames_type_for_refine(entity_data)],
-            "description": self.generate_description(entity_data),
+            "type": [self._geonames_type_for_refine(entity_data)],
+            "description": self._generate_description(entity_data),
             "uri": f"https://www.geonames.org/{entity_data['geonameId']}",
         }
+        candidate['name_sim'] = candidate['score'] / 100.0
         return candidate
-
-    def calculate_score(self, data: dict[str, Any]) -> float:
+    
+    def _calculate_score(self, data: dict[str, Any]) -> float:
         gn_score: float = float(data.get("score", 0.0))
         pop: int = int(data.get("population", 0))
         pop_boost: float = math.log10(pop) if pop > 0 else 0.0
         score: float = round(60 + 40 * min(1.0, (gn_score / 100.0) + (pop_boost / 7)), 2)
         return score
 
-    def generate_description(self, data: dict[str, Any]) -> str:
+    def _generate_description(self, data: dict[str, Any]) -> str:
         pop: int = int(data.get("population", 0))
         return f"{data.get('fcodeName', data.get('fcode')) or ''}{f' · pop {pop:,}' if pop else ''}".strip()
 
@@ -79,7 +80,7 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
             style=kwargs.get("style", self.style),
         )
 
-    def geonames_type_for_refine(self, g: dict[str, Any]) -> dict[str, str]:
+    def _geonames_type_for_refine(self, g: dict[str, Any]) -> dict[str, str]:
         fc = g.get("fcl")
         fcode = g.get("fcode", "")
         if fc == "P":
