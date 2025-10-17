@@ -1,4 +1,3 @@
-import math
 from typing import Any, Iterable, Literal, Self
 
 import httpx
@@ -28,7 +27,6 @@ class GeoNamesProxy:
         # add a proper user_agent identifying your application and contact info
         user_agent: str = "sead-GeonamesProxy/1.0 (contact: https://sead.se)",
     ) -> None:
-        super().__init__(specification=None)
         self.username: str = username
         self.base_url: str = base_url.rstrip("/")
         self.lang: str = lang
@@ -147,78 +145,3 @@ class GeoNamesProxy:
             raise RuntimeError(f"GeoNames error {code}: {msg}")
         return data
 
-
-# ---------- OpenRefine reconciliation helpers (optional, unchanged API) ----------
-
-
-def geonames_type_for_refine(g: dict[str, Any]) -> dict[str, str]:
-    fc = g.get("fcl")
-    fcode = g.get("fcode", "")
-    if fc == "P":
-        return {"id": "/location/citytown", "name": "City/Town"}
-    if fc == "A" and fcode.startswith("ADM"):
-        return {"id": "/location/administrative_area", "name": "Administrative Area"}
-    return {"id": "/location/place", "name": "Place"}
-
-
-def to_reconcile_candidates(geonames_hits: list[dict[str, Any]], query: str) -> dict[str, Any]:
-    results = []
-    for g in geonames_hits:
-        admin_bits = [g.get("adminName1"), g.get("countryName")]
-        admin_str = ", ".join([b for b in admin_bits if b])
-        label = g["name"] + (f", {admin_str}" if admin_str else "")
-
-        gn_score = float(g.get("score", 0.0))
-        pop = int(g.get("population", 0))
-        pop_boost = math.log10(pop) if pop > 0 else 0.0
-        score = round(60 + 40 * min(1.0, (gn_score / 100.0) + (pop_boost / 7)), 2)
-
-        description = f"{g.get('fcodeName', g.get('fcode')) or ''}".strip()
-        if pop:
-            description = (description + f" · pop {pop:,}").strip(" ·")
-
-        results.append(
-            {
-                "id": str(g["geonameId"]),
-                "name": label,
-                "score": score,
-                "match": label.lower() == query.lower(),
-                "type": [geonames_type_for_refine(g)],
-                "description": description,
-                "uri": f"https://www.geonames.org/{g['geonameId']}",
-            }
-        )
-    return {"result": results}
-
-
-# async def reconcile_places_async(
-#     proxy: GeonamesProxy,
-#     query: str,
-#     **search_kwargs: Any,
-# ) -> Dict[str, Any]:
-#     hits = await proxy.search(query, **search_kwargs)
-#     return to_reconcile_candidates(hits, query)
-
-
-# # ---------- Example usage ----------
-
-
-# async def main():
-#     async with GeonamesProxy("YOUR_USERNAME", user_agent="Humlab-OpenRefine-Reconcile/1.0 (contact: roger.mahler@umu.se)") as gn:
-#         hits = await gn.search(
-#             "Umeå",
-#             country_bias="SE",
-#             max_rows=5,
-#             feature_classes=("P",),
-#             orderby="population",
-#         )
-#         print(f"Found {len(hits)} candidates")
-#         print(to_reconcile_candidates(hits, "Umeå"))
-
-#         if hits:
-#             detail = await gn._get_details(hits[0]["geonameId"])
-#             print("First hit details (keys):", list(detail.keys())[:10])
-
-
-# # Uncomment to run as a script:
-# # asyncio.run(main())
