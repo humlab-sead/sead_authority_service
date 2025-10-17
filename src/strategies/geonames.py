@@ -68,11 +68,8 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
 
     async def get_details(self, entity_id: str, **kwargs) -> dict[str, Any] | None:
         """Fetch details for a specific entity."""
-        return await self.query_proxy_class(self.specification).get_details(
-            geoname_id=entity_id,
-            lang=kwargs.get("lang", self.lang),
-            style=kwargs.get("style", self.style),
-        )
+        options: dict[str, Any] = {k: v for k, v in kwargs.items() if k in ("lang", "style")}
+        return await self.get_proxy().get_details(geoname_id=entity_id, **options)
 
     def _geonames_type_for_refine(self, g: dict[str, Any]) -> dict[str, str]:
         fc = g.get("fcl")
