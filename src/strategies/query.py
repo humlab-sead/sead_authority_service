@@ -15,7 +15,7 @@ Params: TypeAlias = Union[Sequence[Any], Mapping[str, Any]]
 class QueryProxy(ABC):
     """Abstract base class for entity-specific query proxies"""
 
-    def __init__(self, specification: StrategySpecification, **kwargs) -> None:
+    def __init__(self, specification: StrategySpecification, **kwargs) -> None:  # pylint: disable=unused-argument
         self.specification: StrategySpecification = specification or {
             "key": "unknown",
             "id_field": "id",
@@ -39,14 +39,14 @@ class QueryProxy(ABC):
         """Fetch details for a specific entity by ID"""
 
     @abstractmethod
-    async def fetch_by_alternate_identity(self, alternate_identity: str) -> list[dict[str, Any]]:
+    async def fetch_by_alternate_identity(self, alternate_identity: str, **kwargs) -> list[dict[str, Any]]:
         """Fetch entity by alternate identity"""
 
 
 class DatabaseQueryProxy(QueryProxy):
     def __init__(self, specification: StrategySpecification, **kwargs) -> None:
+        super().__init__(specification, **kwargs)
         self.connection: psycopg.AsyncConnection | None = kwargs.get("connection")
-        self.specification: StrategySpecification = specification
         self.row_factories: dict[str, Any] = {
             "dict": dict_row,
             "tuple": tuple_row,
@@ -101,11 +101,11 @@ class DatabaseQueryProxy(QueryProxy):
             logger.error(f"Error fetching details for entity_id {entity_id}: {e}")
             return None
 
-    async def fetch_by_fuzzy_label(self, name: str, limit: int = 10) -> list[dict[str, Any]]:
+    async def fetch_by_fuzzy_label(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:  # pylint: disable=unused-argument
         """Perform fuzzy name search"""
         return await self.fetch_all(self.get_sql_query("fuzzy_label_sql"), {"q": name, "n": limit})
 
-    async def fetch_by_alternate_identity(self, alternate_identity: str) -> list[dict[str, Any]]:
+    async def fetch_by_alternate_identity(self, alternate_identity: str, **kwargs) -> list[dict[str, Any]]:  # pylint: disable=unused-argument
         """Fetch entity by alternate identity"""
         sql: str = self.get_sql_query("alternate_identity_sql")
         if not sql:
