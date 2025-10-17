@@ -1,1 +1,1 @@
-from .proxy import GeoNamesQueryProxy
+from .proxy import GeoNamesProxy
