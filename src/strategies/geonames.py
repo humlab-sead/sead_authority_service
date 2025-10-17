@@ -10,14 +10,7 @@ SPECIFICATION: StrategySpecification = {
     "display_name": "GeoNames Places",
     "id_field": "geoname_id",
     "label_field": "label",
-    "properties": [
-        {
-            "id": "place_name",
-            "name": "Place Name",
-            "type": "string",
-            "description": "Geographic place, locality, or administrative area name",
-        },
-    ],
+    "properties": [],
     "property_settings": {},
     "sql_queries": {},
 }
