@@ -26,7 +26,7 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
         super().__init__(specification or SPECIFICATION, proxy)
 
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:
-        """Convert entity data to OpenRefine candidate format"""
+        """Convert Geonames data to OpenRefine candidate format"""
         entity_id: str = str(entity_data["geonameId"])
         admin_bits: list[str] = [entity_data.get("adminName1"), entity_data.get("countryName")]
         admin_str: str = ", ".join([b for b in admin_bits if b])
