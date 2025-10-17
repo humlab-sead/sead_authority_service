@@ -1,34 +1,40 @@
 import math
-from typing import Any, Dict, Iterable, List, Literal, Optional, Self
+from typing import Any, Dict, Iterable, Literal, Self
 
 import httpx
 
 
-class GeoNamesQueryProxy:
+class NotSupportedError(Exception):
+    """Exception for unsupported operations"""
+
+
+class GeoNamesProxy:
     """
     Minimal async proxy around the GeoNames API using httpx.
 
     Usage:
-        async with GeoNamesQueryProxy("YOUR_USERNAME") as gn:
+        async with GeoNamesProxy("YOUR_USERNAME") as gn:
             hits = await gn.geonames_search("Umeå", country_bias="SE")
-            detail = await gn.get_detail(hits[0]["geonameId"])
+            detail = await gn._get_details(hits[0]["geonameId"])
     """
 
     def __init__(
         self,
-        username: str,
         *,
+        username: str,
         base_url: str = "https://api.geonames.org",
         lang: str = "en",
         timeout: float = 20.0,
-        user_agent: str = "Humlab-GeonamesProxy/1.0 (contact: your-email@example.com)",
+        # add a proper user_agent identifying your application and contact info
+        user_agent: str = "sead-GeonamesProxy/1.0 (contact: https://sead.se)",
     ) -> None:
-        self.username = username
-        self.base_url = base_url.rstrip("/")
-        self.lang = lang
-        self.timeout = timeout
-        self.user_agent = user_agent
-        self._client: Optional[httpx.AsyncClient] = None
+        super().__init__(specification=None)
+        self.username: str = username
+        self.base_url: str = base_url.rstrip("/")
+        self.lang: str = lang
+        self.timeout: float = timeout
+        self.user_agent: str = user_agent
+        self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> Self:
         self._client = httpx.AsyncClient(timeout=self.timeout, headers={"User-Agent": self.user_agent})
@@ -44,14 +50,14 @@ class GeoNamesQueryProxy:
         q: str,
         *,
         max_rows: int = 10,
-        country_bias: Optional[str] = None,
-        lang: Optional[str] = None,
+        country_bias: str | None = None,
+        lang: str | None = None,
         feature_classes: Iterable[str] = ("P", "A"),
         fuzzy: float = 0.8,
         orderby: Literal["relevance", "population"] = "relevance",
         style: Literal["FULL", "SHORT", "MEDIUM", "LONG"] = "FULL",
-        extra_params: Optional[Dict[str, Any]] = None,
-    ) -> List[Dict[str, Any]]:
+        extra_params: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Search for places. Returns list of GeoNames dictionaries.
         See https://www.geonames.org/export/geonames-search.html for parameter details.
@@ -90,7 +96,7 @@ class GeoNamesQueryProxy:
         data = await self._get_json("/searchJSON", params)
         return data.get("geonames", [])
 
-    async def get_detail(
+    async def _get_details(
         self,
         geoname_id: int | str,
         *,
@@ -114,6 +120,9 @@ class GeoNamesQueryProxy:
                 params.append((k, v))
 
         return await self._get_json("/getJSON", params)
+
+    async def get_details(self, entity_id: str, **kwargs):
+        raise NotImplementedError
 
     async def _get_json(self, path: str, params: list[tuple[str, Any]]) -> dict[str, Any]:
         """
@@ -140,7 +149,6 @@ class GeoNamesQueryProxy:
             code = data["status"].get("value", "unknown")
             raise RuntimeError(f"GeoNames error {code}: {msg}")
         return data
-
 
 # ---------- OpenRefine reconciliation helpers (optional, unchanged API) ----------
 
@@ -210,7 +218,7 @@ def to_reconcile_candidates(geonames_hits: List[Dict[str, Any]], query: str) -> 
 #         print(to_reconcile_candidates(hits, "Umeå"))
 
 #         if hits:
-#             detail = await gn.get_detail(hits[0]["geonameId"])
+#             detail = await gn._get_details(hits[0]["geonameId"])
 #             print("First hit details (keys):", list(detail.keys())[:10])
 
 
