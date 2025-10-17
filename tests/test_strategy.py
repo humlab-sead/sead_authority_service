@@ -49,16 +49,16 @@
 # class TestMultipleReconciliationStrategy:
 
 #     @pytest.mark.parametrize(
-#         "specification, strategy_class, query_proxy_class",
+#         "specification, strategy_class, proxy_cls",
 #         RECONCILIATION_STRATEGY_SETUPS,
 #     )
 #     @pytest.mark.asyncio
 #     @with_test_config
 #     async def test_reconciliation_strategy(self, specification: StrategySpecification,
-#           strategy_class: Type[ReconciliationStrategy], query_proxy_class: Type[QueryProxy], test_provider: MockConfigProvider) -> None:
+#           strategy_class: Type[ReconciliationStrategy], proxy_cls: Type[QueryProxy], test_provider: MockConfigProvider) -> None:
 #         """Test reconciliation strategy."""
 #         mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-#         proxy = query_proxy_class(specification, mock_cursor)
+#         proxy = proxy_cls(specification, mock_cursor)
 #         id_field: str = specification.get("id_field", "id")
 #         key: str = specification.get("key", "unknown")
 #         mock_rows = [{id_field: 1, "label": f"Test {key.capitalize()} 1", "name_sim": 0.9},

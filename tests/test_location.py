@@ -26,13 +26,13 @@
 #     """Tests for common logic in various ReconciliationStrategy classes."""
 
 #     @pytest.mark.parametrize(
-#         "entity_id, specification, strategy_class, query_proxy_class",
+#         "entity_id, specification, strategy_class, proxy_cls",
 #         TEST_SETUPS,
 #     )
 #     @with_test_config
-#     def test_get_entity_id_field(self, entity_id, specification, strategy_class, query_proxy_class, test_provider: MockConfigProvider):
+#     def test_get_entity_id_field(self, entity_id, specification, strategy_class, proxy_cls, test_provider: MockConfigProvider):
 #         """Test getting entity ID field name."""
-#         proxy: QueryProxy = query_proxy_class(specification)
+#         proxy: QueryProxy = proxy_cls(specification)
 #         strategy: ReconciliationStrategy = strategy_class(specification, proxy)
 #         assert strategy.get_entity_id_field() == specification["id_field"]
 
@@ -41,7 +41,7 @@
 #         TEST_SETUPS,
 #     )
 #     @with_test_config
-#     def test_get_label_field(entity_id, specification, strategy_class, query_proxy_class, test_provider: MockConfigProvider):
+#     def test_get_label_field(entity_id, specification, strategy_class, proxy_cls, test_provider: MockConfigProvider):
 #         """Test getting label field name."""
 #         strategy: ReconciliationStrategy = strategy_class(specification)
 #         assert strategy.get_label_field() == "label"
@@ -51,19 +51,19 @@
 #         TEST_SETUPS,
 #     )
 #     @with_test_config
-#     def test_get_id_path(entity_id, specification, strategy_class, query_proxy_class, test_provider: MockConfigProvider):
+#     def test_get_id_path(entity_id, specification, strategy_class, proxy_cls, test_provider: MockConfigProvider):
 #         """Test getting ID path."""
 #         strategy: ReconciliationStrategy = strategy_class(specification)
 #         assert strategy.get_id_path() == "location"
 
 #     @pytest.mark.parametrize(
-#         "entity_id, specification, strategy_class, query_proxy_class",
+#         "entity_id, specification, strategy_class, proxy_cls",
 #         TEST_SETUPS,
 #     )
 #     @with_test_config
-#     def test_get_property_settings(entity_id, specification, strategy_class, query_proxy_class, test_provider: MockConfigProvider):
+#     def test_get_property_settings(entity_id, specification, strategy_class, proxy_cls, test_provider: MockConfigProvider):
 #         """Test get_property_settings method returns location-specific settings."""
-#         strategy = strategy_class(specification, query_proxy_class)
+#         strategy = strategy_class(specification, proxy_cls)
 #         settings = strategy.get_property_settings()
 
 #         assert isinstance(settings, dict)

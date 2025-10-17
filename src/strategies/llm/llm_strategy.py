@@ -25,8 +25,8 @@ JINJA = Environment(loader=BaseLoader(), autoescape=False)
 class LLMReconciliationStrategy(ReconciliationStrategy):
     """Base class for LLM-powered reconciliation strategies"""
 
-    def __init__(self, specification: StrategySpecification, query_proxy_class: DatabaseQueryProxy) -> None:
-        super().__init__(specification, query_proxy_class)
+    def __init__(self, specification: StrategySpecification, proxy_or_cls: DatabaseQueryProxy) -> None:
+        super().__init__(specification, proxy_or_cls)
 
         provider_name: str = ConfigValue("llm.provider").resolve() or "ollama"
         self.llm_provider: LLMProvider = Providers.items[provider_name]()

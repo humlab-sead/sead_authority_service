@@ -40,4 +40,4 @@ class FeatureTypeReconciliationStrategy(ReconciliationStrategy):
 
     async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific site."""
-        return await self.query_proxy_class(self.specification).get_details(entity_id)
+        return await self.get_proxy().get_details(entity_id)

@@ -5,13 +5,13 @@ from src.configuration import ConfigValue
 from src.utility import Registry
 
 from . import StrategySpecification
-from .query import DatabaseQueryProxy, QueryProxy
+from .query import QueryProxy
 
 
 class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
-    def __init__(self, specification: StrategySpecification, query_proxy_class: Type[DatabaseQueryProxy]) -> None:
+    def __init__(self, specification: StrategySpecification, proxy_or_cls: Type[QueryProxy] | QueryProxy) -> None:
         self.specification: StrategySpecification = specification or {
             "key": "unknown",
             "id_field": "id",
@@ -20,7 +20,17 @@ class ReconciliationStrategy(ABC):
             "property_settings": {},
             "sql_queries": {},
         }
-        self.query_proxy_class: Type[QueryProxy] = query_proxy_class
+        self._proxy_or_cls: Type[QueryProxy] = proxy_or_cls
+        self._proxy: QueryProxy = None
+
+    def get_proxy(self) -> QueryProxy:
+        """Return an instance of the query proxy for this strategy"""
+        if not self._proxy:
+            if isinstance(self._proxy_or_cls, QueryProxy):
+                self._proxy = self._proxy_or_cls
+            else:
+                self._proxy = self._proxy_or_cls(self.specification)
+        return self._proxy
 
     @property
     def key(self) -> str:
@@ -82,9 +92,8 @@ class ReconciliationStrategy(ABC):
         Default implementations find candidates based on fuzzy name matching.
         """
         properties = properties or {}
-        proxy: Any = self.query_proxy_class(self.specification)
 
-        candidates: list[dict] = await self._find_candidates(query, properties, limit, proxy)
+        candidates: list[dict] = await self._find_candidates(query, properties, limit, self.get_proxy())
 
         return sorted(candidates, key=lambda x: x.get("name_sim", x.get("score", 0)), reverse=True)[:limit]
 
@@ -101,7 +110,7 @@ class ReconciliationStrategy(ABC):
 
     async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific entity."""
-        return await self.query_proxy_class(self.specification).get_details(entity_id)
+        return await self.get_proxy().get_details(entity_id)
 
 
 class StrategyRegistry(Registry):

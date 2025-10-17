@@ -225,39 +225,38 @@ class BibliographicReferenceReconciliationStrategy(ReconciliationStrategy):
         limit: int = 10,
     ) -> list[dict]:
         props = properties or {}
-        proxy = self.query_proxy_class(self.specification)
         candidates: list[dict] = []
 
         # 1) High-confidence exact identifiers
         if props.get("isbn"):
-            candidates.extend(await proxy.fetch_by_isbn(str(props["isbn"])))
+            candidates.extend(await self.get_proxy().fetch_by_isbn(str(props["isbn"])))
         if props.get("doi"):
-            candidates.extend(await proxy.fetch_by_doi(str(props["doi"])))
+            candidates.extend(await self.get_proxy().fetch_by_doi(str(props["doi"])))
         if props.get("full_reference"):
-            candidates.extend(await proxy.fetch_by_exact_full_reference(str(props["full_reference"])))
+            candidates.extend(await self.get_proxy().fetch_by_exact_full_reference(str(props["full_reference"])))
         if props.get("title") and props.get("year"):
-            candidates.extend(await proxy.fetch_by_exact_title_year(str(props["title"]), str(props["year"])))
+            candidates.extend(await self.get_proxy().fetch_by_exact_title_year(str(props["title"]), str(props["year"])))
         if props.get("bugs_reference"):
-            candidates.extend(await proxy.fetch_by_exact_bugs_reference(str(props["bugs_reference"])))
+            candidates.extend(await self.get_proxy().fetch_by_exact_bugs_reference(str(props["bugs_reference"])))
 
         # 2) Strong fuzzy / partial passes (0.8 floor)
         if props.get("full_reference"):
-            candidates.extend(await proxy.fuzzy_full_reference_partial(str(props["full_reference"]), limit=limit))
+            candidates.extend(await self.get_proxy().fuzzy_full_reference_partial(str(props["full_reference"]), limit=limit))
 
         if props.get("authors") and props.get("year"):
-            candidates.extend(await proxy.fuzzy_authors_partial_and_year(str(props["authors"]), str(props["year"]), limit=limit))
+            candidates.extend(await self.get_proxy().fuzzy_authors_partial_and_year(str(props["authors"]), str(props["year"]), limit=limit))
 
         # Optional but useful: title+year partial
         # if props.get("title") and props.get("year"):
-        #     candidates.extend(await proxy.fuzzy_title_partial_and_year(str(props["title"]), str(props["year"]), limit=limit))
+        #     candidates.extend(await self.get_proxy().fuzzy_title_partial_and_year(str(props["title"]), str(props["year"]), limit=limit))
 
         # 3) Fallback: fuzzy on the free-text `query` (from the front-end)
         # If query is provided and not obviously identical to a property, try full_reference
         if query and not props.get("full_reference"):
-            candidates.extend(await proxy.fuzzy_full_reference_partial(query, limit=limit))
+            candidates.extend(await self.get_proxy().fuzzy_full_reference_partial(query, limit=limit))
             # If still thin, add overall similarity (lower confidence cap)
             if len(candidates) < limit:
-                candidates.extend(await proxy.fuzzy_full_reference_fallback(query, limit=limit))
+                candidates.extend(await self.get_proxy().fuzzy_full_reference_fallback(query, limit=limit))
 
         # 4) Merge, cap, and convert to OpenRefine candidates
         merged = self._merge_max(candidates)
