@@ -24,7 +24,7 @@ def get_reconcile_properties(strategies: StrategyRegistry, query: str = None, en
 
     # Remove duplicates based on property "id". This keeps last property occurrence.
     # This assumes that properties with the same ID are identical across strategies.
-    all_properties = unique = list({d["id"]: d for d in all_properties}.values())
+    all_properties = list({d["id"]: d for d in all_properties}.values())
 
     # Filter properties based on query if provided
     if query:
