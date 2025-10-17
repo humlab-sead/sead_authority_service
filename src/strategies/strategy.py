@@ -5,7 +5,7 @@ from src.configuration import ConfigValue
 from src.utility import Registry
 
 from . import StrategySpecification
-from .query import DatabaseQueryProxy
+from .query import DatabaseQueryProxy, QueryProxy
 
 
 class ReconciliationStrategy(ABC):
@@ -20,7 +20,7 @@ class ReconciliationStrategy(ABC):
             "property_settings": {},
             "sql_queries": {},
         }
-        self.query_proxy_class: Type[DatabaseQueryProxy] = query_proxy_class
+        self.query_proxy_class: Type[QueryProxy] = query_proxy_class
 
     @property
     def key(self) -> str:
