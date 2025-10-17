@@ -16,6 +16,38 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
+class GeoNamesQueryProxy(QueryProxy):  # pylint: disable=too-many-instance-attributes
+
+    def __init__(self, specification: StrategySpecification, **kwargs) -> None:
+        super().__init__(specification, **kwargs)
+        self.username: str = kwargs.get("username") or ConfigValue("geonames.username", default="demo").resolve()
+        self.lang: str = kwargs.get("lang") or ConfigValue("geonames.lang", default="en").resolve()
+        self.country_bias: str | None = kwargs.get("country_bias") or ConfigValue("geonames.country_bias").resolve()
+        self.fuzzy = float(kwargs.get("fuzzy") or ConfigValue("geonames.fuzzy", default=0.8).resolve())
+        self.feature_classes: tuple[str, ...] = tuple(kwargs.get("feature_classes") or ConfigValue("geonames.feature_classes", default=("P", "A")).resolve())
+        self.orderby: str = kwargs.get("orderby") or ConfigValue("geonames.orderby", default="relevance").resolve()
+        self.style: str = kwargs.get("style") or ConfigValue("geonames.style", default="FULL").resolve()
+
+        self.proxy: GeoNamesProxy = GeoNamesProxy(username=self.username, lang=self.lang)
+
+    async def find(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:
+        return await self.proxy.search(
+            q=name,
+            max_rows=limit,
+            fuzzy=self.fuzzy,
+            feature_classes=self.feature_classes,
+            country_bias=self.country_bias,
+            orderby=self.orderby,
+            style=self.style,
+        )
+
+    async def get_details(self, entity_id: str, **kwargs) -> dict[str, Any] | None:  # pylint: disable=unused-argument
+        return await self.proxy.get_details(entity_id, **kwargs)
+
+    async def fetch_by_alternate_identity(self, alternate_identity: str, **kwargs) -> list[dict[str, Any]]:
+        raise NotImplementedError("Alternate identity lookup not implemented for GeoNames")
+
+
 @Strategies.register(key="geonames")
 class GeoNamesReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
