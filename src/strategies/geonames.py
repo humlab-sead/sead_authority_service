@@ -80,11 +80,3 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
             return {"id": "/location/administrative_area", "name": "Administrative Area"}
         return {"id": "/location/place", "name": "Place"}
 
-
-# async def reconcile_places_async(
-#     proxy: GeonamesProxy,
-#     query: str,
-#     **search_kwargs: Any,
-# ) -> Dict[str, Any]:
-#     hits = await proxy.geonames_search(query, **search_kwargs)
-#     return to_reconcile_candidates(hits, query)
