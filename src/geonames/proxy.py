@@ -1,5 +1,5 @@
 import math
-from typing import Any, Dict, Iterable, Literal, Self
+from typing import Any, Iterable, Literal, Self
 
 import httpx
 
@@ -96,7 +96,7 @@ class GeoNamesProxy:
         data = await self._get_json("/searchJSON", params)
         return data.get("geonames", [])
 
-    async def _get_details(
+    async def get_details(
         self,
         geoname_id: int | str,
         *,
@@ -120,9 +120,6 @@ class GeoNamesProxy:
                 params.append((k, v))
 
         return await self._get_json("/getJSON", params)
-
-    async def get_details(self, entity_id: str, **kwargs):
-        raise NotImplementedError
 
     async def _get_json(self, path: str, params: list[tuple[str, Any]]) -> dict[str, Any]:
         """
@@ -163,7 +160,7 @@ def geonames_type_for_refine(g: dict[str, Any]) -> dict[str, str]:
     return {"id": "/location/place", "name": "Place"}
 
 
-def to_reconcile_candidates(geonames_hits: List[Dict[str, Any]], query: str) -> Dict[str, Any]:
+def to_reconcile_candidates(geonames_hits: list[dict[str, Any]], query: str) -> dict[str, Any]:
     results = []
     for g in geonames_hits:
         admin_bits = [g.get("adminName1"), g.get("countryName")]
