@@ -105,7 +105,7 @@ class ReconciliationStrategy(ABC):
         if alternate_identity_field and properties.get(alternate_identity_field, None):
             candidates.extend(await proxy.fetch_by_alternate_identity(properties[alternate_identity_field]))
 
-        candidates.extend(await proxy.fetch_by_fuzzy_label(query, limit))
+        candidates.extend(await proxy.find(query, limit))
         return candidates
 
     async def get_details(self, entity_id: str) -> dict[str, Any] | None:

@@ -64,7 +64,7 @@ class TestSiteQueryProxy:
 
         proxy = SiteQueryProxy(SPECIFICATION, connection=test_provider.connection_mock)
 
-        result: list[dict[str, Any]] = await proxy.fetch_by_fuzzy_label("test site", limit=5)
+        result: list[dict[str, Any]] = await proxy.find("test site", limit=5)
 
         expected_sql: str = SQL_QUERIES["fuzzy_label_sql"]
         test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"q": "test site", "n": 5})
@@ -82,7 +82,7 @@ class TestSiteQueryProxy:
 
         proxy = SiteQueryProxy(SPECIFICATION, connection=test_provider.connection_mock)
 
-        result: list[dict[str, Any]] = await proxy.fetch_by_fuzzy_label("test site")
+        result: list[dict[str, Any]] = await proxy.find("test site")
 
         expected_sql: str = SQL_QUERIES["fuzzy_label_sql"]
         test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"q": "test site", "n": 10})
@@ -279,7 +279,7 @@ class TestSiteReconciliationStrategy:
             result = await strategy.find_candidates("test query", properties, limit=10)
 
         mock_proxy.fetch_site_by_national_id.assert_called_once_with("TEST123")
-        mock_proxy.fetch_by_fuzzy_label.assert_not_called()
+        mock_proxy.find.assert_not_called()
         assert result == mock_sites
 
     @patch("src.strategies.site.SiteQueryProxy")
@@ -293,12 +293,12 @@ class TestSiteReconciliationStrategy:
 
         mock_proxy.fetch_site_by_national_id.return_value = []
         mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.9}, {"site_id": 2, "label": "Another Site", "name_sim": 0.7}]
-        mock_proxy.fetch_by_fuzzy_label.return_value = mock_sites
+        mock_proxy.find.return_value = mock_sites
 
         with patch.object(strategy, "get_proxy", return_value=mock_proxy):
             result = await strategy.find_candidates("test site", {}, limit=5)
 
-        mock_proxy.fetch_by_fuzzy_label.assert_called_once_with("test site", 5)
+        mock_proxy.find.assert_called_once_with("test site", 5)
         # Results should be sorted by name_sim in descending order
         assert result[0]["name_sim"] >= result[1]["name_sim"]
 
@@ -313,7 +313,7 @@ class TestSiteReconciliationStrategy:
 
         mock_proxy.fetch_site_by_national_id.return_value = []
         mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Near Site", "name_sim": 0.8}, {"site_id": 2, "label": "Far Site", "name_sim": 0.9}]
-        mock_proxy.fetch_by_fuzzy_label.return_value = mock_sites
+        mock_proxy.find.return_value = mock_sites
 
         # Mock the geographic scoring method
         with patch.object(strategy, "_apply_geographic_scoring", new_callable=AsyncMock) as mock_geo_scoring:
@@ -336,7 +336,7 @@ class TestSiteReconciliationStrategy:
 
         mock_proxy.fetch_site_by_national_id.return_value = []
         mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.8}]
-        mock_proxy.fetch_by_fuzzy_label.return_value = mock_sites
+        mock_proxy.find.return_value = mock_sites
 
         with patch.object(strategy, "_apply_place_context_scoring", new_callable=AsyncMock) as mock_place_scoring:
             mock_place_scoring.return_value = mock_sites
@@ -463,7 +463,7 @@ class TestSiteReconciliationStrategy:
 
             mock_proxy.fetch_site_by_national_id.return_value = []
             mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.8}]
-            mock_proxy.fetch_by_fuzzy_label.return_value = mock_sites
+            mock_proxy.find.return_value = mock_sites
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
             with patch.object(strategy, "get_proxy", return_value=mock_proxy):
@@ -471,7 +471,7 @@ class TestSiteReconciliationStrategy:
 
             # Should not call national_id search
             mock_proxy.fetch_site_by_national_id.assert_not_called()
-            mock_proxy.fetch_by_fuzzy_label.assert_called_once_with("test query", 10)
+            mock_proxy.find.assert_called_once_with("test query", 10)
             assert result == mock_sites
 
     @pytest.mark.asyncio
@@ -489,7 +489,7 @@ class TestSiteReconciliationStrategy:
                 {"site_id": 2, "label": "High Score", "name_sim": 0.9},
                 {"site_id": 3, "label": "Medium Score", "name_sim": 0.6},
             ]
-            mock_proxy.fetch_by_fuzzy_label.return_value = mock_sites
+            mock_proxy.find.return_value = mock_sites
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
             with patch.object(strategy, "get_proxy", return_value=mock_proxy):
@@ -511,7 +511,7 @@ class TestSiteReconciliationStrategy:
             mock_proxy.fetch_site_by_national_id.return_value = []
             # More candidates than limit
             mock_sites: list[dict[str, Any]] = [{"site_id": i, "label": f"Site {i}", "name_sim": 1.0 - i * 0.1} for i in range(15)]  # 15 candidates
-            mock_proxy.fetch_by_fuzzy_label.return_value = mock_sites
+            mock_proxy.find.return_value = mock_sites
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
             with patch.object(strategy, "get_proxy", return_value=mock_proxy):
@@ -545,7 +545,7 @@ class TestSiteStrategyIntegration:
 
             # Fuzzy search results
             candidates = [{"site_id": 1, "label": "Stockholm Archaeological Site", "name_sim": 0.8}, {"site_id": 2, "label": "Uppsala Site", "name_sim": 0.7}]
-            mock_proxy.fetch_by_fuzzy_label.return_value = candidates
+            mock_proxy.find.return_value = candidates
 
             # Geographic distances
             distances = {1: 0.1, 2: 5.0}  # Very close and moderately close
@@ -562,7 +562,7 @@ class TestSiteStrategyIntegration:
                 result = await strategy.find_candidates("archaeological site", properties, limit=10)
 
             # Verify all methods were called
-            mock_proxy.fetch_by_fuzzy_label.assert_called_once()
+            mock_proxy.find.assert_called_once()
             mock_proxy.fetch_site_distances.assert_called_once()
             mock_proxy.fetch_site_location_similarity.assert_called_once()
 
@@ -746,7 +746,7 @@ class TestSiteStrategyEdgeCases:
             # No national_id provided, so fuzzy search will be used
             mock_proxy.fetch_site_by_national_id.return_value = []
             mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.5}]
-            mock_proxy.fetch_by_fuzzy_label.return_value = mock_sites
+            mock_proxy.find.return_value = mock_sites
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
             with patch.object(strategy, "get_proxy", return_value=mock_proxy):
@@ -785,13 +785,13 @@ class TestSiteStrategyEdgeCases:
             mock_query_proxy_class.return_value = mock_proxy
 
             mock_proxy.fetch_site_by_national_id.return_value = []
-            mock_proxy.fetch_by_fuzzy_label.return_value = []
+            mock_proxy.find.return_value = []
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
             with patch.object(strategy, "get_proxy", return_value=mock_proxy):
                 result = await strategy.find_candidates("", {}, limit=10)
 
-            mock_proxy.fetch_by_fuzzy_label.assert_called_once_with("", 10)
+            mock_proxy.find.assert_called_once_with("", 10)
             assert result == []
 
     @pytest.mark.asyncio
@@ -806,7 +806,7 @@ class TestSiteStrategyEdgeCases:
 
             mock_proxy.fetch_site_by_national_id.return_value = []
             mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Site", "name_sim": 0.8}]
-            mock_proxy.fetch_by_fuzzy_label.return_value = mock_sites
+            mock_proxy.find.return_value = mock_sites
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
             with patch.object(strategy, "get_proxy", return_value=mock_proxy):

@@ -51,7 +51,7 @@ class TestMultipleQueryProxy:
         test_provider.create_connection_mock(fetchall=mock_rows, execute=None)
         proxy: DatabaseQueryProxy = proxy_cls(specification)
 
-        result: list[dict[str, Any]] = await proxy.fetch_by_fuzzy_label("test entity", limit=5)
+        result: list[dict[str, Any]] = await proxy.find("test entity", limit=5)
 
         sql_queries: dict[str, str] = specification["sql_queries"]
         expected_sql: str = sql_queries["fuzzy_label_sql"]
@@ -70,7 +70,7 @@ class TestMultipleQueryProxy:
         test_provider.create_connection_mock(fetchall=[], execute=None)
         proxy = proxy_cls(specification)
 
-        await proxy.fetch_by_fuzzy_label("test")
+        await proxy.find("test")
         sql_queries: dict[str, str] = specification["sql_queries"]
         expected_sql: str = sql_queries["fuzzy_label_sql"]
         test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"q": "test", "n": 10})

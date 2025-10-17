@@ -67,7 +67,7 @@
 #         strategy_class_instance = strategy_class()
 #         assert strategy_class_instance.specification == specification
 
-#         result: list[dict[str, Any]] = await proxy.fetch_by_fuzzy_label("test site", limit=5)
+#         result: list[dict[str, Any]] = await proxy.find("test site", limit=5)
 
 #         expected_sql: str = SQL_QUERIES["fuzzy_label_sql"]
 #         mock_cursor.execute.assert_called_once_with(expected_sql, {"q": "test site", "n": 5})

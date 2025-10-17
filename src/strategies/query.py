@@ -31,8 +31,8 @@ class QueryProxy(ABC):
         return self.specification["key"]
 
     @abstractmethod
-    async def fetch_by_fuzzy_label(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:
-        """Perform fuzzy name search"""
+    async def find(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:
+        """Perform (possiblyfuzzy name search"""
 
     @abstractmethod
     async def get_details(self, entity_id: str, **kwargs) -> dict[str, Any] | None:
@@ -101,7 +101,7 @@ class DatabaseQueryProxy(QueryProxy):
             logger.error(f"Error fetching details for entity_id {entity_id}: {e}")
             return None
 
-    async def fetch_by_fuzzy_label(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:  # pylint: disable=unused-argument
+    async def find(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:  # pylint: disable=unused-argument
         """Perform fuzzy name search"""
         return await self.fetch_all(self.get_sql_query("fuzzy_label_sql"), {"q": name, "n": limit})
 
