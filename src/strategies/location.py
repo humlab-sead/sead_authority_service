@@ -19,7 +19,7 @@ SPECIFICATION: StrategySpecification = {
         "fuzzy_label_sql": """
         select * from authority.fuzzy_locations(%(q)s, %(n)s);
     """,
-        "get_details": """
+        "details_sql": """
             select  location_id as "ID",
                     label as "Place Name",
                     latitude as "Latitude",

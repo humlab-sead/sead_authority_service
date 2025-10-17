@@ -30,7 +30,7 @@ SPECIFICATION: StrategySpecification = {
             order by name_sim desc, 2
             limit %(n)s;
     """,
-        "get_details": """
+        "details_sql": """
             select sampling_context_id as "ID",
                 sampling_context as "Name",
                 description as "Description",

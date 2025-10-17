@@ -38,7 +38,7 @@ SPECIFICATION: StrategySpecification = {
             order by name_sim desc, 2
             limit %(n)s;
         """,
-        "get_details": """
+        "details_sql": """
             select 
                 d.dimension_id as "ID", 
                 d.dimension_name as "Name", 

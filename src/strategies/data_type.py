@@ -30,7 +30,7 @@ SPECIFICATION: StrategySpecification = {
             order by name_sim desc, 2
             limit %(n)s;
     """,
-        "get_details": """
+        "details_sql": """
             select dt.data_type_id as "ID",
                    dt.label as "Name",
                    dt.description as "Description",

@@ -126,7 +126,7 @@ class TestSiteQueryProxy:
 
         result: dict[str, Any] | None = await proxy.get_details("123")
 
-        expected_sql: str = SQL_QUERIES["get_details"]
+        expected_sql: str = SQL_QUERIES["details_sql"]
         test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"id": 123})
 
         assert result == mock_row

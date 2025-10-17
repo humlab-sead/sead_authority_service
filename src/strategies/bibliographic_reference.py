@@ -24,7 +24,7 @@ SPECIFICATION: StrategySpecification = {
         "fuzzy_label_sql": """
         select * from authority.fuzzy_bibliographic_references(%(q)s, %(n)s);
     """,
-        "get_details": """
+        "details_sql": """
             select  biblio_id as "ID",
                     bugs_reference as "BUGS Reference",
                     doi as "DOI",

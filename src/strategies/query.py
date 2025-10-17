@@ -90,7 +90,7 @@ class DatabaseQueryProxy(QueryProxy):
 
     def get_details_sql(self) -> str:
         """Return the SQL query for fetching detailed information for a given entity ID."""
-        return self.get_sql_query("get_details")
+        return self.get_sql_query("details_sql")
 
     async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific location."""

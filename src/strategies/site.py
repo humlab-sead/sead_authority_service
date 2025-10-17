@@ -75,7 +75,7 @@ SPECIFICATION: StrategySpecification = {
           and location_name is not null
         group by site_id
     """,
-        "get_details": """
+        "details_sql": """
             with locations as (
                 select site_id, string_agg(location_name, ', ') as place_names
                 from tbl_site_locations

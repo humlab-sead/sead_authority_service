@@ -14,7 +14,7 @@ SPECIFICATION: StrategySpecification = {
         "fuzzy_label_sql": """
         select * from authority.fuzzy_feature_types(%(q)s, %(n)s);
     """,
-        "get_details": """
+        "details_sql": """
             select feature_type_id as "ID",
                    label as "Feature Type Name",
                    description as "Description"

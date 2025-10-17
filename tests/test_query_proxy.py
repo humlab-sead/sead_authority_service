@@ -91,7 +91,7 @@ class TestMultipleQueryProxy:
         result: dict[str, Any] | None = await proxy.get_details("123")
 
         sql_queries: dict[str, str] = specification["sql_queries"]
-        expected_sql: str = sql_queries["get_details"]
+        expected_sql: str = sql_queries["details_sql"]
         test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"id": 123})
         assert result == mock_row
 

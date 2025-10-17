@@ -36,7 +36,7 @@ SPECIFICATION: StrategySpecification = {
             ORDER BY name_sim DESC
             LIMIT %(n)s
         """,
-        "get_details": """
+        "details_sql": """
             SELECT 
                 modification_type_id as "ID",
                 modification_type_name as "Name", 

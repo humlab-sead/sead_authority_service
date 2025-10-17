@@ -20,7 +20,7 @@ SPECIFICATION: StrategySpecification = {
         "fuzzy_label_sql": """
         select * from authority.methods(%(q)s, %(n)s);
     """,
-        "get_details": """
+        "details_sql": """
             select 
                 m.method_id as "ID", 
                 m.method_name as "Name", 
