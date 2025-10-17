@@ -60,15 +60,9 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
 
         Default implementations find candidates based on fuzzy name matching.
         """
-        candidates: list[dict] = []
         properties = properties or {}
-        proxy: Any = self.query_proxy_class(self.specification)
 
-        alternate_identity_field: str = self.specification.get("alternate_identity_field")
-        if alternate_identity_field and properties.get(alternate_identity_field, None):
-            candidates.extend(await proxy.fetch_by_alternate_identity(properties[alternate_identity_field]))
-
-        candidates.extend(await proxy.fetch_by_fuzzy_label(query, limit))
+        candidates: list[dict] = await self.get_proxy().find(query, limit, properties=properties)
 
         return sorted(candidates, key=lambda x: x.get("name_sim", 0), reverse=True)[:limit]
 
