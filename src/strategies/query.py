@@ -31,11 +31,11 @@ class QueryProxy(ABC):
         return self.specification["key"]
 
     @abstractmethod
-    async def fetch_by_fuzzy_label(self, name: str, limit: int = 10) -> list[dict[str, Any]]:
+    async def fetch_by_fuzzy_label(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:
         """Perform fuzzy name search"""
 
     @abstractmethod
-    async def get_details(self, entity_id: str) -> dict[str, Any] | None:
+    async def get_details(self, entity_id: str, **kwargs) -> dict[str, Any] | None:
         """Fetch details for a specific entity by ID"""
 
     @abstractmethod
