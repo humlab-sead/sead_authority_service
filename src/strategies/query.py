@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-import asyncio
 from typing import Any, Literal, Mapping, Sequence, Tuple, TypeAlias, Union
 
 import psycopg
@@ -11,6 +10,7 @@ from src.configuration.setup import get_connection
 from . import StrategySpecification
 
 Params: TypeAlias = Union[Sequence[Any], Mapping[str, Any]]
+
 
 class QueryProxy(ABC):
     """Abstract base class for entity-specific query proxies"""
@@ -41,6 +41,7 @@ class QueryProxy(ABC):
     @abstractmethod
     async def fetch_by_alternate_identity(self, alternate_identity: str) -> list[dict[str, Any]]:
         """Fetch entity by alternate identity"""
+
 
 class DatabaseQueryProxy(QueryProxy):
     def __init__(self, specification: StrategySpecification, **kwargs) -> None:
@@ -92,7 +93,7 @@ class DatabaseQueryProxy(QueryProxy):
         """Return the SQL query for fetching detailed information for a given entity ID."""
         return self.get_sql_query("details_sql")
 
-    async def get_details(self, entity_id: str) -> dict[str, Any] | None:
+    async def get_details(self, entity_id: str, **kwargs) -> dict[str, Any] | None:  # pylint: disable=unused-argument
         """Fetch details for a specific location."""
         try:
             return await self.fetch_one(self.get_details_sql(), {"id": int(entity_id)})
