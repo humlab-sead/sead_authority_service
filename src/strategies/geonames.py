@@ -21,7 +21,9 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 
     def __init__(self, specification: dict[str, str] = None) -> None:
-        super().__init__(specification or SPECIFICATION, GeoNamesQueryProxy)
+        strategy_options: dict[str, Any] = ConfigValue(f"policy.{self.key}.geonames.options").resolve() or {}
+        proxy: QueryProxy = GeoNamesQueryProxy(SPECIFICATION, **strategy_options)
+        super().__init__(specification or SPECIFICATION, proxy)
 
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:
         """Convert entity data to OpenRefine candidate format"""
