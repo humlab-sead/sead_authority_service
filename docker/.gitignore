@@ -1,0 +1,11 @@
+# Ignore environment files with secrets
+docker/.env
+docker/.env.production
+
+# Ignore log files
+docker/logs/*
+!docker/logs/.gitkeep
+
+# Ignore data files
+docker/data/*
+!docker/data/.gitkeep

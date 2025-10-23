@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  sead-authority-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: sead-authority-service:latest
+    container_name: sead-authority-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount config from host (read-only recommended for security)
+      - ./config.yml:/app/config/config.yml:ro
+      # Mount logs directory (read-write)
+      - ./logs:/app/logs
+      # Optional: mount data directory if needed
+      - ./data:/app/data
+    environment:
+      # Override CONFIG_FILE to point to mounted config
+      - CONFIG_FILE=/app/config/config.yml
+      
+      # Database configuration (from .env or set here)
+      - SEAD_AUTHORITY_OPTIONS_DATABASE_HOST=${SEAD_AUTHORITY_OPTIONS_DATABASE_HOST}
+      - SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME=${SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME}
+      - SEAD_AUTHORITY_OPTIONS_DATABASE_USER=${SEAD_AUTHORITY_OPTIONS_DATABASE_USER}
+      - SEAD_AUTHORITY_OPTIONS_DATABASE_PORT=${SEAD_AUTHORITY_OPTIONS_DATABASE_PORT}
+      
+      # LLM configuration
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      
+      # GeoNames configuration
+      - GEONAMES_USERNAME=${GEONAMES_USERNAME:-demo}
+      
+      # Optional: Python runtime settings
+      - PYTHONUNBUFFERED=1
+    env_file:
+      # Load additional environment variables from .env file
+      - .env
+    networks:
+      - sead-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/is_alive"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    # Optional: resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Optional: PostgreSQL database (if not using external)
+  # Uncomment if you need a local database for development
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: sead-postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     - POSTGRES_DB=sead_staging
+  #     - POSTGRES_USER=sead_user
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #     - ./sql:/docker-entrypoint-initdb.d:ro
+  #   ports:
+  #     - "5432:5432"
+  #   networks:
+  #     - sead-network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U sead_user"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # Optional: Ollama service (if not using external)
+  # Uncomment if you need a local Ollama instance
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: sead-ollama
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ollama-data:/root/.ollama
+  #   ports:
+  #     - "11434:11434"
+  #   networks:
+  #     - sead-network
+
+networks:
+  sead-network:
+    driver: bridge
+
+volumes:
+  # Uncomment if using local database
+  # postgres-data:
+  # ollama-data:
+  logs:
+  data:
