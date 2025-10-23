@@ -6,10 +6,10 @@ import json
 from typing import Any
 from unittest.mock import patch
 
-from httpx import Response
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from httpx import Response
 
 from src.api.router import router
 from src.configuration import MockConfigProvider

@@ -2,7 +2,7 @@ from typing import Any
 
 from src.configuration import ConfigValue
 
-from .query import QueryProxy
+from .query import DatabaseQueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -75,7 +75,7 @@ SPECIFICATION: StrategySpecification = {
           and location_name is not null
         group by site_id
     """,
-        "get_details": """
+        "details_sql": """
             with locations as (
                 select site_id, string_agg(location_name, ', ') as place_names
                 from tbl_site_locations
@@ -98,7 +98,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class SiteQueryProxy(QueryProxy):
+class SiteQueryProxy(DatabaseQueryProxy):
 
     async def fetch_site_by_national_id(self, national_id: str) -> list[dict[str, Any]]:
         """Exact match by national site identifier"""
@@ -134,33 +134,32 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
         """Find candidate sites based on name, identifier, and optional geographic context"""
         candidates: list[dict] = []
         properties = properties or {}
-        proxy: SiteQueryProxy = self.query_proxy_class(self.specification)
 
         # 1) Exact match by national site identifier
         if properties.get("national_id"):
-            candidates.extend(await proxy.fetch_site_by_national_id(properties["national_id"]))
+            candidates.extend(await self.get_proxy().fetch_site_by_national_id(properties["national_id"]))
 
         # 2) Fuzzy name matching with enhanced scoring
         if not candidates:
-            candidates.extend(await proxy.fetch_by_fuzzy_label(query, limit))
+            candidates.extend(await self.get_proxy().find(query, limit))
 
         # 3) Geographic proximity boost if coordinates provided
         if properties.get("latitude") and properties.get("longitude") and candidates:
-            candidates = await self._apply_geographic_scoring(candidates, {"lat": properties["latitude"], "lon": properties["longitude"]}, proxy)
+            candidates = await self._apply_geographic_scoring(candidates, {"lat": properties["latitude"], "lon": properties["longitude"]})
 
         # 4) Place name context boost
         if properties.get("place_name") and candidates:
-            candidates = await self._apply_place_context_scoring(candidates, properties["place_name"], proxy)
+            candidates = await self._apply_place_context_scoring(candidates, properties["place_name"])
 
         return sorted(candidates, key=lambda x: x.get("name_sim", 0), reverse=True)[:limit]
 
-    async def _apply_geographic_scoring(self, candidates: list[dict], coordinate: dict[str, float], proxy: SiteQueryProxy) -> list[dict]:
+    async def _apply_geographic_scoring(self, candidates: list[dict], coordinate: dict[str, float]) -> list[dict]:
         """Boost scores based on geographic proximity"""
         if not coordinate or not candidates:
             return candidates
         very_near_distance_km: float = ConfigValue("policy:site:proximity_boost:very_near_distance_km").resolve() or 0.2
         to_far_distance_km: float = ConfigValue("policy:site:proximity_boost:to_far_distance_km").resolve() or 10.0
-        distances: dict[int, float] = await proxy.fetch_site_distances(coordinate, [c["site_id"] for c in candidates])
+        distances: dict[int, float] = await self.get_proxy().fetch_site_distances(coordinate, [c["site_id"] for c in candidates])
         # Apply distance-based scoring boost
         for candidate in candidates:
             site_id = candidate["site_id"]
@@ -173,10 +172,10 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
 
         return candidates
 
-    async def _apply_place_context_scoring(self, candidates: list[dict], place: str, proxy: SiteQueryProxy) -> list[dict]:
+    async def _apply_place_context_scoring(self, candidates: list[dict], place: str) -> list[dict]:
         """Boost scores based on place name context"""
 
-        place_results = await proxy.fetch_site_location_similarity(candidates, place)
+        place_results = await self.get_proxy().fetch_site_location_similarity(candidates, place)
 
         similarity_threshold: float = ConfigValue("policy:site:place_name_similarity_boost:similarity_threshold").resolve() or 0.3
         max_boost: float = ConfigValue("policy:site:place_name_similarity_boost:max_boost").resolve() or 0.1

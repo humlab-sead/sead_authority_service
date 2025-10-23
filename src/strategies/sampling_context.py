@@ -1,4 +1,4 @@
-from .query import QueryProxy
+from .query import DatabaseQueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -30,7 +30,7 @@ SPECIFICATION: StrategySpecification = {
             order by name_sim desc, 2
             limit %(n)s;
     """,
-        "get_details": """
+        "details_sql": """
             select sampling_context_id as "ID",
                 sampling_context as "Name",
                 description as "Description",
@@ -54,4 +54,4 @@ class SamplingContextReconciliationStrategy(ReconciliationStrategy):
 
     def __init__(self, specification: StrategySpecification = None) -> None:
         specification = specification or SPECIFICATION
-        super().__init__(specification, QueryProxy)
+        super().__init__(specification, DatabaseQueryProxy)

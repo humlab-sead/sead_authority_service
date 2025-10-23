@@ -1,4 +1,4 @@
-from .query import QueryProxy
+from .query import DatabaseQueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -30,7 +30,7 @@ SPECIFICATION: StrategySpecification = {
             order by name_sim desc, 2
             limit %(n)s;
     """,
-        "get_details": """
+        "details_sql": """
             select dt.data_type_id as "ID",
                    dt.label as "Name",
                    dt.description as "Description",
@@ -45,7 +45,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class DataTypeQueryProxy(QueryProxy):
+class DataTypeQueryProxy(DatabaseQueryProxy):
     """Data Type-specific query proxy"""
 
 

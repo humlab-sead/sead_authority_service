@@ -1,4 +1,4 @@
-from .query import QueryProxy
+from .query import DatabaseQueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -20,7 +20,7 @@ SPECIFICATION: StrategySpecification = {
         "fuzzy_label_sql": """
         select * from authority.methods(%(q)s, %(n)s);
     """,
-        "get_details": """
+        "details_sql": """
             select 
                 m.method_id as "ID", 
                 m.method_name as "Name", 
@@ -42,7 +42,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class MethodQueryProxy(QueryProxy):
+class MethodQueryProxy(DatabaseQueryProxy):
     """Method-specific query proxy"""
 
 

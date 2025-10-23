@@ -1,6 +1,6 @@
 from typing import Any
 
-from .query import QueryProxy
+from .query import DatabaseQueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -14,7 +14,7 @@ SPECIFICATION: StrategySpecification = {
         "fuzzy_label_sql": """
         select * from authority.fuzzy_feature_types(%(q)s, %(n)s);
     """,
-        "get_details": """
+        "details_sql": """
             select feature_type_id as "ID",
                    label as "Feature Type Name",
                    description as "Description"
@@ -25,7 +25,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class FeatureTypeQueryProxy(QueryProxy):
+class FeatureTypeQueryProxy(DatabaseQueryProxy):
     def __init__(self, specification: StrategySpecification) -> None:  # pylint: disable=useless-parent-delegation
         super().__init__(specification)
 
@@ -40,4 +40,4 @@ class FeatureTypeReconciliationStrategy(ReconciliationStrategy):
 
     async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific site."""
-        return await self.query_proxy_class(self.specification).get_details(entity_id)
+        return await self.get_proxy().get_details(entity_id)

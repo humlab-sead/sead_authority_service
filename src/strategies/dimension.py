@@ -1,4 +1,4 @@
-from .query import QueryProxy
+from .query import DatabaseQueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -38,7 +38,7 @@ SPECIFICATION: StrategySpecification = {
             order by name_sim desc, 2
             limit %(n)s;
         """,
-        "get_details": """
+        "details_sql": """
             select 
                 d.dimension_id as "ID", 
                 d.dimension_name as "Name", 
@@ -61,7 +61,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class DimensionQueryProxy(QueryProxy):
+class DimensionQueryProxy(DatabaseQueryProxy):
     """Dimension-specific query proxy"""
 
 

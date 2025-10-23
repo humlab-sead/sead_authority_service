@@ -1,4 +1,4 @@
-from .query import QueryProxy
+from .query import DatabaseQueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -19,7 +19,7 @@ SPECIFICATION: StrategySpecification = {
         "fuzzy_label_sql": """
         select * from authority.fuzzy_locations(%(q)s, %(n)s);
     """,
-        "get_details": """
+        "details_sql": """
             select  location_id as "ID",
                     label as "Place Name",
                     latitude as "Latitude",
@@ -33,7 +33,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class LocationQueryProxy(QueryProxy):
+class LocationQueryProxy(DatabaseQueryProxy):
     """Location-specific query proxy"""
 
 

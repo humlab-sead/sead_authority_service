@@ -27,6 +27,15 @@ policy:
       You are provided with known modification types, each with an id, a label and a description.
     output:
       format: json
+  geonames:
+    options:
+      username: "${GEONAMES_USERNAME}"
+      lang: "en"
+      country_bias: "en"
+      fuzzy: 0.8
+      feature_classes: ["P", "A"]  # Populated places and Administrative divisions
+      orderby: "relevance"
+      style: "FULL"
 llm:
   provider: "openai"  # "openai" or "anthropic", "ollama"
   options:
@@ -160,6 +169,16 @@ llm:
       - Domain/context alignment (terminology fit)
       - Language variants and most common target-language form
       - Penalize partial/ambiguous overlaps and mismatched domain terms
+
+geonames:
+  options:
+    username: "${GEONAMES_USERNAME}"
+    lang: "en"
+    country_bias: "en"
+    fuzzy: 0.8
+    feature_classes: ["P", "A"]  # Populated places and Administrative divisions
+    orderby: "relevance"
+    style: "FULL"
 
 logging:
   folder: ./logs
