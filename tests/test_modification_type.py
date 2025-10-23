@@ -11,9 +11,9 @@ from psycopg import AsyncConnection
 from src.configuration import SingletonConfigProvider, get_config_provider, get_connection
 from src.configuration.interface import ConfigLike
 from src.configuration.provider import ConfigProvider
+from src.strategies.llm.llm_models import Candidate, ReconciliationResponse, ReconciliationResult
+from src.strategies.llm.modification_type import SPECIFICATION, LLMModificationTypeReconciliationStrategy
 from src.strategies.strategy import ReconciliationStrategy
-from strategies.llm.llm_models import Candidate, ReconciliationResponse, ReconciliationResult
-from strategies.llm.modification_type import SPECIFICATION, LLMModificationTypeReconciliationStrategy
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 

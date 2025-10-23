@@ -2,12 +2,15 @@
 Unit tests for GeoNames reconciliation strategy and query proxy.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.strategies.geonames import SPECIFICATION, GeoNamesQueryProxy, GeoNamesReconciliationStrategy
+import pytest
+
 from src.configuration import MockConfigProvider
+from src.strategies.geonames import SPECIFICATION, GeoNamesQueryProxy, GeoNamesReconciliationStrategy
 from tests.decorators import with_test_config
+
+# pylint: disable=unused-argument, protected-access
 
 
 class TestGeoNamesQueryProxy:
@@ -188,7 +191,7 @@ class TestGeoNamesReconciliationStrategy:
         mock_proxy = MagicMock()
         mock_query_proxy_class.return_value = mock_proxy
 
-        strategy = GeoNamesReconciliationStrategy()
+        _ = GeoNamesReconciliationStrategy()
 
         # Verify proxy was created with strategy options
         mock_query_proxy_class.assert_called_once_with(SPECIFICATION, username="strategy_user", lang="sv", country_bias="SE")
@@ -570,6 +573,8 @@ class TestGeoNamesIntegration:
         if refine_candidates:
             details = await strategy.get_details(refine_candidates[0]["id"])
 
+            assert details == details_result
+
         # Verify the workflow
         assert len(candidates) == 1
         assert len(refine_candidates) == 1
@@ -579,8 +584,6 @@ class TestGeoNamesIntegration:
         assert candidate["name"] == "Umeå, Västerbotten, Sweden"
         assert candidate["type"] == [{"id": "/location/citytown", "name": "City/Town"}]
         assert "pop 83,249" in candidate["description"]
-
-        assert details == details_result
 
 
 class TestGeoNamesEdgeCases:

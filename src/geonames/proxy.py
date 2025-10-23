@@ -144,4 +144,3 @@ class GeoNamesProxy:
             code = data["status"].get("value", "unknown")
             raise RuntimeError(f"GeoNames error {code}: {msg}")
         return data
-

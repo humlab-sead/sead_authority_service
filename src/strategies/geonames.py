@@ -55,7 +55,8 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 
     def __init__(self, specification: dict[str, str] = None) -> None:
-        strategy_options: dict[str, Any] = ConfigValue(f"policy.{self.key}.geonames.options").resolve() or {}
+        key = (specification or SPECIFICATION).get("key", "geonames")
+        strategy_options: dict[str, Any] = ConfigValue(f"policy.{key}.geonames.options").resolve() or {}
         proxy: QueryProxy = GeoNamesQueryProxy(SPECIFICATION, **strategy_options)
         super().__init__(specification or SPECIFICATION, proxy)
 
@@ -74,9 +75,9 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
             "description": self._generate_description(entity_data),
             "uri": f"https://www.geonames.org/{entity_data['geonameId']}",
         }
-        candidate['name_sim'] = candidate['score'] / 100.0
+        candidate["name_sim"] = candidate["score"] / 100.0 if "score" in candidate and candidate["score"] is not None else 0.0
         return candidate
-    
+
     def _calculate_score(self, data: dict[str, Any]) -> float:
         gn_score: float = float(data.get("score", 0.0))
         pop: int = int(data.get("population", 0))
@@ -115,4 +116,3 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
         if fc == "A" and fcode.startswith("ADM"):
             return {"id": "/location/administrative_area", "name": "Administrative Area"}
         return {"id": "/location/place", "name": "Place"}
-

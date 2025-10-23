@@ -32,7 +32,7 @@ class QueryProxy(ABC):
 
     @abstractmethod
     async def find(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:
-        """Perform (possiblyfuzzy name search"""
+        """Perform (possibly) fuzzy name search"""
 
     @abstractmethod
     async def get_details(self, entity_id: str, **kwargs) -> dict[str, Any] | None:

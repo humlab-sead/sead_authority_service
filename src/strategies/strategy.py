@@ -21,7 +21,12 @@ class ReconciliationStrategy(ABC):
             "sql_queries": {},
         }
         self._proxy_or_cls: Type[QueryProxy] = proxy_or_cls
-        self._proxy: QueryProxy = None
+        self._proxy: QueryProxy | None = None
+
+    @property
+    def key(self) -> str:
+        """Return the unique key for this strategy, if registered, else 'unknown'"""
+        return getattr(self, "_registry_key", "unknown")
 
     def get_proxy(self) -> QueryProxy:
         """Return an instance of the query proxy for this strategy"""
@@ -31,11 +36,6 @@ class ReconciliationStrategy(ABC):
             else:
                 self._proxy = self._proxy_or_cls(self.specification)
         return self._proxy
-
-    # @property
-    # def key(self) -> str:
-    #     """Return the unique key for this strategy"""
-    #     return self.specification["key"]
 
     def get_entity_id_field(self) -> str:
         """Return the ID field name for this entity type"""
