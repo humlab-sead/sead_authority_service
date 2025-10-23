@@ -1,0 +1,383 @@
+"""
+Unit tests for OllamaProvider LLM implementation.
+"""
+
+import os
+from unittest.mock import AsyncMock, Mock, mock_open, patch
+
+import httpx
+import pytest
+from pydantic import BaseModel
+
+from src.configuration import MockConfigProvider
+from src.llm.providers.ollama import OllamaProvider
+from tests.decorators import with_test_config
+
+# pylint: disable=unused-argument
+
+
+class ResponseModel(BaseModel):
+    """Test Pydantic model for typed responses"""
+
+    answer: str
+    confidence: float
+
+
+class TestOllamaProvider:
+
+    @with_test_config
+    def test_init_with_defaults(self, test_provider: MockConfigProvider) -> None:
+        """Test OllamaProvider initialization with default configuration"""
+
+        with patch("ollama.Client") as mock_client_class, patch("src.llm.providers.ollama.ConfigValue") as mock_config_value:
+
+            # Mock ConfigValue calls to return test values
+            def config_side_effect(key, default=None):
+                config_map = {"llm.ollama.host": "http://localhost:11434", "llm.ollama.model": "llama2", "llm.ollama.timeout": 30}
+                mock_val = Mock()
+                mock_val.resolve.return_value = config_map.get(key, default)
+                return mock_val
+
+            mock_config_value.side_effect = config_side_effect
+
+            mock_client = Mock()
+            mock_client_class.return_value = mock_client
+
+            provider = OllamaProvider()
+
+            assert provider.host == "http://localhost:11434"
+            assert provider.model == "llama2"
+            assert provider.client == mock_client
+            mock_client_class.assert_called_once_with(host="http://localhost:11434", timeout=30, follow_redirects=True)
+
+    @with_test_config
+    def test_init_with_defaults2(self, test_provider: MockConfigProvider):
+        """Test OllamaProvider initialization with default configuration"""
+
+        with patch("ollama.Client") as mock_client_class:
+            mock_client = Mock()
+            mock_client_class.return_value = mock_client
+
+            provider = OllamaProvider()
+
+            environ_base_url: str = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+
+            assert provider.host == environ_base_url
+            assert provider.model == "gpt-oss:20b"
+            assert provider.client == mock_client
+            mock_client_class.assert_called_once_with(host=environ_base_url, timeout=30, follow_redirects=True)
+
+    @with_test_config
+    def test_init_with_parameters(self, test_provider: MockConfigProvider):
+        """Test OllamaProvider initialization with explicit parameters"""
+        # Set up mock configuration (fallback values)
+        # test_provider.get_config().update({"llm": {"ollama": {"host": "http://default:11434", "model": "default_model", "timeout": 30}}})
+
+        with patch("ollama.Client") as mock_client_class:
+            mock_client = Mock()
+            mock_client_class.return_value = mock_client
+
+            provider = OllamaProvider(host="http://custom:8080", model="custom_model")
+
+            assert provider.host == "http://custom:8080"
+            assert provider.model == "custom_model"
+            mock_client_class.assert_called_once_with(host="http://custom:8080", timeout=30, follow_redirects=True)
+
+    @pytest.mark.asyncio  # Add this decorator
+    @with_test_config
+    async def test_complete_basic(self, test_provider: MockConfigProvider):
+        """Test basic completion without typed response"""
+        test_provider.get_config().update(
+            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+        )
+
+        with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
+
+            # Mock the async client and response
+            mock_async_client = Mock()
+            mock_async_client_class.return_value = mock_async_client
+
+            expected_data: dict[str, str] = {"response": "Test completion result"}
+            mock_response = Mock()
+            mock_response.json.return_value = expected_data
+            mock_response.message.model_dump_json.return_value = "Test completion result"
+
+            mock_async_client.chat = AsyncMock(return_value=mock_response)
+
+            # patch json.dump to be a no-op
+            with patch("json.dump", return_value=None):
+                provider = OllamaProvider()
+                result = await provider.complete("Test prompt")
+
+            assert result == "Test completion result"
+
+            # Verify the chat call
+            mock_async_client.chat.assert_called_once_with(
+                model="llama2",
+                messages=[{"role": "user", "content": "Test prompt"}],
+                options={"temperature": 0.7, "num_predict": 4096, "stream": False},
+                stream=False,
+                format="json",
+            )
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_complete_with_custom_options(self, test_provider: MockConfigProvider):
+        """Test completion with custom options passed via kwargs"""
+        test_provider.get_config().update(
+            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+        )
+
+        with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
+
+            mock_async_client = Mock()
+            mock_async_client_class.return_value = mock_async_client
+
+            mock_message = Mock()
+            mock_message.model_dump_json.return_value = "Custom result"
+
+            mock_response = Mock()
+            mock_response.model_dump.return_value = {"response": "Custom result"}
+            mock_response.message = mock_message
+
+            mock_async_client.chat = AsyncMock(return_value=mock_response)
+
+            # Patch json.dump and file operations to avoid actual file writing
+            with patch("json.dump"), patch("builtins.open", mock_open()):
+                provider = OllamaProvider()
+                result = await provider.complete("Test prompt", max_tokens=500, temperature=0.2)
+
+            assert result == "Custom result"
+
+            # Verify custom options were used
+            mock_async_client.chat.assert_called_once_with(
+                model="llama2",
+                messages=[{"role": "user", "content": "Test prompt"}],
+                options={"temperature": 0.2, "num_predict": 4096, "stream": False},
+                stream=False,
+                format="json",
+            )
+
+    @pytest.mark.asyncio  # Add this decorator
+    @with_test_config
+    async def test_complete_with_explicit_options(self, test_provider: MockConfigProvider):
+        """Test completion with explicit options dictionary"""
+        test_provider.get_config().update({"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
+
+        with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
+
+            mock_async_client = Mock()
+            mock_async_client_class.return_value = mock_async_client
+
+            mock_message = Mock()
+            mock_message.model_dump_json.return_value = "Explicit options result"
+
+            mock_response = Mock()
+            mock_response.model_dump.return_value = {"response": "Explicit options result"}
+            mock_response.message = mock_message
+
+            mock_async_client.chat = AsyncMock(return_value=mock_response)
+
+            # Patch json.dump and file operations to avoid actual file writing
+            with patch("json.dump"), patch("builtins.open", mock_open()):
+                provider = OllamaProvider()
+                custom_options = {"num_predict": 100, "top_k": 40, "top_p": 0.9}
+
+                result = await provider.complete("Test prompt", options=custom_options)
+
+            assert result == "Explicit options result"
+
+        # Verify explicit options were used
+        mock_async_client.chat.assert_called_once_with(
+            model="llama2",
+            messages=[{"role": "user", "content": "Test prompt"}],
+            options={"num_predict": 100, "top_k": 40, "top_p": 0.9, "temperature": 0.1, "stream": False},
+            stream=False,
+            format="json",
+        )
+
+    @pytest.mark.skip(reason="Typed response handling not implemented yet")
+    @pytest.mark.asyncio  # Add this decorator
+    @with_test_config
+    async def test_complete_with_typed_response(self, test_provider: MockConfigProvider):
+        """Test completion with Pydantic model for typed response"""
+        test_provider.get_config().update(
+            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.1}}}}
+        )
+
+        with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
+
+            mock_async_client = Mock()
+            mock_async_client_class.return_value = mock_async_client
+
+            mock_message = Mock()
+            mock_message.model_dump_json.return_value = '{"answer": "Test answer", "confidence": 0.95}'
+            mock_message.content = '{"answer": "Test answer", "confidence": 0.95}'
+
+            mock_response = Mock()
+            mock_response.model_dump.return_value = {"message": {"content": '{"answer": "Test answer", "confidence": 0.95}'}}
+            mock_response.message = mock_message
+
+            mock_async_client.chat = AsyncMock(return_value=mock_response)
+
+            # Patch json.dump and file operations to avoid actual file writing
+            with patch("json.dump"), patch("builtins.open", mock_open()):
+                provider = OllamaProvider()
+                result = await provider.complete("Test prompt", response_model=ResponseModel)
+
+            assert result == '{"answer": "Test answer", "confidence": 0.95}'
+
+            # Verify the schema was passed for formatting
+            mock_async_client.chat.assert_called_once()
+            call_args = mock_async_client.chat.call_args[1]
+            assert call_args["format"] == "json"
+
+    @pytest.mark.skip(reason="Typed response handling not implemented yet")
+    @pytest.mark.asyncio  # Add this decorator
+    @with_test_config
+    async def test_complete_typed_response_invalid_model(self, test_provider: MockConfigProvider):
+        """Test completion with invalid response_model raises ValueError"""
+        test_provider.get_config().update({"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
+
+        with patch("ollama.Client"):
+            provider = OllamaProvider()
+
+            # Test with non-BaseModel class
+            with pytest.raises(ValueError, match="response_model must be a pydantic BaseModel subclass"):
+                await provider.complete("Test prompt", response_model=dict)  # Invalid: not a BaseModel
+
+    @pytest.mark.asyncio  # Add this decorator
+    @with_test_config
+    async def test_complete_network_error_handling(self, test_provider: MockConfigProvider):
+        """Test that network errors are properly propagated"""
+        test_provider.get_config().update(
+            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+        )
+
+        with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
+
+            mock_async_client = Mock()
+            mock_async_client_class.return_value = mock_async_client
+
+            # Simulate network error
+            mock_async_client.chat = AsyncMock(side_effect=httpx.ConnectError("Connection failed"))
+
+            provider = OllamaProvider()
+
+            with pytest.raises(httpx.ConnectError):
+                await provider.complete("Test prompt")
+
+    @pytest.mark.asyncio  # Add this decorator
+    @with_test_config
+    async def test_complete_malformed_json_response(self, test_provider: MockConfigProvider):
+        """Test handling of malformed JSON response"""
+        test_provider.get_config().update(
+            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+        )
+
+        with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
+
+            mock_async_client = Mock()
+            mock_async_client_class.return_value = mock_async_client
+
+            # Mock response with model_dump that works, but the test is about JSON handling in the provider
+            mock_message = Mock()
+            mock_message.model_dump_json.return_value = "Invalid JSON Response"
+
+            mock_response = Mock()
+            mock_response.model_dump.return_value = {"response": "Invalid JSON"}
+            mock_response.message = mock_message
+
+            mock_async_client.chat = AsyncMock(return_value=mock_response)
+
+            # Patch json.dump and file operations to avoid actual file writing
+            with patch("json.dump"), patch("builtins.open", mock_open()):
+                provider = OllamaProvider()
+
+                # This test should pass since the provider just returns the message content
+                result = await provider.complete("Test prompt")
+                assert result == "Invalid JSON Response"
+
+    @with_test_config
+    def test_key_property(self, test_provider: MockConfigProvider):
+        """Test that the provider has the correct key property"""
+        test_provider.get_config().update({"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30}}})
+
+        with patch("ollama.Client"):
+            provider = OllamaProvider()
+            # Assuming the provider inherits key from registration
+            assert hasattr(provider, "key")
+            # The key should be set by the @Providers.register("ollama") decorator
+
+    @pytest.mark.asyncio  # Add this decorator
+    @with_test_config
+    async def test_complete_empty_prompt(self, test_provider: MockConfigProvider):
+        """Test completion with empty prompt"""
+        test_provider.get_config().update(
+            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+        )
+
+        with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
+
+            mock_async_client = Mock()
+            mock_async_client_class.return_value = mock_async_client
+
+            mock_message = Mock()
+            mock_message.model_dump_json.return_value = "Empty response"
+
+            mock_response = Mock()
+            mock_response.model_dump.return_value = {"response": "Empty response"}
+            mock_response.message = mock_message
+
+            mock_async_client.chat = AsyncMock(return_value=mock_response)
+
+            # Patch json.dump and file operations to avoid actual file writing
+            with patch("json.dump"), patch("builtins.open", mock_open()):
+                provider = OllamaProvider()
+                result = await provider.complete("")
+
+                assert result == "Empty response"
+
+            # Verify empty prompt was passed correctly
+            mock_async_client.chat.assert_called_once_with(
+                model="llama2",
+                messages=[{"role": "user", "content": ""}],
+                options={"temperature": 0.7, "num_predict": 4096, "stream": False},
+                stream=False,
+                format="json",
+            )
+
+    @pytest.mark.asyncio  # Add this decorator
+    @with_test_config
+    async def test_complete_long_prompt(self, test_provider: MockConfigProvider):
+        """Test completion with very long prompt"""
+        test_provider.get_config().update(
+            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+        )
+
+        with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
+
+            mock_async_client = Mock()
+            mock_async_client_class.return_value = mock_async_client
+
+            mock_message = Mock()
+            mock_message.model_dump_json.return_value = "Long response"
+
+            mock_response = Mock()
+            mock_response.model_dump.return_value = {"response": "Long response"}
+            mock_response.message = mock_message
+
+            mock_async_client.chat = AsyncMock(return_value=mock_response)
+
+            # Patch json.dump and file operations to avoid actual file writing
+            with patch("json.dump"), patch("builtins.open", mock_open()):
+                provider = OllamaProvider()
+                long_prompt = "This is a very long prompt. " * 1000  # ~30k characters
+
+                result = await provider.complete(long_prompt)
+
+                assert result == "Long response"
+
+            # Verify long prompt was handled correctly
+            call_args = mock_async_client.chat.call_args[1]
+            assert call_args["messages"][0]["content"] == long_prompt

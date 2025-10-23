@@ -1,0 +1,58 @@
+{
+    "format": {
+        "type": "json_schema",
+        "json_schema": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": [
+                    "input_id",
+                    "input_value",
+                    "candidates"
+                ],
+                "properties": {
+                    "input_id": {
+                        "type": "string"
+                    },
+                    "input_value": {
+                        "type": "string"
+                    },
+                    "candidates": {
+                        "type": "array",
+                        "maxItems": 5,
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "id",
+                                "value",
+                                "score",
+                                "reasons"
+                            ],
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "value": {
+                                    "type": "string"
+                                },
+                                "score": {
+                                    "type": "number",
+                                    "minimum": 0,
+                                    "maximum": 1
+                                },
+                                "reasons": {
+                                    "type": "array",
+                                    "minItems": 2,
+                                    "maxItems": 4,
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

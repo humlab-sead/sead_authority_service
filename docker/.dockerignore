@@ -1,0 +1,10 @@
+# Docker-specific files
+.env
+.env.production
+logs/
+data/*.csv
+data/*.xlsx
+
+# But keep example files
+!.env.example
+!.env.production.example
