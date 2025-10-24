@@ -24,15 +24,13 @@ jobs:
 
       - name: Install semantic-release and plugins
         run: |
-          sudo apt-get install bumpversion
           npm install -g semantic-release \
             @semantic-release/commit-analyzer \
             @semantic-release/release-notes-generator \
             @semantic-release/changelog \
             @semantic-release/git \
             @semantic-release/github \
-            @semantic-release/exec \
-            conventional-changelog-conventionalcommits
+            @semantic-release/exec
       - name: Run semantic-release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

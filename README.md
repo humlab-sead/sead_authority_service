@@ -126,6 +126,29 @@ make lint
 make format
 ```
 
+### Release Management
+
+This project uses [semantic-release](https://semantic-release.gitbook.io/) for automated versioning and releases. See [SEMANTIC_RELEASE.md](SEMANTIC_RELEASE.md) for detailed information on:
+
+- Commit message conventions
+- Release workflow
+- Version management
+- Troubleshooting
+
+**Quick guide:**
+```bash
+# Features (minor version bump)
+git commit -m "feat: add new reconciliation strategy"
+
+# Bug fixes (patch version bump)
+git commit -m "fix: correct database connection timeout"
+
+# Breaking changes (major version bump)
+git commit -m "feat!: redesign API
+
+BREAKING CHANGE: The reconciliation endpoint now uses a different format."
+```
+
 ### Project Structure
 
 ```
