@@ -1,0 +1,29 @@
+# Production Docker Compose configuration
+# Optimized for production deployment with external services
+
+version: '3.8'
+
+services:
+  sead-authority-service:
+    image: ghcr.io/humlab-sead/sead_authority_service:latest
+    container_name: sead-authority-service-${SEAD_AUTHORITY_ENVIRONMENT:-staging}
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./config.yml:/app/config/config.yml:ro
+      # - /var/log/sead-authority:/app/logs
+      # - ../data:/app/data:ro
+    env_file:
+      - .env
+    networks:
+      - sead-network
+    # logging:
+    #   driver: "json-file"
+    #   options:
+    #     max-size: "10m"
+    #     max-file: "3"
+
+networks:
+  sead-network:
+    external: false
