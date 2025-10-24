@@ -17,7 +17,7 @@ cd docker
 cp .env.example .env
 
 # 3. Edit .env with your credentials
-nano .env
+vi .env
 # Set at minimum:
 #   - SEAD_AUTHORITY_OPTIONS_DATABASE_HOST
 #   - SEAD_AUTHORITY_OPTIONS_DATABASE_USER
@@ -26,7 +26,7 @@ nano .env
 #   - GEONAMES_USERNAME
 
 # 4. Review and customize config.yml if needed
-nano config.yml
+vi config.yml
 
 # 5. Build and start the service
 docker-compose up --build
