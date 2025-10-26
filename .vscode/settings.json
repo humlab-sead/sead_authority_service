@@ -23,5 +23,9 @@
         "tests"
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "pgFormatter.configFile": "${workspaceFolder}/.pg_format",
+    "[sql]": {
+        "editor.defaultFormatter": "bradymholt.pgformatter"
+    }
 }
