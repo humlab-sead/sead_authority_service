@@ -95,3 +95,65 @@ select * from sead_utility.full_text_search
 where table_name = 'tbl_taxa_tree_master'
 
 drop function authority.fuzzy_find_entity_type_candidates( p_text text, p_limit integer);
+
+
+create schema if not exists authority;
+
+-- Immutable wrapper around unaccent using a fixed dictionary
+create or replace function authority.immutable_unaccent(p_value text)
+returns text language sql immutable parallel safe
+as $$
+  select unaccent('public.unaccent'::regdictionary, p_value)
+$$;
+
+create extension if not exists unaccent;
+create extension if not exists pg_trgm;
+create extension if not exists postgis;
+create extension if not exists vector; -- apt install -y postgresql-16-pgvector
+
+select version();
+
+create or replace function authority.fuzzy_find_entity_type_candidates(
+	p_text text,
+	p_limit integer default 10
+) returns table (
+	table_name text,
+	column_name text,
+	value text,
+  fts_rank double precision,
+  trigram_sim double precision,
+  row_score double precision
+)
+language sql
+stable
+as $$
+    with params as (
+      select p_text::text as q,
+            websearch_to_tsquery('simple', p_text) as tsq
+    ),
+    candidates AS (
+      select
+        sead_utility.table_name_to_entity_name(t.table_name) as entity_name,
+        t.table_name,
+        t.column_name,
+        t.value,
+        t.value_norm,
+        t.tsv,
+        ts_rank_cd(t.tsv, p.tsq)                         AS fts_rank,
+        similarity(t.value_norm, p.q)                    AS trigram_sim,
+        -- combined row score (FTS dominates if it hits)
+        (case when t.tsv @@ p.tsq then 1.0 else 0.0 end) * ts_rank_cd(t.tsv, p.tsq)
+          + 0.35 * similarity(t.value_norm, p.q)         as row_score
+      from sead_utility.full_text_search t
+      cross join params p
+      where t.tsv @@ p.tsq or t.value_norm % p.q
+    )
+    select distinct on (table_name)
+      table_name, column_name, value, fts_rank, trigram_sim, row_score
+    from candidates
+    order by table_name, row_score desc
+    limit p_limit;
+$$;
+
+
+commit;
