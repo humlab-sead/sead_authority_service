@@ -4,29 +4,29 @@
  **        Used for semantic search with pgvector
  **********************************************************************************************/
 
-DROP TABLE IF EXISTS authority.feature_type_embeddings;
+drop table if exists authority.feature_type_embeddings;
 
-CREATE TABLE IF NOT EXISTS authority.feature_type_embeddings (
-  feature_type_id INTEGER PRIMARY KEY REFERENCES public.tbl_feature_types(feature_type_id) ON DELETE CASCADE,
-  emb             VECTOR(768),             -- embedding vector
-  language        TEXT,                    -- optional language tag
-  active          BOOLEAN DEFAULT TRUE,    -- optional soft-deactivation flag
-  updated_at      TIMESTAMPTZ DEFAULT now()
+create table if not exists authority.feature_type_embeddings (
+  feature_type_id integer primary key references public.tbl_feature_types(feature_type_id) on delete cascade,
+  emb             vector(768),             -- embedding vector
+  language        text,                    -- optional language tag
+  active          boolean default true,    -- optional soft-deactivation flag
+  updated_at      timestamptz default now()
 );
 
--- Vector index for fast ANN search (cosine). Tune lists to your row count.
-CREATE INDEX IF NOT EXISTS feature_type_embeddings_ivfflat
-  ON authority.feature_type_embeddings
-  USING ivfflat (emb vector_cosine_ops)
-  WITH (lists = 100);
+-- vector index for fast ann search (cosine). tune lists to your row count.
+create index if not exists feature_type_embeddings_ivfflat
+  on authority.feature_type_embeddings
+    using ivfflat (emb vector_cosine_ops)
+      with (lists = 100);
 
 
 /**********************************************************************************************
 **  Feature Type
 **********************************************************************************************/
 
-drop view if exists authority.feature_types;
-create or replace view authority.feature_types as
+drop view if exists authority.feature_type;
+create or replace view authority.feature_type as
   select  ft.feature_type_id,
           ft.feature_type_name as label,
           ft.feature_type_description as description,
@@ -39,8 +39,8 @@ create index if not exists tbl_feature_types_norm_trgm
   on public.tbl_feature_types
     using gin ( (authority.immutable_unaccent(lower(feature_type_name))) gin_trgm_ops );
 
-drop function if exists authority.fuzzy_feature_types(text, integer);
-create or replace function authority.fuzzy_feature_types(
+drop function if exists authority.fuzzy_feature_type(text, integer);
+create or replace function authority.fuzzy_feature_type(
 	p_text text,
 	p_limit integer default 10
 ) returns table (
@@ -58,119 +58,114 @@ as $$
       s.feature_type_id,
       s.label,
       greatest(
-          case when s.norm_label = (select q from params) then 1.0
-              else similarity(s.norm_label, (select q from params))
-          end, 0.0001
+        case when s.norm_label = pq.q then 1.0 else similarity(s.norm_label, pq.q) end,
+        0.0001
       ) as name_sim
-    from authority.feature_types as s
-    where s.norm_label % (select q from params)       -- trigram candidate filter
+    from authority.feature_type as s
+    cross join params pq
+    where s.norm_label % pq.q       -- trigram candidate filter
     order by name_sim desc, s.label
     limit p_limit;
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.semantic_feature_types
+ ** Procedure  authority.semantic_feature_type
  ** What       Semantic search function using pgvector embeddings
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.semantic_feature_types(VECTOR, INTEGER);
+drop function if exists authority.semantic_feature_type(vector, integer);
 
-CREATE OR REPLACE FUNCTION authority.semantic_feature_types(
-  qemb    VECTOR,
-  p_limit INTEGER DEFAULT 10
+create or replace function authority.semantic_feature_type(
+  qemb    vector,
+  p_limit integer default 10
 )
-RETURNS TABLE (
-  feature_type_id INTEGER,
-  label           TEXT,
-  sem_sim         DOUBLE PRECISION
+returns table (
+  feature_type_id integer,
+  label           text,
+  sem_sim         double precision
 )
-LANGUAGE sql
-STABLE
-AS $$
-SELECT
-  ft.feature_type_id,
-  ft.label,
-  1.0 - (ft.emb <=> qemb) AS sem_sim
-FROM authority.feature_types AS ft
-WHERE ft.emb IS NOT NULL
-ORDER BY ft.emb <=> qemb
-LIMIT p_limit;
+language sql stable as $$
+  select
+    ft.feature_type_id,
+    ft.label,
+    1.0 - (ft.emb <=> qemb) as sem_sim
+  from authority.feature_type as ft
+  where ft.emb is not null
+  order by ft.emb <=> qemb
+  limit p_limit;
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.search_feature_types_hybrid
+ ** Procedure  authority.search_feature_type_hybrid
  ** What       Hybrid search combining trigram and semantic search
  ** Notes      See docs/MCP Server/SEAD Reconciliation via MCP — Architecture Doc (Outline).md
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.search_feature_types_hybrid(TEXT, VECTOR, INTEGER, INTEGER, INTEGER, DOUBLE PRECISION);
+drop function if exists authority.search_feature_type_hybrid(text, vector, integer, integer, integer, double precision);
 
-CREATE OR REPLACE FUNCTION authority.search_feature_types_hybrid(
-  p_text  TEXT,
-  qemb    VECTOR,
-  k_trgm  INTEGER DEFAULT 30,
-  k_sem   INTEGER DEFAULT 30,
-  k_final INTEGER DEFAULT 20,
-  alpha   DOUBLE PRECISION DEFAULT 0.5
+create or replace function authority.search_feature_type_hybrid(
+  p_text  text,
+  qemb    vector,
+  k_trgm  integer default 30,
+  k_sem   integer default 30,
+  k_final integer default 20,
+  alpha   double precision default 0.5
 )
-RETURNS TABLE (
-  feature_type_id INTEGER,
-  label           TEXT,
-  trgm_sim        DOUBLE PRECISION,
-  sem_sim         DOUBLE PRECISION,
-  blend           DOUBLE PRECISION
+returns table (
+  feature_type_id integer,
+  label           text,
+  trgm_sim        double precision,
+  sem_sim         double precision,
+  blend           double precision
 )
-LANGUAGE sql
-STABLE
-AS $$
-WITH params AS (
-  SELECT authority.immutable_unaccent(lower(p_text))::TEXT AS q
-),
-trgm AS (
-  SELECT
-    ft.feature_type_id,
-    ft.label,
-    GREATEST(
-      CASE WHEN ft.norm_label = (SELECT q FROM params) THEN 1.0
-           ELSE similarity(ft.norm_label, (SELECT q FROM params))
-      END,
-      0.0001
-    ) AS trgm_sim
-  FROM authority.feature_types AS ft
-  WHERE ft.norm_label % (SELECT q FROM params)
-  ORDER BY trgm_sim DESC, ft.label
-  LIMIT k_trgm
-),
-sem AS (
-  SELECT
-    ft.feature_type_id,
-    ft.label,
-    (1.0 - (ft.emb <=> qemb))::DOUBLE PRECISION AS sem_sim
-  FROM authority.feature_types AS ft
-  WHERE ft.emb IS NOT NULL
-  ORDER BY ft.emb <=> qemb
-  LIMIT k_sem
-),
-u AS (
-  SELECT feature_type_id, label, trgm_sim, NULL::DOUBLE PRECISION AS sem_sim FROM trgm
-  UNION
-  SELECT feature_type_id, label, NULL::DOUBLE PRECISION AS trgm_sim, sem_sim FROM sem
-),
-agg AS (
-  SELECT
+  language sql stable as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q
+  ),
+  trgm as (
+    select
+      ft.feature_type_id,
+      ft.label,
+      greatest(
+        case when ft.norm_label = pq.q then 1.0 else similarity(ft.norm_label, pq.q) end,
+        0.0001
+      ) as trgm_sim
+    from authority.feature_type as ft
+    cross join params pq
+    where ft.norm_label % pq.q
+    order by trgm_sim desc, ft.label
+    limit k_trgm
+  ),
+  sem as (
+    select
+      ft.feature_type_id,
+      ft.label,
+      (1.0 - (ft.emb <=> qemb))::double precision as sem_sim
+    from authority.feature_type as ft
+    where ft.emb is not null
+    order by ft.emb <=> qemb
+    limit k_sem
+  ),
+  u as (
+    select feature_type_id, label, trgm_sim, null::double precision as sem_sim from trgm
+    union
+    select feature_type_id, label, null::double precision as trgm_sim, sem_sim from sem
+  ),
+  agg as (
+    select
+      feature_type_id,
+      max(label) as label,
+      max(trgm_sim) as trgm_sim,
+      max(sem_sim)  as sem_sim
+    from u
+    group by feature_type_id
+  )
+  select
     feature_type_id,
-    MAX(label) AS label,
-    MAX(trgm_sim) AS trgm_sim,
-    MAX(sem_sim)  AS sem_sim
-  FROM u
-  GROUP BY feature_type_id
-)
-SELECT
-  feature_type_id,
-  label,
-  COALESCE(trgm_sim, 0.0) AS trgm_sim,
-  COALESCE(sem_sim,  0.0) AS sem_sim,
-  (alpha * COALESCE(trgm_sim, 0.0) + (1.0 - alpha) * COALESCE(sem_sim, 0.0)) AS blend
-FROM agg
-ORDER BY blend DESC, label
-LIMIT k_final;
+    label,
+    coalesce(trgm_sim, 0.0) as trgm_sim,
+    coalesce(sem_sim,  0.0) as sem_sim,
+    (alpha * coalesce(trgm_sim, 0.0) + (1.0 - alpha) * coalesce(sem_sim, 0.0)) as blend
+  from agg
+  order by blend desc, label
+  limit k_final;
 $$;
  

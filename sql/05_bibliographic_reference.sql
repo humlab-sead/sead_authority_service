@@ -23,8 +23,8 @@ CREATE INDEX IF NOT EXISTS bibliographic_reference_embeddings_ivfflat_idx
     USING ivfflat (emb vector_cosine_ops)
     WITH (lists = 100);
 
-drop view if exists authority.bibliographic_references;
-create or replace view authority.bibliographic_references as
+drop view if exists authority.bibliographic_reference;
+create or replace view authority.bibliographic_reference as
   select  
     b.biblio_id,
     b.full_reference as label,
@@ -64,10 +64,10 @@ create index if not exists tbl_bibliographic_references_bugs_reference_norm_trgm
   on public.tbl_biblio
     using gin ( (authority.immutable_unaccent(lower(bugs_reference))) gin_trgm_ops );
 
-drop function if exists authority.fuzzy_bibliographic_references(text, integer, text, text, double precision);
-drop function if exists authority.fuzzy_bibliographic_references(text, integer, text, text, double precision);
+drop function if exists authority.fuzzy_bibliographic_reference(text, integer, text, text, double precision);
+drop function if exists authority.fuzzy_bibliographic_reference(text, integer, text, text, double precision);
 
-create or replace function authority.fuzzy_bibliographic_references(
+create or replace function authority.fuzzy_bibliographic_reference(
   p_text         text,
   p_limit        integer default 10,
   p_target_field text    default 'full_reference',
@@ -163,109 +163,109 @@ end;
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.semantic_bibliographic_references
+ ** Procedure  authority.semantic_bibliographic_reference
  ** What       Semantic search function using pgvector embeddings
  ** Notes      Searches based on full_reference field embeddings
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.semantic_bibliographic_references(VECTOR, INTEGER);
+drop function if exists authority.semantic_bibliographic_reference(vector, integer);
 
-CREATE OR REPLACE FUNCTION authority.semantic_bibliographic_references(
-  qemb    VECTOR,
-  p_limit INTEGER DEFAULT 10
+create or replace function authority.semantic_bibliographic_reference(qemb vector, p_limit integer default 10)
+returns table (
+  biblio_id integer,
+  label     text,
+  sem_sim   double precision
 )
-RETURNS TABLE (
-  biblio_id INTEGER,
-  label     TEXT,
-  sem_sim   DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-SELECT
-  b.biblio_id,
-  b.label,
-  1.0 - (b.emb <=> qemb) AS sem_sim
-FROM authority.bibliographic_references AS b
-WHERE b.emb IS NOT NULL
-ORDER BY b.emb <=> qemb
-LIMIT p_limit;
+  language sql stable as $$
+  select
+    b.biblio_id,
+    b.label,
+    1.0 - (b.emb <=> qemb) as sem_sim
+  from authority.bibliographic_reference as b
+  where b.emb is not null
+  order by b.emb <=> qemb
+  limit p_limit;
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.search_bibliographic_references_hybrid
- ** What       Hybrid search combining trigram and semantic search
- ** Notes      See docs/MCP Server/SEAD Reconciliation via MCP — Architecture Doc (Outline).md
- **            Uses full_reference field for both trigram and semantic matching
+  ** Procedure  authority.search_bibliographic_reference_hybrid
+  ** What       Hybrid search combining trigram and semantic search
+  ** Notes      See docs/MCP Server/SEAD Reconciliation via MCP — Architecture Doc (Outline).md
+  **            Uses full_reference field for both trigram and semantic matching
+  **            p_text: raw query text
+  **            qemb:  query embedding (same dim as stored vectors)
+  **            k_trgm: number of trigram results to return
+  **            k_sem:  number of semantic results to return
+  **            k_final: number of final results to return
+  **            alpha:   blending factor for hybrid search
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.search_bibliographic_references_hybrid(TEXT, VECTOR, INTEGER, INTEGER, INTEGER, DOUBLE PRECISION);
+drop function if exists authority.search_bibliographic_reference_hybrid(text, vector, integer, integer, integer, double precision);
 
-CREATE OR REPLACE FUNCTION authority.search_bibliographic_references_hybrid(
-  p_text  TEXT,
-  qemb    VECTOR,
-  k_trgm  INTEGER DEFAULT 30,
-  k_sem   INTEGER DEFAULT 30,
-  k_final INTEGER DEFAULT 20,
-  alpha   DOUBLE PRECISION DEFAULT 0.5
+create or replace function authority.search_bibliographic_reference_hybrid(
+  p_text  text,
+  qemb    vector,
+  k_trgm  integer default 30, 
+  k_sem   integer default 30,
+  k_final integer default 20,
+  alpha   double precision default 0.5
 )
-RETURNS TABLE (
-  biblio_id INTEGER,
-  label     TEXT,
-  trgm_sim  DOUBLE PRECISION,
-  sem_sim   DOUBLE PRECISION,
-  blend     DOUBLE PRECISION
+returns table (
+  biblio_id integer,
+  label     text,
+  trgm_sim  double precision,
+  sem_sim   double precision,
+  blend     double precision
 )
-LANGUAGE sql
-STABLE
-AS $$
-WITH params AS (
-  SELECT authority.immutable_unaccent(lower(p_text))::TEXT AS q
-),
-trgm AS (
-  SELECT
-    b.biblio_id,
-    b.label,
-    GREATEST(
-      CASE WHEN b.norm_label = (SELECT q FROM params) THEN 1.0
-           ELSE similarity(b.norm_label, (SELECT q FROM params))
-      END,
-      0.0001
-    ) AS trgm_sim
-  FROM authority.bibliographic_references AS b
-  WHERE b.norm_label % (SELECT q FROM params)
-  ORDER BY trgm_sim DESC, b.label
-  LIMIT k_trgm
-),
-sem AS (
-  SELECT
-    b.biblio_id,
-    b.label,
-    (1.0 - (b.emb <=> qemb))::DOUBLE PRECISION AS sem_sim
-  FROM authority.bibliographic_references AS b
-  WHERE b.emb IS NOT NULL
-  ORDER BY b.emb <=> qemb
-  LIMIT k_sem
-),
-u AS (
-  SELECT biblio_id, label, trgm_sim, NULL::DOUBLE PRECISION AS sem_sim FROM trgm
-  UNION
-  SELECT biblio_id, label, NULL::DOUBLE PRECISION AS trgm_sim, sem_sim FROM sem
-),
-agg AS (
-  SELECT
+language sql stable as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q
+  ),
+  trgm as (
+    select
+      b.biblio_id,
+      b.label,
+      greatest(
+        case when b.norm_label = pq.q then 1.0
+            else similarity(b.norm_label, pq.q)
+        end,
+        0.0001
+      ) as trgm_sim
+    from authority.bibliographic_reference as b
+    cross join params pq
+    where b.norm_label % pq.q
+    order by trgm_sim desc, b.label
+    limit k_trgm
+  ),
+  sem as (
+    select
+      b.biblio_id,
+      b.label,
+      (1.0 - (b.emb <=> qemb))::double precision as sem_sim
+    from authority.bibliographic_reference as b
+    where b.emb is not null
+    order by b.emb <=> qemb
+    limit k_sem
+  ),
+  u as (
+    select biblio_id, label, trgm_sim, null::double precision as sem_sim from trgm
+    union
+    select biblio_id, label, null::double precision as trgm_sim, sem_sim from sem
+  ),
+  agg as (
+    select
+      biblio_id,
+      max(label) as label,
+      max(trgm_sim) as trgm_sim,
+      max(sem_sim)  as sem_sim
+    from u
+    group by biblio_id
+  )
+  select
     biblio_id,
-    MAX(label) AS label,
-    MAX(trgm_sim) AS trgm_sim,
-    MAX(sem_sim)  AS sem_sim
-  FROM u
-  GROUP BY biblio_id
-)
-SELECT
-  biblio_id,
-  label,
-  COALESCE(trgm_sim, 0.0) AS trgm_sim,
-  COALESCE(sem_sim,  0.0) AS sem_sim,
-  (alpha * COALESCE(trgm_sim, 0.0) + (1.0 - alpha) * COALESCE(sem_sim, 0.0)) AS blend
-FROM agg
-ORDER BY blend DESC, label
-LIMIT k_final;
+    label,
+    coalesce(trgm_sim, 0.0) as trgm_sim,
+    coalesce(sem_sim,  0.0) as sem_sim,
+    (alpha * coalesce(trgm_sim, 0.0) + (1.0 - alpha) * coalesce(sem_sim, 0.0)) as blend
+  from agg
+  order by blend desc, label
+  limit k_final;
 $$;

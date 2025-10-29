@@ -4,29 +4,29 @@
  **        Used for semantic search with pgvector
  **********************************************************************************************/
 
-DROP TABLE IF EXISTS authority.location_embeddings;
+drop table if exists authority.location_embeddings;
 
-CREATE TABLE IF NOT EXISTS authority.location_embeddings (
-  location_id INTEGER PRIMARY KEY REFERENCES public.tbl_locations(location_id) ON DELETE CASCADE,
-  emb         VECTOR(768),             -- embedding vector
-  language    TEXT,                    -- optional language tag
-  active      BOOLEAN DEFAULT TRUE,    -- optional soft-deactivation flag
-  updated_at  TIMESTAMPTZ DEFAULT now()
+create table if not exists authority.location_embeddings (
+  location_id integer primary key references public.tbl_locations(location_id) on delete cascade,
+  emb         vector(768),             -- embedding vector
+  language    text,                    -- optional language tag
+  active      boolean default true,    -- optional soft-deactivation flag
+  updated_at  timestamptz default now()
 );
 
 -- Vector index for fast ANN search (cosine). Tune lists to your row count.
-CREATE INDEX IF NOT EXISTS location_embeddings_ivfflat
-  ON authority.location_embeddings
-  USING ivfflat (emb vector_cosine_ops)
-  WITH (lists = 100);
+create index if not exists location_embeddings_ivfflat
+  on authority.location_embeddings
+    using ivfflat (emb vector_cosine_ops)
+      with (lists = 100);
 
 
 /**********************************************************************************************
 **  Location
 **********************************************************************************************/
 
-drop view if exists authority.locations;
-create or replace view authority.locations as
+drop view if exists authority.location;
+create or replace view authority.location as
   select  l.location_id,
           l.location_name as label,
           authority.immutable_unaccent(lower(l.location_name)) as norm_label,
@@ -45,8 +45,8 @@ create index if not exists tbl_locations_norm_trgm
   on public.tbl_locations
     using gin ( (authority.immutable_unaccent(lower(location_name))) gin_trgm_ops );
 
-drop function if exists authority.fuzzy_locations(text, integer);
-create or replace function authority.fuzzy_locations(
+drop function if exists authority.fuzzy_location(text, integer);
+create or replace function authority.fuzzy_location(
 	p_text text,
 	p_limit integer default 10,
 	variadic location_type_ids integer[] default null)
@@ -74,7 +74,7 @@ as $$
               else similarity(s.norm_label, (select q from params))
           end, 0.0001
       ) as name_sim
-    from authority.locations as s
+    from authority.location as s
     join location_types using (location_type_id)
     where s.norm_label % (select q from params)       -- trigram candidate filter
     order by name_sim desc, s.label
@@ -82,116 +82,116 @@ as $$
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.semantic_locations
+ ** Procedure  authority.semantic_location
  ** What       Semantic search function using pgvector embeddings
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.semantic_locations(VECTOR, INTEGER);
+DROP FUNCTION IF EXISTS authority.semantic_location(VECTOR, INTEGER);
 
-CREATE OR REPLACE FUNCTION authority.semantic_locations(
-  qemb    VECTOR,
-  p_limit INTEGER DEFAULT 10
+create or replace function authority.semantic_location( qemb vector, p_limit integer default 10)
+returns table (
+  location_id integer,
+  label       text,
+  sem_sim     double precision
 )
-RETURNS TABLE (
-  location_id INTEGER,
-  label       TEXT,
-  sem_sim     DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-SELECT
-  l.location_id,
-  l.label,
-  1.0 - (l.emb <=> qemb) AS sem_sim
-FROM authority.locations AS l
-WHERE l.emb IS NOT NULL
-ORDER BY l.emb <=> qemb
-LIMIT p_limit;
+language sql stable as $$
+  select
+    l.location_id,
+    l.label,
+    1.0 - (l.emb <=> qemb) as sem_sim
+  from authority.location as l
+  where l.emb is not null
+  order by l.emb <=> qemb
+  limit p_limit;
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.search_locations_hybrid
+ ** Procedure  authority.search_location_hybrid
  ** What       Hybrid search combining trigram and semantic search
  ** Notes      See docs/MCP Server/SEAD Reconciliation via MCP — Architecture Doc (Outline).md
- ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.search_locations_hybrid(TEXT, VECTOR, INTEGER, INTEGER, INTEGER, DOUBLE PRECISION, INTEGER[]);
+ **            Uses full_reference field for both trigram and semantic matching
+ ** Arguments
+ **            p_text: raw query text
+ **            qemb:  query embedding (same dim as stored vectors)
+ **            k_trgm: number of trigram results to return
+ **            k_sem:  number of semantic results to return
+ **            k_final: number of final results to return
+ **            alpha:   blending factor for hybrid search
+****************************************************************************************************/
+drop function if exists authority.search_location_hybrid(text, vector, integer, integer, integer, double precision, integer[]);
 
-CREATE OR REPLACE FUNCTION authority.search_locations_hybrid(
-  p_text             TEXT,
-  qemb               VECTOR,
-  k_trgm             INTEGER DEFAULT 30,
-  k_sem              INTEGER DEFAULT 30,
-  k_final            INTEGER DEFAULT 20,
-  alpha              DOUBLE PRECISION DEFAULT 0.5,
-  location_type_ids  INTEGER[] DEFAULT NULL
+create or replace function authority.search_location_hybrid(
+  p_text             text,
+  qemb               vector,
+  k_trgm             integer default 30,
+  k_sem              integer default 30,
+  k_final            integer default 20,
+  alpha              double precision default 0.5,
+  location_type_ids  integer[] default null
 )
-RETURNS TABLE (
-  location_id INTEGER,
-  label       TEXT,
-  trgm_sim    DOUBLE PRECISION,
-  sem_sim     DOUBLE PRECISION,
-  blend       DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-WITH params AS (
-  SELECT authority.immutable_unaccent(lower(p_text))::TEXT AS q
-),
-location_types AS (
-  SELECT location_type_id
-  FROM tbl_location_types
-  WHERE array_length(location_type_ids, 1) IS NULL
-     OR location_type_id = ANY(location_type_ids)
-),
-trgm AS (
-  SELECT
-    l.location_id,
-    l.label,
-    GREATEST(
-      CASE WHEN l.norm_label = (SELECT q FROM params) THEN 1.0
-           ELSE similarity(l.norm_label, (SELECT q FROM params))
-      END,
-      0.0001
-    ) AS trgm_sim
-  FROM authority.locations AS l
-  JOIN location_types USING (location_type_id)
-  WHERE l.norm_label % (SELECT q FROM params)
-  ORDER BY trgm_sim DESC, l.label
-  LIMIT k_trgm
-),
-sem AS (
-  SELECT
-    l.location_id,
-    l.label,
-    (1.0 - (l.emb <=> qemb))::DOUBLE PRECISION AS sem_sim
-  FROM authority.locations AS l
-  JOIN location_types USING (location_type_id)
-  WHERE l.emb IS NOT NULL
-  ORDER BY l.emb <=> qemb
-  LIMIT k_sem
-),
-u AS (
-  SELECT location_id, label, trgm_sim, NULL::DOUBLE PRECISION AS sem_sim FROM trgm
-  UNION
-  SELECT location_id, label, NULL::DOUBLE PRECISION AS trgm_sim, sem_sim FROM sem
-),
-agg AS (
-  SELECT
-    location_id,
-    MAX(label) AS label,
-    MAX(trgm_sim) AS trgm_sim,
-    MAX(sem_sim)  AS sem_sim
-  FROM u
-  GROUP BY location_id
-)
-SELECT
-  location_id,
-  label,
-  COALESCE(trgm_sim, 0.0) AS trgm_sim,
-  COALESCE(sem_sim,  0.0) AS sem_sim,
-  (alpha * COALESCE(trgm_sim, 0.0) + (1.0 - alpha) * COALESCE(sem_sim, 0.0)) AS blend
-FROM agg
-ORDER BY blend DESC, label
-LIMIT k_final;
-$$;
+returns table (
+  location_id integer,
+  label       text,
+  trgm_sim    double precision,
+  sem_sim     double precision,
+  blend       double precision
+) language sql stable as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q
+  ),
+  location_types as (
+    select location_type_id
+    from tbl_location_types
+    where array_length(location_type_ids, 1) is null
+      or location_type_id = any(location_type_ids)
+  ),
+  trgm as (
+    select
+      l.location_id,
+      l.label,
+      greatest(
+        case when l.norm_label = (select q from params) then 1.0
+            else similarity(l.norm_label, (select q from params))
+        end,
+        0.0001
+      ) as trgm_sim
+    from authority.location as l
+    join location_types using (location_type_id)
+    where l.norm_label % (select q from params)
+    order by trgm_sim desc, l.label
+    limit k_trgm
+  ),
+  sem as (
+    select
+      l.location_id,
+      l.label,
+      (1.0 - (l.emb <=> qemb))::double precision as sem_sim
+    from authority.location as l
+    join location_types using (location_type_id)
+    where l.emb is not null
+    order by l.emb <=> qemb
+    limit k_sem
+  ),
+  u as (
+    select location_id, label, trgm_sim, null::double precision as sem_sim from trgm
+    union
+    select location_id, label, null::double precision as trgm_sim, sem_sim from sem
+  ),
+  agg as (
+    select
+      location_id,
+      max(label) as label,
+      max(trgm_sim) as trgm_sim,
+      max(sem_sim)  as sem_sim
+    from u
+    group by location_id
+  )
+    select
+      location_id,
+      label,
+      coalesce(trgm_sim, 0.0) as trgm_sim,
+      coalesce(sem_sim,  0.0) as sem_sim,
+      (alpha * coalesce(trgm_sim, 0.0) + (1.0 - alpha) * coalesce(sem_sim, 0.0)) as blend
+    from agg
+    order by blend desc, label
+    limit k_final;
+    $$;

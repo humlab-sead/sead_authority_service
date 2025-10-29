@@ -20,8 +20,8 @@ CREATE INDEX IF NOT EXISTS record_type_embeddings_ivfflat_idx
     USING ivfflat (emb vector_cosine_ops)
     WITH (lists = 100);
 
-DROP VIEW IF EXISTS authority.record_types;
-CREATE OR REPLACE VIEW authority.record_types AS
+DROP VIEW IF EXISTS authority.record_type;
+CREATE OR REPLACE VIEW authority.record_type AS
   SELECT  
     rt.record_type_id,
     rt.record_type_name AS label,
@@ -35,8 +35,8 @@ CREATE INDEX IF NOT EXISTS tbl_record_types_norm_trgm
   ON public.tbl_record_types
     USING gin ( (authority.immutable_unaccent(lower(record_type_name))) gin_trgm_ops );
 
-DROP FUNCTION IF EXISTS authority.fuzzy_record_types(TEXT, INTEGER);
-CREATE OR REPLACE FUNCTION authority.fuzzy_record_types(
+DROP FUNCTION IF EXISTS authority.fuzzy_record_type(TEXT, INTEGER);
+CREATE OR REPLACE FUNCTION authority.fuzzy_record_type(
   p_text  TEXT,
   p_limit INTEGER DEFAULT 10
 ) RETURNS TABLE (
@@ -59,19 +59,19 @@ AS $$
       END,
       0.0001
     ) AS name_sim
-  FROM authority.record_types AS rt
+  FROM authority.record_type AS rt
   WHERE rt.norm_label % (SELECT q FROM params)
   ORDER BY name_sim DESC, rt.label
   LIMIT p_limit;
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.semantic_record_types
+ ** Procedure  authority.semantic_record_type
  ** What       Semantic search function using pgvector embeddings
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.semantic_record_types(VECTOR, INTEGER);
+DROP FUNCTION IF EXISTS authority.semantic_record_type(VECTOR, INTEGER);
 
-CREATE OR REPLACE FUNCTION authority.semantic_record_types(
+CREATE OR REPLACE FUNCTION authority.semantic_record_type(
   qemb    VECTOR,
   p_limit INTEGER DEFAULT 10
 )
@@ -87,20 +87,20 @@ SELECT
   rt.record_type_id,
   rt.label,
   1.0 - (rt.emb <=> qemb) AS sem_sim
-FROM authority.record_types AS rt
+FROM authority.record_type AS rt
 WHERE rt.emb IS NOT NULL
 ORDER BY rt.emb <=> qemb
 LIMIT p_limit;
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.search_record_types_hybrid
+ ** Procedure  authority.search_record_type_hybrid
  ** What       Hybrid search combining trigram and semantic search
  ** Notes      See docs/MCP Server/SEAD Reconciliation via MCP — Architecture Doc (Outline).md
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.search_record_types_hybrid(TEXT, VECTOR, INTEGER, INTEGER, INTEGER, DOUBLE PRECISION);
+DROP FUNCTION IF EXISTS authority.search_record_type_hybrid(TEXT, VECTOR, INTEGER, INTEGER, INTEGER, DOUBLE PRECISION);
 
-CREATE OR REPLACE FUNCTION authority.search_record_types_hybrid(
+CREATE OR REPLACE FUNCTION authority.search_record_type_hybrid(
   p_text  TEXT,
   qemb    VECTOR,
   k_trgm  INTEGER DEFAULT 30,
@@ -131,7 +131,7 @@ trgm AS (
       END,
       0.0001
     ) AS trgm_sim
-  FROM authority.record_types AS rt
+  FROM authority.record_type AS rt
   WHERE rt.norm_label % (SELECT q FROM params)
   ORDER BY trgm_sim DESC, rt.label
   LIMIT k_trgm
@@ -141,7 +141,7 @@ sem AS (
     rt.record_type_id,
     rt.label,
     (1.0 - (rt.emb <=> qemb))::DOUBLE PRECISION AS sem_sim
-  FROM authority.record_types AS rt
+  FROM authority.record_type AS rt
   WHERE rt.emb IS NOT NULL
   ORDER BY rt.emb <=> qemb
   LIMIT k_sem

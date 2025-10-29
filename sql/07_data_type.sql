@@ -19,8 +19,8 @@ CREATE INDEX IF NOT EXISTS data_type_embeddings_ivfflat_idx
     USING ivfflat (emb vector_cosine_ops)
     WITH (lists = 100);
 
-drop view if exists authority.data_types;
-create or replace view authority.data_types as
+drop view if exists authority.data_type;
+create or replace view authority.data_type as
   select  dt.data_type_id,
           dt.data_type_name as label,
           dt.definition as description,
@@ -33,8 +33,8 @@ create index if not exists tbl_data_types_norm_trgm
   on public.tbl_data_types
     using gin ( (authority.immutable_unaccent(lower(data_type_name))) gin_trgm_ops );
 
-drop function if exists authority.fuzzy_data_types(text, integer);
-create or replace function authority.fuzzy_data_types(
+drop function if exists authority.fuzzy_data_type(text, integer);
+create or replace function authority.fuzzy_data_type(
 	p_text text,
 	p_limit integer default 10
 ) returns table (
@@ -53,7 +53,7 @@ as $$
               else similarity(s.norm_label, pq.q)
           end, 0.0001
       ) as name_sim
-    from authority.feature_types as s
+    from authority.data_type as s
       cross join (
       select authority.immutable_unaccent(lower('year'))::text as q
     ) as pq
@@ -63,12 +63,12 @@ as $$
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.semantic_data_types
+ ** Procedure  authority.semantic_data_type
  ** What       Semantic search function using pgvector embeddings
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.semantic_data_types(VECTOR, INTEGER);
+DROP FUNCTION IF EXISTS authority.semantic_data_type(VECTOR, INTEGER);
 
-CREATE OR REPLACE FUNCTION authority.semantic_data_types(
+CREATE OR REPLACE FUNCTION authority.semantic_data_type(
   qemb    VECTOR,
   p_limit INTEGER DEFAULT 10
 )
@@ -84,20 +84,20 @@ SELECT
   dt.data_type_id,
   dt.label,
   1.0 - (dt.emb <=> qemb) AS sem_sim
-FROM authority.data_types AS dt
+FROM authority.data_type AS dt
 WHERE dt.emb IS NOT NULL
 ORDER BY dt.emb <=> qemb
 LIMIT p_limit;
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.search_data_types_hybrid
+ ** Procedure  authority.search_data_type_hybrid
  ** What       Hybrid search combining trigram and semantic search
  ** Notes      See docs/MCP Server/SEAD Reconciliation via MCP — Architecture Doc (Outline).md
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.search_data_types_hybrid(TEXT, VECTOR, INTEGER, INTEGER, INTEGER, DOUBLE PRECISION);
+DROP FUNCTION IF EXISTS authority.search_data_type_hybrid(TEXT, VECTOR, INTEGER, INTEGER, INTEGER, DOUBLE PRECISION);
 
-CREATE OR REPLACE FUNCTION authority.search_data_types_hybrid(
+CREATE OR REPLACE FUNCTION authority.search_data_type_hybrid(
   p_text  TEXT,
   qemb    VECTOR,
   k_trgm  INTEGER DEFAULT 30,
@@ -128,7 +128,7 @@ trgm AS (
       END,
       0.0001
     ) AS trgm_sim
-  FROM authority.data_types AS dt
+  FROM authority.data_type AS dt
   WHERE dt.norm_label % (SELECT q FROM params)
   ORDER BY trgm_sim DESC, dt.label
   LIMIT k_trgm
@@ -138,7 +138,7 @@ sem AS (
     dt.data_type_id,
     dt.label,
     (1.0 - (dt.emb <=> qemb))::DOUBLE PRECISION AS sem_sim
-  FROM authority.data_types AS dt
+  FROM authority.data_type AS dt
   WHERE dt.emb IS NOT NULL
   ORDER BY dt.emb <=> qemb
   LIMIT k_sem
