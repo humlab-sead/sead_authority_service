@@ -1,3 +1,10 @@
+-- Immutable wrapper around unaccent using a fixed dictionary
+create or replace function authority.immutable_unaccent(p_value text)
+returns text language sql immutable parallel safe
+as $$
+  select unaccent('public.unaccent'::regdictionary, p_value)
+$$;
+
 
 -- call sead_utility.create_full_text_search_materialized_view()
 create or replace procedure sead_utility.create_full_text_search_materialized_view()
