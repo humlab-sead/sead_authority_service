@@ -5,7 +5,7 @@
 ## Phase 0 — Objectives & Switch Strategy
 
 * [ ] Define goals: small prompts, canonical IDs, SEAD cleanliness, <900 ms p95.
-* [ ] Decide initial rollout tables (e.g., `methods`, `modification_type`, …).
+* [x] Decide initial rollout tables (e.g., `methods`, `modification_type`, …).
 * [ ] Add feature flag to toggle **RAGHybrid** vs current **LLM** strategy.
 
   * **Accept:** Flag present and switchable per table/strategy via config.
@@ -16,9 +16,9 @@
 
 * [x] Verify `pg_trgm` is enabled and current fuzzy functions work.
 * [x] Install `pgvector` on PostgreSQL 17+.
-* [ ] Add `emb VECTOR(<dim>)` column in **authority** for each targeted lookup view/table.
-* [ ] Create IVFFLAT index on `emb` (choose sensible `lists`).
-* [ ] Ensure `norm_label` (unaccent+lower) exists and is indexed via trigram.
+* [x] Add `emb VECTOR(<dim>)` column in **authority** for each targeted lookup view/table.
+* [x] Create IVFFLAT index on `emb` (choose sensible `lists`).
+* [x] Ensure `norm_label` (unaccent+lower) exists and is indexed via trigram.
 
   * **Accept:** `SELECT id, label, norm_label, emb FROM authority.<entity>` returns and is index-backed.
 
