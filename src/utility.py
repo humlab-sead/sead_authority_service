@@ -1,10 +1,37 @@
 import importlib
 import os
 import sys
+import unicodedata
 from datetime import datetime
 from typing import Any, Callable, Literal
 
+import yaml
 from loguru import logger
+
+
+def normalize_text(text: str) -> str:
+    """
+    Normalize text to match PostgreSQL's authority.immutable_unaccent(lower(text)).
+
+    Steps:
+    1. Convert to lowercase
+    2. Remove accents/diacritics using Unicode NFD normalization
+
+    This ensures consistency with PostgreSQL trigram matching and embeddings.
+    """
+    if not text:
+        return ""
+
+    # Step 1: Lowercase
+    text = text.lower()
+
+    # Step 2: Remove accents (unaccent equivalent)
+    # NFD = Canonical Decomposition (separates base chars from combining diacritics)
+    # Filter out combining characters (category 'Mn' = Mark, nonspacing)
+    text = unicodedata.normalize("NFD", text)
+    text = "".join(char for char in text if unicodedata.category(char) != "Mn")
+
+    return text
 
 
 def recursive_update(d1: dict, d2: dict) -> dict:
@@ -236,3 +263,15 @@ def get_connection_uri(connection: Any) -> str:
     dbname: str = conn_info.get("dbname")
     uri: str = f"postgresql://{user}@{host}:{port}/{dbname}"
     return uri
+
+
+def load_resource_yaml(key: str) -> dict[str, Any]:
+    """Loads a resource YAML file from the resources folder."""
+
+    resource_path = os.path.join(os.path.dirname(__file__), "resources", f"{key}.yaml")
+    if not os.path.exists(resource_path):
+        return None
+
+    with open(resource_path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    return data
