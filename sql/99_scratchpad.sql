@@ -123,8 +123,7 @@ create or replace function authority.fuzzy_find_entity_type_candidates(
   fts_rank double precision,
   trigram_sim double precision,
   row_score double precision
-)
-language sql
+) language sql
 stable
 as $$
     with params as (
