@@ -11,21 +11,21 @@ from src.configuration import Config, ConfigFactory, ConfigStore, MockConfigProv
 # pylint: disable=unused-argument
 
 
-def pytest_sessionstart(session) -> None:
-    """Hook to run before any tests are executed."""
-    os.environ["CONFIG_FILE"] = "./tests/config.yml"
-    os.environ["ENV_FILE"] = "./tests/.env"
-    asyncio.run(setup_config_store("./tests/config.yml"))
+# def pytest_sessionstart(session) -> None:
+#     """Hook to run before any tests are executed."""
+#     os.environ["CONFIG_FILE"] = "./tests/config.yml"
+#     os.environ["ENV_FILE"] = "./tests/.env"
+#     asyncio.run(setup_config_store("./tests/config.yml"))
 
 
-@pytest.fixture(autouse=True)
-def setup_reset_config() -> Generator[None, Any, None]:
-    """Reset Config Store and provider before each test"""
-    ConfigStore.reset_instance()
-    reset_config_provider()
-    yield
-    ConfigStore.reset_instance()
-    reset_config_provider()
+# @pytest.fixture(autouse=True)
+# def setup_reset_config() -> Generator[None, Any, None]:
+#     """Reset Config Store and provider before each test"""
+#     ConfigStore.reset_instance()
+#     reset_config_provider()
+#     yield
+#     ConfigStore.reset_instance()
+#     reset_config_provider()
 
 
 class MockRow:
