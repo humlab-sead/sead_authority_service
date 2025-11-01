@@ -13,24 +13,24 @@
  ** Notes     Side table pattern: LEFT JOIN to main view, indexed with IVFFLAT
  **           Embeddings based on synonym text field
  ****************************************************************************************************/
-DROP TABLE IF EXISTS authority.taxa_synonym_embeddings CASCADE;
+drop table if exists authority.taxa_synonym_embeddings cascade;
 
-CREATE TABLE authority.taxa_synonym_embeddings (
-  synonym_id INTEGER PRIMARY KEY REFERENCES public.tbl_taxa_synonyms(synonym_id) ON DELETE CASCADE,
-  emb        VECTOR(768) NOT NULL,
-  updated    TIMESTAMPTZ DEFAULT NOW()
+create table authority.taxa_synonym_embeddings (
+  synonym_id integer primary key references public.tbl_taxa_synonyms(synonym_id) on delete cascade,
+  emb        vector(768) not null,
+  updated    timestamptz default now()
 );
 
-CREATE INDEX IF NOT EXISTS taxa_synonym_embeddings_ivfflat_idx
-  ON authority.taxa_synonym_embeddings
-    USING ivfflat (emb vector_cosine_ops)
-    WITH (lists = 100);
+create index if not exists taxa_synonym_embeddings_ivfflat_idx
+  on authority.taxa_synonym_embeddings
+    using ivfflat (emb vector_cosine_ops)
+      with (lists = 100);
 
-DROP VIEW IF EXISTS authority.taxa_synonyms;
-CREATE OR REPLACE VIEW authority.taxa_synonyms AS
-  SELECT  
+drop view if exists authority.taxa_synonym cascade;
+create or replace view authority.taxa_synonym as
+  select  
     ts.synonym_id,
-    ts.synonym AS label,
+    ts.synonym as label,
     ts.taxon_id,
     ts.family_id,
     ts.genus_id,
@@ -38,149 +38,143 @@ CREATE OR REPLACE VIEW authority.taxa_synonyms AS
     ts.biblio_id,
     ts.reference_type,
     ts.notes,
-    authority.immutable_unaccent(lower(ts.synonym)) AS norm_label,
+    authority.immutable_unaccent(lower(ts.synonym)) as norm_label,
     e.emb
-  FROM public.tbl_taxa_synonyms ts
-  LEFT JOIN authority.taxa_synonym_embeddings e USING (synonym_id);
+  from public.tbl_taxa_synonyms ts
+  left join authority.taxa_synonym_embeddings e using (synonym_id);
 
-CREATE INDEX IF NOT EXISTS tbl_taxa_synonyms_norm_trgm
-  ON public.tbl_taxa_synonyms
-    USING gin ( (authority.immutable_unaccent(lower(synonym))) gin_trgm_ops );
+create index if not exists tbl_taxa_synonyms_norm_trgm
+  on public.tbl_taxa_synonyms
+    using gin ( (authority.immutable_unaccent(lower(synonym))) gin_trgm_ops );
 
-DROP FUNCTION IF EXISTS authority.fuzzy_taxa_synonyms(TEXT, INTEGER);
-CREATE OR REPLACE FUNCTION authority.fuzzy_taxa_synonyms(
-  p_text  TEXT,
-  p_limit INTEGER DEFAULT 10
-) RETURNS TABLE (
-  synonym_id INTEGER,
-  label      TEXT,
-  name_sim   DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-  WITH params AS (
-    SELECT authority.immutable_unaccent(lower(p_text))::TEXT AS q
+drop function if exists authority.fuzzy_taxa_synonym(text, integer) cascade;
+create or replace function authority.fuzzy_taxa_synonym(
+  p_text text,
+  p_limit integer default 10
+) returns table (
+  synonym_id integer,
+  label      text,
+  name_sim   double precision
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q
   )
-  SELECT
-    ts.synonym_id,
-    ts.label,
-    GREATEST(
-      CASE WHEN ts.norm_label = (SELECT q FROM params) THEN 1.0
-           ELSE similarity(ts.norm_label, (SELECT q FROM params))
-      END,
-      0.0001
-    ) AS name_sim
-  FROM authority.taxa_synonyms AS ts
-  WHERE ts.norm_label % (SELECT q FROM params)
-  ORDER BY name_sim DESC, ts.label
-  LIMIT p_limit;
+    select
+      ts.synonym_id,
+      ts.label,
+      greatest(
+        case when ts.norm_label = pq.q then 1.0
+            else similarity(ts.norm_label, pq.q)
+        end,
+        0.0001
+      ) as name_sim
+    from authority.taxa_synonym as ts
+    cross join params pq
+    where ts.norm_label % pq.q
+    order by name_sim desc, ts.label
+    limit p_limit;
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.semantic_taxa_synonyms
+ ** Procedure  authority.semantic_taxa_synonym
  ** What       Semantic search function using pgvector embeddings
  ** Notes      Useful for finding alternative names for taxa across different naming systems
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.semantic_taxa_synonyms(VECTOR, INTEGER);
+drop function if exists authority.semantic_taxa_synonym(vector, integer) cascade;
 
-CREATE OR REPLACE FUNCTION authority.semantic_taxa_synonyms(
-  qemb    VECTOR,
-  p_limit INTEGER DEFAULT 10
-)
-RETURNS TABLE (
-  synonym_id INTEGER,
-  label      TEXT,
-  sem_sim    DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-SELECT
-  ts.synonym_id,
-  ts.label,
-  1.0 - (ts.emb <=> qemb) AS sem_sim
-FROM authority.taxa_synonyms AS ts
-WHERE ts.emb IS NOT NULL
-ORDER BY ts.emb <=> qemb
-LIMIT p_limit;
+create or replace function authority.semantic_taxa_synonym(
+  qemb vector,
+  p_limit integer default 10
+) returns table (
+  synonym_id integer,
+  label      text,
+  sem_sim    double precision
+) language sql stable
+as $$
+  select
+    ts.synonym_id,
+    ts.label,
+    1.0 - (ts.emb <=> qemb) as sem_sim
+  from authority.taxa_synonym as ts
+  where ts.emb is not null
+  order by ts.emb <=> qemb
+  limit p_limit;
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.search_taxa_synonyms_hybrid
+ ** Procedure  authority.search_taxa_synonym_hybrid
  ** What       Hybrid search combining trigram and semantic search
  ** Notes      See docs/MCP Server/SEAD Reconciliation via MCP — Architecture Doc (Outline).md
  **            Particularly useful for historical or alternative taxonomic nomenclature
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.search_taxa_synonyms_hybrid(TEXT, VECTOR, INTEGER, INTEGER, INTEGER, DOUBLE PRECISION);
+drop function if exists authority.search_taxa_synonym_hybrid(text, vector, integer, integer, integer, double precision) cascade;
 
-CREATE OR REPLACE FUNCTION authority.search_taxa_synonyms_hybrid(
-  p_text  TEXT,
-  qemb    VECTOR,
-  k_trgm  INTEGER DEFAULT 30,
-  k_sem   INTEGER DEFAULT 30,
-  k_final INTEGER DEFAULT 20,
-  alpha   DOUBLE PRECISION DEFAULT 0.5
-)
-RETURNS TABLE (
-  synonym_id INTEGER,
-  label      TEXT,
-  trgm_sim   DOUBLE PRECISION,
-  sem_sim    DOUBLE PRECISION,
-  blend      DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-WITH params AS (
-  SELECT authority.immutable_unaccent(lower(p_text))::TEXT AS q
-),
-trgm AS (
-  SELECT
-    ts.synonym_id,
-    ts.label,
-    GREATEST(
-      CASE WHEN ts.norm_label = (SELECT q FROM params) THEN 1.0
-           ELSE similarity(ts.norm_label, (SELECT q FROM params))
-      END,
-      0.0001
-    ) AS trgm_sim
-  FROM authority.taxa_synonyms AS ts
-  WHERE ts.norm_label % (SELECT q FROM params)
-  ORDER BY trgm_sim DESC, ts.label
-  LIMIT k_trgm
-),
-sem AS (
-  SELECT
-    ts.synonym_id,
-    ts.label,
-    (1.0 - (ts.emb <=> qemb))::DOUBLE PRECISION AS sem_sim
-  FROM authority.taxa_synonyms AS ts
-  WHERE ts.emb IS NOT NULL
-  ORDER BY ts.emb <=> qemb
-  LIMIT k_sem
-),
-u AS (
-  SELECT synonym_id, label, trgm_sim, NULL::DOUBLE PRECISION AS sem_sim FROM trgm
-  UNION
-  SELECT synonym_id, label, NULL::DOUBLE PRECISION AS trgm_sim, sem_sim FROM sem
-),
-agg AS (
-  SELECT
-    synonym_id,
-    MAX(label) AS label,
-    MAX(trgm_sim) AS trgm_sim,
-    MAX(sem_sim)  AS sem_sim
-  FROM u
-  GROUP BY synonym_id
-)
-SELECT
-  synonym_id,
-  label,
-  COALESCE(trgm_sim, 0.0) AS trgm_sim,
-  COALESCE(sem_sim,  0.0) AS sem_sim,
-  (alpha * COALESCE(trgm_sim, 0.0) + (1.0 - alpha) * COALESCE(sem_sim, 0.0)) AS blend
-FROM agg
-ORDER BY blend DESC, label
-LIMIT k_final;
+create or replace function authority.search_taxa_synonym_hybrid(
+  p_text  text,
+  qemb    vector,
+  k_trgm  integer default 30,
+  k_sem   integer default 30,
+  k_final integer default 20,
+  alpha   double precision default 0.5
+) returns table (
+  synonym_id integer,
+  label      text,
+  trgm_sim   double precision,
+  sem_sim    double precision,
+  blend      double precision
+) language sql stable
+as $$
+    with params as (
+      select authority.immutable_unaccent(lower(p_text))::text as q
+    ),
+    trgm as (
+      select
+        ts.synonym_id,
+        ts.label,
+        greatest(
+          case when ts.norm_label = pq.q then 1.0
+              else similarity(ts.norm_label, pq.q)
+          end,
+          0.0001
+        ) as trgm_sim
+      from authority.taxa_synonym as ts
+      cross join params pq
+      where ts.norm_label % pq.q
+      order by trgm_sim desc, ts.label
+      limit k_trgm
+    ),
+    sem as (
+      select
+        ts.synonym_id,
+        ts.label,
+        (1.0 - (ts.emb <=> qemb))::double precision as sem_sim
+      from authority.taxa_synonym as ts
+      where ts.emb is not null
+      order by ts.emb <=> qemb
+      limit k_sem
+    ),
+    u as (
+      select synonym_id, label, trgm_sim, null::double precision as sem_sim from trgm
+      union
+      select synonym_id, label, null::double precision as trgm_sim, sem_sim from sem
+    ),
+    agg as (
+      select
+        synonym_id,
+        max(label) as label,
+        max(trgm_sim) as trgm_sim,
+        max(sem_sim)  as sem_sim
+      from u
+      group by synonym_id
+    )
+    select
+      synonym_id,
+      label,
+      coalesce(trgm_sim, 0.0) as trgm_sim,
+      coalesce(sem_sim,  0.0) as sem_sim,
+      (alpha * coalesce(trgm_sim, 0.0) + (1.0 - alpha) * coalesce(sem_sim, 0.0)) as blend
+    from agg
+    order by blend desc, label
+    limit k_final;
 $$;

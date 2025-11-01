@@ -8,169 +8,160 @@
  ** Notes     Side table pattern: LEFT JOIN to main view, indexed with IVFFLAT
  **           Embeddings are based on taxonomy_notes text field (identification issues, references)
  ****************************************************************************************************/
-DROP TABLE IF EXISTS authority.taxonomy_note_embeddings CASCADE;
+drop table if exists authority.taxonomy_note_embeddings cascade;
 
-CREATE TABLE authority.taxonomy_note_embeddings (
-  taxonomy_notes_id INTEGER PRIMARY KEY REFERENCES public.tbl_taxonomy_notes(taxonomy_notes_id) ON DELETE CASCADE,
-  emb               VECTOR(768) NOT NULL,
-  updated           TIMESTAMPTZ DEFAULT NOW()
+create table authority.taxonomy_note_embeddings (
+  taxonomy_notes_id integer primary key references public.tbl_taxonomy_notes(taxonomy_notes_id) on delete cascade,
+  emb               vector(768) not null,
+  updated           timestamptz default now()
 );
 
-CREATE INDEX IF NOT EXISTS taxonomy_note_embeddings_ivfflat_idx
-  ON authority.taxonomy_note_embeddings
-    USING ivfflat (emb vector_cosine_ops)
-    WITH (lists = 100);
+create index if not exists taxonomy_note_embeddings_ivfflat_idx
+  on authority.taxonomy_note_embeddings
+    using ivfflat (emb vector_cosine_ops)
+      with (lists = 100);
 
-DROP VIEW IF EXISTS authority.taxonomy_notes;
-CREATE OR REPLACE VIEW authority.taxonomy_notes AS
-  SELECT  
+drop view if exists authority.taxonomy_note cascade;
+create or replace view authority.taxonomy_note as
+  select  
     tn.taxonomy_notes_id,
-    tn.taxonomy_notes AS label,
+    tn.taxonomy_notes as label,
     tn.taxon_id,
     tn.biblio_id,
-    authority.immutable_unaccent(lower(tn.taxonomy_notes)) AS norm_label,
+    authority.immutable_unaccent(lower(tn.taxonomy_notes)) as norm_label,
     e.emb
-  FROM public.tbl_taxonomy_notes tn
-  LEFT JOIN authority.taxonomy_note_embeddings e USING (taxonomy_notes_id);
+  from public.tbl_taxonomy_notes tn
+  left join authority.taxonomy_note_embeddings e using (taxonomy_notes_id);
 
-CREATE INDEX IF NOT EXISTS tbl_taxonomy_notes_norm_trgm
-  ON public.tbl_taxonomy_notes
-    USING gin ( (authority.immutable_unaccent(lower(taxonomy_notes))) gin_trgm_ops );
+create index if not exists tbl_taxonomy_notes_norm_trgm
+  on public.tbl_taxonomy_notes
+    using gin ( (authority.immutable_unaccent(lower(taxonomy_notes))) gin_trgm_ops );
 
-DROP FUNCTION IF EXISTS authority.fuzzy_taxonomy_notes(TEXT, INTEGER);
-CREATE OR REPLACE FUNCTION authority.fuzzy_taxonomy_notes(
-  p_text  TEXT,
-  p_limit INTEGER DEFAULT 10
-) RETURNS TABLE (
-  taxonomy_notes_id INTEGER,
-  label             TEXT,
-  name_sim          DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-  WITH params AS (
-    SELECT authority.immutable_unaccent(lower(p_text))::TEXT AS q
+drop function if exists authority.fuzzy_taxonomy_note(text, integer) cascade;
+create or replace function authority.fuzzy_taxonomy_note(
+  p_text  text,
+  p_limit integer default 10
+) returns table (
+  taxonomy_notes_id integer,
+  label             text,
+  name_sim          double precision
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q
   )
-  SELECT
+  select
     tn.taxonomy_notes_id,
     tn.label,
-    GREATEST(
-      CASE WHEN tn.norm_label = (SELECT q FROM params) THEN 1.0
-           ELSE similarity(tn.norm_label, (SELECT q FROM params))
-      END,
+    greatest(
+      case when tn.norm_label = pq.q then 1.0
+           else similarity(tn.norm_label, pq.q)
+      end,
       0.0001
-    ) AS name_sim
-  FROM authority.taxonomy_notes AS tn
-  WHERE tn.norm_label % (SELECT q FROM params)
-  ORDER BY name_sim DESC, tn.label
-  LIMIT p_limit;
+    ) as name_sim
+  from authority.taxonomy_note as tn
+  cross join params pq
+  where tn.norm_label % pq.q
+  order by name_sim desc, tn.label
+  limit p_limit;
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.semantic_taxonomy_notes
+ ** Procedure  authority.semantic_taxonomy_note
  ** What       Semantic search function using pgvector embeddings
  ** Notes      Particularly useful for finding notes about identification issues or similar taxa
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.semantic_taxonomy_notes(VECTOR, INTEGER);
+drop function if exists authority.semantic_taxonomy_note(vector, integer) cascade;
 
-CREATE OR REPLACE FUNCTION authority.semantic_taxonomy_notes(
-  qemb    VECTOR,
-  p_limit INTEGER DEFAULT 10
-)
-RETURNS TABLE (
-  taxonomy_notes_id INTEGER,
-  label             TEXT,
-  sem_sim           DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-SELECT
-  tn.taxonomy_notes_id,
-  tn.label,
-  1.0 - (tn.emb <=> qemb) AS sem_sim
-FROM authority.taxonomy_notes AS tn
-WHERE tn.emb IS NOT NULL
-ORDER BY tn.emb <=> qemb
-LIMIT p_limit;
+create or replace function authority.semantic_taxonomy_note(
+  qemb vector,
+  p_limit integer default 10
+) returns table (
+  taxonomy_notes_id integer,
+  label             text,
+  sem_sim           double precision
+) language sql stable
+as $$
+  select tn.taxonomy_notes_id, tn.label, 1.0 - (tn.emb <=> qemb) as sem_sim
+  from authority.taxonomy_note as tn
+  where tn.emb is not null
+  order by tn.emb <=> qemb
+  limit p_limit;
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.search_taxonomy_notes_hybrid
+ ** Procedure  authority.search_taxonomy_note_hybrid
  ** What       Hybrid search combining trigram and semantic search
  ** Notes      See docs/MCP Server/SEAD Reconciliation via MCP — Architecture Doc (Outline).md
  **            Useful for finding similar identification issues or taxonomic confusion
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.search_taxonomy_notes_hybrid(TEXT, VECTOR, INTEGER, INTEGER, INTEGER, DOUBLE PRECISION);
+drop function if exists authority.search_taxonomy_note_hybrid(text, vector, integer, integer, integer, double precision) cascade;
 
-CREATE OR REPLACE FUNCTION authority.search_taxonomy_notes_hybrid(
-  p_text  TEXT,
-  qemb    VECTOR,
-  k_trgm  INTEGER DEFAULT 30,
-  k_sem   INTEGER DEFAULT 30,
-  k_final INTEGER DEFAULT 20,
-  alpha   DOUBLE PRECISION DEFAULT 0.5
-)
-RETURNS TABLE (
-  taxonomy_notes_id INTEGER,
-  label             TEXT,
-  trgm_sim          DOUBLE PRECISION,
-  sem_sim           DOUBLE PRECISION,
-  blend             DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-WITH params AS (
-  SELECT authority.immutable_unaccent(lower(p_text))::TEXT AS q
-),
-trgm AS (
-  SELECT
-    tn.taxonomy_notes_id,
-    tn.label,
-    GREATEST(
-      CASE WHEN tn.norm_label = (SELECT q FROM params) THEN 1.0
-           ELSE similarity(tn.norm_label, (SELECT q FROM params))
-      END,
-      0.0001
-    ) AS trgm_sim
-  FROM authority.taxonomy_notes AS tn
-  WHERE tn.norm_label % (SELECT q FROM params)
-  ORDER BY trgm_sim DESC, tn.label
-  LIMIT k_trgm
-),
-sem AS (
-  SELECT
-    tn.taxonomy_notes_id,
-    tn.label,
-    (1.0 - (tn.emb <=> qemb))::DOUBLE PRECISION AS sem_sim
-  FROM authority.taxonomy_notes AS tn
-  WHERE tn.emb IS NOT NULL
-  ORDER BY tn.emb <=> qemb
-  LIMIT k_sem
-),
-u AS (
-  SELECT taxonomy_notes_id, label, trgm_sim, NULL::DOUBLE PRECISION AS sem_sim FROM trgm
-  UNION
-  SELECT taxonomy_notes_id, label, NULL::DOUBLE PRECISION AS trgm_sim, sem_sim FROM sem
-),
-agg AS (
-  SELECT
+create or replace function authority.search_taxonomy_note_hybrid(
+  p_text  text,
+  qemb    vector,
+  k_trgm  integer default 30,
+  k_sem   integer default 30,
+  k_final integer default 20,
+  alpha   double precision default 0.5
+) returns table (
+  taxonomy_notes_id integer,
+  label             text,
+  trgm_sim          double precision,
+  sem_sim           double precision,
+  blend             double precision
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q
+  ),
+  trgm as (
+    select
+      tn.taxonomy_notes_id,
+      tn.label,
+      greatest(
+        case when tn.norm_label = pq.q then 1.0
+            else similarity(tn.norm_label, pq.q)
+        end,
+        0.0001
+      ) as trgm_sim
+    from authority.taxonomy_note as tn
+    cross join params pq
+    where tn.norm_label % pq.q
+    order by trgm_sim desc, tn.label
+    limit k_trgm
+  ),
+  sem as (
+    select
+      tn.taxonomy_notes_id,
+      tn.label,
+      (1.0 - (tn.emb <=> qemb))::double precision as sem_sim
+    from authority.taxonomy_note as tn
+    where tn.emb is not null
+    order by tn.emb <=> qemb
+    limit k_sem
+  ),
+  u as (
+    select taxonomy_notes_id, label, trgm_sim, null::double precision as sem_sim from trgm
+    union
+    select taxonomy_notes_id, label, null::double precision as trgm_sim, sem_sim from sem
+  ),
+  agg as (
+    select
+      taxonomy_notes_id,
+      max(label) as label,
+      max(trgm_sim) as trgm_sim,
+      max(sem_sim)  as sem_sim
+    from u
+    group by taxonomy_notes_id
+  )
+  select
     taxonomy_notes_id,
-    MAX(label) AS label,
-    MAX(trgm_sim) AS trgm_sim,
-    MAX(sem_sim)  AS sem_sim
-  FROM u
-  GROUP BY taxonomy_notes_id
-)
-SELECT
-  taxonomy_notes_id,
-  label,
-  COALESCE(trgm_sim, 0.0) AS trgm_sim,
-  COALESCE(sem_sim,  0.0) AS sem_sim,
-  (alpha * COALESCE(trgm_sim, 0.0) + (1.0 - alpha) * COALESCE(sem_sim, 0.0)) AS blend
-FROM agg
-ORDER BY blend DESC, label
-LIMIT k_final;
+    label,
+    coalesce(trgm_sim, 0.0) as trgm_sim,
+    coalesce(sem_sim,  0.0) as sem_sim,
+    (alpha * coalesce(trgm_sim, 0.0) + (1.0 - alpha) * coalesce(sem_sim, 0.0)) as blend
+  from agg
+  order by blend desc, label
+  limit k_final;
 $$;

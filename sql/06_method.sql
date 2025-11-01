@@ -21,7 +21,7 @@ create index if not exists method_embeddings_ivfflat_idx
 
 analyze authority."method_embeddings";
 
-drop view if exists authority."method";
+drop view if exists authority."method" cascade;
 
 create or replace view authority."method" as
   select
@@ -37,15 +37,17 @@ create index if not exists tbl_methods_norm_trgm
   on public.tbl_methods
     using gin((authority.immutable_unaccent(lower(method_name))) gin_trgm_ops);
 
-drop function if exists authority.fuzzy_method(text, integer);
+drop function if exists authority.fuzzy_method(text, integer) cascade;
 
-create or replace function authority.fuzzy_method(p_text text, p_limit integer default 10 )
-  returns table (
-    method_id integer,
-    label text,
-    name_sim double precision
-  )
-  language sql stable as $$
+create or replace function authority.fuzzy_method(
+  p_text text,
+  p_limit integer default 10
+) returns table (
+  method_id integer,
+  label text,
+  name_sim double precision
+) language sql stable
+as $$
   with params as (
       select authority.immutable_unaccent(lower(p_text))::text as q
   )
@@ -70,15 +72,18 @@ $$;
  ** Procedure  authority.semantic_method
  ** What       Semantic search function using pgvector embeddings
  ****************************************************************************************************/
-drop function if exists authority.semantic_method(VECTOR, INTEGER);
+drop function if exists authority.semantic_method(VECTOR, INTEGER) cascade;
 
-create or replace function authority.semantic_method(qemb VECTOR, p_limit integer default 10)
-  returns table(
-    method_id integer,
-    label text,
-    sem_sim double precision
-  )
-  language sql stable as $$
+create or replace function authority.semantic_method(
+  qemb VECTOR,
+  p_limit integer default 10
+) returns table(
+  method_id integer,
+  label text,
+  sem_sim double precision
+)
+  language sql stable
+as $$
     select m.method_id, m.label, 1.0 - (m.emb <=> qemb) as sem_sim
     from authority.method as m
     where m.emb is not null
@@ -93,24 +98,23 @@ $$;
  ** Notes      See docs/MCP Server/SEAD Reconciliation via MCP — Architecture Doc (Outline).md
  ****************************************************************************************************/
 
-drop function if exists authority.search_method_hybrid(text, vector, integer, integer, integer, double precision);
+drop function if exists authority.search_method_hybrid(text, vector, integer, integer, integer, double precision) cascade;
 
 create or replace function authority.search_method_hybrid(
-    p_text text,
-    qemb vector,
-    k_trgm integer default 30,
-    k_sem integer default 30,
-    k_final integer default 20,
-    alpha double precision default 0.5
-  )
-    returns table (
-      method_id integer,
-      label text,
-      trgm_sim double precision,
-      sem_sim double precision,
-      blend double precision
-    )
-    language sql stable as $$
+  p_text text,
+  qemb vector,
+  k_trgm integer default 30,
+  k_sem integer default 30,
+  k_final integer default 20,
+  alpha double precision default 0.5
+) returns table (
+  method_id integer,
+  label text,
+  trgm_sim double precision,
+  sem_sim double precision,
+  blend double precision
+) language sql stable
+as $$
     with params as (
         select authority.immutable_unaccent(lower(p_text))::text as q
     ),

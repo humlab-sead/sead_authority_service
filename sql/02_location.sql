@@ -4,7 +4,7 @@
  **        Used for semantic search with pgvector
  **********************************************************************************************/
 
-drop table if exists authority.location_embeddings;
+drop table if exists authority.location_embeddings cascade;
 
 create table if not exists authority.location_embeddings (
   location_id integer primary key references public.tbl_locations(location_id) on delete cascade,
@@ -20,7 +20,6 @@ create index if not exists location_embeddings_ivfflat
     using ivfflat (emb vector_cosine_ops)
       with (lists = 100);
 
-
 /**********************************************************************************************
 **  Location
 **********************************************************************************************/
@@ -34,7 +33,7 @@ create or replace view authority.location as
           l.default_long_dd as longitude,
           l.location_type_id,
           lt.location_type,
-          l.description,
+          lt.description,
           st_setsrid(st_makepoint(l.default_long_dd, l.default_lat_dd), 4326) as geom,
           e.emb
   from public.tbl_locations l
@@ -49,14 +48,12 @@ drop function if exists authority.fuzzy_location(text, integer);
 create or replace function authority.fuzzy_location(
 	p_text text,
 	p_limit integer default 10,
-	variadic location_type_ids integer[] default null)
-returns table (
+	variadic location_type_ids integer[] default null
+) returns table (
 	location_id integer,
 	label text,
 	name_sim double precision
-)
-language sql
-stable
+) language sql stable
 as $$
   with params as (
         select authority.immutable_unaccent(lower(p_text))::text as q
@@ -70,13 +67,14 @@ as $$
       s.location_id,
       s.label,
       greatest(
-          case when s.norm_label = (select q from params) then 1.0
-              else similarity(s.norm_label, (select q from params))
+          case when s.norm_label = pq.q then 1.0
+              else similarity(s.norm_label, pq.q)
           end, 0.0001
       ) as name_sim
     from authority.location as s
+    cross join params pq
     join location_types using (location_type_id)
-    where s.norm_label % (select q from params)       -- trigram candidate filter
+    where s.norm_label % pq.q       -- trigram candidate filter
     order by name_sim desc, s.label
     limit p_limit;
 $$;
@@ -85,15 +83,17 @@ $$;
  ** Procedure  authority.semantic_location
  ** What       Semantic search function using pgvector embeddings
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.semantic_location(VECTOR, INTEGER);
+drop function if exists authority.semantic_location(vector, integer);
 
-create or replace function authority.semantic_location( qemb vector, p_limit integer default 10)
-returns table (
+create or replace function authority.semantic_location(
+  qemb vector,
+  p_limit integer default 10
+) returns table (
   location_id integer,
   label       text,
   sem_sim     double precision
-)
-language sql stable as $$
+) language sql stable
+as $$
   select
     l.location_id,
     l.label,
@@ -127,14 +127,14 @@ create or replace function authority.search_location_hybrid(
   k_final            integer default 20,
   alpha              double precision default 0.5,
   location_type_ids  integer[] default null
-)
-returns table (
+) returns table (
   location_id integer,
   label       text,
   trgm_sim    double precision,
   sem_sim     double precision,
   blend       double precision
-) language sql stable as $$
+) language sql stable
+as $$
   with params as (
     select authority.immutable_unaccent(lower(p_text))::text as q
   ),
@@ -149,14 +149,15 @@ returns table (
       l.location_id,
       l.label,
       greatest(
-        case when l.norm_label = (select q from params) then 1.0
-            else similarity(l.norm_label, (select q from params))
+        case when l.norm_label = pq.q then 1.0
+            else similarity(l.norm_label, pq.q)
         end,
         0.0001
       ) as trgm_sim
     from authority.location as l
     join location_types using (location_type_id)
-    where l.norm_label % (select q from params)
+    cross join params pq
+    where l.norm_label % pq.q
     order by trgm_sim desc, l.label
     limit k_trgm
   ),

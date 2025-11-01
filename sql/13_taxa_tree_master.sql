@@ -8,68 +8,67 @@
  ** Notes     Side table pattern: LEFT JOIN to main view, indexed with IVFFLAT
  **           Embeddings are based on full taxonomic name (genus + species)
  ****************************************************************************************************/
-DROP TABLE IF EXISTS authority.taxa_tree_master_embeddings CASCADE;
+drop table if exists authority.taxa_tree_master_embeddings cascade;
 
-CREATE TABLE authority.taxa_tree_master_embeddings (
-  taxon_id INTEGER PRIMARY KEY REFERENCES public.tbl_taxa_tree_master(taxon_id) ON DELETE CASCADE,
-  emb      VECTOR(768) NOT NULL,
-  updated  TIMESTAMPTZ DEFAULT NOW()
+create table authority.taxa_tree_master_embeddings (
+  taxon_id integer primary key references public.tbl_taxa_tree_master(taxon_id) on delete cascade,
+  emb      vector(768) not null,
+  updated  timestamptz default now()
 );
 
-CREATE INDEX IF NOT EXISTS taxa_tree_master_embeddings_ivfflat_idx
-  ON authority.taxa_tree_master_embeddings
-    USING ivfflat (emb vector_cosine_ops)
-    WITH (lists = 100);
+create index if not exists taxa_tree_master_embeddings_ivfflat_idx
+  on authority.taxa_tree_master_embeddings
+    using ivfflat (emb vector_cosine_ops)
+    with (lists = 100);
 
-DROP VIEW IF EXISTS authority.taxa_tree_master;
-CREATE OR REPLACE VIEW authority.taxa_tree_master AS
-  SELECT  
+drop view if exists authority.taxa_tree_master;
+create or replace view authority.taxa_tree_master as
+  select  
     t.taxon_id,
-    CONCAT(g.genus_name, ' ', t.species) AS label,
+    concat(g.genus_name, ' ', t.species) as label,
     t.species,
     t.genus_id,
     t.author_id,
     g.genus_name,
     a.author_name,
-    authority.immutable_unaccent(lower(CONCAT(g.genus_name, ' ', t.species))) AS norm_label,
+    authority.immutable_unaccent(lower(concat(g.genus_name, ' ', t.species))) as norm_label,
     e.emb
-  FROM public.tbl_taxa_tree_master t
-  LEFT JOIN public.tbl_taxa_tree_genera g USING (genus_id)
-  LEFT JOIN public.tbl_taxa_tree_authors a USING (author_id)
-  LEFT JOIN authority.taxa_tree_master_embeddings e USING (taxon_id);
+  from public.tbl_taxa_tree_master t
+  left join public.tbl_taxa_tree_genera g using (genus_id)
+  left join public.tbl_taxa_tree_authors a using (author_id)
+  left join authority.taxa_tree_master_embeddings e using (taxon_id);
 
-CREATE INDEX IF NOT EXISTS tbl_taxa_tree_master_norm_trgm
-  ON public.tbl_taxa_tree_master
-    USING gin ( (authority.immutable_unaccent(lower(species))) gin_trgm_ops );
+create index if not exists tbl_taxa_tree_master_norm_trgm
+  on public.tbl_taxa_tree_master
+    using gin ( (authority.immutable_unaccent(lower(species))) gin_trgm_ops );
 
-DROP FUNCTION IF EXISTS authority.fuzzy_taxa_tree_master(TEXT, INTEGER);
-CREATE OR REPLACE FUNCTION authority.fuzzy_taxa_tree_master(
-  p_text  TEXT,
-  p_limit INTEGER DEFAULT 10
-) RETURNS TABLE (
-  taxon_id INTEGER,
-  label    TEXT,
-  name_sim DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-  WITH params AS (
-    SELECT authority.immutable_unaccent(lower(p_text))::TEXT AS q
+drop function if exists authority.fuzzy_taxa_tree_master(text, integer);
+create or replace function authority.fuzzy_taxa_tree_master(
+  p_text  text,
+  p_limit integer default 10
+) returns table (
+  taxon_id integer,
+  label    text,
+  name_sim double precision
+) language sql
+stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q
   )
-  SELECT
+  select
     t.taxon_id,
     t.label,
-    GREATEST(
-      CASE WHEN t.norm_label = (SELECT q FROM params) THEN 1.0
-           ELSE similarity(t.norm_label, (SELECT q FROM params))
-      END,
+    greatest(
+      case when t.norm_label = (select q from params) then 1.0
+           else similarity(t.norm_label, (select q from params))
+      end,
       0.0001
-    ) AS name_sim
-  FROM authority.taxa_tree_master AS t
-  WHERE t.norm_label % (SELECT q FROM params)
-  ORDER BY name_sim DESC, t.label
-  LIMIT p_limit;
+    ) as name_sim
+  from authority.taxa_tree_master as t
+  where t.norm_label % (select q from params)
+  order by name_sim desc, t.label
+  limit p_limit;
 $$;
 
 /***************************************************************************************************
@@ -77,28 +76,22 @@ $$;
  ** What       Semantic search function using pgvector embeddings
  ** Notes      Searches based on full taxonomic name (genus + species)
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.semantic_taxa_tree_master(VECTOR, INTEGER);
+drop function if exists authority.semantic_taxa_tree_master(vector, integer);
 
-CREATE OR REPLACE FUNCTION authority.semantic_taxa_tree_master(
-  qemb    VECTOR,
-  p_limit INTEGER DEFAULT 10
-)
-RETURNS TABLE (
-  taxon_id INTEGER,
-  label    TEXT,
-  sem_sim  DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-SELECT
-  t.taxon_id,
-  t.label,
-  1.0 - (t.emb <=> qemb) AS sem_sim
-FROM authority.taxa_tree_master AS t
-WHERE t.emb IS NOT NULL
-ORDER BY t.emb <=> qemb
-LIMIT p_limit;
+create or replace function authority.semantic_taxa_tree_master(
+  qemb    vector,
+  p_limit integer default 10
+) returns table (
+  taxon_id integer,
+  label    text,
+  sem_sim  double precision
+) language sql stable
+as $$
+  select t.taxon_id, t.label, 1.0 - (t.emb <=> qemb) as sem_sim
+  from authority.taxa_tree_master as t
+  where t.emb is not null
+  order by t.emb <=> qemb
+  limit p_limit;
 $$;
 
 /***************************************************************************************************
@@ -107,75 +100,73 @@ $$;
  ** Notes      See docs/MCP Server/SEAD Reconciliation via MCP — Architecture Doc (Outline).md
  **            Searches full taxonomic name (genus + species)
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.search_taxa_tree_master_hybrid(TEXT, VECTOR, INTEGER, INTEGER, INTEGER, DOUBLE PRECISION);
+drop function if exists authority.search_taxa_tree_master_hybrid(text, vector, integer, integer, integer, double precision);
 
-CREATE OR REPLACE FUNCTION authority.search_taxa_tree_master_hybrid(
-  p_text  TEXT,
-  qemb    VECTOR,
-  k_trgm  INTEGER DEFAULT 30,
-  k_sem   INTEGER DEFAULT 30,
-  k_final INTEGER DEFAULT 20,
-  alpha   DOUBLE PRECISION DEFAULT 0.5
-)
-RETURNS TABLE (
-  taxon_id INTEGER,
-  label    TEXT,
-  trgm_sim DOUBLE PRECISION,
-  sem_sim  DOUBLE PRECISION,
-  blend    DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-WITH params AS (
-  SELECT authority.immutable_unaccent(lower(p_text))::TEXT AS q
-),
-trgm AS (
-  SELECT
-    t.taxon_id,
-    t.label,
-    GREATEST(
-      CASE WHEN t.norm_label = (SELECT q FROM params) THEN 1.0
-           ELSE similarity(t.norm_label, (SELECT q FROM params))
-      END,
-      0.0001
-    ) AS trgm_sim
-  FROM authority.taxa_tree_master AS t
-  WHERE t.norm_label % (SELECT q FROM params)
-  ORDER BY trgm_sim DESC, t.label
-  LIMIT k_trgm
-),
-sem AS (
-  SELECT
-    t.taxon_id,
-    t.label,
-    (1.0 - (t.emb <=> qemb))::DOUBLE PRECISION AS sem_sim
-  FROM authority.taxa_tree_master AS t
-  WHERE t.emb IS NOT NULL
-  ORDER BY t.emb <=> qemb
-  LIMIT k_sem
-),
-u AS (
-  SELECT taxon_id, label, trgm_sim, NULL::DOUBLE PRECISION AS sem_sim FROM trgm
-  UNION
-  SELECT taxon_id, label, NULL::DOUBLE PRECISION AS trgm_sim, sem_sim FROM sem
-),
-agg AS (
-  SELECT
+create or replace function authority.search_taxa_tree_master_hybrid(
+  p_text  text,
+  qemb    vector,
+  k_trgm  integer default 30,
+  k_sem   integer default 30,
+  k_final integer default 20,
+  alpha   double precision default 0.5
+) returns table (
+  taxon_id integer,
+  label    text,
+  trgm_sim double precision,
+  sem_sim  double precision,
+  blend    double precision
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q
+  ),
+  trgm as (
+    select
+      t.taxon_id,
+      t.label,
+      greatest(
+        case when t.norm_label = pq.q then 1.0
+            else similarity(t.norm_label, pq.q)
+        end,
+        0.0001
+      ) as trgm_sim
+    from authority.taxa_tree_master as t
+    cross join params pq
+    where t.norm_label % pq.q
+    order by trgm_sim desc, t.label
+    limit k_trgm
+  ),
+  sem as (
+    select
+      t.taxon_id,
+      t.label,
+      (1.0 - (t.emb <=> qemb))::double precision as sem_sim
+    from authority.taxa_tree_master as t
+    where t.emb is not null
+    order by t.emb <=> qemb
+    limit k_sem
+  ),
+  u as (
+    select taxon_id, label, trgm_sim, null::double precision as sem_sim from trgm
+    union
+    select taxon_id, label, null::double precision as trgm_sim, sem_sim from sem
+  ),
+  agg as (
+    select
+      taxon_id,
+      max(label) as label,
+      max(trgm_sim) as trgm_sim,
+      max(sem_sim)  as sem_sim
+    from u
+    group by taxon_id
+  )
+  select
     taxon_id,
-    MAX(label) AS label,
-    MAX(trgm_sim) AS trgm_sim,
-    MAX(sem_sim)  AS sem_sim
-  FROM u
-  GROUP BY taxon_id
-)
-SELECT
-  taxon_id,
-  label,
-  COALESCE(trgm_sim, 0.0) AS trgm_sim,
-  COALESCE(sem_sim,  0.0) AS sem_sim,
-  (alpha * COALESCE(trgm_sim, 0.0) + (1.0 - alpha) * COALESCE(sem_sim, 0.0)) AS blend
-FROM agg
-ORDER BY blend DESC, label
-LIMIT k_final;
+    label,
+    coalesce(trgm_sim, 0.0) as trgm_sim,
+    coalesce(sem_sim,  0.0) as sem_sim,
+    (alpha * coalesce(trgm_sim, 0.0) + (1.0 - alpha) * coalesce(sem_sim, 0.0)) as blend
+  from agg
+  order by blend desc, label
+  limit k_final;
 $$;

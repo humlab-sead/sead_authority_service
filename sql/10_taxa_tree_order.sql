@@ -7,167 +7,156 @@
  ** What      Stores 768-dimensional embeddings for semantic search over taxonomic orders
  ** Notes     Side table pattern: LEFT JOIN to main view, indexed with IVFFLAT
  ****************************************************************************************************/
-DROP TABLE IF EXISTS authority.taxa_tree_order_embeddings CASCADE;
+drop table if exists authority.taxa_tree_order_embeddings cascade;
 
-CREATE TABLE authority.taxa_tree_order_embeddings (
-  order_id INTEGER PRIMARY KEY REFERENCES public.tbl_taxa_tree_orders(order_id) ON DELETE CASCADE,
-  emb      VECTOR(768) NOT NULL,
-  updated  TIMESTAMPTZ DEFAULT NOW()
+create table authority.taxa_tree_order_embeddings (
+  order_id integer primary key references public.tbl_taxa_tree_orders(order_id) on delete cascade,
+  emb      vector(768) not null,
+  updated  timestamptz default now()
 );
 
-CREATE INDEX IF NOT EXISTS taxa_tree_order_embeddings_ivfflat_idx
-  ON authority.taxa_tree_order_embeddings
-    USING ivfflat (emb vector_cosine_ops)
-    WITH (lists = 100);
+create index if not exists taxa_tree_order_embeddings_ivfflat_idx
+  on authority.taxa_tree_order_embeddings
+    using ivfflat (emb vector_cosine_ops)
+    with (lists = 100);
 
-DROP VIEW IF EXISTS authority.taxa_tree_orders;
-CREATE OR REPLACE VIEW authority.taxa_tree_orders AS
-  SELECT  
+drop view if exists authority.taxa_tree_order cascade;
+create or replace view authority.taxa_tree_order as
+  select  
     o.order_id,
-    o.order_name AS label,
+    o.order_name as label,
     o.record_type_id,
     o.sort_order,
-    authority.immutable_unaccent(lower(o.order_name)) AS norm_label,
+    authority.immutable_unaccent(lower(o.order_name)) as norm_label,
     e.emb
-  FROM public.tbl_taxa_tree_orders o
-  LEFT JOIN authority.taxa_tree_order_embeddings e USING (order_id);
+  from public.tbl_taxa_tree_orders o
+  left join authority.taxa_tree_order_embeddings e using (order_id);
 
-CREATE INDEX IF NOT EXISTS tbl_taxa_tree_orders_norm_trgm
-  ON public.tbl_taxa_tree_orders
-    USING gin ( (authority.immutable_unaccent(lower(order_name))) gin_trgm_ops );
+create index if not exists tbl_taxa_tree_orders_norm_trgm
+  on public.tbl_taxa_tree_orders
+    using gin ( (authority.immutable_unaccent(lower(order_name))) gin_trgm_ops );
 
-DROP FUNCTION IF EXISTS authority.fuzzy_taxa_tree_orders(TEXT, INTEGER);
-CREATE OR REPLACE FUNCTION authority.fuzzy_taxa_tree_orders(
-  p_text  TEXT,
-  p_limit INTEGER DEFAULT 10
-) RETURNS TABLE (
-  order_id INTEGER,
-  label    TEXT,
-  name_sim DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-  WITH params AS (
-    SELECT authority.immutable_unaccent(lower(p_text))::TEXT AS q
-  )
-  SELECT
-    o.order_id,
-    o.label,
-    GREATEST(
-      CASE WHEN o.norm_label = (SELECT q FROM params) THEN 1.0
-           ELSE similarity(o.norm_label, (SELECT q FROM params))
-      END,
-      0.0001
-    ) AS name_sim
-  FROM authority.taxa_tree_orders AS o
-  WHERE o.norm_label % (SELECT q FROM params)
-  ORDER BY name_sim DESC, o.label
-  LIMIT p_limit;
+drop function if exists authority.fuzzy_taxa_tree_order(text, integer) cascade;
+create or replace function authority.fuzzy_taxa_tree_order(
+  p_text  text,
+  p_limit integer default 10
+) returns table (
+    order_id integer,
+    label    text,
+    name_sim double precision
+  ) language sql stable
+as $$
+    with params as (
+      select authority.immutable_unaccent(lower(p_text))::text as q
+    )
+    select
+      o.order_id,
+      o.label,
+      greatest(
+        case when o.norm_label = (select q from params) then 1.0
+            else similarity(o.norm_label, (select q from params))
+        end,
+        0.0001
+      ) as name_sim
+    from authority.taxa_tree_order as o
+    where o.norm_label % (select q from params)
+    order by name_sim desc, o.label
+    limit p_limit;
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.semantic_taxa_tree_orders
+ ** Procedure  authority.semantic_taxa_tree_order
  ** What       Semantic search function using pgvector embeddings
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.semantic_taxa_tree_orders(VECTOR, INTEGER);
+drop function if exists authority.semantic_taxa_tree_order(vector, integer) cascade;
 
-CREATE OR REPLACE FUNCTION authority.semantic_taxa_tree_orders(
-  qemb    VECTOR,
-  p_limit INTEGER DEFAULT 10
-)
-RETURNS TABLE (
-  order_id INTEGER,
-  label    TEXT,
-  sem_sim  DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-SELECT
-  o.order_id,
-  o.label,
-  1.0 - (o.emb <=> qemb) AS sem_sim
-FROM authority.taxa_tree_orders AS o
-WHERE o.emb IS NOT NULL
-ORDER BY o.emb <=> qemb
-LIMIT p_limit;
+create or replace function authority.semantic_taxa_tree_order(
+  qemb    vector,
+  p_limit integer default 10
+) returns table (
+    order_id integer,
+    label    text,
+    sem_sim  double precision
+) language sql stable
+as $$
+  select o.order_id, o.label, 1.0 - (o.emb <=> qemb) as sem_sim
+  from authority.taxa_tree_order as o
+  where o.emb is not null
+  order by o.emb <=> qemb
+  limit p_limit;
 $$;
 
 /***************************************************************************************************
- ** Procedure  authority.search_taxa_tree_orders_hybrid
+ ** Procedure  authority.search__hybrid
  ** What       Hybrid search combining trigram and semantic search
  ** Notes      See docs/MCP Server/SEAD Reconciliation via MCP — Architecture Doc (Outline).md
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.search_taxa_tree_orders_hybrid(TEXT, VECTOR, INTEGER, INTEGER, INTEGER, DOUBLE PRECISION);
+drop function if exists authority.search_taxa_tree_order_hybrid(text, vector, integer, integer, integer, double precision) cascade;
 
-CREATE OR REPLACE FUNCTION authority.search_taxa_tree_orders_hybrid(
-  p_text  TEXT,
-  qemb    VECTOR,
-  k_trgm  INTEGER DEFAULT 30,
-  k_sem   INTEGER DEFAULT 30,
-  k_final INTEGER DEFAULT 20,
-  alpha   DOUBLE PRECISION DEFAULT 0.5
-)
-RETURNS TABLE (
-  order_id INTEGER,
-  label    TEXT,
-  trgm_sim DOUBLE PRECISION,
-  sem_sim  DOUBLE PRECISION,
-  blend    DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-WITH params AS (
-  SELECT authority.immutable_unaccent(lower(p_text))::TEXT AS q
-),
-trgm AS (
-  SELECT
-    o.order_id,
-    o.label,
-    GREATEST(
-      CASE WHEN o.norm_label = (SELECT q FROM params) THEN 1.0
-           ELSE similarity(o.norm_label, (SELECT q FROM params))
-      END,
-      0.0001
-    ) AS trgm_sim
-  FROM authority.taxa_tree_orders AS o
-  WHERE o.norm_label % (SELECT q FROM params)
-  ORDER BY trgm_sim DESC, o.label
-  LIMIT k_trgm
-),
-sem AS (
-  SELECT
-    o.order_id,
-    o.label,
-    (1.0 - (o.emb <=> qemb))::DOUBLE PRECISION AS sem_sim
-  FROM authority.taxa_tree_orders AS o
-  WHERE o.emb IS NOT NULL
-  ORDER BY o.emb <=> qemb
-  LIMIT k_sem
-),
-u AS (
-  SELECT order_id, label, trgm_sim, NULL::DOUBLE PRECISION AS sem_sim FROM trgm
-  UNION
-  SELECT order_id, label, NULL::DOUBLE PRECISION AS trgm_sim, sem_sim FROM sem
-),
-agg AS (
-  SELECT
+create or replace function authority.search_taxa_tree_order_hybrid(
+  p_text  text,
+  qemb    vector,
+  k_trgm  integer default 30,
+  k_sem   integer default 30,
+  k_final integer default 20,
+  alpha   double precision default 0.5
+) returns table (
+  order_id integer,
+  label    text,
+  trgm_sim double precision,
+  sem_sim  double precision,
+  blend    double precision
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q
+  ),
+  trgm as (
+    select
+      o.order_id,
+      o.label,
+      greatest(
+        case when o.norm_label = (select q from params) then 1.0
+            else similarity(o.norm_label, (select q from params))
+        end,
+        0.0001
+      ) as trgm_sim
+    from authority.taxa_tree_order as o
+    where o.norm_label % (select q from params)
+    order by trgm_sim desc, o.label
+    limit k_trgm
+  ),
+  sem as (
+    select
+      o.order_id,
+      o.label,
+      (1.0 - (o.emb <=> qemb))::double precision as sem_sim
+    from authority.taxa_tree_order as o
+    where o.emb is not null
+    order by o.emb <=> qemb
+    limit k_sem
+  ),
+  u as (
+    select order_id, label, trgm_sim, null::double precision as sem_sim from trgm
+    union
+    select order_id, label, null::double precision as trgm_sim, sem_sim from sem
+  ),
+  agg as (
+    select
+      order_id,
+      max(label) as label,
+      max(trgm_sim) as trgm_sim,
+      max(sem_sim)  as sem_sim
+    from u
+    group by order_id
+  )
+  select
     order_id,
-    MAX(label) AS label,
-    MAX(trgm_sim) AS trgm_sim,
-    MAX(sem_sim)  AS sem_sim
-  FROM u
-  GROUP BY order_id
-)
-SELECT
-  order_id,
-  label,
-  COALESCE(trgm_sim, 0.0) AS trgm_sim,
-  COALESCE(sem_sim,  0.0) AS sem_sim,
-  (alpha * COALESCE(trgm_sim, 0.0) + (1.0 - alpha) * COALESCE(sem_sim, 0.0)) AS blend
-FROM agg
-ORDER BY blend DESC, label
-LIMIT k_final;
+    label,
+    coalesce(trgm_sim, 0.0) as trgm_sim,
+    coalesce(sem_sim,  0.0) as sem_sim,
+    (alpha * coalesce(trgm_sim, 0.0) + (1.0 - alpha) * coalesce(sem_sim, 0.0)) as blend
+  from agg
+  order by blend desc, label
+  limit k_final;
 $$;

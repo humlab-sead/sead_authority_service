@@ -7,90 +7,83 @@
  ** What      Stores 768-dimensional embeddings for semantic search over record types
  ** Notes     Side table pattern: LEFT JOIN to main view, indexed with IVFFLAT
  ****************************************************************************************************/
-DROP TABLE IF EXISTS authority.record_type_embeddings CASCADE;
+drop table if exists authority.record_type_embeddings cascade;
 
-CREATE TABLE authority.record_type_embeddings (
-  record_type_id INTEGER PRIMARY KEY REFERENCES public.tbl_record_types(record_type_id) ON DELETE CASCADE,
-  emb            VECTOR(768) NOT NULL,
-  updated        TIMESTAMPTZ DEFAULT NOW()
+create table authority.record_type_embeddings (
+  record_type_id integer primary key references public.tbl_record_types(record_type_id) on delete cascade,
+  emb            vector(768) not null,
+  updated        timestamptz default now()
 );
 
-CREATE INDEX IF NOT EXISTS record_type_embeddings_ivfflat_idx
-  ON authority.record_type_embeddings
-    USING ivfflat (emb vector_cosine_ops)
-    WITH (lists = 100);
+create index if not exists record_type_embeddings_ivfflat_idx
+  on authority.record_type_embeddings
+    using ivfflat (emb vector_cosine_ops)
+      with (lists = 100);
 
-DROP VIEW IF EXISTS authority.record_type;
-CREATE OR REPLACE VIEW authority.record_type AS
-  SELECT  
+drop view if exists authority.record_type cascade;
+create or replace view authority.record_type as
+  select  
     rt.record_type_id,
-    rt.record_type_name AS label,
-    rt.record_type_description AS description,
-    authority.immutable_unaccent(lower(rt.record_type_name)) AS norm_label,
+    rt.record_type_name as label,
+    rt.record_type_description as description,
+    authority.immutable_unaccent(lower(rt.record_type_name)) as norm_label,
     e.emb
-  FROM public.tbl_record_types rt
-  LEFT JOIN authority.record_type_embeddings e USING (record_type_id);
+  from public.tbl_record_types rt
+  left join authority.record_type_embeddings e using (record_type_id);
 
-CREATE INDEX IF NOT EXISTS tbl_record_types_norm_trgm
-  ON public.tbl_record_types
-    USING gin ( (authority.immutable_unaccent(lower(record_type_name))) gin_trgm_ops );
+create index if not exists tbl_record_types_norm_trgm
+  on public.tbl_record_types
+    using gin ( (authority.immutable_unaccent(lower(record_type_name))) gin_trgm_ops );
 
-DROP FUNCTION IF EXISTS authority.fuzzy_record_type(TEXT, INTEGER);
-CREATE OR REPLACE FUNCTION authority.fuzzy_record_type(
-  p_text  TEXT,
-  p_limit INTEGER DEFAULT 10
-) RETURNS TABLE (
-  record_type_id INTEGER,
-  label          TEXT,
-  name_sim       DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-  WITH params AS (
-    SELECT authority.immutable_unaccent(lower(p_text))::TEXT AS q
-  )
-  SELECT
-    rt.record_type_id,
-    rt.label,
-    GREATEST(
-      CASE WHEN rt.norm_label = (SELECT q FROM params) THEN 1.0
-           ELSE similarity(rt.norm_label, (SELECT q FROM params))
-      END,
-      0.0001
-    ) AS name_sim
-  FROM authority.record_type AS rt
-  WHERE rt.norm_label % (SELECT q FROM params)
-  ORDER BY name_sim DESC, rt.label
-  LIMIT p_limit;
+drop function if exists authority.fuzzy_record_type(text, integer) cascade;
+create or replace function authority.fuzzy_record_type(
+  p_text  text,
+  p_limit integer default 10
+) returns table (
+  record_type_id integer,
+  label          text,
+  name_sim       double precision
+) language sql stable
+as $$
+    with params as (
+      select authority.immutable_unaccent(lower(p_text))::text as q
+    )
+    select
+      rt.record_type_id,
+      rt.label,
+      greatest(
+        case when rt.norm_label = pq.q then 1.0
+            else similarity(rt.norm_label, pq.q)
+        end,
+        0.0001
+      ) as name_sim
+    from authority.record_type as rt
+    cross join params pq
+    where rt.norm_label % pq.q
+    order by name_sim desc, rt.label
+    limit p_limit;
 $$;
 
 /***************************************************************************************************
  ** Procedure  authority.semantic_record_type
  ** What       Semantic search function using pgvector embeddings
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.semantic_record_type(VECTOR, INTEGER);
+drop function if exists authority.semantic_record_type(vector, integer) cascade;
 
-CREATE OR REPLACE FUNCTION authority.semantic_record_type(
-  qemb    VECTOR,
-  p_limit INTEGER DEFAULT 10
-)
-RETURNS TABLE (
-  record_type_id INTEGER,
-  label          TEXT,
-  sem_sim        DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-SELECT
-  rt.record_type_id,
-  rt.label,
-  1.0 - (rt.emb <=> qemb) AS sem_sim
-FROM authority.record_type AS rt
-WHERE rt.emb IS NOT NULL
-ORDER BY rt.emb <=> qemb
-LIMIT p_limit;
+create or replace function authority.semantic_record_type(
+  qemb vector,
+  p_limit integer default 10
+) returns table (
+  record_type_id integer,
+  label          text,
+  sem_sim        double precision
+) language sql stable
+as $$
+  select rt.record_type_id, rt.label, 1.0 - (rt.emb <=> qemb) as sem_sim
+  from authority.record_type as rt
+  where rt.emb is not null
+  order by rt.emb <=> qemb
+  limit p_limit;
 $$;
 
 /***************************************************************************************************
@@ -98,75 +91,73 @@ $$;
  ** What       Hybrid search combining trigram and semantic search
  ** Notes      See docs/MCP Server/SEAD Reconciliation via MCP — Architecture Doc (Outline).md
  ****************************************************************************************************/
-DROP FUNCTION IF EXISTS authority.search_record_type_hybrid(TEXT, VECTOR, INTEGER, INTEGER, INTEGER, DOUBLE PRECISION);
+drop function if exists authority.search_record_type_hybrid(text, vector, integer, integer, integer, double precision) cascade;
 
-CREATE OR REPLACE FUNCTION authority.search_record_type_hybrid(
-  p_text  TEXT,
-  qemb    VECTOR,
-  k_trgm  INTEGER DEFAULT 30,
-  k_sem   INTEGER DEFAULT 30,
-  k_final INTEGER DEFAULT 20,
-  alpha   DOUBLE PRECISION DEFAULT 0.5
-)
-RETURNS TABLE (
-  record_type_id INTEGER,
-  label          TEXT,
-  trgm_sim       DOUBLE PRECISION,
-  sem_sim        DOUBLE PRECISION,
-  blend          DOUBLE PRECISION
-)
-LANGUAGE sql
-STABLE
-AS $$
-WITH params AS (
-  SELECT authority.immutable_unaccent(lower(p_text))::TEXT AS q
-),
-trgm AS (
-  SELECT
-    rt.record_type_id,
-    rt.label,
-    GREATEST(
-      CASE WHEN rt.norm_label = (SELECT q FROM params) THEN 1.0
-           ELSE similarity(rt.norm_label, (SELECT q FROM params))
-      END,
-      0.0001
-    ) AS trgm_sim
-  FROM authority.record_type AS rt
-  WHERE rt.norm_label % (SELECT q FROM params)
-  ORDER BY trgm_sim DESC, rt.label
-  LIMIT k_trgm
-),
-sem AS (
-  SELECT
-    rt.record_type_id,
-    rt.label,
-    (1.0 - (rt.emb <=> qemb))::DOUBLE PRECISION AS sem_sim
-  FROM authority.record_type AS rt
-  WHERE rt.emb IS NOT NULL
-  ORDER BY rt.emb <=> qemb
-  LIMIT k_sem
-),
-u AS (
-  SELECT record_type_id, label, trgm_sim, NULL::DOUBLE PRECISION AS sem_sim FROM trgm
-  UNION
-  SELECT record_type_id, label, NULL::DOUBLE PRECISION AS trgm_sim, sem_sim FROM sem
-),
-agg AS (
-  SELECT
+create or replace function authority.search_record_type_hybrid(
+  p_text  text,
+  qemb    vector,
+  k_trgm  integer default 30,
+  k_sem   integer default 30,
+  k_final integer default 20,
+  alpha   double precision default 0.5
+) returns table (
+  record_type_id integer,
+  label          text,
+  trgm_sim       double precision,
+  sem_sim        double precision,
+  blend          double precision
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q
+  ),
+  trgm as (
+    select
+      rt.record_type_id,
+      rt.label,
+      greatest(
+        case when rt.norm_label = pq.q then 1.0
+            else similarity(rt.norm_label, pq.q)
+        end,
+        0.0001
+      ) as trgm_sim
+    from authority.record_type as rt
+    cross join params pq
+    where rt.norm_label % pq.q
+    order by trgm_sim desc, rt.label
+    limit k_trgm
+  ),
+  sem as (
+    select
+      rt.record_type_id,
+      rt.label,
+      (1.0 - (rt.emb <=> qemb))::double precision as sem_sim
+    from authority.record_type as rt
+    where rt.emb is not null
+    order by rt.emb <=> qemb
+    limit k_sem
+  ),
+  u as (
+    select record_type_id, label, trgm_sim, null::double precision as sem_sim from trgm
+    union
+    select record_type_id, label, null::double precision as trgm_sim, sem_sim from sem
+  ),
+  agg as (
+    select
+      record_type_id,
+      max(label) as label,
+      max(trgm_sim) as trgm_sim,
+      max(sem_sim)  as sem_sim
+    from u
+    group by record_type_id
+  )
+  select
     record_type_id,
-    MAX(label) AS label,
-    MAX(trgm_sim) AS trgm_sim,
-    MAX(sem_sim)  AS sem_sim
-  FROM u
-  GROUP BY record_type_id
-)
-SELECT
-  record_type_id,
-  label,
-  COALESCE(trgm_sim, 0.0) AS trgm_sim,
-  COALESCE(sem_sim,  0.0) AS sem_sim,
-  (alpha * COALESCE(trgm_sim, 0.0) + (1.0 - alpha) * COALESCE(sem_sim, 0.0)) AS blend
-FROM agg
-ORDER BY blend DESC, label
-LIMIT k_final;
+    label,
+    coalesce(trgm_sim, 0.0) as trgm_sim,
+    coalesce(sem_sim,  0.0) as sem_sim,
+    (alpha * coalesce(trgm_sim, 0.0) + (1.0 - alpha) * coalesce(sem_sim, 0.0)) as blend
+  from agg
+  order by blend desc, label
+  limit k_final;
 $$;

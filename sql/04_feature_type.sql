@@ -4,7 +4,7 @@
  **        Used for semantic search with pgvector
  **********************************************************************************************/
 
-drop table if exists authority.feature_type_embeddings;
+drop table if exists authority.feature_type_embeddings cascade;
 
 create table if not exists authority.feature_type_embeddings (
   feature_type_id integer primary key references public.tbl_feature_types(feature_type_id) on delete cascade,
@@ -25,8 +25,8 @@ create index if not exists feature_type_embeddings_ivfflat
 **  Feature Type
 **********************************************************************************************/
 
-drop view if exists authority.feature_type;
-create or replace view authority.feature_type as
+drop materialized view if exists authority.feature_type cascade;
+create materialized view authority.feature_type as
   select  ft.feature_type_id,
           ft.feature_type_name as label,
           ft.feature_type_description as description,
@@ -39,7 +39,7 @@ create index if not exists tbl_feature_types_norm_trgm
   on public.tbl_feature_types
     using gin ( (authority.immutable_unaccent(lower(feature_type_name))) gin_trgm_ops );
 
-drop function if exists authority.fuzzy_feature_type(text, integer);
+drop function if exists authority.fuzzy_feature_type(text, integer) cascade;
 create or replace function authority.fuzzy_feature_type(
 	p_text text,
 	p_limit integer default 10
@@ -47,8 +47,7 @@ create or replace function authority.fuzzy_feature_type(
 	feature_type_id integer,
 	label text,
 	name_sim double precision
-)
-language sql
+) language sql
 stable
 as $$
   with params as (
@@ -72,18 +71,17 @@ $$;
  ** Procedure  authority.semantic_feature_type
  ** What       Semantic search function using pgvector embeddings
  ****************************************************************************************************/
-drop function if exists authority.semantic_feature_type(vector, integer);
+drop function if exists authority.semantic_feature_type(vector, integer) cascade;
 
 create or replace function authority.semantic_feature_type(
   qemb    vector,
   p_limit integer default 10
-)
-returns table (
+) returns table (
   feature_type_id integer,
   label           text,
   sem_sim         double precision
-)
-language sql stable as $$
+) language sql stable
+as $$
   select
     ft.feature_type_id,
     ft.label,
@@ -99,7 +97,7 @@ $$;
  ** What       Hybrid search combining trigram and semantic search
  ** Notes      See docs/MCP Server/SEAD Reconciliation via MCP — Architecture Doc (Outline).md
  ****************************************************************************************************/
-drop function if exists authority.search_feature_type_hybrid(text, vector, integer, integer, integer, double precision);
+drop function if exists authority.search_feature_type_hybrid(text, vector, integer, integer, integer, double precision) cascade;
 
 create or replace function authority.search_feature_type_hybrid(
   p_text  text,
@@ -108,15 +106,15 @@ create or replace function authority.search_feature_type_hybrid(
   k_sem   integer default 30,
   k_final integer default 20,
   alpha   double precision default 0.5
-)
-returns table (
+) returns table (
   feature_type_id integer,
   label           text,
   trgm_sim        double precision,
   sem_sim         double precision,
   blend           double precision
 )
-  language sql stable as $$
+  language sql stable
+as $$
   with params as (
     select authority.immutable_unaccent(lower(p_text))::text as q
   ),
