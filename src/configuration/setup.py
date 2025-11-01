@@ -37,25 +37,27 @@ async def setup_config_store(filename: str = "config.yml", force: bool = False) 
     logger.info("Config Store initialized successfully.")
 
 
+async def connection_factory(cfg) -> psycopg.AsyncConnection:
+    dsn: str = create_db_uri(**cfg.get("options:database"))
+    if cfg.get("runtime:connection") is None:
+        logger.info("Creating new database connection")
+        con = await psycopg.AsyncConnection.connect(dsn)
+        cfg.update({"runtime:connection": con})
+        return con
+    return cfg.get("runtime:connection")
+
+
 async def _setup_connection_factory(cfg):
     dsn: str = create_db_uri(**cfg.get("options:database"))
 
     if not dsn:
         raise ValueError("Database DSN is not configured properly")
 
-    async def connection_factory() -> psycopg.AsyncConnection:
-        if cfg.get("runtime:connection") is None:
-            logger.info("Creating new database connection")
-            con = await psycopg.AsyncConnection.connect(dsn)
-            cfg.update({"runtime:connection": con})
-            return con
-        return cfg.get("runtime:connection")
-
     cfg.update(
         {
             "runtime:connection": None,
             "runtime:dsn": dsn,
-            "runtime:connection_factory": connection_factory,
+            "runtime:connection_factory": lambda: connection_factory(cfg),
         }
     )
 
