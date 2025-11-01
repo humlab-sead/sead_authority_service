@@ -2,7 +2,7 @@ from abc import ABC
 from typing import Any, Type
 
 from src.configuration import ConfigValue
-from src.utility import Registry
+from src.utility import Registry, load_resource_yaml
 
 from . import StrategySpecification
 from .query import QueryProxy
@@ -12,14 +12,19 @@ class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
     def __init__(self, specification: StrategySpecification, proxy_or_cls: Type[QueryProxy] | QueryProxy) -> None:
-        self.specification: StrategySpecification = specification or {
-            "key": "unknown",
-            "id_field": "id",
-            "label_field": "name",
-            "properties": [],
-            "property_settings": {},
-            "sql_queries": {},
-        }
+
+        self.specification: StrategySpecification = (
+            specification
+            or load_resource_yaml(self.key)
+            or {
+                "key": "unknown",
+                "id_field": "id",
+                "label_field": "name",
+                "properties": [],
+                "property_settings": {},
+                "sql_queries": {},
+            }
+        )
         self._proxy_or_cls: Type[QueryProxy] = proxy_or_cls
         self._proxy: QueryProxy | None = None
 
