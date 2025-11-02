@@ -1,0 +1,209 @@
+bibliographic_reference:
+  name: "Bibliographic Reference"
+  table_name: "tbl_biblio"
+  id_column: "biblio_id"
+  label_column: "full_reference"
+  description_column: "title"
+  alternate_identity_column: "doi"
+data_type:
+  name: "Data Type"
+  table_name: "tbl_data_types"
+  id_column: "data_type_id"
+  label_column: "data_type_name"
+  description_column: "definition"
+  alternate_identity_column: null
+  type_or_grouping:
+    foreign_table: "data_type_group"
+    foreign_key_column: "data_type_group_id"
+data_type_group:
+  name: "Data Type Group"
+  table_name: "tbl_data_type_groups"
+  id_column: "data_type_group_id"
+  label_column: "data_type_group_name"
+  description_column: "description"
+  alternate_identity_column: null
+dating_uncertainty:
+  name: "Dating Uncertainty"
+  table_name: "tbl_dating_uncertainty"
+  id_column: "dating_uncertainty_id"
+  label_column: "uncertainty"
+  description_column: "description"
+  alternate_identity_column: null
+feature_type:
+  name: "Feature Type"
+  table_name: "tbl_feature_types"
+  id_column: "feature_type_id"
+  label_column: "feature_type_name"
+  description_column: "feature_type_description"
+  alternate_identity_column: null
+feature:
+  name: "Feature"
+  table_name: "tbl_features"
+  id_column: "feature_id"
+  label_column: "feature_name"
+  description_column: "feature_description"
+  alternate_identity_column: null
+  type_or_grouping:
+    foreign_table: "feature_type"
+    foreign_key_column: "feature_type_id"
+location_type:
+  name: "Location Type"
+  table_name: "tbl_location_types"
+  id_column: "location_type_id"
+  label_column: "location_type"
+  description_column: "description"
+  alternate_identity_column: null
+location:
+  name: "Location"
+  table_name: "tbl_locations"
+  id_column: "location_id"
+  label_column: "location_name"
+  description_column: null
+  alternate_identity_column: null
+  type_or_grouping:
+    foreign_table: "location_type"
+    foreign_key_column: "location_type_id"  
+method_group:
+  name: "Method Group"
+  table_name: "tbl_method_groups"
+  id_column: "method_group_id"
+  label_column: "group_name"
+  description_column: "description"
+  alternate_identity_column: null
+method:
+  name: "Method"
+  table_name: "tbl_methods"
+  id_column: "method_id"
+  label_column: "method_name"
+  description_column: "description"
+  alternate_identity_column: "method_abbrev_or_alt_name"
+  type_or_grouping:
+    foreign_table: "tbl_method_groups"
+    foreign_key_column: "method_group_id"
+modification_type:
+  name: "Modification Type"
+  table_name: "tbl_modification_types"
+  id_column: "modification_type_id"
+  label_column: "modification_type_name"
+  description_column: "modification_type_description"
+  alternate_identity_column: null
+record_type:
+  name: "Record Type"
+  table_name: "tbl_record_types"
+  id_column: "record_type_id"
+  label_column: "record_type_name"
+  description_column: "record_type_description"
+  alternate_identity_column: null
+relative_age_type:
+  name: "Relative Age Type"
+  table_name: "tbl_relative_age_types"
+  id_column: "relative_age_type_id"
+  label_column: "age_type"
+  description_column: "description"
+  alternate_identity_column: null
+relative_age:
+  name: "Relative Age"
+  table_name: "tbl_relative_ages"
+  id_column: "relative_age_id"
+  label_column: "relative_age"
+  description_column: "description"
+  alternate_identity_column: null
+  type_or_grouping:
+    foreign_table: "relative_age_type"
+    foreign_key_column: "relative_age_type_id"
+site:
+  name: "Site"
+  table_name: "tbl_sites"
+  id_column: "site_id"
+  label_column: "site_name"
+  description_column: "site_description"
+  alternate_identity_column: "national_site_identifier"
+sampling_context:
+  name: "Sampling Context"
+  table_name: "tbl_sample_group_sampling_contexts"
+  id_column: "sampling_context_id"
+  label_column: "sampling_context"
+  description_column: "description"
+  alternate_identity_column: null
+sample_group_description_type:
+  name: "Sample Group Description Type"
+  table_name: "tbl_sample_group_description_types"
+  id_column: "sample_group_description_type_id"
+  label_column: "type_name"
+  description_column: "type_description"
+  alternate_identity_column: null
+sample_description_type:
+  name: "Sample Description Type"
+  table_name: "tbl_sample_description_types"
+  id_column: "sample_description_type_id"
+  label_column: "type_name"
+  description_column: "type_description"
+  alternate_identity_column: null
+sample_location_type:
+  name: "Sample Location Type"
+  table_name: "tbl_sample_location_types"
+  id_column: "sample_location_type_id"
+  label_column: "location_type"
+  description_column: "location_type_description"
+  alternate_identity_column: null
+sample_type:
+  name: "Sample Type"
+  table_name: "tbl_sample_types"
+  id_column: "sample_type_id"
+  label_column: "type_name"
+  description_column: "description"
+  alternate_identity_column: null
+taxa_tree_authors:
+  name: "Taxa Authors"
+  table_name: "tbl_taxa_tree_authors"
+  id_column: "author_id"
+  label_column: "author_name"
+  description_column: null
+  alternate_identity_column: null
+taxa_tree_orders:
+  name: "Taxa Orders"
+  table_name: "tbl_taxa_tree_orders"
+  id_column: "order_id"
+  label_column: "order_name"
+  description_column: null
+  alternate_identity_column: null
+  type_or_grouping:
+    foreign_table: "record_type"
+    foreign_key_column: "record_type_id"
+taxa_tree_family:
+  name: "Taxa Family"
+  table_name: "tbl_taxa_tree_families"
+  id_column: "family_id"
+  label_column: "family_name"
+  description_column: null
+  alternate_identity_column: null
+  type_or_grouping:
+    foreign_table: "taxa_tree_order"
+    foreign_key_column: "order_id"
+taxa_tree_genus:
+  name: "Taxa Genus"
+  table_name: "tbl_taxa_tree_genera"
+  id_column: "genus_id"
+  label_column: "genus_name"
+  description_column: null
+  alternate_identity_column: null
+  type_or_grouping:
+    foreign_table: "taxa_tree_family"
+    foreign_key_column: "family_id"
+taxa_tree_master:
+  name: "Taxa"
+  table_name: "tbl_taxa_tree_master"
+  id_column: "taxon_id"
+  label_column: "species"
+  description_column: null
+  alternate_identity_column: null
+  type_or_grouping:
+    foreign_table: "taxa_tree_genus"
+    foreign_key_column: "genus_id"
+taxonomic_order:
+  name: "Taxonomic Order"
+  table_name: "tbl_taxonomic_orders"
+  id_column: "taxonomic_order_id"
+  label_column: "order_name"
+  description_column: "description"
+  alternate_identity_column: null
