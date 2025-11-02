@@ -12,8 +12,7 @@ drop table if exists authority.taxa_tree_master_embeddings cascade;
 
 create table authority.taxa_tree_master_embeddings (
   taxon_id integer primary key references public.tbl_taxa_tree_master(taxon_id) on delete cascade,
-  emb      vector(768) not null,
-  updated  timestamptz default now()
+  emb      vector(768) not null
 );
 
 create index if not exists taxa_tree_master_embeddings_ivfflat_idx

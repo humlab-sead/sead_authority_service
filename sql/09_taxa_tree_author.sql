@@ -10,8 +10,7 @@ drop table if exists authority.taxa_tree_author_embeddings cascade;
 
 create table authority.taxa_tree_author_embeddings(
     author_id integer primary key references public.tbl_taxa_tree_authors(author_id) on delete cascade,
-    emb VECTOR(768) not null,
-    updated timestamptz default now()
+    emb VECTOR(768) not null
 );
 
 create index if not exists taxa_tree_author_embeddings_ivfflat_idx on authority.taxa_tree_author_embeddings using ivfflat(emb

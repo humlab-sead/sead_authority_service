@@ -10,8 +10,7 @@ drop table if exists authority.data_type_embeddings cascade;
 
 create table authority.data_type_embeddings (
   data_type_id integer primary key references public.tbl_data_types(data_type_id) on delete cascade,
-  emb          vector(768) not null,
-  updated      timestamptz default now()
+  emb          vector(768) not null
 );
 
 create index if not exists data_type_embeddings_ivfflat_idx

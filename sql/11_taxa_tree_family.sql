@@ -11,8 +11,7 @@ drop table if exists authority.taxa_tree_family_embeddings cascade;
 
 create table authority.taxa_tree_family_embeddings (
   family_id integer primary key references public.tbl_taxa_tree_families(family_id) on delete cascade,
-  emb       vector(768) not null,
-  updated   timestamptz default now()
+  emb       vector(768) not null
 );
 
 create index if not exists taxa_tree_family_embeddings_ivfflat_idx

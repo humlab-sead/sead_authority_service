@@ -14,8 +14,7 @@ drop table if exists authority.bibliographic_reference_embeddings cascade;
 
 create table authority.bibliographic_reference_embeddings (
   biblio_id integer primary key references public.tbl_biblio(biblio_id) on delete cascade,
-  emb       vector(768) not null,
-  updated   timestamptz default now()
+  emb       vector(768) not null
 );
 
 create index if not exists bibliographic_reference_embeddings_ivfflat_idx

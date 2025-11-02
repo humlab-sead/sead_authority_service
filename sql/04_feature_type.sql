@@ -8,10 +8,7 @@ drop table if exists authority.feature_type_embeddings cascade;
 
 create table if not exists authority.feature_type_embeddings (
   feature_type_id integer primary key references public.tbl_feature_types(feature_type_id) on delete cascade,
-  emb             vector(768),             -- embedding vector
-  language        text,                    -- optional language tag
-  active          boolean default true,    -- optional soft-deactivation flag
-  updated_at      timestamptz default now()
+  emb             vector(768)
 );
 
 -- vector index for fast ann search (cosine). tune lists to your row count.

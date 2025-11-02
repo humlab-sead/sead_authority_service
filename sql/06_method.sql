@@ -10,8 +10,7 @@ drop table if exists authority."method_embeddings" cascade;
 
 create table authority."method_embeddings"(
     method_id integer primary key references public.tbl_methods(method_id), -- on delete cascade,
-    emb VECTOR(768) not null,
-    updated timestamptz default now()
+    emb VECTOR(768) not null
 );
 
 create index if not exists method_embeddings_ivfflat_idx

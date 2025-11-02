@@ -11,8 +11,7 @@ drop table if exists authority.taxa_tree_order_embeddings cascade;
 
 create table authority.taxa_tree_order_embeddings (
   order_id integer primary key references public.tbl_taxa_tree_orders(order_id) on delete cascade,
-  emb      vector(768) not null,
-  updated  timestamptz default now()
+  emb      vector(768) not null
 );
 
 create index if not exists taxa_tree_order_embeddings_ivfflat_idx

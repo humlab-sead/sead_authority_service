@@ -12,8 +12,7 @@ drop table if exists authority.taxonomic_order_system_embeddings cascade;
 
 create table authority.taxonomic_order_system_embeddings (
   taxonomic_order_system_id integer primary key references public.tbl_taxonomic_order_systems(taxonomic_order_system_id) on delete cascade,
-  emb                       vector(768) not null,
-  updated                   timestamptz default now()
+  emb                       vector(768) not null
 );
 
 create index if not exists taxonomic_order_system_embeddings_ivfflat_idx

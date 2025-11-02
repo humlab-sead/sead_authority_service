@@ -8,10 +8,7 @@ drop table if exists authority.location_embeddings cascade;
 
 create table if not exists authority.location_embeddings (
   location_id integer primary key references public.tbl_locations(location_id) on delete cascade,
-  emb         vector(768),             -- embedding vector
-  language    text,                    -- optional language tag
-  active      boolean default true,    -- optional soft-deactivation flag
-  updated_at  timestamptz default now()
+  emb         vector(768)
 );
 
 -- Vector index for fast ANN search (cosine). Tune lists to your row count.

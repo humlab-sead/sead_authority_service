@@ -12,8 +12,7 @@ drop table if exists authority.taxonomy_note_embeddings cascade;
 
 create table authority.taxonomy_note_embeddings (
   taxonomy_notes_id integer primary key references public.tbl_taxonomy_notes(taxonomy_notes_id) on delete cascade,
-  emb               vector(768) not null,
-  updated           timestamptz default now()
+  emb               vector(768) not null
 );
 
 create index if not exists taxonomy_note_embeddings_ivfflat_idx

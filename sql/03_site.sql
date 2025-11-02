@@ -5,9 +5,6 @@
  **        Choose the dimension to match the embedding model (example uses 768).
  **          site_id: the primary key of the site this embedding belongs to
  **          emb: the actual embedding vector, stored as a pgvector vector type
- **          active: a boolean flag indicating whether this embedding is active (useful for soft deletes or temporary deactivations)
- **          updated_at: timestamp when the embedding was last updated
- **          language: optional text field to tag the embedding with a language code
  **        The last three columns are metadata helpers for managing and governing the embeddings.
  **        They’re not required by PostgreSQL or pgvector itself, but they make the architecture
  **        easier to maintain and to debug over time.
@@ -17,10 +14,7 @@ drop table if exists authority.site_embeddings cascade;
 
 create table if not exists authority.site_embeddings (
   site_id    integer primary key references public.tbl_sites(site_id) on delete cascade,
-  emb        vector(768),             -- embedding vector
-  language   text,                    -- optional language tag
-  active     boolean default true,    -- optional soft-deactivation flag
-  updated_at timestamptz default now()
+  emb        vector(768)
 );
 
 -- Vector index for fast ANN search (cosine). Tune lists to your row count.
@@ -46,8 +40,7 @@ create materialized view authority.site as
     ST_SetSRID(ST_MakePoint(t.longitude_dd, t.latitude_dd), 4326) AS geom,
     e.emb
   from public.tbl_sites as t
-  left join authority.site_embeddings as e using (site_id)
-  where e.active = true;  -- keep only active sites from base table
+  left join authority.site_embeddings as e using (site_id);
 
 -- Required to allow REFRESH MATERIALIZED VIEW CONCURRENTLY
 create unique index if not exists site_uidx
