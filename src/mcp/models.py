@@ -22,8 +22,6 @@ class Candidate(BaseModel):
 
     id: str = Field(description="Canonical ID from authority table")
     value: str = Field(description="Display value (label)")
-    language: Optional[str] = Field(None, description="ISO 639-1 language code")
-    active: bool = Field(True, description="Whether this entry is active")
     raw_scores: Optional[RawScores] = Field(None, description="Detailed scoring breakdown")
 
 
@@ -36,7 +34,6 @@ class SearchLookupParams(BaseModel):
     k_sem: int = Field(30, description="Top-K from semantic search", ge=1, le=100)
     k_final: int = Field(20, description="Final candidate count after union", ge=1, le=50)
     language: Optional[str] = Field(None, description="Prefer/filter by language")
-    active_only: bool = Field(True, description="Only return active entries")
     return_raw_scores: bool = Field(True, description="Include raw_scores in response")
 
 
@@ -83,7 +80,6 @@ class GetByIdResult(BaseModel):
     value: str
     aliases: Optional[list[str]] = None
     language: Optional[str] = None
-    active: bool
     provenance: Optional[dict[str, Any]] = None
     schema_version: str = Field("0.1", description="MCP schema version")
 
@@ -94,7 +90,6 @@ class LookupTable(BaseModel):
     table: str = Field(description="Table/view name in authority schema")
     domain: str = Field(description="Domain/category (e.g., 'taxonomy', 'methods')")
     languages: list[str] = Field(description="Available language codes")
-    active_only_default: bool = Field(True)
     columns: dict[str, str] = Field(description="Column name -> type mapping")
 
 

@@ -87,7 +87,6 @@ class MCPTools:
                         id=str(row[0]),
                         value=row[1],
                         language=None,
-                        active=True,
                         raw_scores=(
                             RawScores(
                                 trgm=float(row[2]) if len(row) > 2 else 0.0,
@@ -140,7 +139,6 @@ class MCPTools:
                 value=row[1],
                 aliases=None,  # TODO: Add when aliases are available
                 language=None,
-                active=True,
                 provenance=None,  # TODO: Add metadata if needed
                 schema_version="0.1",
             )

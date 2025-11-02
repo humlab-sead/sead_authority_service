@@ -72,7 +72,6 @@ class MCPResources:
                             table=table_key,
                             domain=table_key,  # Could be enriched from config
                             languages=["en"],  # TODO: Detect from data
-                            active_only_default=True,
                             columns=columns,
                         )
                     )
@@ -88,7 +87,6 @@ class MCPResources:
         offset: int = 0,
         limit: int = 50,
         language: Optional[str] = None,
-        active_only: bool = True,
     ) -> dict[str, Any]:
         """
         Browse paginated rows from a lookup table
@@ -109,10 +107,9 @@ class MCPResources:
 
         query: sql.Composed = sql.SQL(
             """
-            SELECT {id_column} as id, {label_column} as value, true as active
+            SELECT {id_column} as id, {label_column} as value
             FROM public.{table_name}
             WHERE 1 = 1
-              {active_criteria}
             ORDER BY id
             LIMIT %(limit)s OFFSET %(offset)s
         """
@@ -120,7 +117,6 @@ class MCPResources:
             id_column=sql.Identifier(id_column),
             label_column=sql.Identifier(label_column),
             table_name=sql.Identifier(table_name),
-            active_criteria=sql.SQL(" AND active = TRUE") if active_only else sql.SQL(""),
         )
 
         async with self.connection.cursor() as cursor:
@@ -133,7 +129,6 @@ class MCPResources:
                     {
                         "id": str(row[0]),
                         "value": row[1],
-                        "active": row[2],
                     }
                 )
 

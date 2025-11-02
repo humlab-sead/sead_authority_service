@@ -68,10 +68,9 @@ class SEADMCPServer:
         offset: int = 0,
         limit: int = 50,
         language: Optional[str] = None,
-        active_only: bool = True,
     ) -> dict[str, Any]:
         """Browse paginated rows from a lookup table"""
-        return await self.resources.get_lookup_rows(table, offset, limit, language, active_only)
+        return await self.resources.get_lookup_rows(table, offset, limit, language)
 
     async def search_lookup(self, params: SearchLookupParams) -> dict[str, Any]:
         """
