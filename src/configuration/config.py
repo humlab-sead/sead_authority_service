@@ -120,8 +120,21 @@ class ConfigFactory:
             else source
         )
 
+        # Handle empty YAML files (loads as None)
+        if data is None:
+            data = {}
+
         if not isinstance(data, dict):
             raise TypeError(f"expected dict, found '{type(data)}'")
+
+        # Resolve sub-configurations by loading referenced files recursively
+        data = self._resolve_sub_configs(
+            data, 
+            context=context, 
+            env_filename=env_filename, 
+            env_prefix=env_prefix,
+            source_path=source if isinstance(source, str) else None
+        )
 
         # Update data based on environment variables with a name that starts with `env_prefix`
         data = env2dict(env_prefix, data)
@@ -145,3 +158,45 @@ class ConfigFactory:
         if raise_if_missing and not Path(source).exists():
             raise FileNotFoundError(f"Configuration file not found: {source}")
         return True
+
+    def _resolve_sub_configs(
+        self,
+        data: dict,
+        *,
+        context: str = None,
+        env_filename: str | None = None,
+        env_prefix: str = None,
+        source_path: str | None = None,
+    ) -> dict:
+        """Recursively resolve sub-configurations referenced in the main configuration.
+        
+        A sub-config is referenced using the @include: prefix, e.g. "@include:path/to/subconfig.yaml"
+        Relative paths are resolved relative to the main configuration file.
+        Sub-configs can themselves reference further sub-configs.
+        
+        Example:
+            database: "@include:config/database.yml"
+            api: "@include:config/api.yml"
+        """
+
+        def _resolve(value: Any, base_path: Path | None) -> Any:
+            if isinstance(value, dict):
+                return {k: _resolve(v, base_path) for k, v in value.items()}
+            if isinstance(value, list):
+                return [_resolve(v, base_path) for v in value]
+            if isinstance(value, str) and value.startswith("@include:"):
+                sub_config_path = value[9:]  # Remove "@include:" prefix
+                if not Path(sub_config_path).is_absolute() and base_path is not None:
+                    sub_config_path = str(base_path.parent / sub_config_path)
+                loaded_data = ConfigFactory().load(
+                    source=sub_config_path, 
+                    context=context, 
+                    env_filename=env_filename, 
+                    env_prefix=env_prefix
+                ).data
+                return _resolve(loaded_data, Path(sub_config_path))
+            return value
+
+        # Determine base path from source_path if available
+        initial_base_path = Path(source_path) if source_path and self.is_config_path(source_path, raise_if_missing=False) else None
+        return _resolve(data, initial_base_path)
