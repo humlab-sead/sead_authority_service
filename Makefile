@@ -76,3 +76,8 @@ requirements.txt: pyproject.toml
 .PHONY: test-coverage
 test-coverage:
 	@uv run pytest test_main.py --cov=main --cov-report=html --cov-report=term
+
+.PHONY: dead-code
+dead-code:
+	@uv run vulture src tests main.py
+	
