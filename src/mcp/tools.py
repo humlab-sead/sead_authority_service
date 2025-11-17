@@ -21,6 +21,7 @@ class MCPTools:
     def __init__(self, connection: AsyncConnection):
         self.connection = connection
         self.schema = ConfigValue("table_specs", default={}).resolve()
+        self.language: str = "en"
 
     async def search_lookup(self, params: SearchLookupParams) -> SearchLookupResult:
         """
@@ -41,6 +42,7 @@ class MCPTools:
             elapsed_ms = (time.time() - start_time) * 1000
 
             return SearchLookupResult(
+                schema_version="0.1",
                 entity_type=params.entity_type,
                 query=params.query,
                 candidates=candidates,
@@ -86,7 +88,7 @@ class MCPTools:
                     Candidate(
                         id=str(row[0]),
                         value=row[1],
-                        language=None,
+                        language=self.language,
                         raw_scores=(
                             RawScores(
                                 trgm=float(row[2]) if len(row) > 2 else 0.0,

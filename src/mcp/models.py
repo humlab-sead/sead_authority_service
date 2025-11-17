@@ -23,7 +23,7 @@ class Candidate(BaseModel):
     id: str = Field(description="Canonical ID from authority table")
     value: str = Field(description="Display value (label)")
     raw_scores: Optional[RawScores] = Field(None, description="Detailed scoring breakdown")
-
+    language: str = Field("en", description="Language code")
 
 class SearchLookupParams(BaseModel):
     """Parameters for hybrid search_lookup tool"""
