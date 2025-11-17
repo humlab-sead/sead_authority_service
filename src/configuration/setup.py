@@ -7,7 +7,6 @@ from loguru import logger
 from configuration.interface import ConfigLike
 from src.utility import configure_logging, create_db_uri
 
-from .config import Config
 from .provider import ConfigStore, get_config_provider
 
 dotenv.load_dotenv(dotenv_path=os.getenv("ENV_FILE", ".env"))
@@ -25,7 +24,7 @@ async def setup_config_store(filename: str = "config.yml", force: bool = False) 
 
     assert store.is_configured(), "Config Store failed to configure properly"
 
-    cfg: ConfigLike = store.config()
+    cfg: ConfigLike | None = store.config()
     if not cfg:
         raise ValueError("Config Store did not return a config")
 

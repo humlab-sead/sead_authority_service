@@ -3,6 +3,8 @@ import inspect
 from dataclasses import dataclass, field, fields, is_dataclass
 from typing import Any, Callable, Generic, Type, TypeVar
 
+from configuration.provider import ConfigProvider
+
 from .interface import ConfigLike
 from .provider import get_config_provider
 
@@ -20,11 +22,11 @@ class ConfigValue(Generic[T]):
     mandatory: bool = False
 
     @property
-    def value(self) -> T:
+    def value(self) -> T | None:
         return self.resolve()
 
-    def resolve(self, context: str | None = None, **kwargs: Any) -> T:
-        provider = get_config_provider()
+    def resolve(self, context: str | None = None, **kwargs: Any) -> T | None:
+        provider: ConfigProvider = get_config_provider()
         config: ConfigLike = provider.get_config(context)
 
         val: T | None
@@ -45,7 +47,7 @@ class ConfigValue(Generic[T]):
         return val
 
     @staticmethod
-    def create_field(key: str, default: Any = None, description: str = None) -> Any:
+    def create_field(key: str, default: Any = None, description: str | None = None) -> Any:
         """Create a field for a dataclass that will be resolved at creation time."""
         return field(default_factory=lambda: ConfigValue(key=key, default=default, description=description).resolve())  # pylint: disable=invalid-field-call
 
