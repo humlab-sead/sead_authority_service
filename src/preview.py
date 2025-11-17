@@ -25,7 +25,10 @@ async def render_preview(uri: str) -> ValueError | str:
     if not Strategies.items.get(entity_path):
         raise ValueError(f"Unknown entity type: {entity_path}")
 
-    strategy: ReconciliationStrategy = Strategies.items.get(entity_path)()
+    strategy_cls = Strategies.items.get(entity_path)
+    if not strategy_cls:
+        raise ValueError(f"Unknown entity type: {entity_path}")
+    strategy: ReconciliationStrategy = strategy_cls()
 
     if not strategy:
         raise ValueError(f"Unknown entity type: {entity_path}")
