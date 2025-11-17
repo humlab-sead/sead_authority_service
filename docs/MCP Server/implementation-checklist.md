@@ -29,6 +29,7 @@
 * [ ] Select embedding model (e.g., `nomic-embed-text` / `bge-small`); record `dim`.
 * [ ] Backfill `emb` for all rows in chosen tables (batched).
 * [ ] Store embedding metadata (model name, dim, timestamp) per row or side-table.
+* [ ] Configure a scheduled job to refresh all materialized views.
 * [ ] Configure a scheduled job to re-embed changed/new rows (nightly or on demand).
 
   * **Accept:** Random label → query embedding → `ORDER BY emb <=> qemb` returns reasonable neighbors.
