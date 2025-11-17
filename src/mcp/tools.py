@@ -29,7 +29,7 @@ class MCPTools:
 
         This is the core MCP tool for reconciliation.
         """
-        if params.entity_type not in self.schema:
+        if not self.schema or params.entity_type not in self.schema:
             raise ValueError(f"Unsupported entity type: {params.entity_type}")
 
         start_time = time.time()
