@@ -110,4 +110,4 @@ class DatabaseQueryProxy(QueryProxy):
         sql: str = self.get_sql_query("alternate_identity_sql")
         if not sql:
             return []
-        return self.fetch_all(sql, {"alternate_identity": alternate_identity})
+        return await self.fetch_all(sql, {"alternate_identity": alternate_identity})
