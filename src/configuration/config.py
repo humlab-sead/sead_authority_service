@@ -6,6 +6,7 @@ from os.path import join, normpath
 from pathlib import Path
 from typing import Any, Type
 
+from configuration.interface import ConfigLike
 import yaml
 from dotenv import load_dotenv
 
@@ -93,7 +94,7 @@ class ConfigFactory:
     def load(
         self,
         *,
-        source: str | dict | Config | None = None,
+        source: str | dict[str, Any] | ConfigLike | None = None,
         context: str | None = None,
         env_filename: str | None = None,
         env_prefix: str | None = None,
