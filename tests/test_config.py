@@ -1,4 +1,3 @@
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -89,19 +88,23 @@ class TestConfigFactorySubConfigs:
         """Test loading a simple sub-config referenced with @include: notation"""
         # Create sub-config file
         sub_config = tmp_path / "sub_config.yml"
-        sub_config.write_text("""
+        sub_config.write_text(
+            """
 database:
   host: localhost
   port: 5432
   name: testdb
-""")
+"""
+        )
 
         # Create main config that references sub-config
         main_config = tmp_path / "main_config.yml"
-        main_config.write_text(f"""
+        main_config.write_text(
+            f"""
 app_name: "Test Application"
 db_config: "@include:{sub_config}"
-""")
+"""
+        )
 
         # Load main config
         factory = ConfigFactory()
@@ -123,19 +126,23 @@ db_config: "@include:{sub_config}"
 
         # Create sub-config in same directory
         sub_config = config_dir / "database.yml"
-        sub_config.write_text("""
+        sub_config.write_text(
+            """
 connection:
   host: db.example.com
   port: 5433
-""")
+"""
+        )
 
         # Create main config with relative reference
         main_config = config_dir / "main.yml"
-        main_config.write_text("""
+        main_config.write_text(
+            """
 app:
   name: "My App"
   database: "@include:database.yml"
-""")
+"""
+        )
 
         # Load main config
         factory = ConfigFactory()
@@ -150,25 +157,31 @@ app:
         """Test loading nested sub-configs (sub-config references another sub-config)"""
         # Create innermost config
         credentials_config = tmp_path / "credentials.yml"
-        credentials_config.write_text("""
+        credentials_config.write_text(
+            """
 username: admin
 password: secret123
-""")
+"""
+        )
 
         # Create middle config that references credentials
         db_config = tmp_path / "database.yml"
-        db_config.write_text(f"""
+        db_config.write_text(
+            f"""
 host: localhost
 port: 5432
 credentials: "@include:{credentials_config}"
-""")
+"""
+        )
 
         # Create main config that references database
         main_config = tmp_path / "main.yml"
-        main_config.write_text(f"""
+        main_config.write_text(
+            f"""
 application: "Test App"
 database: "@include:{db_config}"
-""")
+"""
+        )
 
         # Load main config
         factory = ConfigFactory()
@@ -185,31 +198,39 @@ database: "@include:{db_config}"
         """Test loading multiple sub-configs in the same main config"""
         # Create multiple sub-configs
         db_config = tmp_path / "database.yml"
-        db_config.write_text("""
+        db_config.write_text(
+            """
 host: localhost
 port: 5432
-""")
+"""
+        )
 
         api_config = tmp_path / "api.yml"
-        api_config.write_text("""
+        api_config.write_text(
+            """
 base_url: "https://api.example.com"
 timeout: 30
-""")
+"""
+        )
 
         logging_config = tmp_path / "logging.yml"
-        logging_config.write_text("""
+        logging_config.write_text(
+            """
 level: DEBUG
 format: "%(asctime)s - %(message)s"
-""")
+"""
+        )
 
         # Create main config referencing all three
         main_config = tmp_path / "main.yml"
-        main_config.write_text(f"""
+        main_config.write_text(
+            f"""
 app_name: "Multi-Config App"
 database: "@include:{db_config}"
 api: "@include:{api_config}"
 logging: "@include:{logging_config}"
-""")
+"""
+        )
 
         # Load main config
         factory = ConfigFactory()
@@ -225,7 +246,8 @@ logging: "@include:{logging_config}"
         """Test sub-config containing lists"""
         # Create sub-config with list
         servers_config = tmp_path / "servers.yml"
-        servers_config.write_text("""
+        servers_config.write_text(
+            """
 servers:
   - name: server1
     host: 192.168.1.1
@@ -233,14 +255,17 @@ servers:
   - name: server2
     host: 192.168.1.2
     port: 8081
-""")
+"""
+        )
 
         # Create main config
         main_config = tmp_path / "main.yml"
-        main_config.write_text(f"""
+        main_config.write_text(
+            f"""
 environment: production
 backend: "@include:{servers_config}"
-""")
+"""
+        )
 
         # Load and verify
         factory = ConfigFactory()
@@ -256,21 +281,25 @@ backend: "@include:{servers_config}"
         """Test sub-config reference within a list"""
         # Create sub-config
         prod_db = tmp_path / "prod_db.yml"
-        prod_db.write_text("""
+        prod_db.write_text(
+            """
 host: prod.example.com
 port: 5432
 replicas: 3
-""")
+"""
+        )
 
         # Create main config with sub-config reference in list
         main_config = tmp_path / "main.yml"
-        main_config.write_text(f"""
+        main_config.write_text(
+            f"""
 databases:
   - name: development
     host: localhost
     port: 5432
   - "@include:{prod_db}"
-""")
+"""
+        )
 
         # Load and verify
         factory = ConfigFactory()
@@ -285,10 +314,12 @@ databases:
     def test_sub_config_not_found(self, tmp_path: Path):
         """Test error handling when sub-config file doesn't exist"""
         main_config = tmp_path / "main.yml"
-        main_config.write_text("""
+        main_config.write_text(
+            """
 app: test
 database: "@include:nonexistent.yml"
-""")
+"""
+        )
 
         factory = ConfigFactory()
         with pytest.raises(FileNotFoundError, match="Configuration file not found"):
@@ -302,17 +333,21 @@ database: "@include:nonexistent.yml"
 
         # Create sub-config with env vars
         db_config = tmp_path / "database.yml"
-        db_config.write_text("""
+        db_config.write_text(
+            """
 host: "${DB_HOST}"
 port: ${DB_PORT}
-""")
+"""
+        )
 
         # Create main config
         main_config = tmp_path / "main.yml"
-        main_config.write_text(f"""
+        main_config.write_text(
+            f"""
 app: test
 database: "@include:{db_config}"
-""")
+"""
+        )
 
         # Load and verify env vars were replaced
         factory = ConfigFactory()
@@ -325,18 +360,22 @@ database: "@include:{db_config}"
         """Test sub-config with custom YAML constructors like !join and !path_join"""
         # Create sub-config using constructors
         paths_config = tmp_path / "paths.yml"
-        paths_config.write_text("""
+        paths_config.write_text(
+            """
 base_dir: /var/app
 log_file: !path_join [/var/app, logs, app.log]
 message: !join ["Hello", " ", "World"]
-""")
+"""
+        )
 
         # Create main config
         main_config = tmp_path / "main.yml"
-        main_config.write_text(f"""
+        main_config.write_text(
+            f"""
 app: test
 paths: "@include:{paths_config}"
-""")
+"""
+        )
 
         # Load and verify
         factory = ConfigFactory()
@@ -351,18 +390,22 @@ paths: "@include:{paths_config}"
         """Test loading sub-config with absolute path"""
         # Create sub-config
         sub_config = tmp_path / "absolute_sub.yml"
-        sub_config.write_text("""
+        sub_config.write_text(
+            """
 setting: "absolute path test"
 value: 42
-""")
+"""
+        )
 
         # Create main config with absolute path reference
         main_config = tmp_path / "main.yml"
         absolute_path = str(sub_config.absolute())
-        main_config.write_text(f"""
+        main_config.write_text(
+            f"""
 app: test
 config: "@include:{absolute_path}"
-""")
+"""
+        )
 
         # Load and verify
         factory = ConfigFactory()
@@ -375,18 +418,22 @@ config: "@include:{absolute_path}"
         """Test that sub-config completely replaces the key value"""
         # Create sub-config
         sub_config = tmp_path / "override.yml"
-        sub_config.write_text("""
+        sub_config.write_text(
+            """
 new_key: "from sub-config"
 another: 123
-""")
+"""
+        )
 
         # Create main config
         main_config = tmp_path / "main.yml"
-        main_config.write_text(f"""
+        main_config.write_text(
+            f"""
 target:
   old_key: "will be replaced"
   target: "@include:{sub_config}"
-""")
+"""
+        )
 
         # Load and verify
         factory = ConfigFactory()
@@ -404,10 +451,12 @@ target:
 
         # Create main config
         main_config = tmp_path / "main.yml"
-        main_config.write_text(f"""
+        main_config.write_text(
+            f"""
 app: test
 empty_config: "@include:{sub_config}"
-""")
+"""
+        )
 
         # Load and verify
         factory = ConfigFactory()
@@ -423,15 +472,19 @@ empty_config: "@include:{sub_config}"
         config_a = tmp_path / "config_a.yml"
         config_b = tmp_path / "config_b.yml"
 
-        config_a.write_text(f"""
+        config_a.write_text(
+            f"""
 name: config_a
 ref: "@include:{config_b}"
-""")
+"""
+        )
 
-        config_b.write_text(f"""
+        config_b.write_text(
+            f"""
 name: config_b
 ref: "@include:{config_a}"
-""")
+"""
+        )
 
         # This should raise a RecursionError
         factory = ConfigFactory()
@@ -445,18 +498,22 @@ ref: "@include:{config_a}"
 
         # Create sub-config
         db_config = tmp_path / "database.yml"
-        db_config.write_text("""
+        db_config.write_text(
+            """
 database:
   host: default-host
   port: 5432
-""")
+"""
+        )
 
         # Create main config
         main_config = tmp_path / "main.yml"
-        main_config.write_text(f"""
+        main_config.write_text(
+            f"""
 app: test
 config: "@include:{db_config}"
-""")
+"""
+        )
 
         # Load with env_prefix
         factory = ConfigFactory()
@@ -470,7 +527,8 @@ config: "@include:{db_config}"
         """Test that complex nested structure in sub-config is preserved"""
         # Create complex sub-config
         complex_config = tmp_path / "complex.yml"
-        complex_config.write_text("""
+        complex_config.write_text(
+            """
 level1:
   level2:
     level3:
@@ -484,13 +542,16 @@ level1:
       value: 1
     - name: second
       value: 2
-""")
+"""
+        )
 
         # Create main config
         main_config = tmp_path / "main.yml"
-        main_config.write_text(f"""
+        main_config.write_text(
+            f"""
 data: "@include:{complex_config}"
-""")
+"""
+        )
 
         # Load and verify structure
         factory = ConfigFactory()
@@ -504,21 +565,25 @@ data: "@include:{complex_config}"
         """Test that sub-configs can be mixed with regular configuration values"""
         # Create sub-config
         db_config = tmp_path / "database.yml"
-        db_config.write_text("""
+        db_config.write_text(
+            """
 connection_string: "postgresql://localhost:5432/mydb"
 pool_size: 10
-""")
+"""
+        )
 
         # Create main config with both sub-config and regular values
         main_config = tmp_path / "main.yml"
-        main_config.write_text(f"""
+        main_config.write_text(
+            f"""
 app_name: "MyApp"
 version: "1.0.0"
 database: "@include:{db_config}"
 features:
   auth: true
   cache: false
-""")
+"""
+        )
 
         # Load and verify
         factory = ConfigFactory()
@@ -533,11 +598,13 @@ features:
     def test_sub_config_without_at_include_prefix(self, tmp_path: Path):
         """Test that strings not starting with @include: are treated as regular values"""
         main_config = tmp_path / "main.yml"
-        main_config.write_text("""
+        main_config.write_text(
+            """
 app: test
 database: "some/path/that/looks/like/file.yml"
 message: "include:something"
-""")
+"""
+        )
 
         factory = ConfigFactory()
         config = factory.load(source=str(main_config))
