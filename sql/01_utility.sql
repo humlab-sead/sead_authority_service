@@ -225,3 +225,32 @@ $BODY$;
 
 ALTER FUNCTION sead_utility.singularize_en(word text)
     OWNER TO humlab_admin;
+
+-- MOVE TO SEAD Change Control System (utility project)
+CREATE OR REPLACE FUNCTION sead_utility.table_name_to_entity_name(
+	p_tablename text)
+    RETURNS text
+    LANGUAGE plpgsql
+    COST 100
+    IMMUTABLE STRICT PARALLEL UNSAFE
+AS $BODY$
+declare
+  base   text;         -- without tbl_ prefix
+  parts  text[];       -- split on _
+  last   text;         -- last token to singularize
+  result text;
+begin
+  base  := regexp_replace(lower(p_tablename), '^tbl_', '');
+  parts := string_to_array(base, '_');
+  if parts is null or array_length(parts,1) is null then
+    return base;
+  end if;
+  last := parts[array_length(parts,1)];
+  parts[array_length(parts,1)] := sead_utility.singularize_en(last);
+  result := array_to_string(parts, '_');
+  return result;
+end;
+$BODY$;
+
+ALTER FUNCTION sead_utility.table_name_to_entity_name(p_tablename text)
+    OWNER TO humlab_admin;
