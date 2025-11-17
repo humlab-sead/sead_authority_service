@@ -45,7 +45,7 @@ SafeLoaderIgnoreUnknown.add_constructor("!jj", yaml_path_join)
 SafeLoaderIgnoreUnknown.add_constructor("!path_join", yaml_path_join)
 
 
-class Config:
+class Config(ConfigLike):
     """Container for configuration elements."""
 
     def __init__(
