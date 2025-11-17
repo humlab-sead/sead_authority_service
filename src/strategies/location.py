@@ -41,6 +41,6 @@ class LocationQueryProxy(DatabaseQueryProxy):
 class LocationReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 
-    def __init__(self, specification: dict[str, str] = None) -> None:
+    def __init__(self, specification: StrategySpecification | None = None) -> None:
         specification = specification or SPECIFICATION
         super().__init__(specification, LocationQueryProxy)
