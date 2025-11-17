@@ -5,11 +5,12 @@ FastAPI router for SEAD Entity Reconciliation Service endpoints.
 import json
 from typing import Any, Union
 
-from configuration.interface import ConfigLike
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
 from starlette.datastructures import UploadFile
+
+from configuration.interface import ConfigLike
 
 # Not used: ReconBatchRequest, ReconBatchRequestHandler, ReconQueryRequest
 from src.api.model import ReconBatchResponse, ReconQuery, ReconServiceManifest, SuggestEntityResponse, SuggestPropertyResponse, SuggestTypeResponse
@@ -36,7 +37,7 @@ router = APIRouter()
 
 
 @router.get("/whoami")
-async def whoami(request: Request):# -> dict[str, Any]:
+async def whoami(request: Request):  # -> dict[str, Any]:
     host: None | str = request.url.hostname
     port: int | None = request.url.port
     base = str(request.host)  # type: ignore[assignment]

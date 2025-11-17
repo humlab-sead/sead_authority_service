@@ -53,5 +53,5 @@ class DataTypeQueryProxy(DatabaseQueryProxy):
 class DataTypeReconciliationStrategy(ReconciliationStrategy):
     """Data Type-specific reconciliation with data type names and descriptions"""
 
-    def __init__(self, specification: StrategySpecification| None = None) -> None:
+    def __init__(self, specification: StrategySpecification | None = None) -> None:
         super().__init__(specification or SPECIFICATION, DataTypeQueryProxy)

@@ -25,6 +25,7 @@ class Candidate(BaseModel):
     raw_scores: Optional[RawScores] = Field(default=None, description="Detailed scoring breakdown")
     language: Optional[str] = Field(default=None, description="Language code")
 
+
 class SearchLookupParams(BaseModel):
     """Parameters for hybrid search_lookup tool"""
 

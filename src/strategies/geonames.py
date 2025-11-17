@@ -19,6 +19,7 @@ SPECIFICATION: StrategySpecification = {
 
 # pylint: disable=unused-argument, too-many-instance-attributes
 
+
 class GeoNamesQueryProxy(QueryProxy):
 
     def __init__(self, specification: StrategySpecification, **kwargs) -> None:
@@ -28,8 +29,8 @@ class GeoNamesQueryProxy(QueryProxy):
         self.country_bias: str | None = kwargs.get("country_bias") or ConfigValue("geonames.country_bias").resolve()
         self.fuzzy: float = float(kwargs.get("fuzzy") or ConfigValue("geonames.fuzzy").resolve() or 0.8)
         self.feature_classes: tuple[str, ...] = tuple(kwargs.get("feature_classes") or ConfigValue("geonames.feature_classes").resolve() or ("P", "A"))
-        self.orderby: Literal['relevance', 'population'] = kwargs.get("orderby") or ConfigValue("geonames.orderby").resolve() or "relevance"
-        self.style: Literal['FULL', 'SHORT', 'MEDIUM'] = kwargs.get("style") or ConfigValue("geonames.style").resolve() or "FULL"
+        self.orderby: Literal["relevance", "population"] = kwargs.get("orderby") or ConfigValue("geonames.orderby").resolve() or "relevance"
+        self.style: Literal["FULL", "SHORT", "MEDIUM"] = kwargs.get("style") or ConfigValue("geonames.style").resolve() or "FULL"
 
         self.proxy: GeoNamesProxy = GeoNamesProxy(username=self.username, lang=self.lang)
 

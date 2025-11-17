@@ -46,7 +46,7 @@ class ConfigStore:
         ctx: str = context or self.context
         if not self.is_configured(ctx):
             raise ValueError(f"Config context '{ctx}' not properly initialized")
-        
+
         return self.store[ctx]
 
     # Convenience class methods for backward compatibility
@@ -66,7 +66,7 @@ class ConfigStore:
         context: str = "default",
         source: ConfigLike | str | dict[str, Any] = "config.yml",
         env_filename: str | None = None,
-        env_prefix: str | None= None,
+        env_prefix: str | None = None,
         switch_to_context: bool = True,
     ) -> Self:
         if not self.store.get(context) and not source:

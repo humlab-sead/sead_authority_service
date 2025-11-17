@@ -16,7 +16,7 @@ class OllamaProvider(LLMProvider):
     def __init__(self, host: str | None = None, model: str | None = None) -> None:
         self.host: str | None = host or ConfigValue(f"llm.{self.key}.host").resolve()
         self.model: str | None = model or ConfigValue(f"llm.{self.key}.model").resolve()
-        self.timeout: int | None= ConfigValue(f"llm.{self.key}.timeout", default=30).resolve()
+        self.timeout: int | None = ConfigValue(f"llm.{self.key}.timeout", default=30).resolve()
         self.client: ollama.Client = ollama.Client(host=self.host, timeout=self.timeout, follow_redirects=True)
 
     async def complete(self, prompt: str, roles: dict[str, str] | None = None, **kwargs) -> str:

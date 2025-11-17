@@ -6,10 +6,10 @@ from os.path import join, normpath
 from pathlib import Path
 from typing import Any, Type
 
-from configuration.interface import ConfigLike
 import yaml
 from dotenv import load_dotenv
 
+from configuration.interface import ConfigLike
 from src.utility import dget, dotexists, dotset, env2dict, replace_env_vars
 
 # pylint: disable=too-many-arguments

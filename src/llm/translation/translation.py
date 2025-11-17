@@ -2,12 +2,13 @@
 Translation service using LLM
 """
 
-from email.policy import default
 import re
 from dataclasses import dataclass
+from email.policy import default
+
+from loguru import logger
 
 from llm.providers.provider import LLMProvider
-from loguru import logger
 
 # from llm.providers.client import LLMClient
 from src.configuration import ConfigValue
@@ -54,7 +55,9 @@ class TranslationService:
         if source_lang == target_lang:
             return text
 
-        prompt: str = ConfigValue("llm.translation_prompt").resolve() or f"""
+        prompt: str = (
+            ConfigValue("llm.translation_prompt").resolve()
+            or f"""
 Translate this archaeological/geographic site name from {source_lang} to {target_lang}.
 
 Keep the translation natural and preserve proper nouns when appropriate.
@@ -67,6 +70,7 @@ Examples:
 
 Text to translate: "{text}"
 """
+        )
 
         try:
             response = await self.llm_client.complete(prompt, max_tokens=100, temperature=0.1)

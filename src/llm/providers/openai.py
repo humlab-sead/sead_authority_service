@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from typing import Any
+
 from openai import AsyncOpenAI
 from openai.types.chat.chat_completion import ChatCompletion
 
@@ -33,7 +34,6 @@ class OpenAIProvider(LLMProvider):
         messages: list[dict[str, Any]] = self.generate_message_list(prompt, roles)
         response: ChatCompletion = await self.client.chat.completions.create(model=self.model, messages=messages, **opts)  # type: ignore
         return response.choices[0].message.content.lstrip("```json").rstrip("```")  # type: ignore
-
 
     def get_options_keys(self) -> list[tuple[str, Any]]:
         return [("temperature", 0.1), ("max_tokens", 4048), ("stream", False)]

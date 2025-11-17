@@ -73,7 +73,7 @@ class TestConfigProvider:
         store2: ConfigStore = ConfigStore.get_instance()
         assert store is store2
         assert store2 is not None
-        assert store2.config().get("test") == "singleton_value" # type: ignore
+        assert store2.config().get("test") == "singleton_value"  # type: ignore
 
         # Reset and verify it's clean
         ConfigStore.reset_instance()
