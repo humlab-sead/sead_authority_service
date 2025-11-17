@@ -45,10 +45,10 @@ class MCPResources:
     async def list_lookup_tables(self) -> list[LookupTable]:
         """List all exposed lookup tables with metadata"""
         tables = []
-
+        table_name: str = ""
         for table_key, table_spec in self.schema.items():
             try:
-                table_name: str = table_spec["table_name"]
+                table_name = table_spec["table_name"]
                 # Query table metadata from information_schema
                 query = sql.SQL(
                     """
