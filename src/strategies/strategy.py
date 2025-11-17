@@ -11,7 +11,7 @@ from .query import QueryProxy
 class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
-    def __init__(self, specification: StrategySpecification, proxy_or_cls: Type[QueryProxy] | QueryProxy) -> None:
+    def __init__(self, specification: StrategySpecification | None = None, proxy_or_cls: Type[QueryProxy] | QueryProxy | None = None) -> None:
 
         self.specification: StrategySpecification = (
             specification
@@ -25,7 +25,7 @@ class ReconciliationStrategy(ABC):
                 "sql_queries": {},
             }
         )
-        self._proxy_or_cls: Type[QueryProxy] = proxy_or_cls
+        self._proxy_or_cls: Type[QueryProxy] | QueryProxy | None = proxy_or_cls or QueryProxy
         self._proxy: QueryProxy | None = None
 
     @property
@@ -38,8 +38,10 @@ class ReconciliationStrategy(ABC):
         if not self._proxy:
             if isinstance(self._proxy_or_cls, QueryProxy):
                 self._proxy = self._proxy_or_cls
-            else:
+            elif self._proxy_or_cls is not None:
                 self._proxy = self._proxy_or_cls(self.specification)
+            else:
+                raise ValueError(f"No proxy configured for strategy {self.key}")
         return self._proxy
 
     def get_entity_id_field(self) -> str:
@@ -105,7 +107,7 @@ class ReconciliationStrategy(ABC):
     async def _find_candidates(self, query, properties, limit, proxy) -> list[dict]:
         """Internal method to find candidates, can be overridden by subclasses"""
         candidates: list[dict] = []
-        alternate_identity_field: str = self.specification.get("alternate_identity_field")
+        alternate_identity_field: str | None = self.specification.get("alternate_identity_field")
 
         if alternate_identity_field and properties.get(alternate_identity_field, None):
             candidates.extend(await proxy.fetch_by_alternate_identity(properties[alternate_identity_field]))
@@ -120,7 +122,7 @@ class ReconciliationStrategy(ABC):
 
 class StrategyRegistry(Registry):
 
-    items: dict[str, ReconciliationStrategy] = {}
+    items: dict[str, Type[ReconciliationStrategy]] = {}
 
 
 Strategies: StrategyRegistry = StrategyRegistry()

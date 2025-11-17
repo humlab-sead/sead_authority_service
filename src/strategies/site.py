@@ -112,7 +112,7 @@ class SiteQueryProxy(DatabaseQueryProxy):
         distances: dict[int, float] = {row["site_id"]: row["distance_km"] for row in rows}
         return distances
 
-    async def fetch_site_location_similarity(self, candidates: list[dict], place: str) -> list[dict]:
+    async def fetch_site_location_similarity(self, candidates: list[dict], place: str) -> dict[int, float]:
         """Boost scores based on place name context"""
         # This could query a places/regions table or use external geocoding
         # For now, simple implementation checking site descriptions
@@ -129,6 +129,10 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
 
     def __init__(self):
         super().__init__(SPECIFICATION, SiteQueryProxy)
+
+    def get_proxy(self) -> SiteQueryProxy:  # type: ignore[override]
+        """Return the site-specific query proxy"""
+        return super().get_proxy()  # type: ignore[return-value]
 
     async def find_candidates(self, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         """Find candidate sites based on name, identifier, and optional geographic context"""

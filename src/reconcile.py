@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Type
 
 from loguru import logger
 
@@ -34,7 +34,7 @@ async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
             logger.error(f"Unknown query type '{entity_type}' in query {query_id}. Available types: {list(Strategies.items.keys())}")
             raise ValueError(f"Unknown query type '{entity_type}' in query")
 
-        strategy_cls: ReconciliationStrategy | None = Strategies.items.get(entity_type)
+        strategy_cls: Type[ReconciliationStrategy] | None = Strategies.items.get(entity_type)
         if not strategy_cls:
             raise ValueError(f"Unknown entity type: {entity_type}")
         strategy: ReconciliationStrategy = strategy_cls()
