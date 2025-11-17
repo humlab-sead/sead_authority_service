@@ -167,3 +167,61 @@ create or replace procedure sead_utility.create_full_text_search_materialized_vi
 
   end;
   $udf$ language plpgsql;
+  
+CREATE OR REPLACE FUNCTION sead_utility.singularize_en(
+	word text)
+    RETURNS text
+    LANGUAGE plpgsql
+    COST 100
+    IMMUTABLE STRICT PARALLEL UNSAFE
+AS $BODY$
+declare
+  w text := lower(word);
+begin
+  -- hard exceptions (extend if needed)
+  if w in ('species','series','news') then
+    return w; -- unchanged singular/plural
+  end if;
+  -- don't touch words ending in -us or -ss (status, genus, class)
+  if w ~ '(us|ss)$' then
+    return w;
+  end if;
+  -- families -> family  (consonant + ies)
+  if w ~ '[^aeiou]ies$' then
+    return regexp_replace(w, 'ies$', 'y');
+  end if;
+  -- classes/boxes/churches/dishes/oes -> class/box/church/dish/o
+  if w ~ '(xes|ches|shes|sses|zes|oes)$' then
+    return regexp_replace(w, '(xes|ches|shes|sses|zes|oes)$', 
+      case
+        when w ~ 'xes$'   then 'x'
+        when w ~ 'ches$'  then 'ch'
+        when w ~ 'shes$'  then 'sh'
+        when w ~ 'sses$'  then 'ss'
+        when w ~ 'zes$'   then 'z'
+        when w ~ 'oes$'   then 'o'
+      end);
+  end if;
+  -- knives/leaves -> knife/leaf (common -ves rule)
+  if w ~ '([aeioulf])ves$' then
+    -- crude but useful: shelves -> shelf; leaves -> leaf; knives -> knif(e) → knife
+    if w ~ '(?:[^f])ves$' then
+      return regexp_replace(w, 'ves$', 'f');     -- leaves→leaf, shelves→shelf
+    else
+      return regexp_replace(w, 'ves$', 'fe');    -- knives→knife
+    end if;
+  end if;
+  -- genera -> genus
+  if w = 'genera' then
+    return 'genus';
+  end if;
+  -- generic trailing -s
+  if right(w,1) = 's' then
+    return left(w, length(w)-1);
+  end if;
+  return w;
+end;
+$BODY$;
+
+ALTER FUNCTION sead_utility.singularize_en(word text)
+    OWNER TO humlab_admin;
