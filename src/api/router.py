@@ -257,7 +257,7 @@ async def suggest_properties(query: str = "", type: str = "", config: Config = D
 @router.get("/reconcile/preview")
 async def preview(id: str, config: Config = Depends(get_config_dependency)) -> HTMLResponse:  # pylint: disable=redefined-builtin
     """Preview endpoint for OpenRefine reconciliation results"""
-    id_base: str = ConfigValue("options:id_base").resolve()
+    id_base: str = ConfigValue("options:id_base").resolve() or ""
     if not id.startswith(id_base):
         return HTMLResponse("Invalid ID format", status_code=400)
 
