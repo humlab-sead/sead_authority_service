@@ -10,7 +10,7 @@ async def render_preview(uri: str) -> ValueError | str:
     """Provides a generic HTML preview for a given entity ID."""
 
     logger.info(f"Rendering preview for URI: {uri}")
-    id_base: str = ConfigValue("options:id_base").resolve()
+    id_base: str = ConfigValue("options:id_base").resolve() or ""
 
     if not uri.startswith(id_base):
         raise ValueError("Invalid ID format")

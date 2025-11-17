@@ -109,7 +109,7 @@ def get_reconciliation_metadata(strategies: StrategyRegistry, host: str) -> dict
     Collects reconciliation metadata from all registered strategies.
     """
     default_types: list[dict[str, str]] = _get_default_types(strategies)
-    id_base: str = ConfigValue("options:id_base").resolve()
+    id_base: str = ConfigValue("options:id_base").resolve() or ""
 
     # Collect property settings from all registered strategies
     property_settings: list[dict[str, str]] = _compile_property_settings(strategies)

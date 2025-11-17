@@ -23,7 +23,7 @@ async def render_flyout_preview(uri: str) -> dict[str, Any]:
     Returns JSON with 'id' and 'html' fields for inline preview display.
     """
     logger.info(f"Rendering flyout preview for URI: {uri}")
-    id_base: str = ConfigValue("options:id_base").resolve()
+    id_base: str = ConfigValue("options:id_base").resolve() or ""
 
     if not uri.startswith(id_base):
         raise ValueError("Invalid ID format")
@@ -101,7 +101,7 @@ async def suggest_entities(prefix: str, entity_type: str = "", limit: int = 10) 
     if not prefix or len(prefix) < 2:
         return {"result": []}
 
-    id_base: str = ConfigValue("options:id_base").resolve()
+    id_base: str = ConfigValue("options:id_base").resolve() or ""
 
     results = []
 

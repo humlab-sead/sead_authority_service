@@ -82,7 +82,7 @@ class LLMModificationTypeReconciliationStrategy(LLMReconciliationStrategy):
 
     def get_context_description(self) -> str:
         """Return context description for modification types"""
-        return ConfigValue("policy.modification_type.context", default="").resolve()
+        return ConfigValue("policy.modification_type.context", default="").resolve() or ""
 
     def get_lookup_fields(self) -> list[str]:
         return super().get_lookup_fields() + ["modification_type_description"]

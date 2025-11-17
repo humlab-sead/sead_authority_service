@@ -69,7 +69,7 @@ class ReconciliationStrategy(ABC):
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:
         """Convert entity data to OpenRefine candidate format"""
         auto_accept_threshold: float = ConfigValue("options:auto_accept_threshold").resolve() or 0.85
-        id_base: str = ConfigValue("options:id_base").resolve()
+        id_base: str = ConfigValue("options:id_base").resolve() or ""
 
         entity_id: str = entity_data[self.get_entity_id_field()]
         label: str = entity_data[self.get_label_field()]
