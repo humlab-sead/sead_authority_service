@@ -207,7 +207,7 @@ def _ensure_key_property(cls):
     return cls
 
 
-def replace_env_vars(data: Any) -> Any:
+def replace_env_vars(data: dict[str, Any]) -> dict[str, Any]:
     """Searches dict data recursively for values that are strings and matches £´${ENV_VAR} and replaces value with os.getenv("ENV_VAR", "")"""
     if isinstance(data, dict):
         return {k: replace_env_vars(v) for k, v in data.items()}
