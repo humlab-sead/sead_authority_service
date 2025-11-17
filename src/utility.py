@@ -69,11 +69,11 @@ def recursive_filter_dict(data: dict[str, Any], filter_keys: set[str], filter_mo
     }
 
 
-def dget(data: dict, *path: str | list[str], default: Any = None) -> Any:
+def dget(data: dict, *path: str, default: Any = None) -> Any:
     if path is None or not data:
         return default
 
-    ps: list[str] = path if isinstance(path, (list, tuple)) else [path]
+    ps: list[str] = list(path)
 
     d = None
 
@@ -86,7 +86,7 @@ def dget(data: dict, *path: str | list[str], default: Any = None) -> Any:
     return d or default
 
 
-def dotexists(data: dict, *paths: list[str]) -> bool:
+def dotexists(data: dict, *paths: str) -> bool:
     for path in paths:
         if dotget(data, path, default="@@") != "@@":
             return True
@@ -117,9 +117,9 @@ def dotget(data: dict, path: str, default: Any = None) -> Any:
     if path is x:y:y then element is search using borh x.y.y or x_y_y."""
 
     for key in dotexpand(path):
-        d: dict = data
+        d: dict | None = data
         for attr in key.split("."):
-            d: dict = d.get(attr) if isinstance(d, dict) else None
+            d = d.get(attr) if isinstance(d, dict) else None
             if d is None:
                 break
         if d is not None:
@@ -157,7 +157,7 @@ def env2dict(prefix: str, data: dict[str, str] | None = None, lower_key: bool = 
     return data
 
 
-def configure_logging(opts: dict[str, str]) -> None:
+def configure_logging(opts: dict[str, Any]) -> None:
 
     logger.remove()
     logger.add(
@@ -265,13 +265,12 @@ def get_connection_uri(connection: Any) -> str:
     return uri
 
 
-def load_resource_yaml(key: str) -> dict[str, Any]:
+def load_resource_yaml(key: str) -> dict[str, Any] | None:
     """Loads a resource YAML file from the resources folder."""
 
-    resource_path = os.path.join(os.path.dirname(__file__), "resources", f"{key}.yaml")
+    resource_path: str = os.path.join(os.path.dirname(__file__), "resources", f"{key}.yaml")
     if not os.path.exists(resource_path):
         return None
 
     with open(resource_path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    return data
+        return yaml.safe_load(f)
