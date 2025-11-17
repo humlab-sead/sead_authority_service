@@ -51,11 +51,11 @@ class Config(ConfigLike):
     def __init__(
         self,
         *,
-        data: dict | None = None,
+        data: dict[str, Any] | None = None,
         context: str = "default",
         filename: str | None = None,
     ) -> None:
-        self.data: dict = data or {}
+        self.data: dict[str, Any] = data or {}
         self.context: str = context
         self.filename: str | None = filename
 
@@ -108,7 +108,7 @@ class ConfigFactory:
         if source is None:
             source = {}
 
-        data: dict = (
+        data: dict[str, Any] | ConfigLike = (
             (
                 yaml.load(
                     Path(source).read_text(encoding="utf-8"),
@@ -125,8 +125,7 @@ class ConfigFactory:
         if data is None:
             data = {}
 
-        if not isinstance(data, dict):
-            raise TypeError(f"expected dict, found '{type(data)}'")
+        assert isinstance(data, dict)
 
         # Resolve sub-configurations by loading referenced files recursively
         data = self._resolve_sub_configs(
