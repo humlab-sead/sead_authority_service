@@ -1,5 +1,6 @@
 # models_openrefine.py
-from typing import Annotated, Any, Dict, ForwardRef, Generic, List, Mapping, Optional, TypeVar, Union
+from collections.abc import Mapping
+from typing import Annotated, Any, Dict, ForwardRef, Generic, List, Optional, TypeVar, Union
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, RootModel, field_validator
 from typing_extensions import Literal
@@ -302,7 +303,7 @@ class ReconBatchRequestHandler(BaseModel):
     """Flexible handler for batch requests"""
 
     @classmethod
-    def parse_batch(cls, data: Union[dict, ReconBatchRequest]) -> Dict[str, ReconQuery]:
+    def parse_batch(cls, data: Union[dict, ReconBatchRequest]) -> Mapping[str, ReconQuery]:
         if isinstance(data, dict):
             return {k: ReconQuery.model_validate(v) for k, v in data.items()}
         return data.root
