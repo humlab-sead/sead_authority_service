@@ -1,21 +1,21 @@
 {
     "workbench.colorCustomizations": {
-        "activityBar.activeBackground": "#2b4969",
-        "activityBar.background": "#2b4969",
+        "activityBar.activeBackground": "#b41706",
+        "activityBar.background": "#b41706",
         "activityBar.foreground": "#e7e7e7",
         "activityBar.inactiveForeground": "#e7e7e799",
-        "activityBarBadge.background": "#170910",
+        "activityBarBadge.background": "#011f04",
         "activityBarBadge.foreground": "#e7e7e7",
         "commandCenter.border": "#e7e7e799",
-        "sash.hoverBorder": "#2b4969",
-        "statusBar.background": "#1c3045",
+        "sash.hoverBorder": "#b41706",
+        "statusBar.background": "#831104",
         "statusBar.foreground": "#e7e7e7",
-        "statusBarItem.hoverBackground": "#2b4969",
-        "statusBarItem.remoteBackground": "#1c3045",
+        "statusBarItem.hoverBackground": "#b41706",
+        "statusBarItem.remoteBackground": "#831104",
         "statusBarItem.remoteForeground": "#e7e7e7",
-        "titleBar.activeBackground": "#1c3045",
+        "titleBar.activeBackground": "#831104",
         "titleBar.activeForeground": "#e7e7e7",
-        "titleBar.inactiveBackground": "#1c304599",
+        "titleBar.inactiveBackground": "#83110499",
         "titleBar.inactiveForeground": "#e7e7e799"
     },
     "peacock.remoteColor": "#1c3045",
@@ -27,5 +27,23 @@
     "pgFormatter.configFile": "${workspaceFolder}/.pg_format",
     "[sql]": {
         "editor.defaultFormatter": "bradymholt.pgformatter"
-    }
+    },
+    "python.analysis.exclude": [
+        "bin",
+        "data",
+        "dist",
+        "**/__pycache__",
+        ".git",
+        "logs",
+        "tmp",
+        ".venv"
+    ],
+    "python.analysis.ignore": [
+        ".venv"
+    ],
+    "python.analysis.inlayHints.functionReturnTypes": true,
+    "python.analysis.inlayHints.variableTypes": true,
+    "python.analysis.typeCheckingMode": "standard",
+    "python.analysis.autoFormatStrings": true,
+    "python.analysis.autoImportCompletions": true
 }
