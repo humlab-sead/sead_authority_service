@@ -129,11 +129,7 @@ class ConfigFactory:
 
         # Resolve sub-configurations by loading referenced files recursively
         data = self._resolve_sub_configs(
-            data, 
-            context=context, 
-            env_filename=env_filename, 
-            env_prefix=env_prefix,
-            source_path=source if isinstance(source, str) else None
+            data, context=context, env_filename=env_filename, env_prefix=env_prefix, source_path=source if isinstance(source, str) else None
         )
 
         # Update data based on environment variables with a name that starts with `env_prefix`
@@ -169,11 +165,11 @@ class ConfigFactory:
         source_path: str | None = None,
     ) -> dict:
         """Recursively resolve sub-configurations referenced in the main configuration.
-        
+
         A sub-config is referenced using the @include: prefix, e.g. "@include:path/to/subconfig.yaml"
         Relative paths are resolved relative to the main configuration file.
         Sub-configs can themselves reference further sub-configs.
-        
+
         Example:
             database: "@include:config/database.yml"
             api: "@include:config/api.yml"
@@ -188,12 +184,7 @@ class ConfigFactory:
                 sub_config_path = value[9:]  # Remove "@include:" prefix
                 if not Path(sub_config_path).is_absolute() and base_path is not None:
                     sub_config_path = str(base_path.parent / sub_config_path)
-                loaded_data = ConfigFactory().load(
-                    source=sub_config_path, 
-                    context=context, 
-                    env_filename=env_filename, 
-                    env_prefix=env_prefix
-                ).data
+                loaded_data = ConfigFactory().load(source=sub_config_path, context=context, env_filename=env_filename, env_prefix=env_prefix).data
                 return _resolve(loaded_data, Path(sub_config_path))
             return value
 
