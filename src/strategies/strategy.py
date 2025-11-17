@@ -25,7 +25,7 @@ class ReconciliationStrategy(ABC):
                 "sql_queries": {},
             }
         )
-        self._proxy_or_cls: Type[QueryProxy] | QueryProxy | None = proxy_or_cls or QueryProxy
+        self._proxy_or_cls: Type[QueryProxy] | QueryProxy | None = proxy_or_cls
         self._proxy: QueryProxy | None = None
 
     @property

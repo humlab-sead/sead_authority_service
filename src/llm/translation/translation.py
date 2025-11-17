@@ -4,7 +4,6 @@ Translation service using LLM
 
 import re
 from dataclasses import dataclass
-from email.policy import default
 
 from loguru import logger
 
