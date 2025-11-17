@@ -3,7 +3,7 @@ LLM Client abstraction supporting multiple providers
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Type
 
 from src.configuration import ConfigValue
 from src.utility import Registry
@@ -50,4 +50,4 @@ class LLMProvider(ABC):
 
 class ProviderRegistry(Registry):
 
-    items: dict[str, LLMProvider] = {}
+    items: dict[str, Type[LLMProvider]] = {}
