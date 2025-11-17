@@ -31,8 +31,8 @@ class OpenAIProvider(LLMProvider):
         opts = opts | (ConfigValue(f"llm.{self.key}.options").resolve() or {})
 
         messages: list[dict[str, Any]] = self.generate_message_list(prompt, roles)
-        response: ChatCompletion = await self.client.chat.completions.create(model=self.model, messages=messages, **opts)
-        return response.choices[0].message.content.lstrip("```json").rstrip("```")
+        response: ChatCompletion = await self.client.chat.completions.create(model=self.model, messages=messages, **opts)  # type: ignore
+        return response.choices[0].message.content.lstrip("```json").rstrip("```")  # type: ignore
 
 
     def get_options_keys(self) -> list[tuple[str, Any]]:
