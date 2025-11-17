@@ -4,6 +4,7 @@ import dotenv
 import psycopg
 from loguru import logger
 
+from configuration.interface import ConfigLike
 from src.utility import configure_logging, create_db_uri
 
 from .config import Config
@@ -24,7 +25,7 @@ async def setup_config_store(filename: str = "config.yml", force: bool = False) 
 
     assert store.is_configured(), "Config Store failed to configure properly"
 
-    cfg: Config = store.config()
+    cfg: ConfigLike = store.config()
     if not cfg:
         raise ValueError("Config Store did not return a config")
 
@@ -64,7 +65,7 @@ async def _setup_connection_factory(cfg):
 
 async def get_connection() -> psycopg.AsyncConnection:
     """Get a database connection from the config"""
-    cfg: Config = get_config_provider().get_config()
+    cfg: ConfigLike = get_config_provider().get_config()
     if not cfg:
         raise ValueError("Config Store is not configured")
     if not cfg.get("runtime:connection"):
