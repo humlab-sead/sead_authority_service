@@ -64,7 +64,7 @@ async def meta(request: Request, config: Config = Depends(get_config_dependency)
     """
     # get hostname and port from request headers or ASGI scope
     metadata: dict[str, Any] = get_reconciliation_metadata(Strategies, host=str(request.base_url))
-    manifest: ReconServiceManifest = ReconServiceManifest.model_validate(**metadata)
+    manifest: ReconServiceManifest = ReconServiceManifest(**metadata)
     return ReconServiceManifest.model_validate(manifest)
 
 
