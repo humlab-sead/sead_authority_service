@@ -52,6 +52,6 @@ SPECIFICATION: StrategySpecification = {
 class SamplingContextReconciliationStrategy(ReconciliationStrategy):
     """Sampling Context-specific reconciliation with sampling context names and descriptions"""
 
-    def __init__(self, specification: StrategySpecification = None) -> None:
+    def __init__(self, specification: StrategySpecification | None = None) -> None:
         specification = specification or SPECIFICATION
         super().__init__(specification, DatabaseQueryProxy)
