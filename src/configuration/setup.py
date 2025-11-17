@@ -69,9 +69,9 @@ async def get_connection() -> psycopg.AsyncConnection:
     if not cfg:
         raise ValueError("Config Store is not configured")
     if not cfg.get("runtime:connection"):
-        connection_factory = cfg.get("runtime:connection_factory")
-        if not connection_factory:
+        _connection_factory = cfg.get("runtime:connection_factory")
+        if not _connection_factory:
             raise ValueError("Connection factory is not configured")
-        connection = await connection_factory()
+        connection = await _connection_factory()
         cfg.update({"runtime:connection": connection})
     return cfg.get("runtime:connection")
