@@ -21,8 +21,8 @@ class MCPResources:
 
     def __init__(self, connection: AsyncConnection, version: str = "0.1.0"):
         self.connection = connection
-        self.version = version
-        self.schema = ConfigValue("table_specs", default={}).resolve()
+        self.version: str = version
+        self.schema: dict[str, dict[str, str]] = ConfigValue("table_specs").resolve() or {}
 
     async def get_server_info(self) -> ServerInfo:
         """Return MCP server metadata"""

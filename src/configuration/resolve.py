@@ -33,7 +33,7 @@ class ConfigValue(Generic[T]):
         if inspect.isclass(self.key):
             val = self.key(**kwargs)
         else:
-            path = [p.strip() for p in str(self.key).split(",")]
+            path: list[str] = [p.strip() for p in str(self.key).split(",")]
             val = config.get(*path, default=self.default)
 
         if val is None:

@@ -1,5 +1,5 @@
 import math
-from typing import Any
+from typing import Any, Literal
 
 from src.configuration.resolve import ConfigValue
 from src.geonames.proxy import GeoNamesProxy
@@ -17,18 +17,19 @@ SPECIFICATION: StrategySpecification = {
     "sql_queries": {},
 }
 
+# pylint: disable=unused-argument, too-many-instance-attributes
 
-class GeoNamesQueryProxy(QueryProxy):  # pylint: disable=too-many-instance-attributes
+class GeoNamesQueryProxy(QueryProxy):
 
     def __init__(self, specification: StrategySpecification, **kwargs) -> None:
         super().__init__(specification, **kwargs)
-        self.username: str = kwargs.get("username") or ConfigValue("geonames.username", default="demo").resolve()
-        self.lang: str = kwargs.get("lang") or ConfigValue("geonames.lang", default="en").resolve()
+        self.username: str | None = kwargs.get("username") or ConfigValue("geonames.username").resolve() or "demo"
+        self.lang: str | None = kwargs.get("lang") or ConfigValue("geonames.lang").resolve() or "en"
         self.country_bias: str | None = kwargs.get("country_bias") or ConfigValue("geonames.country_bias").resolve()
-        self.fuzzy = float(kwargs.get("fuzzy") or ConfigValue("geonames.fuzzy", default=0.8).resolve())
-        self.feature_classes: tuple[str, ...] = tuple(kwargs.get("feature_classes") or ConfigValue("geonames.feature_classes", default=("P", "A")).resolve())
-        self.orderby: str = kwargs.get("orderby") or ConfigValue("geonames.orderby", default="relevance").resolve()
-        self.style: str = kwargs.get("style") or ConfigValue("geonames.style", default="FULL").resolve()
+        self.fuzzy: float = float(kwargs.get("fuzzy") or ConfigValue("geonames.fuzzy").resolve() or 0.8)
+        self.feature_classes: tuple[str, ...] = tuple(kwargs.get("feature_classes") or ConfigValue("geonames.feature_classes").resolve() or ("P", "A"))
+        self.orderby: Literal['relevance', 'population'] = kwargs.get("orderby") or ConfigValue("geonames.orderby").resolve() or "relevance"
+        self.style: Literal['FULL', 'SHORT', 'MEDIUM'] = kwargs.get("style") or ConfigValue("geonames.style").resolve() or "FULL"
 
         self.proxy: GeoNamesProxy = GeoNamesProxy(username=self.username, lang=self.lang)
 
@@ -43,7 +44,7 @@ class GeoNamesQueryProxy(QueryProxy):  # pylint: disable=too-many-instance-attri
             style=self.style,
         )
 
-    async def get_details(self, entity_id: str, **kwargs) -> dict[str, Any] | None:  # pylint: disable=unused-argument
+    async def get_details(self, entity_id: str, **kwargs) -> dict[str, Any] | None:
         return await self.proxy.get_details(entity_id, **kwargs)
 
     async def fetch_by_alternate_identity(self, alternate_identity: str, **kwargs) -> list[dict[str, Any]]:
@@ -54,7 +55,7 @@ class GeoNamesQueryProxy(QueryProxy):  # pylint: disable=too-many-instance-attri
 class GeoNamesReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 
-    def __init__(self, specification: dict[str, str] = None) -> None:
+    def __init__(self, specification: dict[str, str] | None = None) -> None:
         key = (specification or SPECIFICATION).get("key", "geonames")
         strategy_options: dict[str, Any] = ConfigValue(f"policy.{key}.geonames.options").resolve() or {}
         proxy: QueryProxy = GeoNamesQueryProxy(SPECIFICATION, **strategy_options)
@@ -63,7 +64,7 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:
         """Convert Geonames data to OpenRefine candidate format"""
         entity_id: str = str(entity_data["geonameId"])
-        admin_bits: list[str] = [entity_data.get("adminName1"), entity_data.get("countryName")]
+        admin_bits: list[Any] = [entity_data.get("adminName1"), entity_data.get("countryName")]
         admin_str: str = ", ".join([b for b in admin_bits if b])
         label: str = entity_data["name"] + (f", {admin_str}" if admin_str else "")
         candidate: dict[str, Any] = {

@@ -148,14 +148,14 @@ class BibliographicReferenceQueryProxy(DatabaseQueryProxy):
     async def fuzzy_authors_partial_and_year(self, authors: str, year: str | int, limit: int, threshold: float = 0.45) -> list[dict]:
         rows: list[dict[str, Any]] = await self.fetch_all(self.get_sql_query("authors_fuzzy_sql"), params=(authors, limit, threshold), row_factory="tuple")
         # filter to exact year; promote to 0.8 if matches
-        ids: list[int] = [r[1] for r in rows]
+        ids: list[int] = [r[1] for r in rows]  # type: ignore
         if not ids:
             return []
-        year_ok: dict[str, int] = await self.fetch_all(self.get_sql_query("biblio_ids_sql"), params=(ids, str(year)), row_factory="tuple")
+        year_ok: dict[str, Any] | None = await self.fetch_one(self.get_sql_query("biblio_ids_sql"), params=(ids, str(year)), row_factory="tuple")
         out = []
         for r in rows:
-            bid, label, sim = r[1], r[2], float(r[3])
-            if bid in year_ok:
+            bid, label, sim = r[1], r[2], float(r[3])  # type: ignore
+            if year_ok and bid in year_ok:
                 out.append({"biblio_id": bid, "label": label, "name_sim": max(0.8, sim)})
         return out
 
@@ -226,25 +226,24 @@ class BibliographicReferenceReconciliationStrategy(ReconciliationStrategy):
     ) -> list[dict]:
         props = properties or {}
         candidates: list[dict] = []
-
+        proxy: BibliographicReferenceQueryProxy = self.get_proxy()  # type: ignore
         # 1) High-confidence exact identifiers
         if props.get("isbn"):
-            candidates.extend(await self.get_proxy().fetch_by_isbn(str(props["isbn"])))
+            candidates.extend(await proxy.fetch_by_isbn(str(props["isbn"])))
         if props.get("doi"):
-            candidates.extend(await self.get_proxy().fetch_by_doi(str(props["doi"])))
+            candidates.extend(await proxy.fetch_by_doi(str(props["doi"])))
         if props.get("full_reference"):
-            candidates.extend(await self.get_proxy().fetch_by_exact_full_reference(str(props["full_reference"])))
+            candidates.extend(await proxy.fetch_by_exact_full_reference(str(props["full_reference"])))
         if props.get("title") and props.get("year"):
-            candidates.extend(await self.get_proxy().fetch_by_exact_title_year(str(props["title"]), str(props["year"])))
+            candidates.extend(await proxy.fetch_by_exact_title_year(str(props["title"]), str(props["year"])))
         if props.get("bugs_reference"):
-            candidates.extend(await self.get_proxy().fetch_by_exact_bugs_reference(str(props["bugs_reference"])))
+            candidates.extend(await proxy.fetch_by_exact_bugs_reference(str(props["bugs_reference"])))
 
         # 2) Strong fuzzy / partial passes (0.8 floor)
         if props.get("full_reference"):
-            candidates.extend(await self.get_proxy().fuzzy_full_reference_partial(str(props["full_reference"]), limit=limit))
-
+            candidates.extend(await proxy.fuzzy_full_reference_partial(str(props["full_reference"]), limit=limit))
         if props.get("authors") and props.get("year"):
-            candidates.extend(await self.get_proxy().fuzzy_authors_partial_and_year(str(props["authors"]), str(props["year"]), limit=limit))
+            candidates.extend(await proxy.fuzzy_authors_partial_and_year(str(props["authors"]), str(props["year"]), limit=limit))
 
         # Optional but useful: title+year partial
         # if props.get("title") and props.get("year"):
@@ -253,10 +252,10 @@ class BibliographicReferenceReconciliationStrategy(ReconciliationStrategy):
         # 3) Fallback: fuzzy on the free-text `query` (from the front-end)
         # If query is provided and not obviously identical to a property, try full_reference
         if query and not props.get("full_reference"):
-            candidates.extend(await self.get_proxy().fuzzy_full_reference_partial(query, limit=limit))
+            candidates.extend(await proxy.fuzzy_full_reference_partial(query, limit=limit))
             # If still thin, add overall similarity (lower confidence cap)
             if len(candidates) < limit:
-                candidates.extend(await self.get_proxy().fuzzy_full_reference_fallback(query, limit=limit))
+                candidates.extend(await proxy.fuzzy_full_reference_fallback(query, limit=limit))
 
         # 4) Merge, cap, and convert to OpenRefine candidates
         merged = self._merge_max(candidates)

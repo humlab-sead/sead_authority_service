@@ -2,9 +2,11 @@
 Translation service using LLM
 """
 
+from email.policy import default
 import re
 from dataclasses import dataclass
 
+from llm.providers.provider import LLMProvider
 from loguru import logger
 
 # from llm.providers.client import LLMClient
@@ -20,10 +22,10 @@ class LanguageDetection:
 class TranslationService:
     """LLM-based translation service"""
 
-    def __init__(self, llm_client) -> None:
-        self.llm_client = llm_client
+    def __init__(self, llm_client: LLMProvider) -> None:
+        self.llm_client: LLMProvider = llm_client
 
-    async def detect_language(self, text: str, context: str = "", default: str = "en") -> LanguageDetection:
+    async def detect_language(self, text: str, context: str = "") -> LanguageDetection:
         """Detect the language of input text"""
 
         if text.isascii() and not self._contains_non_english_patterns(text):
@@ -32,11 +34,10 @@ class TranslationService:
         if context:
             context = f"Context:\n{context}"
 
-        default_language: str = default or ConfigValue("llm.prompts.language_detection").resolve()
-        prompt_template: str = ConfigValue("llm.prompts.language_detection").resolve()
+        prompt_template: str = ConfigValue("llm.prompts.language_detection").resolve() or "Detect the language of the following text: {text}\n{context}"
         prompt: str = prompt_template.format(text=text, context=context)
         try:
-            response: str = await self.llm_client.provider.complete(prompt, max_tokens=50, temperature=0.1)
+            response: str = await self.llm_client.complete(prompt, max_tokens=50, temperature=0.1)
             parts: list[str] = response.strip().split(",")
             if len(parts) == 2:
                 lang_code: str = parts[0].strip()
@@ -45,7 +46,7 @@ class TranslationService:
         except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(f"Language detection failed: {e}")
 
-        return LanguageDetection(default_language, 0.5)
+        return LanguageDetection("??", 0.0)
 
     async def translate(self, text: str, source_lang: str, target_lang: str) -> str:
         """Translate text from source to target language"""
@@ -53,8 +54,7 @@ class TranslationService:
         if source_lang == target_lang:
             return text
 
-        prompt: str = ConfigValue("llm.translation_prompt").resolve()
-        prompt = f"""
+        prompt: str = ConfigValue("llm.translation_prompt").resolve() or f"""
 Translate this archaeological/geographic site name from {source_lang} to {target_lang}.
 
 Keep the translation natural and preserve proper nouns when appropriate.
@@ -66,10 +66,10 @@ Examples:
 - "Château de Versailles" (fr->en) -> "Palace of Versailles"
 
 Text to translate: "{text}"
-Translation:"""
+"""
 
         try:
-            response = await self.llm_client.provider.complete(prompt, max_tokens=100, temperature=0.1)
+            response = await self.llm_client.complete(prompt, max_tokens=100, temperature=0.1)
             translation = response.strip().strip('"')
             logger.info(f"Translated '{text}' ({source_lang}) -> '{translation}' ({target_lang})")
             return translation
