@@ -22,19 +22,19 @@ class Candidate(BaseModel):
 
     id: str = Field(description="Canonical ID from authority table")
     value: str = Field(description="Display value (label)")
-    raw_scores: Optional[RawScores] = Field(None, description="Detailed scoring breakdown")
-    language: str = Field("en", description="Language code")
+    raw_scores: Optional[RawScores] = Field(default=None, description="Detailed scoring breakdown")
+    language: Optional[str] = Field(default=None, description="Language code")
 
 class SearchLookupParams(BaseModel):
     """Parameters for hybrid search_lookup tool"""
 
     entity_type: str = Field(description="Lookup entity type (e.g., 'method', 'modification_type')")
     query: str = Field(description="Free-text query to reconcile")
-    k_fuzzy: int = Field(30, description="Top-K from trigram/fuzzy search", ge=1, le=100)
-    k_sem: int = Field(30, description="Top-K from semantic search", ge=1, le=100)
-    k_final: int = Field(20, description="Final candidate count after union", ge=1, le=50)
-    language: Optional[str] = Field(None, description="Prefer/filter by language")
-    return_raw_scores: bool = Field(True, description="Include raw_scores in response")
+    k_fuzzy: int = Field(default=30, description="Top-K from trigram/fuzzy search", ge=1, le=100)
+    k_sem: int = Field(default=30, description="Top-K from semantic search", ge=1, le=100)
+    k_final: int = Field(default=20, description="Final candidate count after union", ge=1, le=50)
+    language: Optional[str] = Field(default=None, description="Prefer/filter by language")
+    return_raw_scores: bool = Field(default=True, description="Include raw_scores in response")
 
 
 class SearchLookupResult(BaseModel):
@@ -45,7 +45,7 @@ class SearchLookupResult(BaseModel):
     candidates: list[Candidate]
     limits: dict[str, int] = Field(description="Applied K limits")
     elapsed_ms: float
-    schema_version: str = Field("0.1", description="MCP schema version")
+    schema_version: str = Field(default="0.1", description="MCP schema version")
 
 
 class RerankParams(BaseModel):
@@ -53,7 +53,7 @@ class RerankParams(BaseModel):
 
     query: str
     candidates: list[dict[str, Any]] = Field(description="Candidates with at least {id, value}")
-    k: int = Field(5, description="Number of top results to return", ge=1, le=20)
+    k: int = Field(default=5, description="Number of top results to return", ge=1, le=20)
 
 
 class RerankResult(BaseModel):
@@ -63,7 +63,7 @@ class RerankResult(BaseModel):
     results: list[Candidate]
     elapsed_ms: float
     model: str = Field(description="Reranker model identifier")
-    schema_version: str = Field("0.1", description="MCP schema version")
+    schema_version: str = Field(default="0.1", description="MCP schema version")
 
 
 class GetByIdParams(BaseModel):
@@ -81,7 +81,7 @@ class GetByIdResult(BaseModel):
     aliases: Optional[list[str]] = None
     language: Optional[str] = None
     provenance: Optional[dict[str, Any]] = None
-    schema_version: str = Field("0.1", description="MCP schema version")
+    schema_version: str = Field(default="0.1", description="MCP schema version")
 
 
 class LookupTable(BaseModel):
@@ -96,10 +96,10 @@ class LookupTable(BaseModel):
 class ServerInfo(BaseModel):
     """MCP server metadata"""
 
-    server: str = Field("sead.pg", description="Server identifier")
+    server: str = Field(default="sead.pg", description="Server identifier")
     version: str = Field(description="Semver version")
-    emb_model: Optional[str] = Field(None, description="Embedding model identifier")
-    pgvector_dim: Optional[int] = Field(None, description="Vector dimension")
+    emb_model: Optional[str] = Field(default=None, description="Embedding model identifier")
+    pgvector_dim: Optional[int] = Field(default=None, description="Vector dimension")
     features: list[str] = Field(description="Available tools/resources")
 
 

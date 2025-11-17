@@ -66,13 +66,14 @@ class TestConfigProvider:
         """Test that singleton ConfigStore persists across calls"""
         # Configure the singleton
         config = Config(data={"test": "singleton_value"})
-        store = ConfigStore.get_instance()
+        store: ConfigStore = ConfigStore.get_instance()
         store.store["default"] = config
 
         # Get another instance - should be the same
-        store2 = ConfigStore.get_instance()
+        store2: ConfigStore = ConfigStore.get_instance()
         assert store is store2
-        assert store2.config().get("test") == "singleton_value"
+        assert store2 is not None
+        assert store2.config().get("test") == "singleton_value" # type: ignore
 
         # Reset and verify it's clean
         ConfigStore.reset_instance()

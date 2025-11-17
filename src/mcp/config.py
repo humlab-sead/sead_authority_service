@@ -20,29 +20,29 @@ class MCPTableConfig(BaseModel):
     db_table: str = Field(description="Actual database table/view name")
     id_column: str = Field(description="Primary key column")
     label_column: str = Field(description="Display label column")
-    norm_column: Optional[str] = Field(None, description="Normalized text column for fuzzy search")
-    emb_column: Optional[str] = Field(None, description="Embedding vector column")
-    language_column: Optional[str] = Field(None, description="Language code column")
-    fuzzy_function: Optional[str] = Field(None, description="Authority schema fuzzy function name")
-    hybrid_function: Optional[str] = Field(None, description="Authority schema hybrid function name (Phase 3)")
+    norm_column: Optional[str] = Field(default=None, description="Normalized text column for fuzzy search")
+    emb_column: Optional[str] = Field(default=None, description="Embedding vector column")
+    language_column: Optional[str] = Field(default=None, description="Language code column")
+    fuzzy_function: Optional[str] = Field(default=None, description="Authority schema fuzzy function name")
+    hybrid_function: Optional[str] = Field(default=None, description="Authority schema hybrid function name (Phase 3)")
 
 
 class MCPRetrievalConfig(BaseModel):
     """Default retrieval parameters"""
 
-    k_fuzzy: int = Field(30, description="Top-K from trigram search", ge=1, le=100)
-    k_sem: int = Field(30, description="Top-K from semantic search", ge=1, le=100)
-    k_final: int = Field(20, description="Final union size", ge=1, le=50)
-    blend_weight_trgm: float = Field(0.5, description="Weight for trigram score", ge=0.0, le=1.0)
-    blend_weight_sem: float = Field(0.5, description="Weight for semantic score", ge=0.0, le=1.0)
-    min_score_threshold: float = Field(0.6, description="Minimum score to return matches", ge=0.0, le=1.0)
+    k_fuzzy: int = Field(default=30, description="Top-K from trigram search", ge=1, le=100)
+    k_sem: int = Field(default=30, description="Top-K from semantic search", ge=1, le=100)
+    k_final: int = Field(default=20, description="Final union size", ge=1, le=50)
+    blend_weight_trgm: float = Field(default=0.5, description="Weight for trigram score", ge=0.0, le=1.0)
+    blend_weight_sem: float = Field(default=0.5, description="Weight for semantic score", ge=0.0, le=1.0)
+    min_score_threshold: float = Field(default=0.6, description="Minimum score to return matches", ge=0.0, le=1.0)
 
 
 class MCPConfig(BaseModel):
     """Main MCP server configuration"""
 
-    version: str = Field("0.1.0", description="MCP server version")
-    enabled: bool = Field(False, description="Global MCP enable flag")
+    version: str = Field(default="0.1.0", description="MCP server version")
+    enabled: bool = Field(default=False, description="Global MCP enable flag")
 
     # Table configurations
     tables: dict[str, MCPTableConfig] = Field(
@@ -96,13 +96,13 @@ class MCPConfig(BaseModel):
     )
 
     # Feature flags
-    enable_reranking: bool = Field(False, description="Enable cross-encoder reranking (Phase 4)")
-    enable_caching: bool = Field(True, description="Enable Redis candidate caching")
-    cache_ttl_seconds: int = Field(86400, description="Cache TTL (24 hours default)")
+    enable_reranking: bool = Field(default=False, description="Enable cross-encoder reranking (Phase 4)")
+    enable_caching: bool = Field(default=True, description="Enable Redis candidate caching")
+    cache_ttl_seconds: int = Field(default=86400, description="Cache TTL (24 hours default)")
 
     # Observability
-    log_queries: bool = Field(True, description="Log all search_lookup calls")
-    log_scores: bool = Field(True, description="Include raw scores in logs")
+    log_queries: bool = Field(default=True, description="Log all search_lookup calls")
+    log_scores: bool = Field(default=True, description="Include raw scores in logs")
 
 
 # Default configuration instance
