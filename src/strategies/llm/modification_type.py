@@ -95,7 +95,7 @@ class LLMModificationTypeReconciliationStrategy(LLMReconciliationStrategy):
     async def find_candidates(
         self,
         query: str,
-        properties: dict[str, Any] = None,
+        properties: dict[str, Any] | None = None,
         limit: int = 10,
     ) -> list[dict[str, Any]]:
         """Find modification type candidates using LLM"""

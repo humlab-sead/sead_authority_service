@@ -1,8 +1,8 @@
 from typing import Any
 
-from .strategy import ReconciliationStrategy, Strategies
+from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
-SPECIFICATION: dict[str, str] = {
+SPECIFICATION: StrategySpecification = {
     "key": "taxon",
     "display_name": "Taxa",
     "id_field": "taxon_id",
@@ -51,12 +51,12 @@ class TaxonReconciliationStrategy(ReconciliationStrategy):
     """Future taxon reconciliation strategy"""
 
     def __init__(self):
-        super().__init__(SPECIFICATION, TaxonQueryProxy)
+        super().__init__(SPECIFICATION, TaxonQueryProxy)  # type: ignore[arg-type]
 
     async def find_candidates(self, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         # Implement taxon-specific logic here
         # Could handle genus/species parsing, synonym matching, etc.
-        pass
+        return []
 
     async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific taxon (placeholder)."""
