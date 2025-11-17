@@ -109,8 +109,8 @@ class MCPTools:
 
         Useful for preview/audit in OpenRefine
         """
-        if params.entity_type not in self.schema:
-            raise ValueError(f"Unsupported entity type: {params.entity_type}")
+        if not self.schema or params.entity_type not in self.schema:
+            raise ValueError(f"Unknown entity type '{params.entity_type}'")
 
         table_spec = self.schema[params.entity_type]
         table_name = table_spec.get("table_name")
