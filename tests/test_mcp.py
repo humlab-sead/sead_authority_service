@@ -12,10 +12,10 @@ Comprehensive tests for the embedded MCP implementation including:
 import os
 from unittest.mock import AsyncMock
 
-from configuration.config import Config, ConfigFactory
-from configuration.setup import _setup_connection_factory, setup_config_store
 import pytest
 
+from configuration.config import Config, ConfigFactory
+from configuration.setup import _setup_connection_factory
 from src.configuration import get_connection
 from src.configuration.provider import MockConfigProvider
 from src.configuration.resolve import ConfigValue
@@ -129,7 +129,6 @@ class TestMCPServer:
 
         assert result["id"] == "1"
         assert result["value"] == "Radiocarbon dating"
-        assert result["active"] is True
 
     @with_test_config
     async def test_get_by_id_not_found(self, test_provider):
@@ -181,21 +180,18 @@ class TestMCPModels:
             id="123",
             value="Test Value",
             language="en",
-            active=True,
             raw_scores=RawScores(trgm=0.9, sem=0.85, blend=0.875),
         )
 
         assert candidate.id == "123"
         assert candidate.value == "Test Value"
+
+        assert candidate.raw_scores is not None
         assert candidate.raw_scores.blend == 0.875  # pylint: disable=no-member
 
     def test_candidate_without_scores(self):
         """Test Candidate without raw_scores"""
-        candidate = Candidate(
-            id="456",
-            value="Another Value",
-            active=True,
-        )
+        candidate = Candidate(id="456", value="Another Value", language="en")
 
         assert candidate.id == "456"
         assert candidate.raw_scores is None
@@ -216,7 +212,6 @@ class TestMCPModels:
         assert params.k_fuzzy == 30
         assert params.k_sem == 30
         assert params.k_final == 20
-        assert params.active_only is True
         assert params.return_raw_scores is True
 
     def test_search_params_custom_values(self):
@@ -228,7 +223,6 @@ class TestMCPModels:
             k_sem=40,
             k_final=15,
             language="en",
-            active_only=False,
             return_raw_scores=False,
         )
 
@@ -236,7 +230,6 @@ class TestMCPModels:
         assert params.k_sem == 40
         assert params.k_final == 15
         assert params.language == "en"
-        assert params.active_only is False
         assert params.return_raw_scores is False
 
     def test_search_params_validation(self):
@@ -255,7 +248,7 @@ class TestMCPModels:
         result = SearchLookupResult(
             entity_type="method",
             query="radiocarbon",
-            candidates=[Candidate(id="1", value="Radiocarbon dating", active=True)],
+            candidates=[Candidate(id="1", value="Radiocarbon dating")],
             limits={"k_fuzzy": 30, "k_sem": 30, "k_final": 20},
             elapsed_ms=42.5,
         )
@@ -280,12 +273,12 @@ class TestMCPModels:
             value="Test Method",
             aliases=["alt1", "alt2"],
             language="en",
-            active=True,
             provenance={"source": "test"},
         )
 
         assert result.id == "123"
         assert result.value == "Test Method"
+        assert result.aliases is not None
         assert len(result.aliases) == 2
         assert result.schema_version == "0.1"
 
@@ -295,7 +288,6 @@ class TestMCPModels:
             table="methods",
             domain="methods",
             languages=["en", "sv"],
-            active_only_default=True,
             columns={"method_id": "integer", "method_name": "text"},
         )
 
@@ -577,7 +569,6 @@ class TestMCPTools:
 
         assert result.id == "1"
         assert result.value == "Radiocarbon dating"
-        assert result.active is True
 
     @with_test_config
     async def test_get_by_id_not_found(self, test_provider):
