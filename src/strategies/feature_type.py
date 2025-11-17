@@ -12,13 +12,13 @@ SPECIFICATION: StrategySpecification = {
     "property_settings": {},
     "sql_queries": {
         "fuzzy_label_sql": """
-        select * from authority.fuzzy_feature_types(%(q)s, %(n)s);
+        select * from authority.fuzzy_feature_type(%(q)s, %(n)s);
     """,
         "details_sql": """
             select feature_type_id as "ID",
                    label as "Feature Type Name",
                    description as "Description"
-            from authority.feature_types
+            from authority.feature_type
             where feature_type_id = %(id)s::int
     """,
     },
