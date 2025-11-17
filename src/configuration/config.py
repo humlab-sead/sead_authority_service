@@ -22,7 +22,7 @@ def yaml_path_join(loader: yaml.Loader, node: yaml.SequenceNode) -> str:
     return join(*[str(i) for i in loader.construct_sequence(node)])
 
 
-def nj(*paths: str | None) -> str | None:
+def nj(*paths: str) -> str | None:
     return normpath(join(*paths)) if None not in paths else None
 
 
@@ -38,7 +38,7 @@ class SafeLoaderIgnoreUnknown(yaml.SafeLoader):  # pylint: disable=too-many-ance
         return None
 
 
-SafeLoaderIgnoreUnknown.add_constructor(None, SafeLoaderIgnoreUnknown.let_unknown_through)
+SafeLoaderIgnoreUnknown.add_constructor(None, SafeLoaderIgnoreUnknown.let_unknown_through)  # type: ignore
 SafeLoaderIgnoreUnknown.add_constructor("!join", yaml_str_join)
 SafeLoaderIgnoreUnknown.add_constructor("!jj", yaml_path_join)
 SafeLoaderIgnoreUnknown.add_constructor("!path_join", yaml_path_join)
@@ -50,11 +50,11 @@ class Config:
     def __init__(
         self,
         *,
-        data: dict = None,
+        data: dict | None = None,
         context: str = "default",
         filename: str | None = None,
-    ):
-        self.data: dict = data
+    ) -> None:
+        self.data: dict = data or {}
         self.context: str = context
         self.filename: str | None = filename
 
@@ -93,10 +93,10 @@ class ConfigFactory:
     def load(
         self,
         *,
-        source: str | dict | Config = None,
-        context: str = None,
+        source: str | dict | Config | None = None,
+        context: str | None = None,
         env_filename: str | None = None,
-        env_prefix: str = None,
+        env_prefix: str | None = None,
     ) -> "Config":
 
         load_dotenv(dotenv_path=env_filename)
@@ -133,7 +133,8 @@ class ConfigFactory:
         )
 
         # Update data based on environment variables with a name that starts with `env_prefix`
-        data = env2dict(env_prefix, data)
+        if env_prefix:
+            data = env2dict(env_prefix, data)
 
         # Do a recursive replace of values with pattern "${ENV_NAME}" with value of environment
         data = replace_env_vars(data)
@@ -141,7 +142,7 @@ class ConfigFactory:
         return Config(
             data=data,
             context=context or "default",
-            filename=source if self.is_config_path(source) else None,
+            filename=source if isinstance(source, str) and self.is_config_path(source) else None,
         )
 
     @staticmethod
@@ -159,9 +160,9 @@ class ConfigFactory:
         self,
         data: dict,
         *,
-        context: str = None,
+        context: str | None = None,
         env_filename: str | None = None,
-        env_prefix: str = None,
+        env_prefix: str | None = None,
         source_path: str | None = None,
     ) -> dict:
         """Recursively resolve sub-configurations referenced in the main configuration.
