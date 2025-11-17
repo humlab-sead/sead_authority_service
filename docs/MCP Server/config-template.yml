@@ -14,7 +14,6 @@ retrieval:                         # NEW: global retrieval defaults (overridable
     trgm_weight: 0.5
     sem_weight: 0.5
   filters:
-    active_only: true
     language: null                 # e.g., "sv"|"en"|null
   rerank:                           # optional cross-encoder re-ranker
     enabled: ${RERANK_ENABLED:false}
@@ -94,7 +93,6 @@ policy:
       k_sem: 30
       k_final: 20
       filters:
-        active_only: true
         language: null
 
     thresholds:                         # NEW: per-entity cutoffs (override global)

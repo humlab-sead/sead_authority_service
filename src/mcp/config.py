@@ -22,7 +22,6 @@ class MCPTableConfig(BaseModel):
     label_column: str = Field(description="Display label column")
     norm_column: Optional[str] = Field(None, description="Normalized text column for fuzzy search")
     emb_column: Optional[str] = Field(None, description="Embedding vector column")
-    active_column: Optional[str] = Field(None, description="Active/deleted flag column")
     language_column: Optional[str] = Field(None, description="Language code column")
     fuzzy_function: Optional[str] = Field(None, description="Authority schema fuzzy function name")
     hybrid_function: Optional[str] = Field(None, description="Authority schema hybrid function name (Phase 3)")
@@ -55,7 +54,6 @@ class MCPConfig(BaseModel):
                 label_column="method_name",
                 norm_column=None,
                 emb_column=None,
-                active_column=None,
                 language_column=None,
                 fuzzy_function="authority.fuzzy_method",
                 hybrid_function=None,
@@ -67,7 +65,6 @@ class MCPConfig(BaseModel):
                 label_column="modification_type_name",
                 norm_column=None,
                 emb_column=None,
-                active_column=None,
                 language_column=None,
                 fuzzy_function="authority.fuzzy_modification_types",
                 hybrid_function=None,
@@ -79,7 +76,6 @@ class MCPConfig(BaseModel):
                 label_column="site_name",
                 norm_column=None,
                 emb_column=None,
-                active_column=None,
                 language_column=None,
                 fuzzy_function="authority.fuzzy_sites",
                 hybrid_function=None,
