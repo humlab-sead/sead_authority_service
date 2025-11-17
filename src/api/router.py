@@ -3,11 +3,13 @@ FastAPI router for SEAD Entity Reconciliation Service endpoints.
 """
 
 import json
-from typing import Any
+from typing import Any, Union
 
+from configuration.interface import ConfigLike
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
+from starlette.datastructures import UploadFile
 
 # Not used: ReconBatchRequest, ReconBatchRequestHandler, ReconQueryRequest
 from src.api.model import ReconBatchResponse, ReconQuery, ReconServiceManifest, SuggestEntityResponse, SuggestPropertyResponse, SuggestTypeResponse
@@ -23,7 +25,7 @@ from src.suggest import suggest_types
 # pylint: disable=unused-argument, redefined-builtin, too-many-locals, too-many-return-statements, too-many-branches
 
 
-async def get_config_dependency() -> Config:
+async def get_config_dependency() -> ConfigLike:
     if not get_config_provider().is_configured():
         logger.info("Config Store is not configured, setting up...")
         await setup_config_store()
@@ -34,10 +36,10 @@ router = APIRouter()
 
 
 @router.get("/whoami")
-async def whoami(request: Request):
-    host = request.url.hostname
-    port = request.url.port
-    base = str(request.host)  # e.g. "http://localhost:8000/"
+async def whoami(request: Request):# -> dict[str, Any]:
+    host: None | str = request.url.hostname
+    port: int | None = request.url.port
+    base = str(request.host)  # type: ignore[assignment]
     # ASGI scope fallback
     server = request.scope.get("server")
     if server and (host is None or port is None):
@@ -60,11 +62,13 @@ async def meta(request: Request, config: Config = Depends(get_config_dependency)
     that can be used for enhanced reconciliation matching.
     """
     # get hostname and port from request headers or ASGI scope
-    return get_reconciliation_metadata(Strategies, host=request.base_url)
+    metadata: dict[str, Any] = get_reconciliation_metadata(Strategies, host=str(request.base_url))
+    manifest: ReconServiceManifest = ReconServiceManifest.model_validate(**metadata)
+    return ReconServiceManifest.model_validate(manifest)
 
 
 @router.post("/reconcile", response_model=ReconBatchResponse, response_model_exclude_none=True)
-async def reconcile(request: Request, config: Config = Depends(get_config_dependency)) -> ReconBatchResponse:
+async def reconcile(request: Request, config: Config = Depends(get_config_dependency)) -> Union[ReconBatchResponse, JSONResponse]:
     """
     OpenRefine reconciliation endpoint for batch queries.
 
@@ -168,7 +172,8 @@ async def reconcile(request: Request, config: Config = Depends(get_config_depend
         if "application/x-www-form-urlencoded" in content_type:
             form_data = await request.form()
             logger.info(f"Form data keys: {list(form_data.keys())}")
-            queries_str = form_data.get("queries")
+            queries_str: UploadFile | str | None = form_data.get("queries")
+            assert isinstance(queries_str, (str)), "Invalid 'queries' field type in form data"
             if queries_str:
                 queries = json.loads(queries_str)
             else:
@@ -261,7 +266,7 @@ async def preview(id: str, config: Config = Depends(get_config_dependency)) -> H
         return HTMLResponse("Invalid ID path", status_code=400)
 
     try:
-        html: str = await render_preview(id)
+        html = await render_preview(id)
         return HTMLResponse(html)
     except ValueError as e:
         return HTMLResponse(f"Error: {str(e)}", status_code=500)
@@ -274,7 +279,7 @@ async def preview(id: str, config: Config = Depends(get_config_dependency)) -> H
 
 
 @router.get("/suggest/entity", response_model=SuggestEntityResponse)
-async def suggest_entity(prefix: str = "", type: str = "", config: Config = Depends(get_config_dependency)) -> SuggestEntityResponse:
+async def suggest_entity(prefix: str = "", type: str = "", config: Config = Depends(get_config_dependency)) -> Union[SuggestEntityResponse, JSONResponse]:
     """
     Entity autocomplete endpoint for OpenRefine Suggest API.
 
@@ -308,7 +313,7 @@ async def suggest_entity(prefix: str = "", type: str = "", config: Config = Depe
 
 
 @router.get("/suggest/type", response_model=SuggestTypeResponse)
-async def suggest_type(prefix: str = "", config: Config = Depends(get_config_dependency)) -> SuggestTypeResponse:
+async def suggest_type(prefix: str = "", config: Config = Depends(get_config_dependency)) -> Union[SuggestTypeResponse, JSONResponse]:
     """
     Type autocomplete endpoint for OpenRefine Suggest API.
 
@@ -335,7 +340,7 @@ async def suggest_type(prefix: str = "", config: Config = Depends(get_config_dep
 
 
 @router.get("/suggest/property", response_model=SuggestPropertyResponse)
-async def suggest_property(prefix: str = "", type: str = "", config: Config = Depends(get_config_dependency)) -> SuggestPropertyResponse:
+async def suggest_property(prefix: str = "", type: str = "", config: Config = Depends(get_config_dependency)) -> Union[SuggestPropertyResponse, JSONResponse]:
     """
     Property autocomplete endpoint for OpenRefine Suggest API.
 
