@@ -38,6 +38,154 @@ policy:
       feature_classes: ["P", "A"]  # Populated places and Administrative divisions
       orderby: "relevance"
       style: "FULL"
+
+features:
+  use_mcp_server: false  # Start disabled, flip to true when ready
+
+mcp:
+  version: "0.1.0"
+  retrieval:
+    k_fuzzy: 30        # Top-K from trigram search
+    k_sem: 30          # Top-K from semantic search (Phase 3)
+    k_final: 20        # Final candidate count
+    min_score_threshold: 0.6  # Minimum score to return
+  enable_caching: true
+  cache_ttl_seconds: 86400
+  embedding:
+    model: "sentence-transformers/all-mpnet-base-v2"
+    dimensions: 768
+
+table_specs:
+  data_type:
+    table_name: "tbl_data_types"
+    id_column: "data_type_id"
+    label_column: "data_type_name"
+    description_column: "definition"
+    alternate_identity_column: null
+    type_or_grouping:
+      foreign_table: "data_type_group"
+      foreign_key_column: "data_type_group_id"
+  data_type_group:
+    table_name: "tbl_data_type_groups"
+    id_column: "data_type_group_id"
+    label_column: "data_type_group_name"
+    description_column: "description"
+    alternate_identity_column: null
+  dating_uncertainty:
+    table_name: "tbl_dating_uncertainty"
+    id_column: "dating_uncertainty_id"
+    label_column: "uncertainty"
+    description_column: "description"
+    alternate_identity_column: null
+  feature_type:
+    table_name: "tbl_feature_types"
+    id_column: "feature_type_id"
+    label_column: "feature_type_name"
+    description_column: "feature_type_description"
+    alternate_identity_column: null
+  feature:
+    table_name: "tbl_features"
+    id_column: "feature_id"
+    label_column: "feature_name"
+    description_column: "feature_description"
+    alternate_identity_column: null
+    type_or_grouping:
+      foreign_table: "feature_type"
+      foreign_key_column: "feature_type_id"
+  location_type:
+    table_name: "tbl_location_types"
+    id_column: "location_type_id"
+    label_column: "location_type"
+    description_column: "description"
+    alternate_identity_column: null
+  location:
+    table_name: "tbl_locations"
+    id_column: "location_id"
+    label_column: "location_name"
+    description_column: null
+    alternate_identity_column: null
+    type_or_grouping:
+      foreign_table: "location_type"
+      foreign_key_column: "location_type_id"  
+  method_group:
+    table_name: "tbl_method_groups"
+    id_column: "method_group_id"
+    label_column: "group_name"
+    description_column: "description"
+    alternate_identity_column: null
+  method:
+    table_name: "tbl_methods"
+    id_column: "method_id"
+    label_column: "method_name"
+    description_column: "description"
+    alternate_identity_column: "method_abbrev_or_alt_name"
+    type_or_grouping:
+      foreign_table: "tbl_method_groups"
+      foreign_key_column: "method_group_id"
+  modification_type:
+    table_name: "tbl_modification_types"
+    id_column: "modification_type_id"
+    label_column: "modification_type_name"
+    description_column: "modification_type_description"
+    alternate_identity_column: null
+  record_type:
+    table_name: "tbl_record_types"
+    id_column: "record_type_id"
+    label_column: "record_type_name"
+    description_column: "record_type_description"
+    alternate_identity_column: null
+  relative_age_type:
+    table_name: "tbl_relative_age_types"
+    id_column: "relative_age_type_id"
+    label_column: "age_type"
+    description_column: "description"
+    alternate_identity_column: null
+  relative_age:
+    table_name: "tbl_relative_ages"
+    id_column: "relative_age_id"
+    label_column: "relative_age"
+    description_column: "description"
+    alternate_identity_column: null
+    type_or_grouping:
+      foreign_table: "relative_age_type"
+      foreign_key_column: "relative_age_type_id"
+  site:
+    table_name: "tbl_sites"
+    id_column: "site_id"
+    label_column: "site_name"
+    description_column: "site_description"
+    alternate_identity_column: "national_site_identifier"
+  sampling_context:
+    table_name: "tbl_sample_group_sampling_contexts"
+    id_column: "sampling_context_id"
+    label_column: "sampling_context"
+    description_column: "description"
+    alternate_identity_column: null
+  sample_group_description_type:
+    table_name: "tbl_sample_group_description_types"
+    id_column: "sample_group_description_type_id"
+    label_column: "type_name"
+    description_column: "type_description"
+    alternate_identity_column: null
+  sample_description_type:
+    table_name: "tbl_sample_description_types"
+    id_column: "sample_description_type_id"
+    label_column: "type_name"
+    description_column: "type_description"
+    alternate_identity_column: null
+  sample_location_type:
+    table_name: "tbl_sample_location_types"
+    id_column: "sample_location_type_id"
+    label_column: "location_type"
+    description_column: "location_type_description"
+    alternate_identity_column: null
+  sample_type:
+    table_name: "tbl_sample_types"
+    id_column: "sample_type_id"
+    label_column: "type_name"
+    description_column: "description"
+    alternate_identity_column: null
+
 llm:
   provider: "openai"  # "openai" or "anthropic", "ollama"
   options:
