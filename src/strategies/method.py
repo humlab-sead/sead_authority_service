@@ -1,4 +1,6 @@
+# from src.utility import load_resource_yaml
 from .query import DatabaseQueryProxy
+from .rag_hybrid.rag_hybrid_strategy import RAGHybridReconciliationStrategy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -21,10 +23,10 @@ SPECIFICATION: StrategySpecification = {
         select * from authority.methods(%(q)s, %(n)s);
     """,
         "details_sql": """
-            select 
-                m.method_id as "ID", 
-                m.method_name as "Name", 
-                m.description as "Description", 
+            select
+                m.method_id as "ID",
+                m.method_name as "Name",
+                m.description as "Description",
                 m.method_abbrev_or_alt_name as "Abbreviation",
                 mg.group_name as "Group",
                 mg.description as "Group Description"
@@ -41,6 +43,17 @@ SPECIFICATION: StrategySpecification = {
     },
 }
 
+RAG_SPECIFICATION: StrategySpecification = {
+    "key": "method (rag hybrid)",
+    "display_name": "Methods (RAG Hybrid)",
+    "id_field": "method_id",
+    "label_field": "label",
+    "alternate_identity_field": "method_abbreviation",
+    "properties": [],
+    "property_settings": {},
+    "sql_queries": {},
+}
+
 
 class MethodQueryProxy(DatabaseQueryProxy):
     """Method-specific query proxy"""
@@ -52,3 +65,9 @@ class MethodReconciliationStrategy(ReconciliationStrategy):
 
     def __init__(self) -> None:
         super().__init__(SPECIFICATION, MethodQueryProxy)
+
+
+@Strategies.register(key="rag_methods")
+class RAGMethodsReconciliationStrategy(RAGHybridReconciliationStrategy):
+    def __init__(self):
+        super().__init__(RAG_SPECIFICATION, MethodQueryProxy)

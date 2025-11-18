@@ -198,7 +198,7 @@ class TestReconcileEndpoint:
     @with_test_config
     def test_reconcile_invalid_json(self, client: TestClient, test_provider: MockConfigProvider):
         """Test error when request contains invalid JSON"""
-        response = client.post("/reconcile", data="invalid json", headers={"Content-Type": "application/json"})
+        response = client.post("/reconcile", data="invalid json", headers={"Content-Type": "application/json"})  # type: ignore
         assert response.status_code == 400
         assert "Invalid JSON" in response.json()["error"]
 
@@ -478,7 +478,7 @@ class TestErrorHandling:
         """Test various malformed JSON requests"""
         # Missing content-type
         # Patch get_default_config_filename to return the test config path
-        response = client.post("/reconcile", data='{"invalid": json}')
+        response = client.post("/reconcile", data='{"invalid": json}')  # type: ignore
         assert response.status_code in [400, 422]  # FastAPI validation error
 
         # Empty JSON object

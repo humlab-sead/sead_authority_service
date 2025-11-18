@@ -10,8 +10,10 @@ Comprehensive tests for the embedded MCP implementation including:
 """
 
 import os
+from typing import Any
 from unittest.mock import AsyncMock
 
+from configuration.interface import ConfigLike
 import pytest
 
 from configuration.config import Config, ConfigFactory
@@ -619,7 +621,7 @@ async def test_search_lookup_integration(test_provider):
     os.environ["CONFIG_FILE"] = "./config/config.yml"
     os.environ["ENV_FILE"] = ".env"
 
-    config: Config = ConfigFactory().load(source="./config/config.yml", env_prefix="SEAD_AUTHORITY", env_filename=".env")
+    config: ConfigLike = ConfigFactory().load(source="./config/config.yml", env_prefix="SEAD_AUTHORITY", env_filename=".env")
     test_provider.set_config(config)
     await _setup_connection_factory(config)
 
@@ -632,7 +634,7 @@ async def test_search_lookup_integration(test_provider):
             k_final=5,
         )
 
-        result = await server.search_lookup(params)
+        result: dict[str, Any] = await server.search_lookup(params)
 
         assert result["entity_type"] == "method"
         assert len(result["candidates"]) <= 5

@@ -111,7 +111,7 @@ class TestRecursiveFilterDict:
         """Test that non-dict input is returned as-is."""
         data = "not a dict"
         filter_keys = {"a"}
-        result = recursive_filter_dict(data, filter_keys, "exclude")
+        result = recursive_filter_dict(data, filter_keys, "exclude")  # type: ignore
         assert result == "not a dict"
 
     def test_default_mode_is_exclude(self):
@@ -226,8 +226,8 @@ class TestDotNotationUtilities:
     def test_dotexists_multiple_paths(self):
         """Test dotexists with multiple paths."""
         data = {"a": {"b": {"c": 42}}}
-        assert dotexists(data, ["x.y.z"], ["a.b.c"]) is True
-        assert dotexists(data, ["x.y.z"], ["p.q.r"]) is False
+        assert dotexists(data, "x.y.z", "a.b.c") is True
+        assert dotexists(data, "x.y.z", "p.q.r") is False
 
     def test_dget_simple(self):
         """Test dget with simple usage."""
@@ -250,7 +250,7 @@ class TestDotNotationUtilities:
     def test_dget_none_path(self):
         """Test dget with None path."""
         data = {"a": 1}
-        result = dget(data, None, default="default")
+        result = dget(data, None, default="default")  # type: ignore
         assert result == "default"
 
     def test_dget_empty_data(self):
@@ -365,7 +365,9 @@ class TestRegistry:
             return "test_result"
 
         assert Registry.is_registered("test_func")
-        assert Registry.get("test_func")() == "test_result"
+        fx = Registry.get("test_func")
+        assert fx is not None
+        assert fx() == "test_result"
 
     def test_register_with_function_type(self):
         """Test registering with function type (calls function)."""
@@ -385,7 +387,10 @@ class TestRegistry:
             return "result"
 
         assert Registry.is_registered("my_function")
-        assert Registry.get("my_function")() == "result"
+        fx = Registry.get("my_function")
+
+        assert fx is not None
+        assert fx() == "result"
 
     def test_get_nonexistent_key(self):
         """Test getting nonexistent key raises ValueError."""
@@ -405,7 +410,9 @@ class TestRegistry:
                 return "class_result"
 
         assert Registry.is_registered("test_class")
-        instance = Registry.get("test_class")()
+        cls = Registry.get("test_class")
+        assert cls is not None
+        instance = cls()
         assert instance.method() == "class_result"
 
 

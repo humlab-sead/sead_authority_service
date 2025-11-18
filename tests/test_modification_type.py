@@ -110,7 +110,7 @@ class TestModificationTypeReconciliationStrategy:
         ]
         test_provider.create_connection_mock(fetchall=mock_data)
 
-        strategy: ReconciliationStrategy = LLMModificationTypeReconciliationStrategy()
+        strategy: LLMModificationTypeReconciliationStrategy = LLMModificationTypeReconciliationStrategy()
         lookup_data = await strategy.get_lookup_data()
 
         assert len(lookup_data) == 2

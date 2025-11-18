@@ -157,7 +157,7 @@ def env2dict(prefix: str, data: dict[str, str] | None = None, lower_key: bool = 
     return data
 
 
-def configure_logging(opts: dict[str, Any]) -> None:
+def configure_logging(opts: dict[str, Any] | None) -> None:
 
     logger.remove()
     logger.add(
@@ -207,7 +207,7 @@ def _ensure_key_property(cls):
     return cls
 
 
-def replace_env_vars(data: dict[str, Any]) -> dict[str, Any]:
+def replace_env_vars(data: dict[str, Any] | list[Any] | str) -> dict[str, Any] | list[Any] | str:
     """Searches dict data recursively for values that are strings and matches £´${ENV_VAR} and replaces value with os.getenv("ENV_VAR", "")"""
     if isinstance(data, dict):
         return {k: replace_env_vars(v) for k, v in data.items()}

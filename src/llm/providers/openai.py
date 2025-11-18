@@ -1,7 +1,7 @@
 import ruff
 
 
-make rufffrom typing import Any
+from typing import Any
 
 from openai import AsyncOpenAI
 from openai.types.chat.chat_completion import ChatCompletion

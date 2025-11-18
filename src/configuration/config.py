@@ -98,17 +98,17 @@ class ConfigFactory:
         context: str | None = None,
         env_filename: str | None = None,
         env_prefix: str | None = None,
-    ) -> "Config":
+    ) -> Config | ConfigLike:
 
         load_dotenv(dotenv_path=env_filename)
 
-        if isinstance(source, Config):
+        if isinstance(source, (Config, ConfigLike)):
             return source
 
         if source is None:
             source = {}
 
-        data: dict[str, Any] | ConfigLike = (
+        data: dict[str, Any] = (
             (
                 yaml.load(
                     Path(source).read_text(encoding="utf-8"),
@@ -137,7 +137,7 @@ class ConfigFactory:
             data = env2dict(env_prefix, data)
 
         # Do a recursive replace of values with pattern "${ENV_NAME}" with value of environment
-        data = replace_env_vars(data)
+        data = replace_env_vars(data)  # type: ignore
 
         return Config(
             data=data,

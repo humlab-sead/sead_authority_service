@@ -96,7 +96,7 @@ def test_config() -> Config:
         return mock_conn
 
     factory: ConfigFactory = ConfigFactory()
-    config: Config = factory.load(source="./tests/config.yml", context="default", env_filename="./tests/.env")
+    config: Config = factory.load(source="./tests/config.yml", context="default", env_filename="./tests/.env")  # type: ignore
     config.update(
         {
             "runtime": {
