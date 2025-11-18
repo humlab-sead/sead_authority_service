@@ -1,6 +1,3 @@
-import ruff
-
-
 from typing import Any
 
 from openai import AsyncOpenAI

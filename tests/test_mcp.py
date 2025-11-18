@@ -13,10 +13,10 @@ import os
 from typing import Any
 from unittest.mock import AsyncMock
 
-from configuration.interface import ConfigLike
 import pytest
 
-from configuration.config import Config, ConfigFactory
+from configuration.config import ConfigFactory
+from configuration.interface import ConfigLike
 from configuration.setup import _setup_connection_factory
 from src.configuration import get_connection
 from src.configuration.provider import MockConfigProvider
