@@ -2,10 +2,7 @@
 \set echo none
 \set verbosity terse
 set client_min_messages = warning;
-
 begin;
-
-
 \i sql/01_authority.sql
 \i sql/01_utility.sql
 \i sql/02_location.sql
@@ -24,7 +21,5 @@ begin;
 \i sql/15_taxonomy_note.sql
 \i sql/16_taxonomic_order.sql
 \i sql/17_taxa_synonym.sql
-
-\i sql/99_refresh_materialized_views.sql
-
+\i sql/49_refresh_materialized_views.sql
 commit;
