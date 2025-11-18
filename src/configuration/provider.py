@@ -13,7 +13,7 @@ from .interface import ConfigLike
 class ConfigStore:
     """A class to manage configuration files and contexts"""
 
-    _instance: "ConfigStore" | None = None  # type: ignore
+    _instance: "ConfigStore | None" = None
     _lock = threading.Lock()
 
     def __init__(self):
