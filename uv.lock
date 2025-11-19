@@ -38,6 +38,7 @@ name = "authority-service"
 version = "1.2.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "click" },
     { name = "dotenv" },
     { name = "fastapi" },
     { name = "jinja2" },
@@ -63,6 +64,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8.3.0" },
     { name = "dotenv", specifier = ">=0.9.9" },
     { name = "fastapi", specifier = ">=0.117.1" },
     { name = "jinja2", specifier = ">=3.1.6" },
