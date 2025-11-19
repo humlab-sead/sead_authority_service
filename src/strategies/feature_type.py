@@ -25,7 +25,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class FeatureTypeQueryProxy(BaseRepository):
+class FeatureTypeRepository(BaseRepository):
     def __init__(self, specification: StrategySpecification) -> None:  # pylint: disable=useless-parent-delegation
         super().__init__(specification)
 
@@ -36,7 +36,7 @@ class FeatureTypeReconciliationStrategy(ReconciliationStrategy):
 
     def __init__(self, specification: StrategySpecification | None = None) -> None:
         specification = specification or SPECIFICATION
-        super().__init__(specification, FeatureTypeQueryProxy)
+        super().__init__(specification, FeatureTypeRepository)
 
     async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific site."""

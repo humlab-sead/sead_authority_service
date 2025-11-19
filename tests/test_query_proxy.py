@@ -4,11 +4,11 @@ import pytest
 
 from src.strategies.country import SPECIFICATION as COUNTRY_SPECIFICATION
 from src.strategies.data_type import SPECIFICATION as DATA_TYPE_SPECIFICATION
-from src.strategies.data_type import DataTypeQueryProxy
+from src.strategies.data_type import DataTypeRepository
 from src.strategies.dimension import SPECIFICATION as DIMENSION_SPECIFICATION
 from src.strategies.dimension import DimensionRepository
 from src.strategies.feature_type import SPECIFICATION as FEATURE_TYPE_SPECIFICATION
-from src.strategies.feature_type import FeatureTypeQueryProxy
+from src.strategies.feature_type import FeatureTypeRepository
 from src.strategies.location import SPECIFICATION as LOCATION_SPECIFICATION
 from src.strategies.location import LocationRepository
 from src.strategies.method import SPECIFICATION as METHOD_SPECIFICATION
@@ -26,9 +26,9 @@ SQL_QUERIES: dict[str, str] = LOCATION_SPECIFICATION["sql_queries"]
 QUERY_PROXY_TESTS_SETUPS = [
     (LOCATION_SPECIFICATION, LocationRepository),
     (COUNTRY_SPECIFICATION, LocationRepository),
-    (FEATURE_TYPE_SPECIFICATION, FeatureTypeQueryProxy),
+    (FEATURE_TYPE_SPECIFICATION, FeatureTypeRepository),
     (SITE_TYPE_SPECIFICATION, SiteRepository),
-    (DATA_TYPE_SPECIFICATION, DataTypeQueryProxy),
+    (DATA_TYPE_SPECIFICATION, DataTypeRepository),
     (DIMENSION_SPECIFICATION, DimensionRepository),
     (METHOD_SPECIFICATION, MethodRepository),
 ]

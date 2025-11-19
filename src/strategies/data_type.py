@@ -45,7 +45,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class DataTypeQueryProxy(BaseRepository):
+class DataTypeRepository(BaseRepository):
     """Data Type-specific query proxy"""
 
 
@@ -54,4 +54,4 @@ class DataTypeReconciliationStrategy(ReconciliationStrategy):
     """Data Type-specific reconciliation with data type names and descriptions"""
 
     def __init__(self, specification: StrategySpecification | None = None) -> None:
-        super().__init__(specification or SPECIFICATION, DataTypeQueryProxy)
+        super().__init__(specification or SPECIFICATION, DataTypeRepository)

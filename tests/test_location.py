@@ -7,7 +7,7 @@
 # from src.strategies.strategy import ReconciliationStrategy
 # from src.strategies.location import SPECIFICATION as LOCATION_SPECIFICATION, LocationReconciliationStrategy, LocationRepository
 # from src.strategies.country import SPECIFICATION as COUNTRY_SPECIFICATION, CountryReconciliationStrategy
-# from src.strategies.feature_type import SPECIFICATION as FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeQueryProxy
+# from src.strategies.feature_type import SPECIFICATION as FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeRepository
 # from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteRepository
 
 # from src.configuration import MockConfigProvider
@@ -18,7 +18,7 @@
 # TEST_SETUPS = [
 #     ("location", LOCATION_SPECIFICATION, LocationReconciliationStrategy, LocationRepository),
 #     ("country", COUNTRY_SPECIFICATION, CountryReconciliationStrategy, LocationRepository),
-#     ("feature_type", FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeQueryProxy),
+#     ("feature_type", FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeRepository),
 #     ("site", SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteRepository),
 # ]
 

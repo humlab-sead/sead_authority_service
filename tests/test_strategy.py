@@ -8,14 +8,14 @@ from src.configuration import MockConfigProvider
 from src.strategies.country import SPECIFICATION as COUNTRY_SPECIFICATION
 from src.strategies.country import CountryReconciliationStrategy
 from src.strategies.data_type import SPECIFICATION as DATA_TYPE_SPECIFICATION
-from src.strategies.data_type import (DataTypeQueryProxy,
+from src.strategies.data_type import (DataTypeRepository,
                                       DataTypeReconciliationStrategy)
 from src.strategies.dimension import SPECIFICATION as DIMENSION_SPECIFICATION
 from src.strategies.dimension import (DimensionRepository,
                                       DimensionReconciliationStrategy)
 from src.strategies.feature_type import \
     SPECIFICATION as FEATURE_TYPE_SPECIFICATION
-from src.strategies.feature_type import (FeatureTypeQueryProxy,
+from src.strategies.feature_type import (FeatureTypeRepository,
                                          FeatureTypeReconciliationStrategy)
 from src.strategies.location import SPECIFICATION as LOCATION_SPECIFICATION
 from src.strategies.location import (LocationRepository,
@@ -38,9 +38,9 @@ CountryQueryProxy = LocationRepository  # Country uses the same QueryProxy as Lo
 RECONCILIATION_STRATEGY_SETUPS: tuple[dict[str, Any], Type[ReconciliationStrategy], Type[QueryProxy]] = [
     (LOCATION_SPECIFICATION, LocationReconciliationStrategy, LocationRepository),
     (COUNTRY_SPECIFICATION, CountryReconciliationStrategy, CountryQueryProxy),
-    (FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeQueryProxy),
+    (FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeRepository),
     (SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteRepository),
-    (DATA_TYPE_SPECIFICATION, DataTypeReconciliationStrategy, DataTypeQueryProxy),
+    (DATA_TYPE_SPECIFICATION, DataTypeReconciliationStrategy, DataTypeRepository),
     (DIMENSION_SPECIFICATION, DimensionReconciliationStrategy, DimensionRepository),
     (METHOD_SPECIFICATION, MethodReconciliationStrategy, MethodRepository),
 ]
