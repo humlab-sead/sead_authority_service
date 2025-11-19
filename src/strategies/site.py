@@ -2,7 +2,7 @@ from typing import Any
 
 from src.configuration import ConfigValue
 
-from .query import DatabaseQueryProxy
+from .query import EntityRepository
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -98,7 +98,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class SiteQueryProxy(DatabaseQueryProxy):
+class SiteQueryProxy(EntityRepository):
 
     async def fetch_site_by_national_id(self, national_id: str) -> list[dict[str, Any]]:
         """Exact match by national site identifier"""
@@ -128,6 +128,8 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
     """Site-specific reconciliation with place names and coordinates"""
 
     def __init__(self):
+        self.entity_config: dict[str, Any] = ConfigValue("table_specs.site").resolve() or {}
+
         super().__init__(SPECIFICATION, SiteQueryProxy)
 
     def get_proxy(self) -> SiteQueryProxy:  # type: ignore[override]

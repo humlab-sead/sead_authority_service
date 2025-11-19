@@ -25,6 +25,7 @@ class ReconciliationStrategy(ABC):
                 "sql_queries": {},
             }
         )
+        self.entity_config: dict[str, Any] = ConfigValue(f"table_specs.{self.key}").resolve() or {}
         self._proxy_or_cls: Type[QueryProxy] | QueryProxy | None = proxy_or_cls
         self._proxy: QueryProxy | None = None
 

@@ -168,7 +168,7 @@ class TestDatabaseQueryProxyTransactionHandling:
         
         This is the key test to verify the fix for the transaction error.
         """
-        from src.strategies.query import DatabaseQueryProxy
+        from src.strategies.query import EntityRepository
         from src.strategies.site import SPECIFICATION
 
         test_provider.create_connection_mock(execute=None)
@@ -189,7 +189,7 @@ class TestDatabaseQueryProxyTransactionHandling:
         test_provider.connection_mock.rollback = mock_rollback
         
         # Create proxy with mocked connection
-        proxy = DatabaseQueryProxy(
+        proxy = EntityRepository(
             SPECIFICATION, connection=test_provider.connection_mock
         )
         
@@ -207,7 +207,7 @@ class TestDatabaseQueryProxyTransactionHandling:
         self, test_provider: ExtendedMockConfigProvider
     ):
         """Test that fetch_one properly handles errors and rolls back the transaction."""
-        from src.strategies.query import DatabaseQueryProxy
+        from src.strategies.query import EntityRepository
         from src.strategies.site import SPECIFICATION
 
         test_provider.create_connection_mock(execute=None)
@@ -224,7 +224,7 @@ class TestDatabaseQueryProxyTransactionHandling:
         
         test_provider.connection_mock.rollback = mock_rollback
         
-        proxy = DatabaseQueryProxy(
+        proxy = EntityRepository(
             SPECIFICATION, connection=test_provider.connection_mock
         )
         

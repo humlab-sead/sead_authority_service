@@ -43,10 +43,11 @@ class QueryProxy(ABC):
         """Fetch entity by alternate identity"""
 
 
-class DatabaseQueryProxy(QueryProxy):
+class EntityRepository(QueryProxy):
     def __init__(self, specification: StrategySpecification, **kwargs) -> None:
         super().__init__(specification, **kwargs)
         self.connection: psycopg.AsyncConnection | None = kwargs.get("connection")
+        self.entity_config: dict[str, Any] = self.specification.get("entity_config", {})
         self.row_factories: dict[str, Any] = {
             "dict": dict_row,
             "tuple": tuple_row,

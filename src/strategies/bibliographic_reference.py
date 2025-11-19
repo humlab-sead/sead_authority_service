@@ -1,7 +1,7 @@
 import re
 from typing import Any
 
-from .query import DatabaseQueryProxy
+from .query import EntityRepository
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -95,7 +95,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class BibliographicReferenceQueryProxy(DatabaseQueryProxy):
+class BibliographicReferenceQueryProxy(EntityRepository):
 
     @staticmethod
     def _norm_isbn(isbn: str | None) -> str | None:
