@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Literal, Mapping, Sequence, Tuple, TypeAlias, Union
 
+from configuration.resolve import ConfigValue
 import psycopg
 from loguru import logger
 from psycopg.rows import dict_row, tuple_row
@@ -24,6 +25,7 @@ class QueryProxy(ABC):
             "property_settings": {},
             "sql_queries": {},
         }
+        self.config: dict[str, Any] = ConfigValue("table_specs." + self.specification["key"]).resolve() or {}   
 
     @property
     def key(self) -> str:
@@ -47,7 +49,6 @@ class BaseRepository(QueryProxy):
     def __init__(self, specification: StrategySpecification, **kwargs) -> None:
         super().__init__(specification, **kwargs)
         self.connection: psycopg.AsyncConnection | None = kwargs.get("connection")
-        self.entity_config: dict[str, Any] = self.specification.get("entity_config", {})
         self.row_factories: dict[str, Any] = {
             "dict": dict_row,
             "tuple": tuple_row,
