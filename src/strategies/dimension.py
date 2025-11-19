@@ -61,7 +61,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class DimensionQueryProxy(BaseRepository):
+class DimensionRepository(BaseRepository):
     """Dimension-specific query proxy"""
 
 
@@ -70,4 +70,4 @@ class DimensionReconciliationStrategy(ReconciliationStrategy):
     """Dimension-specific reconciliation with place names and coordinates"""
 
     def __init__(self):
-        super().__init__(SPECIFICATION, DimensionQueryProxy)
+        super().__init__(SPECIFICATION, DimensionRepository)

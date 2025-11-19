@@ -6,7 +6,7 @@ from src.strategies.country import SPECIFICATION as COUNTRY_SPECIFICATION
 from src.strategies.data_type import SPECIFICATION as DATA_TYPE_SPECIFICATION
 from src.strategies.data_type import DataTypeQueryProxy
 from src.strategies.dimension import SPECIFICATION as DIMENSION_SPECIFICATION
-from src.strategies.dimension import DimensionQueryProxy
+from src.strategies.dimension import DimensionRepository
 from src.strategies.feature_type import SPECIFICATION as FEATURE_TYPE_SPECIFICATION
 from src.strategies.feature_type import FeatureTypeQueryProxy
 from src.strategies.location import SPECIFICATION as LOCATION_SPECIFICATION
@@ -29,7 +29,7 @@ QUERY_PROXY_TESTS_SETUPS = [
     (FEATURE_TYPE_SPECIFICATION, FeatureTypeQueryProxy),
     (SITE_TYPE_SPECIFICATION, SiteRepository),
     (DATA_TYPE_SPECIFICATION, DataTypeQueryProxy),
-    (DIMENSION_SPECIFICATION, DimensionQueryProxy),
+    (DIMENSION_SPECIFICATION, DimensionRepository),
     (METHOD_SPECIFICATION, MethodRepository),
 ]
 

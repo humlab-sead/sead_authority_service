@@ -11,7 +11,7 @@ from src.strategies.data_type import SPECIFICATION as DATA_TYPE_SPECIFICATION
 from src.strategies.data_type import (DataTypeQueryProxy,
                                       DataTypeReconciliationStrategy)
 from src.strategies.dimension import SPECIFICATION as DIMENSION_SPECIFICATION
-from src.strategies.dimension import (DimensionQueryProxy,
+from src.strategies.dimension import (DimensionRepository,
                                       DimensionReconciliationStrategy)
 from src.strategies.feature_type import \
     SPECIFICATION as FEATURE_TYPE_SPECIFICATION
@@ -41,7 +41,7 @@ RECONCILIATION_STRATEGY_SETUPS: tuple[dict[str, Any], Type[ReconciliationStrateg
     (FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeQueryProxy),
     (SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteRepository),
     (DATA_TYPE_SPECIFICATION, DataTypeReconciliationStrategy, DataTypeQueryProxy),
-    (DIMENSION_SPECIFICATION, DimensionReconciliationStrategy, DimensionQueryProxy),
+    (DIMENSION_SPECIFICATION, DimensionReconciliationStrategy, DimensionRepository),
     (METHOD_SPECIFICATION, MethodReconciliationStrategy, MethodRepository),
 ]
 
