@@ -11,9 +11,9 @@ SPECIFICATION: StrategySpecification = {
     "properties": [],
     "property_settings": {},
     "sql_queries": {
-    #     "fuzzy_find_sql": """
-    #     select * from authority.fuzzy_feature_type(%(q)s, %(n)s);
-    # """,
+        "fuzzy_find_sql": """
+        select * from authority.fuzzy_feature_type(%(q)s, %(n)s);
+    """,
         "details_sql": """
             select feature_type_id as "ID",
                    label as "Feature Type Name",
