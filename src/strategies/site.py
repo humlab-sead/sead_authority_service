@@ -2,7 +2,7 @@ from typing import Any
 
 from src.configuration import ConfigValue
 
-from .query import EntityRepository
+from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -49,7 +49,7 @@ SPECIFICATION: StrategySpecification = {
     "sql_queries": {
         "fetch_site_by_national_id": """
         select site_id, label, 1.0 as name_sim, latitude_dd as latitude, longitude_dd as longitude
-        from authority.sites
+        from authority.site
         where national_site_identifier = %(identifier)s
         limit 1
     """,
@@ -62,7 +62,7 @@ SPECIFICATION: StrategySpecification = {
                    ST_Transform(ST_SetSRID(ST_MakePoint(longitude_dd, latitude_dd), 4326), 3857),
                    ST_Transform(ST_SetSRID(ST_MakePoint(%(lon)s, %(lat)s), 4326), 3857)
                ) / 1000.0 as distance_km
-        from authority.sites 
+        from authority.site
         where site_id = ANY(%(site_ids)s) 
           and latitude_dd is not null 
           and longitude_dd is not null
@@ -90,7 +90,7 @@ SPECIFICATION: StrategySpecification = {
                 longitude_dd as "Longitude",
                 national_site_identifier as "National ID",
                 place_names
-            from authority.sites
+            from authority.site
             left join locations using (site_id)
         where site_id = %(id)s
     """,
@@ -98,7 +98,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class SiteQueryProxy(EntityRepository):
+class SiteQueryProxy(BaseRepository):
 
     async def fetch_site_by_national_id(self, national_id: str) -> list[dict[str, Any]]:
         """Exact match by national site identifier"""

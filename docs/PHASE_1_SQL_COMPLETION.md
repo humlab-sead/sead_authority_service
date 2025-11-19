@@ -157,8 +157,8 @@ RETURNS TABLE (
 3. **Materialized View Refresh**
    - For `sites` and `methods` (materialized views):
      ```sql
-     REFRESH MATERIALIZED VIEW authority.sites;
-     REFRESH MATERIALIZED VIEW authority.methods;
+     REFRESH MATERIALIZED VIEW authority.site;
+     REFRESH MATERIALIZED VIEW authority.method;
      ```
 
 4. **Verification Queries**
@@ -203,7 +203,7 @@ RETURNS TABLE (
 - **Pros**: Faster query performance (pre-computed JOIN)
 - **Cons**: Must refresh after embedding updates
 - **Refresh Strategy**: 
-  - Manual: `REFRESH MATERIALIZED VIEW authority.sites;`
+  - Manual: `REFRESH MATERIALIZED VIEW authority.site;`
   - Automatic: Create trigger or cron job
   - Concurrent: `REFRESH MATERIALIZED VIEW CONCURRENTLY` (requires UNIQUE index)
 
@@ -221,7 +221,7 @@ RETURNS TABLE (
 - [ ] Verify all tables created: `\dt authority.*embeddings`
 - [ ] Verify all indexes created: `\di authority.*ivfflat*`
 - [ ] Verify all functions created: `\df authority.semantic_*` and `\df authority.search_*_hybrid`
-- [ ] Check view/MV definitions: `\d+ authority.sites` (should include `emb` column)
+- [ ] Check view/MV definitions: `\d+ authority.site` (should include `emb` column)
 
 ### Post-Ingestion
 - [ ] Verify embedding counts match entity counts

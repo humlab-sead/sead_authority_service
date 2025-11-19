@@ -1,4 +1,4 @@
-from .query import EntityRepository
+from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 SPECIFICATION: StrategySpecification = {
@@ -61,7 +61,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class DimensionQueryProxy(EntityRepository):
+class DimensionQueryProxy(BaseRepository):
     """Dimension-specific query proxy"""
 
 

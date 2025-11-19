@@ -1,5 +1,5 @@
 # from src.utility import load_resource_yaml
-from .query import EntityRepository
+from .query import BaseRepository
 from .rag_hybrid.rag_hybrid_strategy import RAGHybridReconciliationStrategy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
@@ -55,7 +55,7 @@ RAG_SPECIFICATION: StrategySpecification = {
 }
 
 
-class MethodQueryProxy(EntityRepository):
+class MethodQueryProxy(BaseRepository):
     """Method-specific query proxy"""
 
 
