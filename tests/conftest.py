@@ -111,6 +111,9 @@ def test_config() -> Config:
 class ExtendedMockConfigProvider(MockConfigProvider):
     """Extended MockConfigProvider that allows setting config after initialization"""
 
+    def __init__(self, initial_config: Config) -> None:
+        super().__init__(initial_config)
+
     def create_connection_mock(self, **kwargs) -> None:
         connection = create_connection_mock(**({"execute": None} | kwargs))
         self.get_config().update({"runtime:connection": connection})
@@ -163,4 +166,5 @@ def create_connection_mock(**method_returns: Any) -> AsyncMock:
     cursor_context_manager.__aenter__.return_value = mock_cursor
     cursor_context_manager.__aexit__.return_value = None
     mock_conn.cursor.return_value = cursor_context_manager
+    mock_conn.cursor_instance = mock_cursor
     return mock_conn

@@ -268,7 +268,7 @@ def get_connection_uri(connection: Any) -> str:
 def load_resource_yaml(key: str) -> dict[str, Any] | None:
     """Loads a resource YAML file from the resources folder."""
 
-    resource_path: str = os.path.join(os.path.dirname(__file__), "resources", f"{key}.yaml")
+    resource_path: str = os.path.join(os.path.dirname(__file__), "resources", f"{key}.yml")
     if not os.path.exists(resource_path):
         return None
 

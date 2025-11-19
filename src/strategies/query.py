@@ -86,14 +86,14 @@ class BaseRepository(QueryProxy):
     async def fetch_all(self, sql: str, params: Params | None = None, *, row_factory: Literal["dict", "tuple"] = "dict") -> list[dict[str, Any]]:
         connection: psycopg.AsyncConnection[Tuple[Any, ...]] = await self.get_connection()
         async with connection.cursor(row_factory=self.row_factories[row_factory]) as cursor:
-            await cursor.execute(sql, params)  # type: ignore
+            await cursor.execute(sql.strip(), params)  # type: ignore
             rows: list[dict[str, Any]] = await cursor.fetchall()
             return [d if isinstance(d, dict) else dict(d) for d in rows]
 
     async def fetch_one(self, sql: str, params: Params | None = None, *, row_factory: Literal["dict", "tuple"] = "dict") -> dict[str, Any] | None:
         connection: psycopg.AsyncConnection[Tuple[Any, ...]] = await self.get_connection()
         async with connection.cursor(row_factory=self.row_factories[row_factory]) as cursor:
-            await cursor.execute(sql, params)  # type: ignore
+            await cursor.execute(sql.strip(), params)  # type: ignore
             row: dict[str, Any] | None = await cursor.fetchone()
             return dict(row) if row else None
     def get_details_sql(self) -> str:

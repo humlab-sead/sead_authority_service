@@ -64,7 +64,7 @@ class MethodReconciliationStrategy(ReconciliationStrategy):
     """Method-specific reconciliation with place names and coordinates"""
 
     def __init__(self) -> None:
-        super().__init__(SPECIFICATION, MethodRepository)
+        super().__init__(None, MethodRepository)
 
 
 @Strategies.register(key="rag_methods")
