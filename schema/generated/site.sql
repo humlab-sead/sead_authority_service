@@ -103,12 +103,13 @@ create index if not exists site_vec_ivfflat
       with (lists = 100);
 
 -- (First-time populate)
--- REFRESH MATERIALIZED VIEW CONCURRENTLY authority.site;
--- ANALYZE authority.site;
+-- refresh materialized view concurrently authority.site;
+-- analyze authority.site;
 /***************************************************************************************************
  ** Procedure  authority.fuzzy_site
  ** What       Trigram fuzzy search function using pg_trgm similarity
- ** Usage      SELECT * FROM authority.fuzzy_site('query text', 10); ****************************************************************************************************/
+ ** Usage      SELECT * FROM authority.fuzzy_site('query text', 10);
+ ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_site(text, integer) cascade;
 
@@ -173,6 +174,7 @@ $$;
  **            k_sem:  number of semantic results to return (default 30)
  **            k_final: number of final results to return (default 20)
  **            alpha:   blending factor for trigram vs semantic (default 0.5) ****************************************************************************************************/
+ 
 drop function if exists authority.search_site_hybrid(text, vector, integer, integer, integer, double precision) cascade;
 
 create or replace function authority.search_site_hybrid(

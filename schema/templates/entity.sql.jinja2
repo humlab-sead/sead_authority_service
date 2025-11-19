@@ -161,6 +161,7 @@ create index if not exists {{ entity.table_name }}_norm_trgm
 {%- if embedding_config.filter_params %}
  ** Params     {% for param in embedding_config.filter_params %}{{ param.name }}: {{ param.description | default('filter parameter') }}{% if not loop.last %}, {% endif %}{% endfor %}
 {%- endif %}
+
  ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_{{ entity_key }}(text, integer{% for param in embedding_config.filter_params | default([]) %}, {{ param.type }}{% endfor %}) cascade;

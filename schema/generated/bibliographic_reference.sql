@@ -17,8 +17,6 @@ create index if not exists bibliographic_reference_embeddings_ivfflat
   on authority.bibliographic_reference_embeddings
     using ivfflat (emb vector_cosine_ops)
       with (lists = 100);
-
-  
 /***************************************************************************************************
  ** Procedure  authority.update_bibliographic_reference_embeddings
  ** What       Updates embeddings in authority.bibliographic_reference_embeddings table
@@ -95,7 +93,8 @@ create index if not exists tbl_biblio_norm_trgm
 /***************************************************************************************************
  ** Procedure  authority.fuzzy_bibliographic_reference
  ** What       Trigram fuzzy search function using pg_trgm similarity
- ** Usage      SELECT * FROM authority.fuzzy_bibliographic_reference('query text', 10); ****************************************************************************************************/
+ ** Usage      SELECT * FROM authority.fuzzy_bibliographic_reference('query text', 10);
+ ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_bibliographic_reference(text, integer) cascade;
 
@@ -160,6 +159,7 @@ $$;
  **            k_sem:  number of semantic results to return (default 30)
  **            k_final: number of final results to return (default 20)
  **            alpha:   blending factor for trigram vs semantic (default 0.5) ****************************************************************************************************/
+ 
 drop function if exists authority.search_bibliographic_reference_hybrid(text, vector, integer, integer, integer, double precision) cascade;
 
 create or replace function authority.search_bibliographic_reference_hybrid(

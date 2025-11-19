@@ -5,7 +5,6 @@ set client_min_messages = warning;
 begin;
 \i schema/sql/authority.sql
 \i schema/sql/utility.sql
-\i schema/sql/update_embeddings.sql
 \i schema/generated/bibliographic_reference.sql
 \i schema/generated/data_type.sql
 \i schema/generated/feature_type.sql

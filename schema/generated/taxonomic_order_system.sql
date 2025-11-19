@@ -93,7 +93,8 @@ create index if not exists tbl_taxonomic_order_systems_norm_trgm
 /***************************************************************************************************
  ** Procedure  authority.fuzzy_taxonomic_order_system
  ** What       Trigram fuzzy search function using pg_trgm similarity
- ** Usage      SELECT * FROM authority.fuzzy_taxonomic_order_system('query text', 10); ****************************************************************************************************/
+ ** Usage      SELECT * FROM authority.fuzzy_taxonomic_order_system('query text', 10);
+ ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_taxonomic_order_system(text, integer) cascade;
 
@@ -158,6 +159,7 @@ $$;
  **            k_sem:  number of semantic results to return (default 30)
  **            k_final: number of final results to return (default 20)
  **            alpha:   blending factor for trigram vs semantic (default 0.5) ****************************************************************************************************/
+ 
 drop function if exists authority.search_taxonomic_order_system_hybrid(text, vector, integer, integer, integer, double precision) cascade;
 
 create or replace function authority.search_taxonomic_order_system_hybrid(

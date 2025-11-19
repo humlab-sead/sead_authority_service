@@ -90,7 +90,8 @@ create index if not exists tbl_locations_norm_trgm
 /***************************************************************************************************
  ** Procedure  authority.fuzzy_location
  ** What       Trigram fuzzy search function using pg_trgm similarity
- ** Usage      SELECT * FROM authority.fuzzy_location('query text', 10); ** Params     location_type_ids: Filter by location type IDs ****************************************************************************************************/
+ ** Usage      SELECT * FROM authority.fuzzy_location('query text', 10); ** Params     location_type_ids: Filter by location type IDs
+ ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_location(text, integer, integer[]) cascade;
 
@@ -160,6 +161,7 @@ $$;
  **            k_sem:  number of semantic results to return (default 30)
  **            k_final: number of final results to return (default 20)
  **            alpha:   blending factor for trigram vs semantic (default 0.5) **            location_type_ids: Filter by location type IDs ****************************************************************************************************/
+ 
 drop function if exists authority.search_location_hybrid(text, vector, integer, integer, integer, double precision, integer[]) cascade;
 
 create or replace function authority.search_location_hybrid(

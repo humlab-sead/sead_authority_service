@@ -3,6 +3,7 @@
 
 set -e
 
+
 DEPLOY_SQL_FILE="schema/__deploy__.sql"
 
 if [ -d "./schema" ]; then
@@ -29,8 +30,9 @@ set client_min_messages = warning;
 begin;
 \i schema/sql/authority.sql
 \i schema/sql/utility.sql
-\i schema/sql/update_embeddings.sql
 EOF
+
+# \i schema/sql/update_embeddings.sql
 
 for sql_file in $(ls schema/generated/*.sql | sort); do
     echo "\i $sql_file" >> ${DEPLOY_SQL_FILE}
