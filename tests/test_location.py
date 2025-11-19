@@ -8,7 +8,7 @@
 # from src.strategies.location import SPECIFICATION as LOCATION_SPECIFICATION, LocationReconciliationStrategy, LocationQueryProxy
 # from src.strategies.country import SPECIFICATION as COUNTRY_SPECIFICATION, CountryReconciliationStrategy
 # from src.strategies.feature_type import SPECIFICATION as FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeQueryProxy
-# from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteQueryProxy
+# from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteRepository
 
 # from src.configuration import MockConfigProvider
 # from tests.decorators import with_test_config
@@ -19,7 +19,7 @@
 #     ("location", LOCATION_SPECIFICATION, LocationReconciliationStrategy, LocationQueryProxy),
 #     ("country", COUNTRY_SPECIFICATION, CountryReconciliationStrategy, LocationQueryProxy),
 #     ("feature_type", FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeQueryProxy),
-#     ("site", SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteQueryProxy),
+#     ("site", SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteRepository),
 # ]
 
 # class TestReconciliationStrategy:

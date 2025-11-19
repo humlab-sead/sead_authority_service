@@ -25,7 +25,7 @@
 #                                    MethodReconciliationStrategy)
 # from src.strategies.query import QueryProxy
 # from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION
-# from src.strategies.site import SiteQueryProxy, SiteReconciliationStrategy
+# from src.strategies.site import SiteRepository, SiteReconciliationStrategy
 # from strategies.strategy import ReconciliationStrategy, StrategySpecification
 # from tests.decorators import with_test_config
 
@@ -39,7 +39,7 @@
 #     (LOCATION_SPECIFICATION, LocationReconciliationStrategy, LocationQueryProxy),
 #     (COUNTRY_SPECIFICATION, CountryReconciliationStrategy, CountryQueryProxy),
 #     (FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeQueryProxy),
-#     (SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteQueryProxy),
+#     (SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteRepository),
 #     (DATA_TYPE_SPECIFICATION, DataTypeReconciliationStrategy, DataTypeQueryProxy),
 #     (DIMENSION_SPECIFICATION, DimensionReconciliationStrategy, DimensionQueryProxy),
 #     (METHOD_SPECIFICATION, MethodReconciliationStrategy, MethodQueryProxy),

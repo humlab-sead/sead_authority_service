@@ -593,7 +593,7 @@ class TestMCPTools:
 
         params = GetByIdParams(entity_type="invalid_type", id="1")
 
-        with pytest.raises(ValueError, match="Unsupported entity type"):
+        with pytest.raises(ValueError, match="Unknown entity type 'invalid_type'"):
             await tools.get_by_id(params)
 
     @with_test_config

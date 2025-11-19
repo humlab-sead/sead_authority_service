@@ -18,7 +18,7 @@ SQL_QUERIES: dict[str, str] = SPECIFICATION["sql_queries"]
 
 
 class TestSiteQueryProxy:
-    """Tests for SiteQueryProxy class."""
+    """Tests for SiteRepository class."""
 
     @pytest.mark.asyncio
     @with_test_config
@@ -261,7 +261,7 @@ class TestSiteReconciliationStrategy:
         assert "national_id" in property_ids
         assert "place_name" in property_ids
 
-    @patch("src.strategies.site.SiteQueryProxy")
+    @patch("src.strategies.site.SiteRepository")
     @pytest.mark.asyncio
     @with_test_config
     async def test_find_candidates_by_national_id(self, mock_query_proxy_class, test_provider: ExtendedMockConfigProvider):
@@ -282,7 +282,7 @@ class TestSiteReconciliationStrategy:
         mock_proxy.find.assert_not_called()
         assert result == mock_sites
 
-    @patch("src.strategies.site.SiteQueryProxy")
+    @patch("src.strategies.site.SiteRepository")
     @pytest.mark.asyncio
     @with_test_config
     async def test_find_candidates_by_fuzzy_search(self, mock_query_proxy_class, test_provider: ExtendedMockConfigProvider):
@@ -302,7 +302,7 @@ class TestSiteReconciliationStrategy:
         # Results should be sorted by name_sim in descending order
         assert result[0]["name_sim"] >= result[1]["name_sim"]
 
-    @patch("src.strategies.site.SiteQueryProxy")
+    @patch("src.strategies.site.SiteRepository")
     @pytest.mark.asyncio
     @with_test_config
     async def test_find_candidates_with_geographic_scoring(self, mock_query_proxy_class, test_provider: ExtendedMockConfigProvider):
@@ -325,7 +325,7 @@ class TestSiteReconciliationStrategy:
 
             mock_geo_scoring.assert_called_once_with(mock_sites, {"lat": 59.3293, "lon": 18.0686})
 
-    @patch("src.strategies.site.SiteQueryProxy")
+    @patch("src.strategies.site.SiteRepository")
     @pytest.mark.asyncio
     @with_test_config
     async def test_find_candidates_with_place_context_scoring(self, mock_query_proxy_class, test_provider: ExtendedMockConfigProvider):
@@ -435,7 +435,7 @@ class TestSiteReconciliationStrategy:
         assert result[0]["name_sim"] > 0.7  # Got place boost
         assert result[1]["name_sim"] == 0.8  # No boost
 
-    @patch("src.strategies.site.SiteQueryProxy")
+    @patch("src.strategies.site.SiteRepository")
     @pytest.mark.asyncio
     @with_test_config
     async def test_get_details(self, mock_query_proxy_class, test_provider: ExtendedMockConfigProvider):
@@ -449,7 +449,7 @@ class TestSiteReconciliationStrategy:
         with patch.object(strategy, "get_proxy", return_value=mock_proxy):
             result = await strategy.get_details("123")
 
-        # The SiteQueryProxy is called with the SPECIFICATION
+        # The SiteRepository is called with the SPECIFICATION
         mock_proxy.get_details.assert_called_once_with("123")
         assert result == expected_details
 
@@ -457,7 +457,7 @@ class TestSiteReconciliationStrategy:
     @with_test_config
     async def test_find_candidates_empty_properties(self, test_provider: ExtendedMockConfigProvider):
         """Test finding candidates with empty properties."""
-        with patch("src.strategies.site.SiteQueryProxy") as mock_query_proxy_class:
+        with patch("src.strategies.site.SiteRepository") as mock_query_proxy_class:
             mock_proxy = AsyncMock()
             mock_query_proxy_class.return_value = mock_proxy
 
@@ -478,7 +478,7 @@ class TestSiteReconciliationStrategy:
     @with_test_config
     async def test_find_candidates_sorting(self, test_provider: ExtendedMockConfigProvider):
         """Test that candidates are sorted by name_sim in descending order."""
-        with patch("src.strategies.site.SiteQueryProxy") as mock_query_proxy_class:
+        with patch("src.strategies.site.SiteRepository") as mock_query_proxy_class:
             mock_proxy = AsyncMock()
             mock_query_proxy_class.return_value = mock_proxy
 
@@ -504,7 +504,7 @@ class TestSiteReconciliationStrategy:
     @with_test_config
     async def test_find_candidates_limit_applied(self, test_provider: ExtendedMockConfigProvider):
         """Test that limit is properly applied to results."""
-        with patch("src.strategies.site.SiteQueryProxy") as mock_query_proxy_class:
+        with patch("src.strategies.site.SiteRepository") as mock_query_proxy_class:
             mock_proxy = AsyncMock()
             mock_query_proxy_class.return_value = mock_proxy
 
@@ -536,7 +536,7 @@ class TestSiteStrategyIntegration:
         mock_config_instance.resolve.side_effect = [0.2, 10.0, 0.3, 0.1]
         mock_config_value.return_value = mock_config_instance
 
-        with patch("src.strategies.site.SiteQueryProxy") as mock_query_proxy_class:
+        with patch("src.strategies.site.SiteRepository") as mock_query_proxy_class:
             mock_proxy = AsyncMock()
             mock_query_proxy_class.return_value = mock_proxy
 
@@ -739,7 +739,7 @@ class TestSiteStrategyEdgeCases:
     async def test_find_candidates_all_enhancements_applied(self, test_provider: ExtendedMockConfigProvider):
         """Test that all enhancements are applied in the correct order."""
 
-        with patch("src.strategies.site.SiteQueryProxy") as mock_query_proxy_class:
+        with patch("src.strategies.site.SiteRepository") as mock_query_proxy_class:
             mock_proxy = AsyncMock()
             mock_query_proxy_class.return_value = mock_proxy
 
@@ -779,7 +779,7 @@ class TestSiteStrategyEdgeCases:
     async def test_empty_query_string(self, test_provider: ExtendedMockConfigProvider):
         """Test behavior with empty query string."""
 
-        with patch("src.strategies.site.SiteQueryProxy") as mock_query_proxy_class:
+        with patch("src.strategies.site.SiteRepository") as mock_query_proxy_class:
 
             mock_proxy = AsyncMock()
             mock_query_proxy_class.return_value = mock_proxy
@@ -799,7 +799,7 @@ class TestSiteStrategyEdgeCases:
     async def test_zero_limit(self, test_provider: ExtendedMockConfigProvider):
         """Test behavior with zero limit."""
 
-        with patch("src.strategies.site.SiteQueryProxy") as mock_query_proxy_class:
+        with patch("src.strategies.site.SiteRepository") as mock_query_proxy_class:
 
             mock_proxy = AsyncMock()
             mock_query_proxy_class.return_value = mock_proxy

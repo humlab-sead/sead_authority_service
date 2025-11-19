@@ -11,9 +11,9 @@ from src.configuration import Config, ConfigFactory, MockConfigProvider
 
 # def pytest_sessionstart(session) -> None:
 #     """Hook to run before any tests are executed."""
-#     os.environ["CONFIG_FILE"] = "./tests/config.yml"
+#     os.environ["CONFIG_FILE"] = "./tests/config/config.yml"
 #     os.environ["ENV_FILE"] = "./tests/.env"
-#     asyncio.run(setup_config_store("./tests/config.yml"))
+#     asyncio.run(setup_config_store("./tests/config/config.yml"))
 
 
 # @pytest.fixture(autouse=True)
@@ -96,7 +96,7 @@ def test_config() -> Config:
         return mock_conn
 
     factory: ConfigFactory = ConfigFactory()
-    config: Config = factory.load(source="./tests/config.yml", context="default", env_filename="./tests/.env")  # type: ignore
+    config: Config = factory.load(source="./tests/config/config.yml", context="default", env_filename="./tests/.env")  # type: ignore
     config.update(
         {
             "runtime": {
