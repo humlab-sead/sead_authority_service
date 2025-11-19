@@ -153,7 +153,7 @@
 * add decorators for test configuration management with setup and teardown functionality ([36513aa](https://github.com/humlab-sead/sead_authority_service/commit/36513aa58157c3af9adbf4a44358773162d11fb6))
 * add default implementation for  get_details method in ReconciliationStrategy ([9a29383](https://github.com/humlab-sead/sead_authority_service/commit/9a29383d7b7434dea232482009da0d1fb775eac8))
 * add descriptions to bibliographic reference properties for clarity ([ca51656](https://github.com/humlab-sead/sead_authority_service/commit/ca516567819e63db504a90b5ed3f3479a58e178c))
-* add DimensionQueryProxy and MethodQueryProxy to QUERY_PROXY_TESTS_SETUPS ([13dddbd](https://github.com/humlab-sead/sead_authority_service/commit/13dddbd3ed6c9c6b3e1a7dd42f05d16cb54b30d9))
+* add DimensionQueryProxy and MethodRepository to QUERY_PROXY_TESTS_SETUPS ([13dddbd](https://github.com/humlab-sead/sead_authority_service/commit/13dddbd3ed6c9c6b3e1a7dd42f05d16cb54b30d9))
 * add Docker support with build scripts, configuration, and deployment guides ([dc1936d](https://github.com/humlab-sead/sead_authority_service/commit/dc1936d0c9e7598477b27c6b476506a1dd5efd71))
 * add Docker support with configuration, entrypoint, and service definitions ([84277d5](https://github.com/humlab-sead/sead_authority_service/commit/84277d5f4d391e331557d8225f173aa05ad29723))
 * add examples for using ConfigStore with Provider Pattern for enhanced configuration management ([d4867e1](https://github.com/humlab-sead/sead_authority_service/commit/d4867e12eb6d6a3c8c5a5337ba69802995edde5b))

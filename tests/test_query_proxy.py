@@ -12,7 +12,7 @@ from src.strategies.feature_type import FeatureTypeQueryProxy
 from src.strategies.location import SPECIFICATION as LOCATION_SPECIFICATION
 from src.strategies.location import LocationQueryProxy
 from src.strategies.method import SPECIFICATION as METHOD_SPECIFICATION
-from src.strategies.method import MethodQueryProxy
+from src.strategies.method import MethodRepository
 from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION
 from src.strategies.site import SiteRepository
 from strategies.query import BaseRepository
@@ -30,7 +30,7 @@ QUERY_PROXY_TESTS_SETUPS = [
     (SITE_TYPE_SPECIFICATION, SiteRepository),
     (DATA_TYPE_SPECIFICATION, DataTypeQueryProxy),
     (DIMENSION_SPECIFICATION, DimensionQueryProxy),
-    (METHOD_SPECIFICATION, MethodQueryProxy),
+    (METHOD_SPECIFICATION, MethodRepository),
 ]
 
 

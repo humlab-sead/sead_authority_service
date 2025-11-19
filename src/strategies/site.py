@@ -53,9 +53,9 @@ SPECIFICATION: StrategySpecification = {
         where national_site_identifier = %(identifier)s
         limit 1
     """,
-    #     "fuzzy_find_sql": """
-    #     SELECT * FROM authority.fuzzy_site(%(q)s, %(n)s);
-    # """,
+        "fuzzy_find_sql": """
+        select * from authority.fuzzy_site(%(q)s, %(n)s);
+    """,
         "fetch_site_distances": """
         select site_id, 
                ST_Distance(

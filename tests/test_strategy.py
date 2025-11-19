@@ -21,7 +21,7 @@
 # from src.strategies.location import (LocationQueryProxy,
 #                                      LocationReconciliationStrategy)
 # from src.strategies.method import SPECIFICATION as METHOD_SPECIFICATION
-# from src.strategies.method import (MethodQueryProxy,
+# from src.strategies.method import (MethodRepository,
 #                                    MethodReconciliationStrategy)
 # from src.strategies.query import QueryProxy
 # from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION
@@ -42,7 +42,7 @@
 #     (SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteRepository),
 #     (DATA_TYPE_SPECIFICATION, DataTypeReconciliationStrategy, DataTypeQueryProxy),
 #     (DIMENSION_SPECIFICATION, DimensionReconciliationStrategy, DimensionQueryProxy),
-#     (METHOD_SPECIFICATION, MethodReconciliationStrategy, MethodQueryProxy),
+#     (METHOD_SPECIFICATION, MethodReconciliationStrategy, MethodRepository),
 # ]
 
 
