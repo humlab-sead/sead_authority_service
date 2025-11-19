@@ -32,9 +32,10 @@ begin;
 \i schema/sql/utility.sql
 EOF
 
-# \i schema/sql/update_embeddings.sql
-
-for sql_file in $(ls schema/generated/*.sql | sort); do
+for sql_file in $(ls schema/generated/*.sql | grep -v "semantic-" | sort); do
+    echo "\i $sql_file" >> ${DEPLOY_SQL_FILE}
+done
+for sql_file in $(ls schema/generated/*.sql | grep "semantic-" | sort); do
     echo "\i $sql_file" >> ${DEPLOY_SQL_FILE}
 done
 echo "commit;" >> ${DEPLOY_SQL_FILE}
@@ -42,6 +43,9 @@ echo "commit;" >> ${DEPLOY_SQL_FILE}
 echo "info: running schema deploy SQL file ${DEPLOY_SQL_FILE}"
 
 ${HOME}/bin/sql -v ON_ERROR_STOP=1 -q -t -A -f ${DEPLOY_SQL_FILE}
+
 echo "info: installation completed!"
 
-${HOME}/bin/sql -v ON_ERROR_STOP=1 -q -t -A -c "call authority.update_all_embeddings(true);"
+# embeddings are updated client-side now
+# \i schema/sql/update_embeddings.sql
+# ${HOME}/bin/sql -v ON_ERROR_STOP=1 -q -t -A -c "call authority.update_all_embeddings(true);"
