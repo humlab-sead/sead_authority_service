@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Any, Literal, Mapping, Sequence, Tuple, TypeAlias, Union
 
-from configuration.resolve import ConfigValue
 import psycopg
 from loguru import logger
 from psycopg.rows import dict_row, tuple_row
 
+from src.configuration.resolve import ConfigValue
 from src.configuration.setup import get_connection
 
 from . import StrategySpecification
