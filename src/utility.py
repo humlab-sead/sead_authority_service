@@ -157,7 +157,7 @@ def env2dict(prefix: str, data: dict[str, str] | None = None, lower_key: bool = 
     return data
 
 
-def configure_logging(opts: dict[str, Any] | None) -> None:
+def configure_logging(opts: dict[str, Any] | None=None) -> None:
 
     logger.remove()
     logger.add(
