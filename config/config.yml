@@ -53,7 +53,7 @@ mcp:
     model: "sentence-transformers/all-mpnet-base-v2"
     dimensions: 768
 
-table_specs: "@include entities.yml"
+table_specs: "@include: entities.yml"
 
 llm:
   provider: "openai"  # "openai" or "anthropic", "ollama"
