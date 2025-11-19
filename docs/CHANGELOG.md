@@ -222,7 +222,7 @@
 * implement JSON response handling and candidate extraction in LLM reconciliation strategy ([6685a0d](https://github.com/humlab-sead/sead_authority_service/commit/6685a0d2183f18020b465ad07fe3d8cd2b800ea1))
 * implement LLM-enhanced site reconciliation strategy with semantic and translation capabilities ([e4013f1](https://github.com/humlab-sead/sead_authority_service/commit/e4013f16c1312d2e97d3d2a135cf4b44b658ec91))
 * implement LLMReconciliationStrategy for LLM-powered reconciliation with batch processing support ([4076b1b](https://github.com/humlab-sead/sead_authority_service/commit/4076b1b38c7bcbb9c21495b8d005cebc49413038))
-* implement LocationQueryProxy and LocationReconciliationStrategy for location data handling ([92f5a75](https://github.com/humlab-sead/sead_authority_service/commit/92f5a75eeb06f08e5438d5f55af5fa2a4503b3d3))
+* implement LocationRepository and LocationReconciliationStrategy for location data handling ([92f5a75](https://github.com/humlab-sead/sead_authority_service/commit/92f5a75eeb06f08e5438d5f55af5fa2a4503b3d3))
 * implement QueryProxy and SiteQueryProxy for enhanced site data retrieval ([822bbbb](https://github.com/humlab-sead/sead_authority_service/commit/822bbbb5aa54cdde2245cf69d3302b334194ac44))
 * implement reconcile_queries function for handling query reconciliation ([0ccb41e](https://github.com/humlab-sead/sead_authority_service/commit/0ccb41e85e7bad0c91b4b1f414bc4682ffc6ccaf))
 * increase max_tokens for LLM and update feature_types role description ([59e545a](https://github.com/humlab-sead/sead_authority_service/commit/59e545a88d2062c1886ddf4dad4eb78f0cf489d0))

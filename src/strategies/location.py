@@ -33,7 +33,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class LocationQueryProxy(BaseRepository):
+class LocationRepository(BaseRepository):
     """Location-specific query proxy"""
 
 
@@ -43,4 +43,4 @@ class LocationReconciliationStrategy(ReconciliationStrategy):
 
     def __init__(self, specification: StrategySpecification | None = None) -> None:
         specification = specification or SPECIFICATION
-        super().__init__(specification, LocationQueryProxy)
+        super().__init__(specification, LocationRepository)

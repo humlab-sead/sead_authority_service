@@ -10,7 +10,7 @@ from src.strategies.dimension import DimensionQueryProxy
 from src.strategies.feature_type import SPECIFICATION as FEATURE_TYPE_SPECIFICATION
 from src.strategies.feature_type import FeatureTypeQueryProxy
 from src.strategies.location import SPECIFICATION as LOCATION_SPECIFICATION
-from src.strategies.location import LocationQueryProxy
+from src.strategies.location import LocationRepository
 from src.strategies.method import SPECIFICATION as METHOD_SPECIFICATION
 from src.strategies.method import MethodRepository
 from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION
@@ -24,8 +24,8 @@ from tests.decorators import with_test_config
 SQL_QUERIES: dict[str, str] = LOCATION_SPECIFICATION["sql_queries"]
 
 QUERY_PROXY_TESTS_SETUPS = [
-    (LOCATION_SPECIFICATION, LocationQueryProxy),
-    (COUNTRY_SPECIFICATION, LocationQueryProxy),
+    (LOCATION_SPECIFICATION, LocationRepository),
+    (COUNTRY_SPECIFICATION, LocationRepository),
     (FEATURE_TYPE_SPECIFICATION, FeatureTypeQueryProxy),
     (SITE_TYPE_SPECIFICATION, SiteRepository),
     (DATA_TYPE_SPECIFICATION, DataTypeQueryProxy),

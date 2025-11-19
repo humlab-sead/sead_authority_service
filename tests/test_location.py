@@ -5,7 +5,7 @@
 # import pytest
 # from src.strategies.query import QueryProxy
 # from src.strategies.strategy import ReconciliationStrategy
-# from src.strategies.location import SPECIFICATION as LOCATION_SPECIFICATION, LocationReconciliationStrategy, LocationQueryProxy
+# from src.strategies.location import SPECIFICATION as LOCATION_SPECIFICATION, LocationReconciliationStrategy, LocationRepository
 # from src.strategies.country import SPECIFICATION as COUNTRY_SPECIFICATION, CountryReconciliationStrategy
 # from src.strategies.feature_type import SPECIFICATION as FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeQueryProxy
 # from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteRepository
@@ -16,8 +16,8 @@
 # # pylint: disable=attribute-defined-outside-init,protected-access, unused-argument
 
 # TEST_SETUPS = [
-#     ("location", LOCATION_SPECIFICATION, LocationReconciliationStrategy, LocationQueryProxy),
-#     ("country", COUNTRY_SPECIFICATION, CountryReconciliationStrategy, LocationQueryProxy),
+#     ("location", LOCATION_SPECIFICATION, LocationReconciliationStrategy, LocationRepository),
+#     ("country", COUNTRY_SPECIFICATION, CountryReconciliationStrategy, LocationRepository),
 #     ("feature_type", FEATURE_TYPE_SPECIFICATION, FeatureTypeReconciliationStrategy, FeatureTypeQueryProxy),
 #     ("site", SITE_TYPE_SPECIFICATION, SiteReconciliationStrategy, SiteRepository),
 # ]
@@ -68,7 +68,7 @@
 
 #         assert isinstance(settings, dict)
 
-#     @patch("src.strategies.location.LocationQueryProxy")
+#     @patch("src.strategies.location.LocationRepository")
 #     @pytest.mark.parametrize(
 #         "specification, strategy_class",
 #         TEST_SETUPS,
@@ -100,7 +100,7 @@
 #         "specification, strategy_class",
 #         TEST_SETUPS,
 #     )
-#     @patch("src.strategies.location.LocationQueryProxy")
+#     @patch("src.strategies.location.LocationRepository")
 #     @with_test_config
 #     async def test_get_details(self, mock_query_proxy_class, specification, strategy_class, test_provider: MockConfigProvider):
 #         """Test getting site details."""
