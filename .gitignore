@@ -114,3 +114,4 @@ bin
 *.pdf
 *.pid
 *.out
+deprecated
