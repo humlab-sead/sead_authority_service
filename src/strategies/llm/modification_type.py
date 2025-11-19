@@ -26,7 +26,7 @@ SPECIFICATION: StrategySpecification = {
     ],
     "property_settings": {},
     "sql_queries": {
-        "fuzzy_label_sql": """
+        "fuzzy_find_sql": """
             SELECT 
                 modification_type_id,
                 modification_type_name as label,

@@ -17,7 +17,7 @@ SPECIFICATION: StrategySpecification = {
     ],
     "property_settings": {},
     "sql_queries": {
-        "fuzzy_label_sql": """
+        "fuzzy_find_sql": """
             select
                 s.dimension_id,
                 s.dimension_name as label,

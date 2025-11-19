@@ -69,7 +69,7 @@
 
 #         result: list[dict[str, Any]] = await proxy.find("test site", limit=5)
 
-#         expected_sql: str = SQL_QUERIES["fuzzy_label_sql"]
+#         expected_sql: str = SQL_QUERIES["fuzzy_find_sql"]
 #         mock_cursor.execute.assert_called_once_with(expected_sql, {"q": "test site", "n": 5})
 #         mock_cursor.fetchall.assert_called_once()
 #         assert result == mock_rows

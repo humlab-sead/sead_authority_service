@@ -9,7 +9,7 @@ SPECIFICATION: StrategySpecification = {
     "properties": [],
     "property_settings": {},
     "sql_queries": {
-        "fuzzy_label_sql": """
+        "fuzzy_find_sql": """
             select
                 s.data_type_id,
                 s.data_type_name as label,

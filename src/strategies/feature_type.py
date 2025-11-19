@@ -11,7 +11,7 @@ SPECIFICATION: StrategySpecification = {
     "properties": [],
     "property_settings": {},
     "sql_queries": {
-        "fuzzy_label_sql": """
+        "fuzzy_find_sql": """
         select * from authority.fuzzy_feature_type(%(q)s, %(n)s);
     """,
         "details_sql": """

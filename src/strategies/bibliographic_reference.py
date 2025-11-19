@@ -21,7 +21,7 @@ SPECIFICATION: StrategySpecification = {
     # "default_types": [{"id": "biblio", "name": "Bibliographic reference"}],
     "property_settings": {},
     "sql_queries": {
-        "fuzzy_label_sql": """
+        "fuzzy_find_sql": """
         select * from authority.fuzzy_bibliographic_references(%(q)s, %(n)s);
     """,
         "details_sql": """

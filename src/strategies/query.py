@@ -103,7 +103,7 @@ class DatabaseQueryProxy(QueryProxy):
 
     async def find(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:  # pylint: disable=unused-argument
         """Perform fuzzy name search"""
-        return await self.fetch_all(self.get_sql_query("fuzzy_label_sql"), {"q": name, "n": limit})
+        return await self.fetch_all(self.get_sql_query("fuzzy_find_sql"), {"q": name, "n": limit})
 
     async def fetch_by_alternate_identity(self, alternate_identity: str, **kwargs) -> list[dict[str, Any]]:  # pylint: disable=unused-argument
         """Fetch entity by alternate identity"""

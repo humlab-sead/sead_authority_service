@@ -17,7 +17,7 @@ SPECIFICATION: StrategySpecification = {
     # ],
     "property_settings": {},
     "sql_queries": {
-        "fuzzy_label_sql": """ select * from authority.fuzzy_locations(%(q)s, %(n)s, 1) """,
+        "fuzzy_find_sql": """ select * from authority.fuzzy_locations(%(q)s, %(n)s, 1) """,
         "details_sql": """
             select  location_id as "ID",
                     label as "Country",

@@ -66,7 +66,7 @@ class TestSiteQueryProxy:
 
         result: list[dict[str, Any]] = await proxy.find("test site", limit=5)
 
-        expected_sql: str = SQL_QUERIES["fuzzy_label_sql"]
+        expected_sql: str = SQL_QUERIES["fuzzy_find_sql"]
         test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"q": "test site", "n": 5})
         test_provider.cursor_mock.fetchall.assert_called_once()
         # Convert MockRow objects back to dicts for comparison
@@ -84,7 +84,7 @@ class TestSiteQueryProxy:
 
         result: list[dict[str, Any]] = await proxy.find("test site")
 
-        expected_sql: str = SQL_QUERIES["fuzzy_label_sql"]
+        expected_sql: str = SQL_QUERIES["fuzzy_find_sql"]
         test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"q": "test site", "n": 10})
         test_provider.cursor_mock.fetchall.assert_called_once()
         # Convert MockRow objects back to dicts for comparison

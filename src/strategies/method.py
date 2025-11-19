@@ -19,7 +19,7 @@ SPECIFICATION: StrategySpecification = {
     ],
     "property_settings": {},
     "sql_queries": {
-        "fuzzy_label_sql": """
+        "fuzzy_find_sql": """
         select * from authority.methods(%(q)s, %(n)s);
     """,
         "details_sql": """
