@@ -39,7 +39,7 @@
 ## Phase 3 — Hybrid Retrieval (DB layer)
 
 * [ ] Keep existing `authority.fuzzy_*` (trigram) functions.
-* [ ] Add semantic helper (e.g., `authority.semantic_methods(text, limit)`).
+* [ ] Add semantic helper (e.g., `authority.semantic_method(text, limit)`).
 * [ ] Add hybrid function (e.g., `authority.search_methods_hybrid(text, k_trgm, k_sem, k_final, language?, active_only?)`) to:
 
   * Retrieve K from fuzzy + K from semantic,

@@ -17,12 +17,12 @@ SPECIFICATION: StrategySpecification = {
     # ],
     "property_settings": {},
     "sql_queries": {
-        "fuzzy_find_sql": """ select * from authority.fuzzy_locations(%(q)s, %(n)s, 1) """,
+        "fuzzy_find_sql": """ select * from authority.fuzzy_location(%(q)s, %(n)s, 1) """,
         "details_sql": """
             select  location_id as "ID",
                     label as "Country",
                     description as "Description"
-            from authority.locations
+            from authority.location
             where location_id = %(id)s::int
     """,
     },

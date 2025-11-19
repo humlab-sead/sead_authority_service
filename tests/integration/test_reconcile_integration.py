@@ -99,7 +99,7 @@ class TestReconcileIntegration:
             nonlocal call_count
             call_count += 1
             if call_count == 2:  # Second query fails
-                raise psycopg.errors.UndefinedFunction("function authority.fuzzy_sites does not exist")
+                raise psycopg.errors.UndefinedFunction("function authority.fuzzy_site does not exist")
             # First and subsequent calls succeed (but in real scenario, subsequent would fail with transaction error)
         
         cursor_mock.execute.side_effect = execute_side_effect
@@ -175,7 +175,7 @@ class TestDatabaseQueryProxyTransactionHandling:
         
         # Make execute fail
         test_provider.cursor_mock.execute.side_effect = psycopg.errors.UndefinedFunction(
-            "function authority.fuzzy_sites does not exist"
+            "function authority.fuzzy_site does not exist"
         )
         
         # Track rollback calls
@@ -195,7 +195,7 @@ class TestDatabaseQueryProxyTransactionHandling:
         
         # Execute query that will fail
         with pytest.raises(psycopg.errors.UndefinedFunction):
-            await proxy.fetch_all("SELECT * FROM authority.fuzzy_sites(%(q)s, %(n)s)", {"q": "test", "n": 10})
+            await proxy.fetch_all("SELECT * FROM authority.fuzzy_site(%(q)s, %(n)s)", {"q": "test", "n": 10})
         
         # Verify rollback was called
         # Note: This will fail with current implementation, which is the bug
@@ -245,7 +245,7 @@ class TestSiteReconciliationStrategyErrorHandling:
         self, test_provider: ExtendedMockConfigProvider
     ):
         """Test that database errors in find_candidates are properly propagated."""
-        from src.strategies.site import SiteQueryProxy
+        from src.strategies.site import SiteRepository
 
         test_provider.create_connection_mock(execute=None)
         
@@ -257,7 +257,7 @@ class TestSiteReconciliationStrategyErrorHandling:
         strategy = SiteReconciliationStrategy()
         
         # Mock the proxy to use our test connection
-        mock_proxy = SiteQueryProxy(
+        mock_proxy = SiteRepository(
             strategy.specification, connection=test_provider.connection_mock
         )
         
@@ -321,7 +321,7 @@ class TestReconcileWithDebugger:
             elif call_count == 2:
                 # Second query fails with function error
                 raise psycopg.errors.UndefinedFunction(
-                    "function authority.fuzzy_sites(character varying, integer) does not exist"
+                    "function authority.fuzzy_site(character varying, integer) does not exist"
                 )
             else:
                 # Subsequent queries fail with transaction error
@@ -367,7 +367,7 @@ class TestReconcileWithDebugger:
 To manually test against a real database:
 
 1. Ensure your config/config.yml has correct database credentials
-2. Ensure the authority.fuzzy_sites() function exists in the database
+2. Ensure the authority.fuzzy_site() function exists in the database
 3. Run the manual test:
 
     pytest tests/test_reconcile_integration.py::TestManualDatabaseTesting -v -s --log-cli-level=INFO
@@ -378,11 +378,11 @@ To manually test against a real database:
     - Restore the function
 
 Example SQL to check the function:
-    SELECT * FROM authority.fuzzy_sites('Agunnaryd', 10);
+    SELECT * FROM authority.fuzzy_site('Agunnaryd', 10);
     
 Example SQL to break/fix the function:
-    ALTER FUNCTION authority.fuzzy_sites(text, int) RENAME TO fuzzy_sites_backup;
-    ALTER FUNCTION authority.fuzzy_sites_backup(text, int) RENAME TO fuzzy_sites;
+    ALTER FUNCTION authority.fuzzy_site(text, int) RENAME TO fuzzy_sites_backup;
+    ALTER FUNCTION authority.fuzzy_sites_backup(text, int) RENAME TO fuzzy_site;
 """
 
 
@@ -402,7 +402,7 @@ class TestManualDatabaseTesting:
         
         Requires:
         - Valid database configuration in config/config.yml
-        - authority.fuzzy_sites() function exists
+        - authority.fuzzy_site() function exists
         """
         # Load real configuration
         factory = ConfigFactory()

@@ -44,6 +44,20 @@ class QueryProxy(ABC):
     async def fetch_by_alternate_identity(self, alternate_identity: str, **kwargs) -> list[dict[str, Any]]:
         """Fetch entity by alternate identity"""
 
+    def get_sql_queries(self) -> dict[str, str]:
+        """Return the SQL queries defined in the specification"""
+        return self.specification.get("sql_queries", {})
+
+    def get_sql_query(self, key: str) -> str:
+        """Return the SQL query defined in the specification for a given key."""
+        return self.get_sql_queries().get(key, "")
+
+    def get_find_fuzzy_sql(self) -> str:
+        """Return the SQL query for fuzzy finding entities"""
+        sql: str = self.get_sql_queries().get("fuzzy_find_sql", "")
+        if not sql:
+            sql = "select * from authority.fuzzy_site(%(q)s, %(n)s);"
+        return sql
 
 class BaseRepository(QueryProxy):
     def __init__(self, specification: StrategySpecification, **kwargs) -> None:
@@ -82,15 +96,6 @@ class BaseRepository(QueryProxy):
             await cursor.execute(sql, params)  # type: ignore
             row: dict[str, Any] | None = await cursor.fetchone()
             return dict(row) if row else None
-
-    def get_sql_queries(self) -> dict[str, str]:
-        """Return the SQL queries defined in the specification"""
-        return self.specification.get("sql_queries", {})
-
-    def get_sql_query(self, key: str) -> str:
-        """Return the SQL query defined in the specification for a given key."""
-        return self.get_sql_queries().get(key, "")
-
     def get_details_sql(self) -> str:
         """Return the SQL query for fetching detailed information for a given entity ID."""
         return self.get_sql_query("details_sql")
@@ -105,7 +110,7 @@ class BaseRepository(QueryProxy):
 
     async def find(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:  # pylint: disable=unused-argument
         """Perform fuzzy name search"""
-        return await self.fetch_all(self.get_sql_query("fuzzy_find_sql"), {"q": name, "n": limit})
+        return await self.fetch_all(self.get_find_fuzzy_sql(), {"q": name, "n": limit})
 
     async def fetch_by_alternate_identity(self, alternate_identity: str, **kwargs) -> list[dict[str, Any]]:  # pylint: disable=unused-argument
         """Fetch entity by alternate identity"""

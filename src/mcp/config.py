@@ -66,7 +66,7 @@ class MCPConfig(BaseModel):
                 norm_column=None,
                 emb_column=None,
                 language_column=None,
-                fuzzy_function="authority.fuzzy_modification_types",
+                fuzzy_function="authority.fuzzy_modification_type",
                 hybrid_function=None,
             ),
             "sites": MCPTableConfig(
@@ -77,7 +77,7 @@ class MCPConfig(BaseModel):
                 norm_column=None,
                 emb_column=None,
                 language_column=None,
-                fuzzy_function="authority.fuzzy_sites",
+                fuzzy_function="authority.fuzzy_site",
                 hybrid_function=None,
             ),
         }

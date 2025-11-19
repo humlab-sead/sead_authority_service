@@ -13,7 +13,7 @@ SPECIFICATION: StrategySpecification = {
             select  location_id as "ID",
                     label as "Region",
                     description as "Description"
-            from authority.locations
+            from authority.location
             where location_id = %(id)s::int
     """,
     },

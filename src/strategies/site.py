@@ -53,9 +53,9 @@ SPECIFICATION: StrategySpecification = {
         where national_site_identifier = %(identifier)s
         limit 1
     """,
-        "fuzzy_find_sql": """
-        SELECT * FROM authority.fuzzy_site(%(q)s, %(n)s);
-    """,
+    #     "fuzzy_find_sql": """
+    #     SELECT * FROM authority.fuzzy_site(%(q)s, %(n)s);
+    # """,
         "fetch_site_distances": """
         select site_id, 
                ST_Distance(
@@ -98,7 +98,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class SiteQueryProxy(BaseRepository):
+class SiteRepository(BaseRepository):
 
     async def fetch_site_by_national_id(self, national_id: str) -> list[dict[str, Any]]:
         """Exact match by national site identifier"""
@@ -130,9 +130,9 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
     def __init__(self):
         self.entity_config: dict[str, Any] = ConfigValue("table_specs.site").resolve() or {}
 
-        super().__init__(SPECIFICATION, SiteQueryProxy)
+        super().__init__(SPECIFICATION, SiteRepository)
 
-    def get_proxy(self) -> SiteQueryProxy:  # type: ignore[override]
+    def get_proxy(self) -> SiteRepository:  # type: ignore[override]
         """Return the site-specific query proxy"""
         return super().get_proxy()  # type: ignore[return-value]
 

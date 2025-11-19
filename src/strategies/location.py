@@ -17,7 +17,7 @@ SPECIFICATION: StrategySpecification = {
     "property_settings": {},
     "sql_queries": {
         "fuzzy_find_sql": """
-        select * from authority.fuzzy_locations(%(q)s, %(n)s);
+        select * from authority.fuzzy_location(%(q)s, %(n)s);
     """,
         "details_sql": """
             select  location_id as "ID",
@@ -26,7 +26,7 @@ SPECIFICATION: StrategySpecification = {
                     longitude as "Longitude",
                     location_type as "Location Type",
                     description as "Description"
-            from authority.locations
+            from authority.location
             where location_id = %(id)s::int
     """,
     },

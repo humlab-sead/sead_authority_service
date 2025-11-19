@@ -96,12 +96,12 @@ pytest -m manual tests/test_reconcile_integration.py -v -s
 
 **Prerequisites:**
 - Valid database configuration in `config/config.yml`
-- Database function `authority.fuzzy_sites()` must exist
+- Database function `authority.fuzzy_site()` must exist
 
 **To simulate the error in production:**
 1. Temporarily rename the database function:
    ```sql
-   ALTER FUNCTION authority.fuzzy_sites(text, int) RENAME TO fuzzy_sites_backup;
+   ALTER FUNCTION authority.fuzzy_site(text, int) RENAME TO fuzzy_sites_backup;
    ```
 
 2. Run the manual test - you'll see the exact error from production

@@ -348,12 +348,12 @@ class TestMCPConfig:
             db_table="tbl_methods",
             id_column="method_id",
             label_column="method_name",
-            fuzzy_function="authority.fuzzy_methods",
+            fuzzy_function="authority.fuzzy_method",
         )
 
         assert config.table_key == "methods"
         assert config.db_table == "tbl_methods"
-        assert config.fuzzy_function == "authority.fuzzy_methods"
+        assert config.fuzzy_function == "authority.fuzzy_method"
 
     def test_mcp_retrieval_config(self):
         """Test MCPRetrievalConfig model"""
@@ -615,7 +615,7 @@ async def test_search_lookup_integration(test_provider):
 
     Requires:
     - PostgreSQL running
-    - authority.fuzzy_methods() function exists
+    - authority.fuzzy_method() function exists
     - Test data in tbl_methods
     """
     os.environ["CONFIG_FILE"] = "./config/config.yml"

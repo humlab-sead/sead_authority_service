@@ -53,7 +53,7 @@ SPECIFICATION: StrategySpecification = {
     """,
         "alternate_identity_sql": """
         select dimension_id, label, 1.0 as name_sim
-        from authority.dimensions
+        from authority.dimension
         where dimension_abbreviation = %(alternate_identity)s
         limit 1
     """,

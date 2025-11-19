@@ -22,7 +22,7 @@ SPECIFICATION: StrategySpecification = {
     "property_settings": {},
     "sql_queries": {
         "fuzzy_find_sql": """
-        select * from authority.fuzzy_bibliographic_references(%(q)s, %(n)s);
+        select * from authority.fuzzy_bibliographic_reference(%(q)s, %(n)s);
     """,
         "details_sql": """
             select  biblio_id as "ID",
@@ -66,14 +66,14 @@ SPECIFICATION: StrategySpecification = {
             """,
         "full_reference_fuzzy_word_similarity_sql": """
             select entity_id, biblio_id, label, name_sim
-            from authority.fuzzy_bibliographic_references(
+            from authority.fuzzy_bibliographic_reference(
               p_text => %s, p_limit => %s, p_target_field => 'full_reference',
               p_mode => 'word', p_threshold => %s
             )
             """,
         "authors_fuzzy_sql": """
             select entity_id, biblio_id, label, name_sim
-            from authority.fuzzy_bibliographic_references(
+            from authority.fuzzy_bibliographic_reference(
               p_text => %s, p_limit => %s, p_target_field => 'authors',
               p_mode => 'word', p_threshold => %s
             )
@@ -86,7 +86,7 @@ SPECIFICATION: StrategySpecification = {
         """,
         "full_reference_fuzzy_similarity_sql": """
             select entity_id, biblio_id, label, name_sim
-            from authority.fuzzy_bibliographic_references(
+            from authority.fuzzy_bibliographic_reference(
               p_text => %s, p_limit => %s, p_target_field => 'full_reference',
               p_mode => 'similarity', p_threshold => %s
             )
@@ -164,7 +164,7 @@ class BibliographicReferenceQueryProxy(BaseRepository):
     #     rows = await self.fetch_all(
     #         """
     #         SELECT entity_id, biblio_id, label, name_sim
-    #         FROM authority.fuzzy_bibliographic_references(
+    #         FROM authority.fuzzy_bibliographic_reference(
     #           p_text => %s, p_limit => %s, p_target_field => 'title',
     #           p_mode => 'word', p_threshold => %s
     #         )

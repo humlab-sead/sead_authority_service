@@ -37,7 +37,7 @@ SPECIFICATION: StrategySpecification = {
                    dt.definition as "Definition",
                    dtg.data_type_group_name as "Group",
                    dtg.description as "Group Description"
-            from authority.data_types dt
+            from authority.data_type dt
             join tbl_data_type_groups dtg using (data_type_group_id)
             where data_type_id = %(id)s::int
     """,

@@ -175,7 +175,7 @@ RETURNS TABLE (
    SELECT 'biblio', COUNT(*) FROM authority.bibliographic_reference_embeddings;
    
    -- Test semantic search
-   SELECT * FROM authority.semantic_sites(
+   SELECT * FROM authority.semantic_site(
      (SELECT emb FROM authority.site_embeddings LIMIT 1),
      10
    );
@@ -228,7 +228,7 @@ RETURNS TABLE (
 - [ ] Test semantic_* functions with sample embeddings
 - [ ] Test hybrid search with text + embeddings
 - [ ] Benchmark query performance (target <100ms p95)
-- [ ] Check index usage: `EXPLAIN ANALYZE SELECT * FROM authority.semantic_sites(...)`
+- [ ] Check index usage: `EXPLAIN ANALYZE SELECT * FROM authority.semantic_site(...)`
 
 ## Known Issues & Notes
 

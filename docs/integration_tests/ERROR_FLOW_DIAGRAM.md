@@ -219,18 +219,18 @@ Error Flow (With Fix):
 Request: Reconcile ["Agunnaryd", "Ala", "Stockholm"]
 
 Query 1: "Agunnaryd"
-  ✅ SELECT * FROM authority.fuzzy_sites('Agunnaryd', 10)
+  ✅ SELECT * FROM authority.fuzzy_site('Agunnaryd', 10)
   → Returns results
 
 Query 2: "Ala"  
-  ❌ SELECT * FROM authority.fuzzy_sites('Ala', 10)
+  ❌ SELECT * FROM authority.fuzzy_site('Ala', 10)
   → Function error (maybe doesn't exist or has bug)
   → Exception thrown
   → Transaction enters ERROR state
   → NO ROLLBACK
 
 Query 3: "Stockholm"
-  ❌ SELECT * FROM authority.fuzzy_sites('Stockholm', 10)
+  ❌ SELECT * FROM authority.fuzzy_site('Stockholm', 10)
   → PostgreSQL says: "Nope! Transaction is broken!"
   → Error: "current transaction is aborted"
   → User sees error in OpenRefine
@@ -242,11 +242,11 @@ Query 3: "Stockholm"
 Request: Reconcile ["Agunnaryd", "Ala", "Stockholm"]
 
 Query 1: "Agunnaryd"
-  ✅ SELECT * FROM authority.fuzzy_sites('Agunnaryd', 10)
+  ✅ SELECT * FROM authority.fuzzy_site('Agunnaryd', 10)
   → Returns results
 
 Query 2: "Ala"
-  ❌ SELECT * FROM authority.fuzzy_sites('Ala', 10)
+  ❌ SELECT * FROM authority.fuzzy_site('Ala', 10)
   → Function error
   → Exception caught
   → ROLLBACK executed ✅
@@ -254,7 +254,7 @@ Query 2: "Ala"
   → Error logged
 
 Query 3: "Stockholm"
-  ✅ SELECT * FROM authority.fuzzy_sites('Stockholm', 10)
+  ✅ SELECT * FROM authority.fuzzy_site('Stockholm', 10)
   → Works normally!
   → Returns results
   → User sees results for queries 1 and 3

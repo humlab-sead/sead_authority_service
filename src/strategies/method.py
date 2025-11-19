@@ -20,7 +20,7 @@ SPECIFICATION: StrategySpecification = {
     "property_settings": {},
     "sql_queries": {
         "fuzzy_find_sql": """
-        select * from authority.methods(%(q)s, %(n)s);
+        select * from authority.method(%(q)s, %(n)s);
     """,
         "details_sql": """
             select
@@ -36,7 +36,7 @@ SPECIFICATION: StrategySpecification = {
     """,
         "alternate_identity_sql": """
         select method_id, label, 1.0 as name_sim
-        from authority.methods
+        from authority.method
         where method_abbrev_or_alt_name = %(alternate_identity)s
         limit 1
     """,

@@ -14,7 +14,7 @@ from src.strategies.location import LocationQueryProxy
 from src.strategies.method import SPECIFICATION as METHOD_SPECIFICATION
 from src.strategies.method import MethodQueryProxy
 from src.strategies.site import SPECIFICATION as SITE_TYPE_SPECIFICATION
-from src.strategies.site import SiteQueryProxy
+from src.strategies.site import SiteRepository
 from strategies.query import BaseRepository
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
@@ -27,7 +27,7 @@ QUERY_PROXY_TESTS_SETUPS = [
     (LOCATION_SPECIFICATION, LocationQueryProxy),
     (COUNTRY_SPECIFICATION, LocationQueryProxy),
     (FEATURE_TYPE_SPECIFICATION, FeatureTypeQueryProxy),
-    (SITE_TYPE_SPECIFICATION, SiteQueryProxy),
+    (SITE_TYPE_SPECIFICATION, SiteRepository),
     (DATA_TYPE_SPECIFICATION, DataTypeQueryProxy),
     (DIMENSION_SPECIFICATION, DimensionQueryProxy),
     (METHOD_SPECIFICATION, MethodQueryProxy),
