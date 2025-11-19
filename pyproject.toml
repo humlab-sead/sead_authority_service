@@ -111,8 +111,11 @@ addopts = "-q -ra --strict-markers"
 testpaths = ["tests"]
 python_classes = "Test*"
 python_functions = "test_*"
+asyncio_mode = "auto"
 markers = [
-  "integration: marks tests that hit external services (e.g., Ollama, DB)"
+  "integration: marks tests that hit external services (e.g., Ollama, DB)",
+  "debug: marks tests for debugging purposes (typically run manually)",
+  "manual: marks tests requiring manual setup (e.g., real database)",
 ]
 # python_files = "test_*.py" "*_test.py"
 
