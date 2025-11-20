@@ -447,7 +447,6 @@ class TestSiteReconciliationStrategy:
         with patch.object(strategy, "get_proxy", return_value=mock_proxy):
             result = await strategy.get_details("123")
 
-        # The SiteRepository is called with the SPECIFICATION
         mock_proxy.get_details.assert_called_once_with("123")
         assert result == expected_details
 

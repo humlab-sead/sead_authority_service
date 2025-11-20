@@ -265,7 +265,7 @@ class TestFeatureTypeReconciliationStrategy:
         properties = strategy.get_properties_meta()
 
         assert isinstance(properties, list)
-        assert properties == []  # SPECIFICATION has empty properties list
+        assert properties == []
 
     @with_test_config
     def test_get_property_settings(self, test_provider: ExtendedMockConfigProvider):
@@ -274,7 +274,7 @@ class TestFeatureTypeReconciliationStrategy:
         settings = strategy.get_property_settings()
 
         assert isinstance(settings, dict)
-        assert settings == {}  # SPECIFICATION has empty property_settings
+        assert settings == {} 
 
     @with_test_config
     def test_key_property(self, test_provider: ExtendedMockConfigProvider):
