@@ -157,7 +157,7 @@ def env2dict(prefix: str, data: dict[str, str] | None = None, lower_key: bool = 
     return data
 
 
-def configure_logging(opts: dict[str, Any] | None=None) -> None:
+def configure_logging(opts: dict[str, Any] | None = None) -> None:
 
     logger.remove()
     logger.add(
@@ -274,3 +274,19 @@ def load_resource_yaml(key: str) -> dict[str, Any] | None:
 
     with open(resource_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+
+def resolve_specification(specification: dict[str, Any] | str| None) -> dict[str, Any]:
+    """Resolves a specification which can be either a dict or a resource key string."""
+    if isinstance(specification, dict):
+        return specification
+    if isinstance(specification, str):
+        return load_resource_yaml(specification)  # type: ignore
+    return {
+        "key": "unknown",
+        "id_field": "id",
+        "label_field": "name",
+        "properties": [],
+        "property_settings": {},
+        "sql_queries": {},
+    }
