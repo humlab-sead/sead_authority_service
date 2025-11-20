@@ -8,13 +8,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import psycopg
 import pytest
 
-from src.strategies.site import SPECIFICATION, SiteRepository, SiteReconciliationStrategy
+from src.strategies.site import SiteRepository, SiteReconciliationStrategy
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 
 # pylint: disable=attribute-defined-outside-init,protected-access, unused-argument
-
-SQL_QUERIES: dict[str, str] = SPECIFICATION["sql_queries"]
 
 
 class TestSiteQueryProxy:
@@ -30,12 +28,12 @@ class TestSiteQueryProxy:
         test_provider.create_connection_mock(fetchone=mock_row, execute=None)
         cursor_mock = test_provider.connection_mock.cursor.return_value.__aenter__.return_value
 
-        proxy = SiteRepository(SPECIFICATION, connection=test_provider.connection_mock)
+        proxy = SiteRepository("site", connection=test_provider.connection_mock)
 
         result: list[dict[str, Any]] = await proxy.fetch_site_by_national_id("TEST123")
 
         # Verify SQL execution
-        expected_sql: str = SQL_QUERIES["fetch_site_by_national_id"]
+        expected_sql: str = proxy.specification["sql_queries"]["fetch_site_by_national_id"].strip()
         cursor_mock.execute.assert_called_once_with(expected_sql, {"identifier": "TEST123"})
         cursor_mock.fetchone.assert_called_once()
 
@@ -47,7 +45,7 @@ class TestSiteQueryProxy:
         """Test fetching site by national ID when site doesn't exist."""
         test_provider.create_connection_mock(fetchone=None, execute=None)
 
-        proxy = SiteRepository(SPECIFICATION, connection=test_provider.connection_mock)
+        proxy = SiteRepository("site", connection=test_provider.connection_mock)
 
         result: list[dict[str, Any]] = await proxy.fetch_site_by_national_id("NONEXISTENT")
 
@@ -62,11 +60,11 @@ class TestSiteQueryProxy:
         mock_rows = [{"site_id": 1, "label": "Test Site 1", "name_sim": 0.9}, {"site_id": 2, "label": "Test Site 2", "name_sim": 0.8}]
         test_provider.create_connection_mock(fetchall=mock_rows, execute=None)
 
-        proxy = SiteRepository(SPECIFICATION, connection=test_provider.connection_mock)
+        proxy = SiteRepository("site", connection=test_provider.connection_mock)
 
         result: list[dict[str, Any]] = await proxy.find("test site", limit=5)
 
-        expected_sql: str = SQL_QUERIES["fuzzy_find_sql"]
+        expected_sql: str = proxy.specification["sql_queries"]["fuzzy_find_sql"].strip()
         test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"q": "test site", "n": 5})
         test_provider.cursor_mock.fetchall.assert_called_once()
         # Convert MockRow objects back to dicts for comparison
@@ -80,11 +78,11 @@ class TestSiteQueryProxy:
         mock_rows = []
         test_provider.create_connection_mock(fetchall=mock_rows, execute=None)
 
-        proxy = SiteRepository(SPECIFICATION, connection=test_provider.connection_mock)
+        proxy = SiteRepository("site", connection=test_provider.connection_mock)
 
         result: list[dict[str, Any]] = await proxy.find("test site")
 
-        expected_sql: str = SQL_QUERIES["fuzzy_find_sql"]
+        expected_sql: str = proxy.specification["sql_queries"]["fuzzy_find_sql"].strip()
         test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"q": "test site", "n": 10})
         test_provider.cursor_mock.fetchall.assert_called_once()
         # Convert MockRow objects back to dicts for comparison
@@ -98,7 +96,7 @@ class TestSiteQueryProxy:
         mock_rows = [{"site_id": 1, "distance_km": 1.2}, {"site_id": 2, "distance_km": 5.7}, {"site_id": 3, "distance_km": 12.3}]
         test_provider.create_connection_mock(fetchall=mock_rows, execute=None)
 
-        proxy = SiteRepository(SPECIFICATION, connection=test_provider.connection_mock)
+        proxy = SiteRepository("site", connection=test_provider.connection_mock)
         coordinate: dict[str, float] = {"lat": 59.3293, "lon": 18.0686}
         site_ids: list[int] = [1, 2, 3]
 
@@ -120,13 +118,13 @@ class TestSiteQueryProxy:
         """Test getting site details with valid ID."""
         test_provider.create_connection_mock(fetchall=None, execute=None)
 
-        proxy = SiteRepository(SPECIFICATION)
+        proxy = SiteRepository("site")
         mock_row = {"ID": 123, "Name": "Test Site", "Description": "A test site", "National ID": "TEST123", "Latitude": 59.3293, "Longitude": 18.0686}
         test_provider.cursor_mock.fetchone.return_value = mock_row
 
         result: dict[str, Any] | None = await proxy.get_details("123")
 
-        expected_sql: str = SQL_QUERIES["details_sql"]
+        expected_sql: str = proxy.specification["sql_queries"]["details_sql"].strip()
         test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"id": 123})
 
         assert result == mock_row
@@ -137,7 +135,7 @@ class TestSiteQueryProxy:
         """Test getting site details with invalid ID."""
         test_provider.create_connection_mock(fetchall=None, execute=None)
 
-        proxy = SiteRepository(SPECIFICATION)
+        proxy = SiteRepository("site")
         result: dict[str, Any] | None = await proxy.get_details("not_a_number")
         assert result is None
         test_provider.cursor_mock.execute.assert_not_called()
@@ -148,7 +146,7 @@ class TestSiteQueryProxy:
         """Test getting site details when site doesn't exist."""
         test_provider.create_connection_mock(fetchone=None, execute=None)
 
-        proxy = SiteRepository(SPECIFICATION, connection=test_provider.connection_mock)
+        proxy = SiteRepository("site", connection=test_provider.connection_mock)
 
         result: dict[str, Any] | None = await proxy.get_details("999")
 
@@ -161,7 +159,7 @@ class TestSiteQueryProxy:
         """Test getting site details when database error occurs."""
         test_provider.create_connection_mock(fetchall=None, execute=None)
 
-        proxy = SiteRepository(SPECIFICATION)
+        proxy = SiteRepository("site")
         test_provider.cursor_mock.execute.side_effect = psycopg.Error("Database error")
 
         result: dict[str, Any] | None = await proxy.get_details("123")
@@ -174,7 +172,7 @@ class TestSiteQueryProxy:
         """Test fetching site location similarity."""
         test_provider.create_connection_mock(fetchall=None, execute=None)
 
-        proxy = SiteRepository(SPECIFICATION)
+        proxy = SiteRepository("site")
         candidates: list[dict[str, Any]] = [{"site_id": 1, "label": "Site 1"}, {"site_id": 2, "label": "Site 2"}]
 
         mock_rows: list[dict[str, Any]] = [{"site_id": 1, "place_sim": 0.8}, {"site_id": 2, "place_sim": 0.6}]
@@ -182,7 +180,7 @@ class TestSiteQueryProxy:
 
         result = await proxy.fetch_site_location_similarity(candidates, "Stockholm")
 
-        expected_sql: str = SQL_QUERIES["fetch_site_location_similarity"]
+        expected_sql: str = proxy.specification["sql_queries"]["fetch_site_location_similarity"].strip()
         test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"place": "Stockholm", "site_ids": [1, 2]})
 
         expected_result: dict[int, float] = {1: 0.8, 2: 0.6}
