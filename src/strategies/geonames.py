@@ -1,5 +1,8 @@
 import math
+from pydoc import resolve
 from typing import Any, Literal
+
+from utility import resolve_specification
 
 from src.configuration.resolve import ConfigValue
 from src.geonames.proxy import GeoNamesProxy
@@ -48,9 +51,10 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 
     def __init__(self, specification: dict[str, str] | str | None = None) -> None:
+        specification = resolve_specification(specification=specification or self.key)
         strategy_options: dict[str, Any] = ConfigValue(f"policy.{self.key}.geonames.options").resolve() or {}
         proxy: QueryProxy = GeoNamesQueryProxy(specification, **strategy_options)  # type: ignore[arg-type]
-        super().__init__(proxy.specification, proxy)
+        super().__init__(specification, proxy)
 
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:
         """Convert Geonames data to OpenRefine candidate format"""
