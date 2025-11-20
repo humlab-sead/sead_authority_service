@@ -60,7 +60,7 @@ def get_trigram_config(entity: dict[str, Any]) -> dict[str, Any]:
     # All view-related settings now at entity level
     # Only where_clause might still be in embedding_config (rarely used)
     embedding_config = entity.get("embedding_config", {})
-    
+
     return {
         "materialized": entity.get("materialized", False),
         "extra_columns": entity.get("extra_columns", []),
@@ -182,7 +182,7 @@ def main(entities: str | None, generate_all: bool, force: bool, verbose: bool, c
 
     # Separate entities with and without embeddings
     entities_with_embeddings = filter_entities_with_embeddings(entities_config)
-    
+
     logger.info(f"Total entities: {len(entities_config)}")
     logger.info(f"Entities with embedding_config: {len(entities_with_embeddings)}")
 
@@ -197,7 +197,7 @@ def main(entities: str | None, generate_all: bool, force: bool, verbose: bool, c
         requested_entities = [e.strip() for e in entities.split(",")]
         trigram_entities = {}
         semantic_entities = {}
-        
+
         for entity_key in requested_entities:
             if entity_key not in entities_config:
                 logger.warning(f"Entity '{entity_key}' not found, skipping")

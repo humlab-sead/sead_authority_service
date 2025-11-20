@@ -1,7 +1,6 @@
 from typing import Any
 
 import pytest
-from utility import load_resource_yaml
 
 from src.strategies.data_type import DataTypeRepository
 from src.strategies.dimension import DimensionRepository
@@ -12,6 +11,7 @@ from src.strategies.site import SiteRepository
 from strategies.query import BaseRepository
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
+from utility import load_resource_yaml
 
 # pylint: disable=attribute-defined-outside-init,protected-access, unused-argument
 
@@ -25,6 +25,7 @@ QUERY_PROXY_TESTS_SETUPS = [
     ("method", MethodRepository),
 ]
 
+
 class TestMultipleQueryProxy:
     """Tests for common logic in various QueryProxy classes."""
 
@@ -35,9 +36,8 @@ class TestMultipleQueryProxy:
     @pytest.mark.asyncio
     @with_test_config
     async def test_fetch_by_fuzzy_search(self, specification, proxy_cls, test_provider: ExtendedMockConfigProvider):
-
         """Test fuzzy name search."""
-        
+
         proxy: BaseRepository = proxy_cls(specification)
 
         assert isinstance(proxy.specification, dict)

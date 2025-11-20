@@ -276,7 +276,7 @@ def load_resource_yaml(key: str) -> dict[str, Any] | None:
         return yaml.safe_load(f)
 
 
-def resolve_specification(specification: dict[str, Any] | str| None) -> dict[str, Any]:
+def resolve_specification(specification: dict[str, Any] | str | None) -> dict[str, Any]:
     """Resolves a specification which can be either a dict or a resource key string."""
     if isinstance(specification, dict):
         return specification

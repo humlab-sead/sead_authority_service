@@ -3,6 +3,7 @@ from typing import Any
 from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
+
 class FeatureTypeRepository(BaseRepository):
     def __init__(self, specification: StrategySpecification) -> None:  # pylint: disable=useless-parent-delegation
         super().__init__(specification)

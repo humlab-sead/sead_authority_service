@@ -2,14 +2,12 @@ import math
 from pydoc import resolve
 from typing import Any, Literal
 
-from utility import resolve_specification
-
 from src.configuration.resolve import ConfigValue
 from src.geonames.proxy import GeoNamesProxy
+from utility import resolve_specification
 
 from .query import QueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
-
 
 # pylint: disable=unused-argument, too-many-instance-attributes
 

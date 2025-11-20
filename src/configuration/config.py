@@ -182,7 +182,7 @@ class ConfigFactory:
             if isinstance(value, list):
                 return [_resolve(v, base_path) for v in value]
             if isinstance(value, str) and value.startswith("@include"):
-                sub_config_path: str = value[8:].lstrip(':').strip()  # Remove "@include:" prefix
+                sub_config_path: str = value[8:].lstrip(":").strip()  # Remove "@include:" prefix
                 if not Path(sub_config_path).is_absolute() and base_path is not None:
                     sub_config_path = str(base_path.parent / sub_config_path)
                 loaded_data = ConfigFactory().load(source=sub_config_path, context=context, env_filename=env_filename, env_prefix=env_prefix).data

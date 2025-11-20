@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import psycopg
 import pytest
 
-from src.strategies.site import SiteRepository, SiteReconciliationStrategy
+from src.strategies.site import SiteReconciliationStrategy, SiteRepository
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 

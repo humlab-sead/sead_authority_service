@@ -1,6 +1,7 @@
 from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
+
 class DimensionRepository(BaseRepository):
     """Dimension-specific query proxy"""
 

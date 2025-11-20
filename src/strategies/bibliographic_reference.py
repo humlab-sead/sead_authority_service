@@ -4,6 +4,7 @@ from typing import Any
 from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
+
 class BibliographicReferenceQueryProxy(BaseRepository):
 
     @staticmethod

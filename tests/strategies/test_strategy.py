@@ -3,7 +3,6 @@ from typing import Any, Type
 import pytest
 
 from src.strategies.strategy import ReconciliationStrategy, Strategies
-
 from strategies import strategy
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config

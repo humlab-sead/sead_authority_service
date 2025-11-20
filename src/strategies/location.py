@@ -1,6 +1,7 @@
 from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
+
 class LocationRepository(BaseRepository):
     """Location-specific query proxy"""
 

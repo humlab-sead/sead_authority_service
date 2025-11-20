@@ -27,9 +27,7 @@ class TestFeatureTypeReconciliationStrategy:
         assert strategy.get_display_name() == "Feature Types"
 
     @with_test_config
-    def test_initialization_with_custom_specification(
-        self, test_provider: ExtendedMockConfigProvider
-    ):
+    def test_initialization_with_custom_specification(self, test_provider: ExtendedMockConfigProvider):
         """Test strategy initialization with custom specification"""
         custom_spec = {
             "key": "custom_feature_type",
@@ -124,20 +122,12 @@ class TestFeatureTypeReconciliationStrategy:
 
     @with_test_config
     @pytest.mark.asyncio
-    async def test_find_candidates_sorting(
-        self, test_provider: ExtendedMockConfigProvider
-    ):
+    async def test_find_candidates_sorting(self, test_provider: ExtendedMockConfigProvider):
         """Test that candidates are sorted by similarity score"""
         mock_candidates = [
-            MockRow(
-                {"feature_type_id": 1, "label": "Low Match", "name_sim": 0.65}
-            ),
-            MockRow(
-                {"feature_type_id": 2, "label": "High Match", "name_sim": 0.95}
-            ),
-            MockRow(
-                {"feature_type_id": 3, "label": "Medium Match", "name_sim": 0.80}
-            ),
+            MockRow({"feature_type_id": 1, "label": "Low Match", "name_sim": 0.65}),
+            MockRow({"feature_type_id": 2, "label": "High Match", "name_sim": 0.95}),
+            MockRow({"feature_type_id": 3, "label": "Medium Match", "name_sim": 0.80}),
         ]
 
         test_provider.create_connection_mock(fetchall=mock_candidates)
@@ -155,10 +145,7 @@ class TestFeatureTypeReconciliationStrategy:
     @pytest.mark.asyncio
     async def test_find_candidates_limit(self, test_provider: ExtendedMockConfigProvider):
         """Test that candidate limit is respected"""
-        mock_candidates = [
-            MockRow({"feature_type_id": i, "label": f"Feature {i}", "name_sim": 0.9 - i * 0.1})
-            for i in range(1, 11)
-        ]
+        mock_candidates = [MockRow({"feature_type_id": i, "label": f"Feature {i}", "name_sim": 0.9 - i * 0.1}) for i in range(1, 11)]
 
         test_provider.create_connection_mock(fetchall=mock_candidates)
 
@@ -170,9 +157,7 @@ class TestFeatureTypeReconciliationStrategy:
 
     @with_test_config
     @pytest.mark.asyncio
-    async def test_find_candidates_empty_result(
-        self, test_provider: ExtendedMockConfigProvider
-    ):
+    async def test_find_candidates_empty_result(self, test_provider: ExtendedMockConfigProvider):
         """Test finding candidates when no matches exist"""
         test_provider.create_connection_mock(fetchall=[])
 
@@ -183,9 +168,7 @@ class TestFeatureTypeReconciliationStrategy:
 
     @with_test_config
     @pytest.mark.asyncio
-    async def test_find_candidates_with_properties(
-        self, test_provider: ExtendedMockConfigProvider
-    ):
+    async def test_find_candidates_with_properties(self, test_provider: ExtendedMockConfigProvider):
         """Test finding candidates with additional properties"""
         mock_candidates = [
             MockRow(
@@ -274,7 +257,7 @@ class TestFeatureTypeReconciliationStrategy:
         settings = strategy.get_property_settings()
 
         assert isinstance(settings, dict)
-        assert settings == {} 
+        assert settings == {}
 
     @with_test_config
     def test_key_property(self, test_provider: ExtendedMockConfigProvider):
@@ -297,9 +280,7 @@ class TestFeatureTypeReconciliationStrategy:
 
     @with_test_config
     @pytest.mark.asyncio
-    async def test_database_error_handling(
-        self, test_provider: ExtendedMockConfigProvider
-    ):
+    async def test_database_error_handling(self, test_provider: ExtendedMockConfigProvider):
         """Test handling of database errors during operations"""
         test_provider.create_connection_mock(fetchone=Exception("Database connection failed"))
 

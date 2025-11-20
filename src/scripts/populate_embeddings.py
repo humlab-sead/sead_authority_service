@@ -32,17 +32,17 @@ from pathlib import Path
 from typing import Any
 
 import click
-from configuration.interface import ConfigLike
-from configuration.provider import ConfigStore, get_config_provider
-from configuration.resolve import ConfigValue
 import ollama
 import psycopg
-from utility import configure_logging, create_db_uri
 import yaml
 from dotenv import load_dotenv
 from loguru import logger
 
+from configuration.interface import ConfigLike
+from configuration.provider import ConfigStore, get_config_provider
+from configuration.resolve import ConfigValue
 from src.configuration import setup_config_store
+from utility import configure_logging, create_db_uri
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -67,7 +67,7 @@ class EmbeddingPopulator:
 
     def load_entities(self) -> dict[str, Any]:
         """Load entity configuration from YAML."""
-        entities = get_config_provider().get_config().get('table_specs')
+        entities = get_config_provider().get_config().get("table_specs")
         return {k: v for k, v in entities.items() if v and v.get("embedding_config")}
 
     def construct_text_field(self, entity_config: dict[str, Any]) -> str:
@@ -84,9 +84,7 @@ class EmbeddingPopulator:
             return f"t.{label_column} || coalesce(' ' || t.{desc_column}, '')"
         return f"t.{label_column}"
 
-    def fetch_texts_to_embed(
-        self, conn: psycopg.Connection, entity_key: str, entity_config: dict[str, Any]
-    ) -> list[tuple[int, str]]:
+    def fetch_texts_to_embed(self, conn: psycopg.Connection, entity_key: str, entity_config: dict[str, Any]) -> list[tuple[int, str]]:
         """
         Fetch texts that need embeddings from the database.
 
@@ -97,11 +95,7 @@ class EmbeddingPopulator:
         text_expr: str = self.construct_text_field(entity_config)
         embeddings_table: str = f"authority.{entity_key}_embeddings"
 
-        where_clause: str = (
-            f"where not exists (select 1 from {embeddings_table} e where e.{id_column} = t.{id_column})"
-            if not self.force
-            else ""
-        )
+        where_clause: str = f"where not exists (select 1 from {embeddings_table} e where e.{id_column} = t.{id_column})" if not self.force else ""
 
         query: str = f"""
             select t.{id_column} as id, {text_expr} as text
@@ -210,9 +204,7 @@ class EmbeddingPopulator:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self.populate_entity, entity_key, entity_config)
 
-    async def populate_all_entities(
-        self, entities: dict[str, Any], workers: int = 4, target_entity: str | None = None
-    ) -> dict[str, int]:
+    async def populate_all_entities(self, entities: dict[str, Any], workers: int = 4, target_entity: str | None = None) -> dict[str, int]:
         """
         Populate embeddings for all entities (or single entity if specified).
 
@@ -256,8 +248,8 @@ def setup_config_store2(filename: str = "config.yml", force: bool = False) -> No
 
     cfg.update({"runtime:config_file": config_file})
 
-
     logger.info("Config Store initialized successfully.")
+
 
 @click.command()
 @click.argument("config_filename", type=str)
@@ -293,15 +285,12 @@ def main(
     # Configure logger
     logger.remove()
     logger.add(sys.stderr, level="INFO", format="<green>{time:HH:mm:ss}</green> | <level>{message}</level>")
-    
+
     populator = EmbeddingPopulator(db_url=db_url, ollama_host=ollama_host, batch_size=batch_size, force=force)
 
     entities: dict[str, Any] = populator.load_entities()
 
-    logger.info(
-        f"Starting embedding population: {len(entities)} entities, "
-        f"batch_size={batch_size}, force={force}, workers={workers}"
-    )
+    logger.info(f"Starting embedding population: {len(entities)} entities, " f"batch_size={batch_size}, force={force}, workers={workers}")
 
     # Run async population
     results: dict[str, int] = asyncio.run(populator.populate_all_entities(entities, workers=workers, target_entity=entity))
@@ -318,7 +307,8 @@ def main(
 if __name__ == "__main__":
     # main()
     from click.testing import CliRunner
+
     runner = CliRunner()
-    result = runner.invoke(main, ["--entity", "feature_type", '--force', '--batch-size', "1", 'config/config.yml'])
+    result = runner.invoke(main, ["--entity", "feature_type", "--force", "--batch-size", "1", "config/config.yml"])
 
     print(result.output)

@@ -1,6 +1,7 @@
 from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
+
 class DataTypeRepository(BaseRepository):
     """Data Type-specific query proxy"""
 

@@ -5,10 +5,10 @@ from typing import Any, Literal, Mapping, Sequence, Tuple, TypeAlias, Union
 import psycopg
 from loguru import logger
 from psycopg.rows import dict_row, tuple_row
-from utility import resolve_specification
 
 from src.configuration.resolve import ConfigValue
 from src.configuration.setup import get_connection
+from utility import resolve_specification
 
 from . import StrategySpecification
 
