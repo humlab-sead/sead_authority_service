@@ -3,99 +3,7 @@ from typing import Any
 from src.configuration import ConfigValue
 
 from .query import BaseRepository
-from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
-
-SPECIFICATION: StrategySpecification = {
-    "key": "site",
-    "display_name": "Sites",
-    "id_field": "site_id",
-    "label_field": "label",
-    "properties": [
-        {
-            "id": "latitude",
-            "name": "Latitude",
-            "type": "number",
-            "description": "Geographic latitude in decimal degrees (WGS84)",
-        },
-        {
-            "id": "longitude",
-            "name": "Longitude",
-            "type": "number",
-            "description": "Geographic longitude in decimal degrees (WGS84)",
-        },
-        {
-            "id": "country",
-            "name": "Country",
-            "type": "string",
-            "description": "Country name where the site is located",
-        },
-        {
-            "id": "national_id",
-            "name": "National Site ID",
-            "type": "string",
-            "description": "Official national site identifier or registration number",
-        },
-        {
-            "id": "place_name",
-            "name": "Place Name",
-            "type": "string",
-            "description": "Geographic place, locality, or administrative area name",
-        },
-    ],
-    "property_settings": {
-        "latitude": {"min": -90.0, "max": 90.0, "precision": 6},
-        "longitude": {"min": -180.0, "max": 180.0, "precision": 6},
-    },
-    "sql_queries": {
-        "fetch_site_by_national_id": """
-        select site_id, label, 1.0 as name_sim, latitude_dd as latitude, longitude_dd as longitude
-        from authority.site
-        where national_site_identifier = %(identifier)s
-        limit 1
-    """,
-        "fuzzy_find_sql": """
-        select * from authority.fuzzy_site(%(q)s, %(n)s);
-    """,
-        "fetch_site_distances": """
-        select site_id, 
-               ST_Distance(
-                   ST_Transform(ST_SetSRID(ST_MakePoint(longitude_dd, latitude_dd), 4326), 3857),
-                   ST_Transform(ST_SetSRID(ST_MakePoint(%(lon)s, %(lat)s), 4326), 3857)
-               ) / 1000.0 as distance_km
-        from authority.site
-        where site_id = ANY(%(site_ids)s) 
-          and latitude_dd is not null 
-          and longitude_dd is not null
-    """,
-        "fetch_site_location_similarity": """
-        select site_id, max(similarity(location_name, %(place)s)) as place_sim
-        from public.tbl_site_locations
-        join public.tbl_locations using(location_id)
-        where site_id = any(%(site_ids)s) 
-          and location_name is not null
-        group by site_id
-    """,
-        "details_sql": """
-            with locations as (
-                select site_id, string_agg(location_name, ', ') as place_names
-                from tbl_site_locations
-                join tbl_locations using (location_id)
-                group by site_id
-            )
-            select 
-                site_id as "ID", 
-                label as "Name", 
-                site_description as "Description", 
-                latitude_dd as "Latitude", 
-                longitude_dd as "Longitude",
-                national_site_identifier as "National ID",
-                place_names
-            from authority.site
-            left join locations using (site_id)
-        where site_id = %(id)s
-    """,
-    },
-}
+from .strategy import ReconciliationStrategy, Strategies
 
 
 class SiteRepository(BaseRepository):
@@ -127,10 +35,10 @@ class SiteRepository(BaseRepository):
 class SiteReconciliationStrategy(ReconciliationStrategy):
     """Site-specific reconciliation with place names and coordinates"""
 
-    def __init__(self):
+    def __init__(self, specification: dict[str, Any] | None = None) -> None:
         self.entity_config: dict[str, Any] = ConfigValue("table_specs.site").resolve() or {}
 
-        super().__init__(SPECIFICATION, SiteRepository)
+        super().__init__(specification, SiteRepository)
 
     def get_proxy(self) -> SiteRepository:  # type: ignore[override]
         """Return the site-specific query proxy"""

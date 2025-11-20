@@ -7,22 +7,13 @@ from src.geonames.proxy import GeoNamesProxy
 from .query import QueryProxy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
-SPECIFICATION: StrategySpecification = {
-    "key": "geonames",
-    "display_name": "GeoNames Places",
-    "id_field": "geoname_id",
-    "label_field": "label",
-    "properties": [],
-    "property_settings": {},
-    "sql_queries": {},
-}
 
 # pylint: disable=unused-argument, too-many-instance-attributes
 
 
 class GeoNamesQueryProxy(QueryProxy):
 
-    def __init__(self, specification: StrategySpecification, **kwargs) -> None:
+    def __init__(self, specification: StrategySpecification | str, **kwargs) -> None:
         super().__init__(specification, **kwargs)
         self.username: str | None = kwargs.get("username") or ConfigValue("geonames.username").resolve() or "demo"
         self.lang: str | None = kwargs.get("lang") or ConfigValue("geonames.lang").resolve() or "en"
@@ -56,11 +47,10 @@ class GeoNamesQueryProxy(QueryProxy):
 class GeoNamesReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 
-    def __init__(self, specification: dict[str, str] | None = None) -> None:
-        key = (specification or SPECIFICATION).get("key", "geonames")
-        strategy_options: dict[str, Any] = ConfigValue(f"policy.{key}.geonames.options").resolve() or {}
-        proxy: QueryProxy = GeoNamesQueryProxy(SPECIFICATION, **strategy_options)
-        super().__init__(specification or SPECIFICATION, proxy)
+    def __init__(self, specification: dict[str, str] | str | None = None) -> None:
+        strategy_options: dict[str, Any] = ConfigValue(f"policy.{self.key}.geonames.options").resolve() or {}
+        proxy: QueryProxy = GeoNamesQueryProxy(specification, **strategy_options)  # type: ignore[arg-type]
+        super().__init__(proxy.specification, proxy)
 
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:
         """Convert Geonames data to OpenRefine candidate format"""

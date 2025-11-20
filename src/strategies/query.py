@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
+from pydoc import resolve
 from typing import Any, Literal, Mapping, Sequence, Tuple, TypeAlias, Union
 
 import psycopg
 from loguru import logger
 from psycopg.rows import dict_row, tuple_row
+from utility import resolve_specification
 
 from src.configuration.resolve import ConfigValue
 from src.configuration.setup import get_connection
@@ -16,16 +18,9 @@ Params: TypeAlias = Union[Sequence[Any], Mapping[str, Any]]
 class QueryProxy(ABC):
     """Abstract base class for entity-specific query proxies"""
 
-    def __init__(self, specification: StrategySpecification, **kwargs) -> None:  # pylint: disable=unused-argument
-        self.specification: StrategySpecification = specification or {
-            "key": "unknown",
-            "id_field": "id",
-            "label_field": "name",
-            "properties": [],
-            "property_settings": {},
-            "sql_queries": {},
-        }
-        self.config: dict[str, Any] = ConfigValue("table_specs." + self.specification["key"]).resolve() or {}   
+    def __init__(self, specification: StrategySpecification | str, **kwargs) -> None:  # pylint: disable=unused-argument
+        self.specification: StrategySpecification = resolve_specification(specification)
+        self.config: dict[str, Any] = ConfigValue("table_specs." + self.specification["key"]).resolve() or {}
 
     @property
     def key(self) -> str:
@@ -59,8 +54,9 @@ class QueryProxy(ABC):
             sql = "select * from authority.fuzzy_site(%(q)s, %(n)s);"
         return sql
 
+
 class BaseRepository(QueryProxy):
-    def __init__(self, specification: StrategySpecification, **kwargs) -> None:
+    def __init__(self, specification: StrategySpecification | str, **kwargs) -> None:
         super().__init__(specification, **kwargs)
         self.connection: psycopg.AsyncConnection | None = kwargs.get("connection")
         self.row_factories: dict[str, Any] = {
@@ -96,6 +92,7 @@ class BaseRepository(QueryProxy):
             await cursor.execute(sql.strip(), params)  # type: ignore
             row: dict[str, Any] | None = await cursor.fetchone()
             return dict(row) if row else None
+
     def get_details_sql(self) -> str:
         """Return the SQL query for fetching detailed information for a given entity ID."""
         return self.get_sql_query("details_sql")
