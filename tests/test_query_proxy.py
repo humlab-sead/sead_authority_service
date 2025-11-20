@@ -11,7 +11,6 @@ from src.strategies.site import SiteRepository
 from strategies.query import BaseRepository
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
-from utility import load_resource_yaml
 
 # pylint: disable=attribute-defined-outside-init,protected-access, unused-argument
 

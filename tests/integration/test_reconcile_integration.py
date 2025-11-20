@@ -6,17 +6,19 @@ These tests are designed to debug database transaction issues by:
 2. Reproducing the transaction error scenario
 3. Providing debugging breakpoints and detailed logging
 """
-
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
+from configuration.config import Config
+from configuration.interface import ConfigLike
 import psycopg
 import pytest
 from loguru import logger
 
-from src.configuration import Config, ConfigFactory, get_config_provider
+from src.configuration import ConfigFactory, MockConfigProvider, set_config_provider
 from src.reconcile import reconcile_queries
-from src.strategies.site import SiteReconciliationStrategy
+from src.strategies.query import BaseRepository
+from src.strategies.site import SiteReconciliationStrategy, SiteRepository
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 
@@ -61,7 +63,7 @@ class TestReconcileIntegration:
         assert "result" in results["q1"]
         assert len(results["q1"]["result"]) == 1
 
-        logger.info(f"Test passed: Single query reconciliation successful")
+        logger.info("Test passed: Single query reconciliation successful")
 
     @pytest.mark.asyncio
     @with_test_config
@@ -92,7 +94,7 @@ class TestReconcileIntegration:
         cursor_mock = test_provider.cursor_mock
         call_count = 0
 
-        async def execute_side_effect(sql, params=None):
+        async def execute_side_effect(sql, params=None):  # pylint: disable=unused-argument
             nonlocal call_count
             call_count += 1
             if call_count == 2:  # Second query fails
@@ -162,7 +164,6 @@ class TestDatabaseQueryProxyTransactionHandling:
 
         This is the key test to verify the fix for the transaction error.
         """
-        from src.strategies.query import BaseRepository
 
         test_provider.create_connection_mock(execute=None)
 
@@ -195,7 +196,6 @@ class TestDatabaseQueryProxyTransactionHandling:
     @with_test_config
     async def test_fetch_one_with_error_and_rollback(self, test_provider: ExtendedMockConfigProvider):
         """Test that fetch_one properly handles errors and rolls back the transaction."""
-        from src.strategies.query import BaseRepository
 
         test_provider.create_connection_mock(execute=None)
 
@@ -228,7 +228,6 @@ class TestSiteReconciliationStrategyErrorHandling:
     @with_test_config
     async def test_find_candidates_database_error_propagation(self, test_provider: ExtendedMockConfigProvider):
         """Test that database errors in find_candidates are properly propagated."""
-        from src.strategies.site import SiteRepository
 
         test_provider.create_connection_mock(execute=None)
 
@@ -290,7 +289,7 @@ class TestReconcileWithDebugger:
         # Make the first query succeed, second fail
         call_count = 0
 
-        async def execute_side_effect(sql, params=None):
+        async def execute_side_effect(sql, params=None):  # pylint: disable=unused-argument
             nonlocal call_count
             call_count += 1
             logger.info(f"Execute call #{call_count}: {params}")
@@ -298,12 +297,11 @@ class TestReconcileWithDebugger:
             if call_count == 1:
                 # First query succeeds
                 return None
-            elif call_count == 2:
+            if call_count == 2:
                 # Second query fails with function error
                 raise psycopg.errors.UndefinedFunction("function authority.fuzzy_site(character varying, integer) does not exist")
-            else:
-                # Subsequent queries fail with transaction error
-                raise psycopg.errors.InFailedSqlTransaction("current transaction is aborted, commands ignored until end of transaction block")
+            # Subsequent queries fail with transaction error
+            raise psycopg.errors.InFailedSqlTransaction("current transaction is aborted, commands ignored until end of transaction block")
 
         test_provider.cursor_mock.execute.side_effect = execute_side_effect
 
@@ -339,27 +337,27 @@ class TestReconcileWithDebugger:
 # ============================================================================
 # MANUAL TESTING INSTRUCTIONS
 # ============================================================================
-"""
-To manually test against a real database:
+# """
+# To manually test against a real database:
 
-1. Ensure your config/config.yml has correct database credentials
-2. Ensure the authority.fuzzy_site() function exists in the database
-3. Run the manual test:
+# 1. Ensure your config/config.yml has correct database credentials
+# 2. Ensure the authority.fuzzy_site() function exists in the database
+# 3. Run the manual test:
 
-    pytest tests/test_reconcile_integration.py::TestManualDatabaseTesting -v -s --log-cli-level=INFO
+#     pytest tests/test_reconcile_integration.py::TestManualDatabaseTesting -v -s --log-cli-level=INFO
 
-4. If you want to test with a broken database function:
-    - Temporarily rename the function in the database
-    - Run the test to see the actual transaction error
-    - Restore the function
+# 4. If you want to test with a broken database function:
+#     - Temporarily rename the function in the database
+#     - Run the test to see the actual transaction error
+#     - Restore the function
 
-Example SQL to check the function:
-    SELECT * FROM authority.fuzzy_site('Agunnaryd', 10);
-    
-Example SQL to break/fix the function:
-    ALTER FUNCTION authority.fuzzy_site(text, int) RENAME TO fuzzy_sites_backup;
-    ALTER FUNCTION authority.fuzzy_sites_backup(text, int) RENAME TO fuzzy_site;
-"""
+# Example SQL to check the function:
+#     SELECT * FROM authority.fuzzy_site('Agunnaryd', 10);
+
+# Example SQL to break/fix the function:
+#     ALTER FUNCTION authority.fuzzy_site(text, int) RENAME TO fuzzy_sites_backup;
+#     ALTER FUNCTION authority.fuzzy_sites_backup(text, int) RENAME TO fuzzy_site;
+# """
 
 
 @pytest.mark.manual  # Skip in automated tests
@@ -383,10 +381,7 @@ class TestManualDatabaseTesting:
         """
         # Load real configuration
         factory = ConfigFactory()
-        config = factory.load(source="config/config.yml", context="default")
-
-        # Override config provider
-        from src.configuration import MockConfigProvider, set_config_provider
+        config: Config | ConfigLike = factory.load(source="config/config.yml", context="default")
 
         provider = MockConfigProvider(config)
         set_config_provider(provider)
@@ -395,7 +390,7 @@ class TestManualDatabaseTesting:
             queries = {"q1": {"query": "Agunnaryd", "type": "site", "limit": 3}}
 
             logger.info("Executing reconciliation against real database...")
-            results = await reconcile_queries(queries)
+            results: dict[str, Any] = await reconcile_queries(queries)
 
             logger.info(f"Results: {results}")
             assert "q1" in results
@@ -416,9 +411,7 @@ class TestManualDatabaseTesting:
         """
         # Load real configuration
         factory = ConfigFactory()
-        config = factory.load(source="config/config.yml", context="default")
-
-        from src.configuration import MockConfigProvider, set_config_provider
+        config: Config | ConfigLike = factory.load(source="config/config.yml", context="default")
 
         provider = MockConfigProvider(config)
         set_config_provider(provider)

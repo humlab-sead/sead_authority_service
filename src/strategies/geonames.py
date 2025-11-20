@@ -1,5 +1,4 @@
 import math
-from pydoc import resolve
 from typing import Any, Literal
 
 from src.configuration.resolve import ConfigValue

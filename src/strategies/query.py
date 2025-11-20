@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from pydoc import resolve
 from typing import Any, Literal, Mapping, Sequence, Tuple, TypeAlias, Union
 
 import psycopg
