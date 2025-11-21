@@ -9,12 +9,12 @@ class FeatureTypeRepository(BaseRepository):
         super().__init__(specification)
 
 
-@Strategies.register(key="feature_type")
+@Strategies.register(key="feature_type", repository_cls=FeatureTypeRepository)
 class FeatureTypeReconciliationStrategy(ReconciliationStrategy):
     """Feature-specific reconciliation with feature names and descriptions"""
-
+    
     def __init__(self, specification: StrategySpecification | None = None) -> None:
-        super().__init__(specification, FeatureTypeRepository)
+        super().__init__(specification)
 
     async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific site."""

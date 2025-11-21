@@ -239,6 +239,8 @@ class Registry:
                 fn_or_class = _ensure_key_property(fn_or_class)
 
             cls.items[key] = fn_or_class
+
+            fn_or_class = cls.registered_class_hook(fn_or_class, **args)
             return fn_or_class
 
         return decorator
@@ -247,6 +249,9 @@ class Registry:
     def is_registered(cls, key: str) -> bool:
         return key in cls.items
 
+    @classmethod
+    def registered_class_hook(cls, fn_or_class: Any, **args) -> Any:
+        return fn_or_class
 
 def create_db_uri(*, host: str, port: int | str, user: str, dbname: str) -> str:
     """

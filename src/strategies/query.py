@@ -14,7 +14,7 @@ from . import StrategySpecification
 Params: TypeAlias = Union[Sequence[Any], Mapping[str, Any]]
 
 
-class QueryProxy(ABC):
+class AbstractRepository(ABC):
     """Abstract base class for entity-specific query proxies"""
 
     def __init__(self, specification: StrategySpecification | str, **kwargs) -> None:  # pylint: disable=unused-argument
@@ -54,7 +54,8 @@ class QueryProxy(ABC):
         return sql
 
 
-class BaseRepository(QueryProxy):
+class BaseRepository(AbstractRepository):
+
     def __init__(self, specification: StrategySpecification | str, **kwargs) -> None:
         super().__init__(specification, **kwargs)
         self.connection: psycopg.AsyncConnection | None = kwargs.get("connection")

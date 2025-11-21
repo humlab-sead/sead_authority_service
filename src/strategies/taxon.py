@@ -1,4 +1,7 @@
 from typing import Any
+from unittest.mock import Base
+
+from strategies.query import BaseRepository
 
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
@@ -38,7 +41,8 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class TaxonQueryProxy:
+class TaxonRepository(BaseRepository):
+
     def __init__(self, specification: dict[str, str | dict[str, Any]]):
         self.specification: dict[str, str | dict[str, Any]] = specification
 
@@ -46,12 +50,12 @@ class TaxonQueryProxy:
     # e.g., async def fetch_by_name(self, name: str, limit: int) -> list[dict[str, Any]]: ...
 
 
-@Strategies.register(key="taxon")
+@Strategies.register(key="taxon", repository_cls=TaxonRepository)
 class TaxonReconciliationStrategy(ReconciliationStrategy):
     """Future taxon reconciliation strategy"""
-
+    
     def __init__(self):
-        super().__init__(SPECIFICATION, TaxonQueryProxy)  # type: ignore[arg-type]
+        super().__init__(SPECIFICATION)
 
     async def find_candidates(self, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         # Implement taxon-specific logic here

@@ -64,7 +64,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class ModificationTypeQueryProxy(BaseRepository):
+class ModificationTypeRepository(BaseRepository):
     """Modification type-specific query proxy"""
 
     async def get_lookup_data(self) -> list[dict[str, Any]]:
@@ -72,12 +72,12 @@ class ModificationTypeQueryProxy(BaseRepository):
         return await self.fetch_all(self.specification["sql_queries"]["get_lookup_data"])
 
 
-@Strategies.register(key="modification_type")
+@Strategies.register(key="modification_type", repository_cls=ModificationTypeRepository)
 class LLMModificationTypeReconciliationStrategy(LLMReconciliationStrategy):
     """LLM-powered modification type reconciliation strategy"""
 
     def __init__(self) -> None:
-        super().__init__(SPECIFICATION, ModificationTypeQueryProxy)
+        super().__init__(SPECIFICATION)
         logger.info("Initialized ModificationTypeReconciliationStrategy with LLM support")
 
     def get_context_description(self) -> str:
@@ -89,7 +89,7 @@ class LLMModificationTypeReconciliationStrategy(LLMReconciliationStrategy):
 
     async def get_lookup_data(self) -> list[dict[str, Any]]:
         """Fetch modification type lookup data"""
-        proxy = ModificationTypeQueryProxy(self.specification)
+        proxy = ModificationTypeRepository(self.specification)
         return await proxy.get_lookup_data()
 
     async def find_candidates(

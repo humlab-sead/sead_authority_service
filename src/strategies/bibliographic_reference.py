@@ -5,7 +5,7 @@ from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 
-class BibliographicReferenceQueryProxy(BaseRepository):
+class BibliographicReferenceRepository(BaseRepository):
 
     @staticmethod
     def _norm_isbn(isbn: str | None) -> str | None:
@@ -98,12 +98,12 @@ class BibliographicReferenceQueryProxy(BaseRepository):
         return [r | {"name_sim": min(0.7, float(r["name_sim"]))} for r in rows]
 
 
-@Strategies.register(key="bibliographic_reference")
+@Strategies.register(key="bibliographic_reference", repository_cls=BibliographicReferenceRepository)
 class BibliographicReferenceReconciliationStrategy(ReconciliationStrategy):
     """Reconcile bibliographic references using exact identifiers and fuzzy text."""
 
     def __init__(self, specification: StrategySpecification | None = None) -> None:
-        super().__init__(specification, BibliographicReferenceQueryProxy)
+        super().__init__(specification)
 
     @staticmethod
     def _as_openrefine_candidate(row: dict) -> dict:
@@ -136,7 +136,7 @@ class BibliographicReferenceReconciliationStrategy(ReconciliationStrategy):
     ) -> list[dict]:
         props = properties or {}
         candidates: list[dict] = []
-        proxy: BibliographicReferenceQueryProxy = self.get_proxy()  # type: ignore
+        proxy: BibliographicReferenceRepository = self.get_proxy()  # type: ignore
         # 1) High-confidence exact identifiers
         if props.get("isbn"):
             candidates.extend(await proxy.fetch_by_isbn(str(props["isbn"])))

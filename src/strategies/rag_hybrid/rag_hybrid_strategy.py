@@ -15,7 +15,7 @@ from loguru import logger
 
 from src.configuration import ConfigValue, get_connection
 from src.mcp import SEADMCPServer, SearchLookupParams
-from src.strategies.query import QueryProxy
+from src.strategies.query import BaseRepository
 from src.strategies.strategy import ReconciliationStrategy, StrategySpecification
 
 
@@ -28,8 +28,8 @@ class RAGHybridReconciliationStrategy(ReconciliationStrategy):
     Phase 4: Optional cross-encoder reranking
     """
 
-    def __init__(self, specification: StrategySpecification, query_proxy_class: type[QueryProxy]):
-        super().__init__(specification, query_proxy_class)
+    def __init__(self, specification: StrategySpecification, repository_or_cls: type[BaseRepository] | BaseRepository) -> None:
+        super().__init__(specification, repository_or_cls)
 
         # Feature flag to enable MCP
         self.use_mcp = ConfigValue("features.use_mcp_server", default=False).resolve()
@@ -121,4 +121,4 @@ class RAGHybridReconciliationStrategy(ReconciliationStrategy):
 # @Strategies.register(key="methods")
 # class MethodsReconciliationStrategy(RAGHybridReconciliationStrategy):
 #     def __init__(self):
-#         super().__init__(METHODS_SPECIFICATION, MethodsQueryProxy)
+#         super().__init__(METHODS_SPECIFICATION, MethodsRepository)

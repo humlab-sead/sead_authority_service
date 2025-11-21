@@ -6,9 +6,10 @@ class DimensionRepository(BaseRepository):
     """Dimension-specific query proxy"""
 
 
-@Strategies.register(key="dimension")
+@Strategies.register(key="dimension", repository_cls=DimensionRepository)
 class DimensionReconciliationStrategy(ReconciliationStrategy):
     """Dimension-specific reconciliation with place names and coordinates"""
-
+    
+    
     def __init__(self, specification: StrategySpecification | str | None = None) -> None:
-        super().__init__(specification, DimensionRepository)
+        super().__init__(specification)

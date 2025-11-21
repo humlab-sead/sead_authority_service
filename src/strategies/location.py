@@ -6,9 +6,8 @@ class LocationRepository(BaseRepository):
     """Location-specific query proxy"""
 
 
-@Strategies.register(key="location")
+@Strategies.register(key="location", repository_cls=LocationRepository)
 class LocationReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
-
     def __init__(self, specification: StrategySpecification | None = None) -> None:
-        super().__init__(specification, LocationRepository)
+        super().__init__(specification)

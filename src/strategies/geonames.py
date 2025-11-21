@@ -5,13 +5,13 @@ from src.configuration.resolve import ConfigValue
 from src.geonames.proxy import GeoNamesProxy
 from utility import resolve_specification
 
-from .query import QueryProxy
+from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 # pylint: disable=unused-argument, too-many-instance-attributes
 
 
-class GeoNamesQueryProxy(QueryProxy):
+class GeoNamesRepository(BaseRepository):
 
     def __init__(self, specification: StrategySpecification | str, **kwargs) -> None:
         super().__init__(specification, **kwargs)
@@ -43,14 +43,14 @@ class GeoNamesQueryProxy(QueryProxy):
         raise NotImplementedError("Alternate identity lookup not implemented for GeoNames")
 
 
-@Strategies.register(key="geonames")
+@Strategies.register(key="geonames", repository_cls=GeoNamesRepository)
 class GeoNamesReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 
     def __init__(self, specification: dict[str, str] | str | None = None) -> None:
         specification = resolve_specification(specification=specification or self.key)
         strategy_options: dict[str, Any] = ConfigValue(f"policy.{self.key}.geonames.options").resolve() or {}
-        proxy: QueryProxy = GeoNamesQueryProxy(specification, **strategy_options)  # type: ignore[arg-type]
+        proxy: BaseRepository = self.repository_cls(specification, **strategy_options)  # type: ignore[arg-type]
         super().__init__(specification, proxy)
 
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:

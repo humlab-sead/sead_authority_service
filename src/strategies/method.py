@@ -19,15 +19,15 @@ class MethodRepository(BaseRepository):
     """Method-specific query proxy"""
 
 
-@Strategies.register(key="method")
+@Strategies.register(key="method", repository_cls=MethodRepository)
 class MethodReconciliationStrategy(ReconciliationStrategy):
     """Method-specific reconciliation with place names and coordinates"""
-
     def __init__(self) -> None:
-        super().__init__(None, MethodRepository)
+        super().__init__(None)
 
 
-@Strategies.register(key="rag_methods")
+@Strategies.register(key="rag_methods", repository_cls=MethodRepository)
 class RAGMethodsReconciliationStrategy(RAGHybridReconciliationStrategy):
+
     def __init__(self):
-        super().__init__(RAG_SPECIFICATION, MethodRepository)
+        super().__init__(RAG_SPECIFICATION, self.repository_cls)

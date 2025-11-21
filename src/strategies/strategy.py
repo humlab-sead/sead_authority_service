@@ -1,38 +1,40 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Any
 
 from src.configuration import ConfigValue
-from src.utility import Registry, resolve_specification
+from src.utility import Registry, _ensure_key_property, resolve_specification
 
 from . import StrategySpecification
-from .query import QueryProxy
+from .query import BaseRepository
 
 
 class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
-    def __init__(self, specification: StrategySpecification | str | None = None, proxy_or_cls: type[QueryProxy] | QueryProxy | None = None) -> None:
+    repository_cls: type[BaseRepository] = BaseRepository
+    
+    def __init__(self, specification: StrategySpecification | str | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None) -> None:
 
         self.specification: StrategySpecification = resolve_specification(specification or self.key)
         self.entity_config: dict[str, Any] = ConfigValue(f"table_specs.{self.key}").resolve() or {}
-        self._proxy_or_cls: type[QueryProxy] | QueryProxy | None = proxy_or_cls
-        self._proxy: QueryProxy | None = None
+        self.repository_instance_or_cls: type[BaseRepository] | BaseRepository | None = repository_or_cls or self.repository_cls
+        self.repository: BaseRepository | None = None
 
     @property
     def key(self) -> str:
         """Return the unique key for this strategy, if registered, else 'unknown'"""
         return getattr(self, "_registry_key", "unknown")
 
-    def get_proxy(self) -> QueryProxy:
+    def get_proxy(self) -> BaseRepository:
         """Return an instance of the query proxy for this strategy"""
-        if not self._proxy:
-            if isinstance(self._proxy_or_cls, QueryProxy):
-                self._proxy = self._proxy_or_cls
-            elif self._proxy_or_cls is not None:
-                self._proxy = self._proxy_or_cls(self.specification)
+        if not self.repository:
+            if isinstance(self.repository_instance_or_cls, BaseRepository):
+                self.repository = self.repository_instance_or_cls
+            elif self.repository_instance_or_cls is not None:
+                self.repository = self.repository_instance_or_cls(self.specification)
             else:
                 raise ValueError(f"No proxy configured for strategy {self.key}")
-        return self._proxy
+        return self.repository
 
     def get_entity_id_field(self) -> str:
         """Return the ID field name for this entity type"""
@@ -116,5 +118,12 @@ class StrategyRegistry(Registry):
 
     items: dict[str, type[ReconciliationStrategy]] = {}
 
-
+    @classmethod
+    def registered_class_hook(cls, fn_or_class: Any, **args) -> Any:
+        if args.get("type") != "function":
+            if args.get("repository_cls"):
+                if not hasattr(fn_or_class, "repository_cls"):
+                    setattr(fn_or_class, "repository_cls", staticmethod(args["repository_cls"]))    
+        return fn_or_class
+    
 Strategies: StrategyRegistry = StrategyRegistry()
