@@ -102,8 +102,8 @@ class BibliographicReferenceRepository(BaseRepository):
 class BibliographicReferenceReconciliationStrategy(ReconciliationStrategy):
     """Reconcile bibliographic references using exact identifiers and fuzzy text."""
 
-    def __init__(self, specification: StrategySpecification | None = None) -> None:
-        super().__init__(specification)
+    def __init__(self, specification: StrategySpecification | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None) -> None:
+        super().__init__(specification, repository_or_cls=repository_or_cls)
 
     @staticmethod
     def _as_openrefine_candidate(row: dict) -> dict:

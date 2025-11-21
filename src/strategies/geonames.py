@@ -47,10 +47,10 @@ class GeoNamesRepository(BaseRepository):
 class GeoNamesReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 
-    def __init__(self, specification: dict[str, str] | str | None = None) -> None:
+    def __init__(self, specification: dict[str, str] | str | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None) -> None:
         specification = resolve_specification(specification=specification or self.key)
         strategy_options: dict[str, Any] = ConfigValue(f"policy.{self.key}.geonames.options").resolve() or {}
-        proxy: BaseRepository = self.repository_cls(specification, **strategy_options)  # type: ignore[arg-type]
+        proxy: BaseRepository = (repository_or_cls or self.repository_cls)(specification, **strategy_options)  # type: ignore[arg-type]
         super().__init__(specification, proxy)
 
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:
