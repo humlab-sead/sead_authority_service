@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Any, Type
+from typing import Any
 
 from src.configuration import ConfigValue
 from src.utility import Registry, resolve_specification
@@ -11,11 +11,11 @@ from .query import QueryProxy
 class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
-    def __init__(self, specification: StrategySpecification | str | None = None, proxy_or_cls: Type[QueryProxy] | QueryProxy | None = None) -> None:
+    def __init__(self, specification: StrategySpecification | str | None = None, proxy_or_cls: type[QueryProxy] | QueryProxy | None = None) -> None:
 
         self.specification: StrategySpecification = resolve_specification(specification or self.key)
         self.entity_config: dict[str, Any] = ConfigValue(f"table_specs.{self.key}").resolve() or {}
-        self._proxy_or_cls: Type[QueryProxy] | QueryProxy | None = proxy_or_cls
+        self._proxy_or_cls: type[QueryProxy] | QueryProxy | None = proxy_or_cls
         self._proxy: QueryProxy | None = None
 
     @property
@@ -114,7 +114,7 @@ class ReconciliationStrategy(ABC):
 
 class StrategyRegistry(Registry):
 
-    items: dict[str, Type[ReconciliationStrategy]] = {}
+    items: dict[str, type[ReconciliationStrategy]] = {}
 
 
 Strategies: StrategyRegistry = StrategyRegistry()
