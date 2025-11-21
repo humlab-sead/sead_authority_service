@@ -48,7 +48,9 @@ class ReconciliationStrategy(ABC):
 
     def get_display_name(self) -> str:
         """Return human-readable display name for this entity type"""
-        return self.specification.get("display_name", self.get_id_path().replace("_", " ").title())
+        if "display_name" in self.specification:
+            return self.specification["display_name"]
+        return self.key.replace("_", " ").title()
 
     def get_properties_meta(self) -> list[dict[str, str]]:
         """Return metadata for entity-specific properties used in enhanced reconciliation"""
