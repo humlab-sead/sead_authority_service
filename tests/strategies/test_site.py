@@ -15,7 +15,7 @@ from tests.decorators import with_test_config
 # pylint: disable=attribute-defined-outside-init,protected-access, unused-argument
 
 
-class TestSiteQueryProxy:
+class TestSiteRepository:
     """Tests for SiteRepository class."""
 
     @pytest.mark.asyncio

@@ -153,8 +153,8 @@ class TestReconcileIntegration:
         logger.info(f"Rollback called: {rollback_called}")
 
 
-class TestDatabaseQueryProxyTransactionHandling:
-    """Tests specifically for DatabaseQueryProxy transaction handling"""
+class TestDatabaseRepositoryTransactionHandling:
+    """Tests specifically for DatabaseRepository transaction handling"""
 
     @pytest.mark.skip(reason="Demonstration of expected rollback behavior - not implemented yet")
     @pytest.mark.asyncio
@@ -257,8 +257,8 @@ class TestReconcileWithDebugger:
 
     To use this test:
     1. Set breakpoints in:
-       - src/strategies/query.py::DatabaseQueryProxy.fetch_all (line with cursor.execute)
-       - src/strategies/query.py::DatabaseQueryProxy.fetch_all (in the except block)
+       - src/strategies/query.py::DatabaseRepository.fetch_all (line with cursor.execute)
+       - src/strategies/query.py::DatabaseRepository.fetch_all (in the except block)
        - src/reconcile.py::reconcile_queries (where strategy.find_candidates is called)
 
     2. Run this test in debug mode:
@@ -280,7 +280,7 @@ class TestReconcileWithDebugger:
 
         SET BREAKPOINTS HERE:
         - Before reconcile_queries call
-        - In DatabaseQueryProxy.fetch_all before cursor.execute
+        - In DatabaseRepository.fetch_all before cursor.execute
         - In the exception handler
         """
         # Simulate the exact scenario from the error log

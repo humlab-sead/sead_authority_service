@@ -1,6 +1,11 @@
 from typing import Any, Type
+from unittest import mock
+from unittest.mock import AsyncMock, patch
 
+from configuration.provider import MockConfigProvider
+import psycopg
 import pytest
+from strategies.query import AbstractRepository
 
 from src.strategies.strategy import ReconciliationStrategy, Strategies
 from strategies import strategy
@@ -13,21 +18,21 @@ from tests.decorators import with_test_config
 class TestMultipleReconciliationStrategy:
 
     @pytest.mark.parametrize(
-        "strategy_class",
+        "strategy_cls",
         [strategy_cls for strategy_cls in Strategies.items.values()],
     )
     @pytest.mark.asyncio
     @with_test_config
     async def test_reconciliation_strategy(
         self,
-        strategy_class: Type[ReconciliationStrategy],
+        strategy_cls: Type[ReconciliationStrategy],
         test_provider: ExtendedMockConfigProvider,
     ) -> None:
         """Test reconciliation strategy."""
 
-        strategy = strategy_class()
+        strategy = strategy_cls()
 
-        if strategy_class.__name__.split(".")[-1] in [
+        if strategy_cls.__name__.split(".")[-1] in [
             "GeoNamesReconciliationStrategy",
             "BibliographicReferenceReconciliationStrategy",
             "RAGMethodsReconciliationStrategy",
@@ -54,3 +59,91 @@ class TestMultipleReconciliationStrategy:
         test_provider.connection_mock.cursor_instance.execute.assert_called()
         test_provider.connection_mock.cursor_instance.fetchall.assert_called()
         assert result == mock_rows
+
+    @pytest.mark.parametrize(
+        "strategy_cls",
+        [strategy_cls for strategy_cls in Strategies.items.values()],
+    )
+    @with_test_config
+    def test_get_entity_id_field(self, strategy_cls, test_provider: MockConfigProvider):
+        """Test getting entity ID field name."""
+        strategy: ReconciliationStrategy = strategy_cls()
+        assert strategy.get_entity_id_field() == strategy.specification["id_field"]
+
+    # @pytest.mark.parametrize(
+    #     "strategy_cls",
+    #     [strategy_cls for strategy_cls in Strategies.items.values()],
+    # )
+    # @with_test_config
+    # def test_get_label_field(self, strategy_cls, test_provider: MockConfigProvider):
+    #     """Test getting label field name."""
+    #     strategy: ReconciliationStrategy = strategy_cls()
+    #     assert strategy.get_label_field() == "label"
+
+    # @pytest.mark.parametrize(
+    #     "strategy_cls",
+    #     [strategy_cls for strategy_cls in Strategies.items.values()],
+    # )
+    # @with_test_config
+    # def test_get_id_path(self, strategy_cls, test_provider: MockConfigProvider):
+    #     """Test getting ID path."""
+    #     strategy: ReconciliationStrategy = strategy_cls()
+    #     assert strategy.specification.get("key", "unknown") == strategy.key
+
+    @pytest.mark.parametrize(
+        "strategy_cls",
+        [strategy_cls for strategy_cls in Strategies.items.values()],
+    )
+    @with_test_config
+    def test_get_property_settings(self, strategy_cls, test_provider: MockConfigProvider):
+        """Test get_property_settings method returns location-specific settings."""
+        strategy = strategy_cls()
+        settings = strategy.get_property_settings()
+
+        assert isinstance(settings, dict)
+
+    # @patch("src.strategies.location.LocationRepository")
+    # @pytest.mark.parametrize(
+    #     "strategy_cls",
+    #     [strategy_cls for strategy_cls in Strategies.items.values()],
+    # )
+    # @pytest.mark.asyncio
+    # @with_test_config
+    # async def test_find_candidates_by_fuzzy_search(self, mock_query_proxy_class, strategy_cls, test_provider: MockConfigProvider):
+    #     """Test finding candidates by fuzzy search when no national ID."""
+    #     strategy: ReconciliationStrategy = strategy_cls()
+    #     mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
+    #     mock_proxy = AsyncMock()
+    #     mock_query_proxy_class.return_value = mock_proxy
+
+    #     mock_proxy.fetch_location_by_national_id.return_value = []
+    #     mock_locations: list[dict[str, Any]] = [
+    #         {"location_id": 1, "label": "Test Location", "name_sim": 0.9},
+    #         {"location_id": 2, "label": "Another Location", "name_sim": 0.7},
+    #     ]
+    #     mock_proxy.find.return_value = mock_locations
+
+    #     result = await strategy.find_candidates(mock_cursor, "test location", {}, limit=5)
+
+    #     mock_proxy.find.assert_called_once_with("test location", 5)
+    #     # Results should be sorted by name_sim in descending order
+    #     assert result[0]["name_sim"] >= result[1]["name_sim"]
+
+    # @pytest.mark.asyncio
+    # @pytest.mark.parametrize(
+    #     "strategy_cls",
+    #     [strategy_cls for strategy_cls in Strategies.items.values()],
+    # )
+    # @patch("src.strategies.location.LocationRepository")
+    # @with_test_config
+    # async def test_get_details(self, mock_query_proxy_class, strategy_cls, test_provider: ExtendedMockConfigProvider):
+    #     """Test getting site details."""
+
+    #     strategy: ReconciliationStrategy = strategy_cls()
+    #     mock_rows = [{"ID": 123, "Name": "Test Site", "Description": "A test site"}]
+    #     test_provider.create_connection_mock(fetchall=mock_rows, execute=None)
+
+    #     result = await strategy.get_details("123")
+
+    #     test_provider.connection_mock.egy.get_details.assert_called_once_with("123")
+    #     assert result == mock_rows

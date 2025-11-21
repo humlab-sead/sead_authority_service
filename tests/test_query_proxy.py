@@ -25,8 +25,8 @@ QUERY_PROXY_TESTS_SETUPS = [
 ]
 
 
-class TestMultipleQueryProxy:
-    """Tests for common logic in various QueryProxy classes."""
+class TestMultipleRepository:
+    """Tests for common logic in various Repository classes."""
 
     @pytest.mark.parametrize(
         "specification, proxy_cls",
