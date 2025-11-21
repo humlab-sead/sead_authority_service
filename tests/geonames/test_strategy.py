@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.configuration import MockConfigProvider
-from src.strategies.geonames import GeoNamesRepository, GeoNamesReconciliationStrategy
+from src.strategies.geonames import GeoNamesReconciliationStrategy, GeoNamesRepository
 from tests.decorators import with_test_config
 
 # pylint: disable=unused-argument, protected-access

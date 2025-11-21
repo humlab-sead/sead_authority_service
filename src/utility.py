@@ -253,6 +253,7 @@ class Registry:
     def registered_class_hook(cls, fn_or_class: Any, **args) -> Any:
         return fn_or_class
 
+
 def create_db_uri(*, host: str, port: int | str, user: str, dbname: str) -> str:
     """
     Builds database URI from the individual config elements.

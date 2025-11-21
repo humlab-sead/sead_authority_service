@@ -12,8 +12,10 @@ class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
     repository_cls: type[BaseRepository] = BaseRepository
-    
-    def __init__(self, specification: StrategySpecification | str | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None) -> None:
+
+    def __init__(
+        self, specification: StrategySpecification | str | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None
+    ) -> None:
 
         self.specification: StrategySpecification = resolve_specification(specification or self.key)
         self.entity_config: dict[str, Any] = ConfigValue(f"table_specs.{self.key}").resolve() or {}
@@ -123,7 +125,8 @@ class StrategyRegistry(Registry):
         if args.get("type") != "function":
             if args.get("repository_cls"):
                 if hasattr(fn_or_class, "repository_cls"):
-                    setattr(fn_or_class, "repository_cls", staticmethod(args["repository_cls"]))    
+                    setattr(fn_or_class, "repository_cls", staticmethod(args["repository_cls"]))
         return fn_or_class
-    
+
+
 Strategies: StrategyRegistry = StrategyRegistry()

@@ -53,7 +53,7 @@ class TaxonRepository(BaseRepository):
 @Strategies.register(key="taxon", repository_cls=TaxonRepository)
 class TaxonReconciliationStrategy(ReconciliationStrategy):
     """Future taxon reconciliation strategy"""
-    
+
     def __init__(self):
         super().__init__(SPECIFICATION)
 

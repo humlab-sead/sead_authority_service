@@ -2,13 +2,13 @@ from typing import Any, Type
 from unittest import mock
 from unittest.mock import AsyncMock, patch
 
-from configuration.provider import MockConfigProvider
 import psycopg
 import pytest
-from strategies.query import AbstractRepository
 
+from configuration.provider import MockConfigProvider
 from src.strategies.strategy import ReconciliationStrategy, Strategies
 from strategies import strategy
+from strategies.query import AbstractRepository
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 

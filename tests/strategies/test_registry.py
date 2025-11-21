@@ -20,7 +20,7 @@ class TestStrategyRegistry:
         """Set up clean registry state before each test"""
         # Store original items
         self.original_items = Strategies.items.copy()
-        
+
     def teardown_method(self):
         """Restore original registry state after each test"""
         # Clear test registrations and restore originals
@@ -44,7 +44,7 @@ class TestStrategyRegistry:
         """Test registering a basic strategy class"""
 
         strategies = StrategyRegistry()
-    
+
         @strategies.register(key="test_strategy")
         class TestStrategy(ReconciliationStrategy):
             def __init__(self, specification=None):
@@ -65,7 +65,7 @@ class TestStrategyRegistry:
     def test_register_strategy_with_key_property(self):
         """Test that registered strategy has _registry_key attribute"""
         strategies = StrategyRegistry()
-    
+
         @strategies.register(key="keyed_strategy")
         class KeyedStrategy(ReconciliationStrategy):
             def __init__(self, specification=None):
@@ -85,6 +85,7 @@ class TestStrategyRegistry:
     def test_register_strategy_without_explicit_key(self):
         """Test registering strategy without explicit key uses class name"""
         strategies = StrategyRegistry()
+
         @strategies.register()
         class AutoNamedStrategy(ReconciliationStrategy):
             def __init__(self, specification=None):
@@ -104,7 +105,7 @@ class TestStrategyRegistry:
     def test_get_registered_strategy(self):
         """Test retrieving a registered strategy"""
         strategies = StrategyRegistry()
-    
+
         @strategies.register(key="retrievable_strategy")
         class RetrievableStrategy(ReconciliationStrategy):
             def __init__(self, specification=None):
@@ -125,7 +126,7 @@ class TestStrategyRegistry:
         """Test that getting unregistered strategy raises KeyError"""
         with pytest.raises(KeyError) as exc_info:
             Strategies.get("nonexistent_strategy")
-        
+
         assert "nonexistent_strategy" in str(exc_info.value)
 
     def test_is_registered_true(self):
@@ -153,20 +154,20 @@ class TestStrategyRegistry:
 
     def test_registered_class_hook_basic(self):
         """Test that registered_class_hook is called during registration"""
-        
+
         # Create a custom registry to test the hook
         class TestRegistry(StrategyRegistry):
             hook_called = False
             hook_args = None
-            
+
             @classmethod
             def registered_class_hook(cls, fn_or_class, **args):
                 cls.hook_called = True
                 cls.hook_args = args
                 return super().registered_class_hook(fn_or_class, **args)
-        
+
         test_registry = TestRegistry()
-        
+
         @test_registry.register(key="hook_test", custom_arg="test_value")
         class HookTest(ReconciliationStrategy):
             def __init__(self, specification=None):
@@ -179,7 +180,7 @@ class TestStrategyRegistry:
                     "sql_queries": {},
                 }
                 super().__init__(spec, BaseRepository)
-        
+
         assert TestRegistry.hook_called is True
         assert TestRegistry.hook_args is not None
         assert "custom_arg" in TestRegistry.hook_args
@@ -190,6 +191,7 @@ class TestStrategyRegistry:
 
         class CustomRepository(BaseRepository):
             """Custom repository for testing"""
+
             pass
 
         @Strategies.register(key="custom_repo_strategy", repository_cls=CustomRepository)
@@ -214,6 +216,7 @@ class TestStrategyRegistry:
         @Strategies.register(key="duplicate_key")
         class FirstStrategy(ReconciliationStrategy):
             value = "first"
+
             def __init__(self, specification=None):
                 spec = specification or {
                     "key": "duplicate_key",
@@ -228,6 +231,7 @@ class TestStrategyRegistry:
         @Strategies.register(key="duplicate_key")
         class SecondStrategy(ReconciliationStrategy):
             value = "second"
+
             def __init__(self, specification=None):
                 spec = specification or {
                     "key": "duplicate_key",
@@ -291,17 +295,17 @@ class TestStrategyRegistry:
 
     def test_register_function_type(self):
         """Test registering with type='function' (though not typical for strategies)"""
-        
+
         class FunctionRegistry(StrategyRegistry):
             items = {}
-        
+
         function_registry = FunctionRegistry()
-        
+
         # Functions with type='function' are called during registration
         @function_registry.register(key="test_function", type="function")
         def test_function():
             return "function_result"
-        
+
         # The function should be called and result stored
         assert function_registry.is_registered("test_function")
         assert function_registry.items["test_function"] == "function_result"
@@ -309,11 +313,11 @@ class TestStrategyRegistry:
     def test_registry_hook_preserves_class(self):
         """Test that registered_class_hook preserves the original class"""
         strategies = StrategyRegistry()
-    
+
         @strategies.register(key="preserved_class")
         class PreservedClass(ReconciliationStrategy):
             custom_attr = "preserved"
-            
+
             def __init__(self, specification=None):
                 spec = specification or {
                     "key": "preserved_class",
