@@ -1,8 +1,8 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import Any
 
 from src.configuration import ConfigValue
-from src.utility import Registry, _ensure_key_property, resolve_specification
+from src.utility import Registry, resolve_specification
 
 from . import StrategySpecification
 from .query import BaseRepository
@@ -17,7 +17,7 @@ class ReconciliationStrategy(ABC):
         self, specification: StrategySpecification | str | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None
     ) -> None:
 
-        self.specification: StrategySpecification = resolve_specification(specification or self.key)
+        self.specification: StrategySpecification = resolve_specification(specification=specification or self.key)
         self.entity_config: dict[str, Any] = ConfigValue(f"table_specs.{self.key}").resolve() or {}
         self.repository_instance_or_cls: type[BaseRepository] | BaseRepository | None = repository_or_cls or self.repository_cls
         self.repository: BaseRepository | None = None

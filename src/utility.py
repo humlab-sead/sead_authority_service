@@ -250,7 +250,7 @@ class Registry:
         return key in cls.items
 
     @classmethod
-    def registered_class_hook(cls, fn_or_class: Any, **args) -> Any:
+    def registered_class_hook(cls, fn_or_class: Any, **args) -> Any:  # pylint: disable=unused-argument
         return fn_or_class
 
 
