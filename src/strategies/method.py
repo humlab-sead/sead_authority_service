@@ -30,4 +30,4 @@ class MethodReconciliationStrategy(ReconciliationStrategy):
 class RAGMethodsReconciliationStrategy(RAGHybridReconciliationStrategy):
 
     def __init__(self):
-        super().__init__(RAG_SPECIFICATION, self.repository_cls)
+        super().__init__(specification=RAG_SPECIFICATION, repository_or_cls=self.repository_cls)

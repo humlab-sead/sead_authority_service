@@ -241,7 +241,7 @@ class TestSiteReconciliationStrategyErrorHandling:
         # Mock the proxy to use our test connection
         mock_proxy = SiteRepository(strategy.specification, connection=test_provider.connection_mock)
 
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             with pytest.raises(psycopg.errors.InFailedSqlTransaction):
                 await strategy.find_candidates("Test Query", {}, limit=10)
 

@@ -136,7 +136,7 @@ class BibliographicReferenceReconciliationStrategy(ReconciliationStrategy):
     ) -> list[dict]:
         props = properties or {}
         candidates: list[dict] = []
-        proxy: BibliographicReferenceRepository = self.get_proxy()  # type: ignore
+        proxy: BibliographicReferenceRepository = self.get_repository()  # type: ignore
         # 1) High-confidence exact identifiers
         if props.get("isbn"):
             candidates.extend(await proxy.fetch_by_isbn(str(props["isbn"])))
@@ -157,7 +157,7 @@ class BibliographicReferenceReconciliationStrategy(ReconciliationStrategy):
 
         # Optional but useful: title+year partial
         # if props.get("title") and props.get("year"):
-        #     candidates.extend(await self.get_proxy().fuzzy_title_partial_and_year(str(props["title"]), str(props["year"]), limit=limit))
+        #     candidates.extend(await self.get_repository().fuzzy_title_partial_and_year(str(props["title"]), str(props["year"]), limit=limit))
 
         # 3) Fallback: fuzzy on the free-text `query` (from the front-end)
         # If query is provided and not obviously identical to a property, try full_reference

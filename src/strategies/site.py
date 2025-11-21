@@ -34,14 +34,13 @@ class SiteRepository(BaseRepository):
 @Strategies.register(key="site", repository_cls=SiteRepository)
 class SiteReconciliationStrategy(ReconciliationStrategy):
     """Site-specific reconciliation with place names and coordinates"""
-    def __init__(self, specification: dict[str, Any] | None = None) -> None:
+    def __init__(self, specification: dict[str, Any] | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None) -> None:
         self.entity_config: dict[str, Any] = ConfigValue("table_specs.site").resolve() or {}
+        super().__init__(specification=specification, repository_or_cls=repository_or_cls)
 
-        super().__init__(specification)
-
-    def get_proxy(self) -> SiteRepository:  # type: ignore[override]
+    def get_repository(self) -> SiteRepository:  # type: ignore[override]
         """Return the site-specific query proxy"""
-        return super().get_proxy()  # type: ignore[return-value]
+        return super().get_repository()  # type: ignore[return-value]
 
     async def find_candidates(self, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         """Find candidate sites based on name, identifier, and optional geographic context"""
@@ -50,11 +49,11 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
 
         # 1) Exact match by national site identifier
         if properties.get("national_id"):
-            candidates.extend(await self.get_proxy().fetch_site_by_national_id(properties["national_id"]))
+            candidates.extend(await self.get_repository().fetch_site_by_national_id(properties["national_id"]))
 
         # 2) Fuzzy name matching with enhanced scoring
         if not candidates:
-            candidates.extend(await self.get_proxy().find(query, limit))
+            candidates.extend(await self.get_repository().find(query, limit))
 
         # 3) Geographic proximity boost if coordinates provided
         if properties.get("latitude") and properties.get("longitude") and candidates:
@@ -72,7 +71,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
             return candidates
         very_near_distance_km: float = ConfigValue("policy:site:proximity_boost:very_near_distance_km").resolve() or 0.2
         to_far_distance_km: float = ConfigValue("policy:site:proximity_boost:to_far_distance_km").resolve() or 10.0
-        distances: dict[int, float] = await self.get_proxy().fetch_site_distances(coordinate, [c["site_id"] for c in candidates])
+        distances: dict[int, float] = await self.get_repository().fetch_site_distances(coordinate, [c["site_id"] for c in candidates])
         # Apply distance-based scoring boost
         for candidate in candidates:
             site_id = candidate["site_id"]
@@ -88,7 +87,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
     async def _apply_place_context_scoring(self, candidates: list[dict], place: str) -> list[dict]:
         """Boost scores based on place name context"""
 
-        place_results = await self.get_proxy().fetch_site_location_similarity(candidates, place)
+        place_results = await self.get_repository().fetch_site_location_similarity(candidates, place)
 
         similarity_threshold: float = ConfigValue("policy:site:place_name_similarity_boost:similarity_threshold").resolve() or 0.3
         max_boost: float = ConfigValue("policy:site:place_name_similarity_boost:max_boost").resolve() or 0.1

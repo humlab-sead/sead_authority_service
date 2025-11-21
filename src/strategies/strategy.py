@@ -25,7 +25,7 @@ class ReconciliationStrategy(ABC):
         """Return the unique key for this strategy, if registered, else 'unknown'"""
         return getattr(self, "_registry_key", "unknown")
 
-    def get_proxy(self) -> BaseRepository:
+    def get_repository(self) -> BaseRepository:
         """Return an instance of the query proxy for this strategy"""
         if not self.repository:
             if isinstance(self.repository_instance_or_cls, BaseRepository):
@@ -94,7 +94,7 @@ class ReconciliationStrategy(ABC):
         """
         properties = properties or {}
 
-        candidates: list[dict] = await self._find_candidates(query, properties, limit, self.get_proxy())
+        candidates: list[dict] = await self._find_candidates(query, properties, limit, self.get_repository())
 
         return sorted(candidates, key=lambda x: x.get("name_sim", x.get("score", 0)), reverse=True)[:limit]
 
@@ -111,7 +111,7 @@ class ReconciliationStrategy(ABC):
 
     async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific entity."""
-        return await self.get_proxy().get_details(entity_id)
+        return await self.get_repository().get_details(entity_id)
 
 
 class StrategyRegistry(Registry):
@@ -122,7 +122,7 @@ class StrategyRegistry(Registry):
     def registered_class_hook(cls, fn_or_class: Any, **args) -> Any:
         if args.get("type") != "function":
             if args.get("repository_cls"):
-                if not hasattr(fn_or_class, "repository_cls"):
+                if hasattr(fn_or_class, "repository_cls"):
                     setattr(fn_or_class, "repository_cls", staticmethod(args["repository_cls"]))    
         return fn_or_class
     

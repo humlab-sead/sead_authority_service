@@ -92,14 +92,14 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
         """
         properties = properties or {}
 
-        candidates: list[dict] = await self.get_proxy().find(query, limit, properties=properties)
+        candidates: list[dict] = await self.get_repository().find(query, limit, properties=properties)
 
         return sorted(candidates, key=lambda x: x.get("name_sim", 0), reverse=True)[:limit]
 
     async def get_details(self, entity_id: str, **kwargs) -> dict[str, Any] | None:
         """Fetch details for a specific entity."""
         options: dict[str, Any] = {k: v for k, v in kwargs.items() if k in ("lang", "style")}
-        return await self.get_proxy().get_details(entity_id=entity_id, **options)
+        return await self.get_repository().get_details(entity_id=entity_id, **options)
 
     def _geonames_type_for_refine(self, g: dict[str, Any]) -> dict[str, str]:
         fc = g.get("fcl")

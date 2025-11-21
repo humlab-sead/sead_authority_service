@@ -49,7 +49,7 @@ class TestFeatureTypeReconciliationStrategy:
     def test_repository_initialization(self, test_provider: ExtendedMockConfigProvider):
         """Test that repository is initialized correctly"""
         strategy = FeatureTypeReconciliationStrategy()
-        proxy = strategy.get_proxy()
+        proxy = strategy.get_repository()
 
         assert isinstance(proxy, FeatureTypeRepository)
         assert isinstance(proxy.specification, dict)
@@ -273,8 +273,8 @@ class TestFeatureTypeReconciliationStrategy:
         """Test that proxy instance is reused across calls"""
         strategy = FeatureTypeReconciliationStrategy()
 
-        proxy1 = strategy.get_proxy()
-        proxy2 = strategy.get_proxy()
+        proxy1 = strategy.get_repository()
+        proxy2 = strategy.get_repository()
 
         assert proxy1 is proxy2  # Same instance
 

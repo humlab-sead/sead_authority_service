@@ -194,28 +194,28 @@ class TestSiteReconciliationStrategy:
     def test_get_entity_id_field(self, test_provider: ExtendedMockConfigProvider):
         """Test getting entity ID field name."""
         strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-        with patch.object(strategy, "get_proxy", return_value=MagicMock(spec=SiteRepository)):
+        with patch.object(strategy, "get_repository", return_value=MagicMock(spec=SiteRepository)):
             assert strategy.get_entity_id_field() == "site_id"
 
     @with_test_config
     def test_get_label_field(self, test_provider: ExtendedMockConfigProvider):
         """Test getting label field name."""
         strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-        with patch.object(strategy, "get_proxy", return_value=MagicMock(spec=SiteRepository)):
+        with patch.object(strategy, "get_repository", return_value=MagicMock(spec=SiteRepository)):
             assert strategy.get_label_field() == "label"
 
     @with_test_config
     def test_get_id_path(self, test_provider: ExtendedMockConfigProvider):
         """Test getting ID path."""
         strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-        with patch.object(strategy, "get_proxy", return_value=MagicMock(spec=SiteRepository)):
+        with patch.object(strategy, "get_repository", return_value=MagicMock(spec=SiteRepository)):
             assert strategy.get_id_path() == "site"
 
     @with_test_config
     def test_get_property_settings(self, test_provider: ExtendedMockConfigProvider):
         """Test get_property_settings method returns site-specific settings."""
         strategy = SiteReconciliationStrategy()
-        with patch.object(strategy, "get_proxy", return_value=MagicMock(spec=SiteRepository)):
+        with patch.object(strategy, "get_repository", return_value=MagicMock(spec=SiteRepository)):
             settings = strategy.get_property_settings()
 
         assert isinstance(settings, dict)
@@ -238,7 +238,7 @@ class TestSiteReconciliationStrategy:
     def test_get_properties_meta(self, test_provider: ExtendedMockConfigProvider):
         """Test get_properties_meta method returns site-specific properties."""
         strategy = SiteReconciliationStrategy()
-        with patch.object(strategy, "get_proxy", return_value=MagicMock(spec=SiteRepository)):
+        with patch.object(strategy, "get_repository", return_value=MagicMock(spec=SiteRepository)):
             properties = strategy.get_properties_meta()
 
         assert isinstance(properties, list)
@@ -273,7 +273,7 @@ class TestSiteReconciliationStrategy:
         mock_proxy.fetch_site_by_national_id.return_value = mock_sites
 
         properties: dict[str, str] = {"national_id": "TEST123"}
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy.find_candidates("test query", properties, limit=10)
 
         mock_proxy.fetch_site_by_national_id.assert_called_once_with("TEST123")
@@ -293,7 +293,7 @@ class TestSiteReconciliationStrategy:
         mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.9}, {"site_id": 2, "label": "Another Site", "name_sim": 0.7}]
         mock_proxy.find.return_value = mock_sites
 
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy.find_candidates("test site", {}, limit=5)
 
         mock_proxy.find.assert_called_once_with("test site", 5)
@@ -318,7 +318,7 @@ class TestSiteReconciliationStrategy:
             mock_geo_scoring.return_value = mock_sites
 
             properties: dict[str, float] = {"latitude": 59.3293, "longitude": 18.0686}
-            with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+            with patch.object(strategy, "get_repository", return_value=mock_proxy):
                 await strategy.find_candidates("test site", properties, limit=10)
 
             mock_geo_scoring.assert_called_once_with(mock_sites, {"lat": 59.3293, "lon": 18.0686})
@@ -340,7 +340,7 @@ class TestSiteReconciliationStrategy:
             mock_place_scoring.return_value = mock_sites
 
             properties: dict[str, str] = {"place_name": "Stockholm"}  # Fixed key name
-            with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+            with patch.object(strategy, "get_repository", return_value=mock_proxy):
                 await strategy.find_candidates("test site", properties, limit=10)
 
             mock_place_scoring.assert_called_once_with(mock_sites, "Stockholm")
@@ -363,7 +363,7 @@ class TestSiteReconciliationStrategy:
         mock_proxy = AsyncMock()
         mock_proxy.fetch_site_distances.return_value = distances
 
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy._apply_geographic_scoring(candidates, coordinate)
 
         # Verify distances were fetched
@@ -386,7 +386,7 @@ class TestSiteReconciliationStrategy:
         mock_proxy = AsyncMock()
 
         strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy._apply_geographic_scoring(candidates, {})
 
         assert result == candidates
@@ -400,7 +400,7 @@ class TestSiteReconciliationStrategy:
         mock_proxy = AsyncMock()
 
         strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy._apply_geographic_scoring([], coordinate)
 
         assert result == []
@@ -423,7 +423,7 @@ class TestSiteReconciliationStrategy:
         mock_proxy.fetch_site_location_similarity.return_value = place_results
 
         strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy._apply_place_context_scoring(candidates, "Stockholm")
 
         mock_proxy.fetch_site_location_similarity.assert_called_once_with(candidates, "Stockholm")
@@ -444,7 +444,7 @@ class TestSiteReconciliationStrategy:
         mock_proxy.get_details.return_value = expected_details
 
         strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy.get_details("123")
 
         mock_proxy.get_details.assert_called_once_with("123")
@@ -463,7 +463,7 @@ class TestSiteReconciliationStrategy:
             mock_proxy.find.return_value = mock_sites
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-            with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+            with patch.object(strategy, "get_repository", return_value=mock_proxy):
                 result = await strategy.find_candidates("test query", None, limit=10)
 
             # Should not call national_id search
@@ -489,7 +489,7 @@ class TestSiteReconciliationStrategy:
             mock_proxy.find.return_value = mock_sites
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-            with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+            with patch.object(strategy, "get_repository", return_value=mock_proxy):
                 result = await strategy.find_candidates("test query", {}, limit=10)
 
             # Should be sorted by name_sim descending
@@ -511,7 +511,7 @@ class TestSiteReconciliationStrategy:
             mock_proxy.find.return_value = mock_sites
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-            with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+            with patch.object(strategy, "get_repository", return_value=mock_proxy):
                 result = await strategy.find_candidates("test query", {}, limit=5)  # Limit to 5
 
             assert len(result) == 5
@@ -555,7 +555,7 @@ class TestSiteStrategyIntegration:
             properties = {"latitude": 59.3293, "longitude": 18.0686, "place_name": "Stockholm"}
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-            with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+            with patch.object(strategy, "get_repository", return_value=mock_proxy):
                 result = await strategy.find_candidates("archaeological site", properties, limit=10)
 
             # Verify all methods were called
@@ -586,7 +586,7 @@ class TestSiteStrategyIntegration:
         mock_proxy.fetch_site_distances.side_effect = Exception("Database error")
 
         strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             with pytest.raises(Exception) as _:
                 _ = await strategy._apply_geographic_scoring(candidates, coordinate)
 
@@ -618,7 +618,7 @@ class TestSiteStrategyEdgeCases:
         mock_proxy.fetch_site_distances.return_value = distances
 
         strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy._apply_geographic_scoring(candidates, coordinate)
 
         # Sites with distances should have distance_km field
@@ -649,7 +649,7 @@ class TestSiteStrategyEdgeCases:
         mock_proxy.fetch_site_location_similarity.return_value = place_results
 
         strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy._apply_place_context_scoring(candidates, "Unknown Place")
 
         # Scores should remain unchanged
@@ -675,7 +675,7 @@ class TestSiteStrategyEdgeCases:
         mock_proxy.fetch_site_location_similarity.return_value = place_results
 
         strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy._apply_place_context_scoring(candidates, "Place")
 
         # Score should remain unchanged (below threshold)
@@ -700,7 +700,7 @@ class TestSiteStrategyEdgeCases:
         mock_proxy.fetch_site_distances.return_value = distances
 
         strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy._apply_geographic_scoring(candidates, coordinate)
 
         # Score should be capped at 1.0
@@ -725,7 +725,7 @@ class TestSiteStrategyEdgeCases:
 
         strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
 
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy._apply_place_context_scoring(candidates, "Place")
 
         # Score should be capped at 1.0
@@ -746,7 +746,7 @@ class TestSiteStrategyEdgeCases:
             mock_proxy.find.return_value = mock_sites
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-            with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+            with patch.object(strategy, "get_repository", return_value=mock_proxy):
 
                 # Mock both enhancement methods
                 with (
@@ -785,7 +785,7 @@ class TestSiteStrategyEdgeCases:
             mock_proxy.find.return_value = []
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-            with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+            with patch.object(strategy, "get_repository", return_value=mock_proxy):
                 result = await strategy.find_candidates("", {}, limit=10)
 
             mock_proxy.find.assert_called_once_with("", 10)
@@ -806,7 +806,7 @@ class TestSiteStrategyEdgeCases:
             mock_proxy.find.return_value = mock_sites
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
-            with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+            with patch.object(strategy, "get_repository", return_value=mock_proxy):
                 result = await strategy.find_candidates("test", {}, limit=0)
 
             # Should return empty list due to limit=0
