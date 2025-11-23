@@ -4,7 +4,7 @@ import dotenv
 import psycopg
 from loguru import logger
 
-from configuration.interface import ConfigLike
+from .interface import ConfigLike
 from src.utility import configure_logging, create_db_uri
 
 from .provider import ConfigStore, get_config_provider
@@ -12,9 +12,10 @@ from .provider import ConfigStore, get_config_provider
 dotenv.load_dotenv(dotenv_path=os.getenv("ENV_FILE", ".env"))
 
 
-async def setup_config_store(filename: str = "config.yml", force: bool = False) -> None:
+async def setup_config_store(filename: str | None = None, force: bool = False) -> None:
 
-    config_file: str = os.getenv("CONFIG_FILE", filename)
+    config_file: str | None = filename or os.getenv("CONFIG_FILE", "config.yml")
+    
     store: ConfigStore = ConfigStore.get_instance()
 
     if store.is_configured() and not force:
