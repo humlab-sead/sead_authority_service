@@ -12,9 +12,11 @@ dependencies = [
     "loguru>=0.7.3",
     "ollama>=0.6.0",
     "openai>=2.3.0",
-    "psycopg>=3.2.10",
+    "pandas>=2.3.3",
+    "psycopg>=3.2.13",
     "pyaml>=25.7.0",
     "python-multipart>=0.0.20",
+    "sqlalchemy>=2.0.44",
     "uvicorn>=0.37.0",
 ]
 [dependency-groups]
