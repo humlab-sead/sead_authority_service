@@ -612,4 +612,356 @@ message: "include:something"
 
         # These should be treated as regular string values, not file references
         assert config.get("database") == "some/path/that/looks/like/file.yml"
+        # Note: "include:something" will be treated as a reference by replace_references
+        # Since "something" doesn't exist in the config, it will remain as the original string
         assert config.get("message") == "include:something"
+
+
+class TestConfigFactoryReferences:
+    """Test internal reference replacement feature using include: notation"""
+
+    def test_simple_internal_reference(self, tmp_path: Path):
+        """Test simple internal reference replacement."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+base_url: "https://api.example.com"
+api_endpoint: "include:base_url"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("base_url") == "https://api.example.com"
+        assert config.get("api_endpoint") == "https://api.example.com"
+
+    def test_nested_path_reference(self, tmp_path: Path):
+        """Test reference to nested configuration path."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+database:
+  primary:
+    host: db.example.com
+    port: 5432
+  replica:
+    host: replica.example.com
+    port: 5433
+    
+connection:
+  primary_host: "include:database.primary.host"
+  primary_port: "include:database.primary.port"
+  replica_host: "include:database.replica.host"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("connection:primary_host") == "db.example.com"
+        assert config.get("connection:primary_port") == 5432
+        assert config.get("connection:replica_host") == "replica.example.com"
+
+    def test_reference_with_colon_notation(self, tmp_path: Path):
+        """Test reference using colon notation in path."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+app:
+  settings:
+    timeout: 30
+    retries: 3
+    
+timeout_value: "include:app:settings:timeout"
+retry_count: "include:app:settings:retries"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("timeout_value") == 30
+        assert config.get("retry_count") == 3
+
+    def test_reference_to_entire_dict(self, tmp_path: Path):
+        """Test reference pointing to entire dictionary."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+defaults:
+  timeout: 30
+  retries: 3
+  cache: true
+  
+service_a:
+  config: "include:defaults"
+  
+service_b:
+  config: "include:defaults"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("service_a:config:timeout") == 30
+        assert config.get("service_a:config:retries") == 3
+        assert config.get("service_b:config:cache") is True
+
+    def test_reference_to_list(self, tmp_path: Path):
+        """Test reference pointing to list."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+allowed_hosts:
+  - localhost
+  - example.com
+  - api.example.com
+  
+cors_origins: "include:allowed_hosts"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        allowed = config.get("allowed_hosts")
+        cors = config.get("cors_origins")
+        assert cors == allowed
+        assert cors == ["localhost", "example.com", "api.example.com"]
+
+    def test_references_in_list(self, tmp_path: Path):
+        """Test references within a list."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+primary_db: "db1.example.com"
+backup_db: "db2.example.com"
+
+database_hosts:
+  - "include:primary_db"
+  - "include:backup_db"
+  - "static.example.com"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        hosts = config.get("database_hosts")
+        assert hosts == ["db1.example.com", "db2.example.com", "static.example.com"]
+
+    def test_recursive_reference_resolution(self, tmp_path: Path):
+        """Test that references pointing to other references are resolved."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+base_value: "final_value"
+level1: "include:base_value"
+level2: "include:level1"
+level3: "include:level2"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("base_value") == "final_value"
+        assert config.get("level1") == "final_value"
+        assert config.get("level2") == "final_value"
+        assert config.get("level3") == "final_value"
+
+    def test_missing_reference_path(self, tmp_path: Path):
+        """Test that missing reference paths remain as original strings."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+value: "test"
+missing_ref: "include:nonexistent.path"
+another_ref: "include:value"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("value") == "test"
+        assert config.get("missing_ref") == "include:nonexistent.path"
+        assert config.get("another_ref") == "test"
+
+    def test_reference_with_environment_variables(self, tmp_path: Path, monkeypatch):
+        """Test that references work after environment variable replacement."""
+        monkeypatch.setenv("DB_HOST", "env-db.example.com")
+        monkeypatch.setenv("DB_PORT", "5432")
+
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+database:
+  host: "${DB_HOST}"
+  port: ${DB_PORT}
+  
+connection_string: "include:database.host"
+connection_port: "include:database.port"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Env vars should be replaced first, then references resolved
+        assert config.get("database:host") == "env-db.example.com"
+        assert config.get("database:port") == "5432"
+        assert config.get("connection_string") == "env-db.example.com"
+        assert config.get("connection_port") == "5432"
+
+    def test_references_with_sub_configs(self, tmp_path: Path):
+        """Test that references work with @include: sub-config loading."""
+        # Create sub-config
+        db_config = tmp_path / "database.yml"
+        db_config.write_text(
+            """
+host: localhost
+port: 5432
+name: mydb
+"""
+        )
+
+        # Create main config with both @include: and include: references
+        main_config = tmp_path / "main.yml"
+        main_config.write_text(
+            f"""
+database: "@include:{db_config}"
+app:
+  db_host: "include:database.host"
+  db_name: "include:database.name"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        # Sub-config should load first, then references resolve
+        assert config.get("database:host") == "localhost"
+        assert config.get("app:db_host") == "localhost"
+        assert config.get("app:db_name") == "mydb"
+
+    def test_complex_nested_references(self, tmp_path: Path):
+        """Test complex nested structure with multiple references."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+defaults:
+  timeout: 30
+  retries: 3
+  
+services:
+  api:
+    name: "API Service"
+    settings: "include:defaults"
+  worker:
+    name: "Worker Service"
+    settings: "include:defaults"
+    
+monitoring:
+  # Direct references to values that exist in the original structure
+  default_timeout: "include:defaults.timeout"
+  api_name: "include:services.api.name"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Services should have their settings resolved from defaults
+        assert config.get("services:api:settings:timeout") == 30
+        assert config.get("services:worker:settings:retries") == 3
+        # Monitoring should reference values that exist in original structure
+        assert config.get("monitoring:default_timeout") == 30
+        assert config.get("monitoring:api_name") == "API Service"
+
+    def test_reference_with_underscore_fallback(self, tmp_path: Path):
+        """Test that references support underscore notation fallback."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+app_config_value: 42
+reference: "include:app:config:value"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("app_config_value") == 42
+        assert config.get("reference") == 42
+
+    def test_reference_does_not_affect_yaml_constructors(self, tmp_path: Path):
+        """Test that references work alongside YAML constructors."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+base_dir: /var/app
+log_path: !path_join [/var/app, logs, app.log]
+message: !join ["Hello", " ", "World"]
+
+app:
+  directory: "include:base_dir"
+  greeting: "include:message"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("base_dir") == "/var/app"
+        assert config.get("message") == "Hello World"
+        assert config.get("app:directory") == "/var/app"
+        assert config.get("app:greeting") == "Hello World"
+
+    def test_mixed_references_and_regular_values(self, tmp_path: Path):
+        """Test that references can be mixed with regular configuration values."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+base_url: "https://api.example.com"
+version: "v1"
+
+endpoints:
+  users: "include:base_url"
+  posts: "include:base_url"
+  static_endpoint: "https://static.example.com"
+  version: "include:version"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("endpoints:users") == "https://api.example.com"
+        assert config.get("endpoints:posts") == "https://api.example.com"
+        assert config.get("endpoints:static_endpoint") == "https://static.example.com"
+        assert config.get("endpoints:version") == "v1"
+
+    def test_reference_order_independence(self, tmp_path: Path):
+        """Test that references work regardless of definition order."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+# Reference defined before the target
+early_ref: "include:late_value"
+
+# Other config
+app_name: "Test App"
+
+# Target defined after the reference
+late_value: "this was defined later"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("late_value") == "this was defined later"
+        assert config.get("early_ref") == "this was defined later"
