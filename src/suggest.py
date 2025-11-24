@@ -7,7 +7,7 @@ This module provides the Suggest API endpoints that enable:
 - Type and property suggestions
 """
 
-from typing import Any
+from typing import Any, Type
 
 from loguru import logger
 
@@ -23,7 +23,7 @@ async def render_flyout_preview(uri: str) -> dict[str, Any]:
     Returns JSON with 'id' and 'html' fields for inline preview display.
     """
     logger.info(f"Rendering flyout preview for URI: {uri}")
-    id_base: str = ConfigValue("options:id_base").resolve()
+    id_base: str = ConfigValue("options:id_base").resolve() or ""
 
     if not uri.startswith(id_base):
         raise ValueError("Invalid ID format")
@@ -39,7 +39,10 @@ async def render_flyout_preview(uri: str) -> dict[str, Any]:
     if not Strategies.items.get(entity_path):
         raise ValueError(f"Unknown entity type: {entity_path}")
 
-    strategy: ReconciliationStrategy = Strategies.items.get(entity_path)()
+    strategy_cls: Type[ReconciliationStrategy] | None = Strategies.items.get(entity_path)
+    if not strategy_cls:
+        raise ValueError(f"Unknown entity type: {entity_path}")
+    strategy: ReconciliationStrategy = strategy_cls()
 
     details: dict[str, Any] | None = await strategy.get_details(entity_id_str)
 
@@ -101,7 +104,7 @@ async def suggest_entities(prefix: str, entity_type: str = "", limit: int = 10) 
     if not prefix or len(prefix) < 2:
         return {"result": []}
 
-    id_base: str = ConfigValue("options:id_base").resolve()
+    id_base: str = ConfigValue("options:id_base").resolve() or ""
 
     results = []
 

@@ -3,7 +3,7 @@ LLM Client abstraction supporting multiple providers
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Type
 
 from src.configuration import ConfigValue
 from src.utility import Registry
@@ -19,11 +19,11 @@ class LLMProvider(ABC):
         return getattr(self, "_registry_key", "undefined")
 
     @abstractmethod
-    async def complete(self, prompt: str, roles: dict[str, str] = None, **kwargs) -> str:
+    async def complete(self, prompt: str, roles: dict[str, str] | None = None, **kwargs) -> str:
         pass
 
     @abstractmethod
-    def get_options_keys(self) -> list[str]:
+    def get_options_keys(self) -> list[tuple[str, Any]]:
         """Return a list of supported option keys and their default values"""
 
     def resolve_options(self, kwargs) -> dict[str, Any]:
@@ -37,7 +37,17 @@ class LLMProvider(ABC):
             opts[k] = ConfigValue(f"llm.{self.key}.options.{k},llm.options.{k}", default=default).resolve()
         return opts
 
+    def generate_message_list(self, prompt: str, roles: dict[str, str] | None = None) -> list[dict[str, Any]]:
+        messages: list[dict[str, str]] = [{"role": k, "content": v} for k, v in (roles or {}).items() if k != "user"] + [
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ]
+
+        return messages
+
 
 class ProviderRegistry(Registry):
 
-    items: dict[str, LLMProvider] = {}
+    items: dict[str, Type[LLMProvider]] = {}

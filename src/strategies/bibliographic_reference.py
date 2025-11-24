@@ -1,101 +1,11 @@
 import re
 from typing import Any
 
-from .query import DatabaseQueryProxy
+from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
-SPECIFICATION: StrategySpecification = {
-    "key": "bibliographic_reference",
-    "display_name": "Bibliographic References",
-    "id_field": "biblio_id",
-    "label_field": "full_reference",  # show the whole reference
-    "properties": [
-        {"id": "doi", "name": "DOI", "type": "string", "description": "Digital Object Identifier"},
-        {"id": "isbn", "name": "ISBN", "type": "string", "description": "International Standard Book Number"},
-        {"id": "title", "name": "Title", "type": "string", "description": "Title of the work"},
-        {"id": "year", "name": "Year", "type": "string", "description": "Publication year"},
-        {"id": "authors", "name": "Authors", "type": "string", "description": "Authors of the work"},
-        {"id": "full_reference", "name": "Full reference", "type": "string", "description": "Full bibliographic reference"},
-        {"id": "bugs_reference", "name": "BUGS reference", "type": "string", "description": "BugsCEP reference"},
-    ],
-    # "default_types": [{"id": "biblio", "name": "Bibliographic reference"}],
-    "property_settings": {},
-    "sql_queries": {
-        "fuzzy_label_sql": """
-        select * from authority.fuzzy_bibliographic_references(%(q)s, %(n)s);
-    """,
-        "details_sql": """
-            select  biblio_id as "ID",
-                    bugs_reference as "BUGS Reference",
-                    doi as "DOI",
-                    isbn as "ISBN",
-                    notes as "Notes",
-                    title as "Title",
-                    year as "Year",
-                    authors as "Authors",
-                    full_reference as "Full reference",
-                    url as "URL"
-            from public.tbl_biblio
-            where biblio_id = %(id)s::int
-    """,
-        "isbn_sql": """
-            select biblio_id, full_reference as label
-            from public.tbl_biblio
-            where replace(upper(isbn), '-', '') = %s
-            """,
-        "doi_sql": """
-            select biblio_id, full_reference as label
-            from public.tbl_biblio
-            where replace(lower(doi), 'https://doi.org/', '') = lower(%s)
-               or lower(doi) = lower(%s)
-            """,
-        "full_reference_sql": """
-            select biblio_id, full_reference as label
-            from public.tbl_biblio
-            where full_reference = %s
-            """,
-        "title_year_sql": """
-            select biblio_id, full_reference as label
-            from public.tbl_biblio
-            where title = %s and year = %s
-            """,
-        "bugs_reference_sql": """
-            select biblio_id, full_reference as label
-            from public.tbl_biblio
-            where bugs_reference = %s
-            """,
-        "full_reference_fuzzy_word_similarity_sql": """
-            select entity_id, biblio_id, label, name_sim
-            from authority.fuzzy_bibliographic_references(
-              p_text => %s, p_limit => %s, p_target_field => 'full_reference',
-              p_mode => 'word', p_threshold => %s
-            )
-            """,
-        "authors_fuzzy_sql": """
-            select entity_id, biblio_id, label, name_sim
-            from authority.fuzzy_bibliographic_references(
-              p_text => %s, p_limit => %s, p_target_field => 'authors',
-              p_mode => 'word', p_threshold => %s
-            )
-            """,
-        "biblio_ids_sql": """
-            select biblio_id, full_reference AS label
-            from public.tbl_biblio
-            where biblio_id = any(%s)
-              and year = %s
-        """,
-        "full_reference_fuzzy_similarity_sql": """
-            select entity_id, biblio_id, label, name_sim
-            from authority.fuzzy_bibliographic_references(
-              p_text => %s, p_limit => %s, p_target_field => 'full_reference',
-              p_mode => 'similarity', p_threshold => %s
-            )
-            """,
-    },
-}
 
-
-class BibliographicReferenceQueryProxy(DatabaseQueryProxy):
+class BibliographicReferenceRepository(BaseRepository):
 
     @staticmethod
     def _norm_isbn(isbn: str | None) -> str | None:
@@ -148,14 +58,14 @@ class BibliographicReferenceQueryProxy(DatabaseQueryProxy):
     async def fuzzy_authors_partial_and_year(self, authors: str, year: str | int, limit: int, threshold: float = 0.45) -> list[dict]:
         rows: list[dict[str, Any]] = await self.fetch_all(self.get_sql_query("authors_fuzzy_sql"), params=(authors, limit, threshold), row_factory="tuple")
         # filter to exact year; promote to 0.8 if matches
-        ids: list[int] = [r[1] for r in rows]
+        ids: list[int] = [r[1] for r in rows]  # type: ignore
         if not ids:
             return []
-        year_ok: dict[str, int] = await self.fetch_all(self.get_sql_query("biblio_ids_sql"), params=(ids, str(year)), row_factory="tuple")
+        year_ok: dict[str, Any] | None = await self.fetch_one(self.get_sql_query("biblio_ids_sql"), params=(ids, str(year)), row_factory="tuple")
         out = []
         for r in rows:
-            bid, label, sim = r[1], r[2], float(r[3])
-            if bid in year_ok:
+            bid, label, sim = r[1], r[2], float(r[3])  # type: ignore
+            if year_ok and bid in year_ok:
                 out.append({"biblio_id": bid, "label": label, "name_sim": max(0.8, sim)})
         return out
 
@@ -164,7 +74,7 @@ class BibliographicReferenceQueryProxy(DatabaseQueryProxy):
     #     rows = await self.fetch_all(
     #         """
     #         SELECT entity_id, biblio_id, label, name_sim
-    #         FROM authority.fuzzy_bibliographic_references(
+    #         FROM authority.fuzzy_bibliographic_reference(
     #           p_text => %s, p_limit => %s, p_target_field => 'title',
     #           p_mode => 'word', p_threshold => %s
     #         )
@@ -188,12 +98,12 @@ class BibliographicReferenceQueryProxy(DatabaseQueryProxy):
         return [r | {"name_sim": min(0.7, float(r["name_sim"]))} for r in rows]
 
 
-@Strategies.register(key="bibliographic_reference")
+@Strategies.register(key="bibliographic_reference", repository_cls=BibliographicReferenceRepository)
 class BibliographicReferenceReconciliationStrategy(ReconciliationStrategy):
     """Reconcile bibliographic references using exact identifiers and fuzzy text."""
 
-    def __init__(self):
-        super().__init__(SPECIFICATION, BibliographicReferenceQueryProxy)
+    def __init__(self, specification: StrategySpecification | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None) -> None:
+        super().__init__(specification, repository_or_cls=repository_or_cls)
 
     @staticmethod
     def _as_openrefine_candidate(row: dict) -> dict:
@@ -226,37 +136,36 @@ class BibliographicReferenceReconciliationStrategy(ReconciliationStrategy):
     ) -> list[dict]:
         props = properties or {}
         candidates: list[dict] = []
-
+        proxy: BibliographicReferenceRepository = self.get_repository()  # type: ignore
         # 1) High-confidence exact identifiers
         if props.get("isbn"):
-            candidates.extend(await self.get_proxy().fetch_by_isbn(str(props["isbn"])))
+            candidates.extend(await proxy.fetch_by_isbn(str(props["isbn"])))
         if props.get("doi"):
-            candidates.extend(await self.get_proxy().fetch_by_doi(str(props["doi"])))
+            candidates.extend(await proxy.fetch_by_doi(str(props["doi"])))
         if props.get("full_reference"):
-            candidates.extend(await self.get_proxy().fetch_by_exact_full_reference(str(props["full_reference"])))
+            candidates.extend(await proxy.fetch_by_exact_full_reference(str(props["full_reference"])))
         if props.get("title") and props.get("year"):
-            candidates.extend(await self.get_proxy().fetch_by_exact_title_year(str(props["title"]), str(props["year"])))
+            candidates.extend(await proxy.fetch_by_exact_title_year(str(props["title"]), str(props["year"])))
         if props.get("bugs_reference"):
-            candidates.extend(await self.get_proxy().fetch_by_exact_bugs_reference(str(props["bugs_reference"])))
+            candidates.extend(await proxy.fetch_by_exact_bugs_reference(str(props["bugs_reference"])))
 
         # 2) Strong fuzzy / partial passes (0.8 floor)
         if props.get("full_reference"):
-            candidates.extend(await self.get_proxy().fuzzy_full_reference_partial(str(props["full_reference"]), limit=limit))
-
+            candidates.extend(await proxy.fuzzy_full_reference_partial(str(props["full_reference"]), limit=limit))
         if props.get("authors") and props.get("year"):
-            candidates.extend(await self.get_proxy().fuzzy_authors_partial_and_year(str(props["authors"]), str(props["year"]), limit=limit))
+            candidates.extend(await proxy.fuzzy_authors_partial_and_year(str(props["authors"]), str(props["year"]), limit=limit))
 
         # Optional but useful: title+year partial
         # if props.get("title") and props.get("year"):
-        #     candidates.extend(await self.get_proxy().fuzzy_title_partial_and_year(str(props["title"]), str(props["year"]), limit=limit))
+        #     candidates.extend(await self.get_repository().fuzzy_title_partial_and_year(str(props["title"]), str(props["year"]), limit=limit))
 
         # 3) Fallback: fuzzy on the free-text `query` (from the front-end)
         # If query is provided and not obviously identical to a property, try full_reference
         if query and not props.get("full_reference"):
-            candidates.extend(await self.get_proxy().fuzzy_full_reference_partial(query, limit=limit))
+            candidates.extend(await proxy.fuzzy_full_reference_partial(query, limit=limit))
             # If still thin, add overall similarity (lower confidence cap)
             if len(candidates) < limit:
-                candidates.extend(await self.get_proxy().fuzzy_full_reference_fallback(query, limit=limit))
+                candidates.extend(await proxy.fuzzy_full_reference_fallback(query, limit=limit))
 
         # 4) Merge, cap, and convert to OpenRefine candidates
         merged = self._merge_max(candidates)

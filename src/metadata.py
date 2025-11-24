@@ -4,7 +4,7 @@ from src.configuration import ConfigValue
 from src.strategies.strategy import ReconciliationStrategy, StrategyRegistry
 
 
-def get_reconcile_properties(strategies: StrategyRegistry, query: str = None, entity_type: str = None) -> list[dict[str, str]] | Any:
+def get_reconcile_properties(strategies: StrategyRegistry, query: str | None = None, entity_type: str | None = None) -> list[dict[str, str]] | Any:
     """
     Collects property suggestions returned by the `/properties endpoint` for OpenRefine.
 
@@ -52,21 +52,21 @@ def _get_properties(strategies, entity_type):
     return [p for strategy_class in strategies.items.values() for p in strategy_class().get_properties_meta()]
 
 
-def _compile_property_settings(strategies) -> list[dict[str, str]]:
+def _compile_property_settings(strategies) -> list[dict[str, Any]]:
     """
     Collects property settings from all registered strategies for OpenRefine.
 
     Endpoint: /reconcile (GET)
     Returns a list of property settings dicts for OpenRefine's property selection UI.
     """
-    property_settings: list[dict[str, str]] = []
+    property_settings: list[dict[str, Any]] = []
     for strategy_cls in strategies.items.values():
         strategy: ReconciliationStrategy = strategy_cls()
         specific_settings: dict[str, dict[str, Any]] = strategy.get_property_settings() or {}
 
         for item in strategy.get_properties_meta():
 
-            property_setting: dict[str, str] | None = next((s for s in property_settings if s["name"] == item["id"]), None)
+            property_setting: dict[str, Any] | None = next((s for s in property_settings if s["name"] == item["id"]), None)
             if not property_setting:
                 property_setting = {
                     "name": item["id"],
@@ -109,10 +109,10 @@ def get_reconciliation_metadata(strategies: StrategyRegistry, host: str) -> dict
     Collects reconciliation metadata from all registered strategies.
     """
     default_types: list[dict[str, str]] = _get_default_types(strategies)
-    id_base: str = ConfigValue("options:id_base").resolve()
+    id_base: str = ConfigValue("options:id_base").resolve() or ""
 
     # Collect property settings from all registered strategies
-    property_settings: list[dict[str, str]] = _compile_property_settings(strategies)
+    property_settings: list[dict[str, Any]] = _compile_property_settings(strategies)
 
     # Ensure host doesn't end with slash to avoid double slashes
     base_url_clean: str = str(host).rstrip("/")

@@ -3,6 +3,7 @@ Unit tests for LLM input formatting functionality.
 """
 
 import json
+from typing import Any, Type
 from unittest.mock import patch
 
 import pytest
@@ -38,7 +39,8 @@ class TestFormatterRegistry:
 
     def test_get_formatter(self):
         """Test getting formatters from registry"""
-        markdown_formatter = Formatters.get("markdown")
+        markdown_formatter: Type[Any] | None = Formatters.get("markdown")
+        assert markdown_formatter is not None
         assert issubclass(markdown_formatter, MarkdownFormatter)
 
         with pytest.raises(KeyError):
@@ -501,7 +503,7 @@ class TestEdgeCases:
         mock_get.side_effect = KeyError("formatter not found")
 
         with pytest.raises(KeyError):
-            format_rows_for_llm([{"id": "1", "label": "test"}], target_format="nonexistent")
+            format_rows_for_llm([{"id": "1", "label": "test"}], target_format="nonexistent")  # type: ignore
 
 
 if __name__ == "__main__":

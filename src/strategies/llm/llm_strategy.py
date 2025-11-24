@@ -3,7 +3,7 @@
 import json
 import re
 from abc import abstractmethod
-from typing import Any
+from typing import Any, Literal, Type, cast
 
 from jinja2 import BaseLoader, Environment, Template
 from loguru import logger
@@ -11,7 +11,7 @@ from loguru import logger
 from src.configuration import ConfigValue
 from src.llm.providers import Providers
 from src.llm.providers.provider import LLMProvider
-from src.strategies.query import DatabaseQueryProxy
+from src.strategies.query import BaseRepository
 from src.strategies.strategy import ReconciliationStrategy, StrategySpecification
 
 from .input_format import format_rows_for_llm
@@ -25,13 +25,15 @@ JINJA = Environment(loader=BaseLoader(), autoescape=False)
 class LLMReconciliationStrategy(ReconciliationStrategy):
     """Base class for LLM-powered reconciliation strategies"""
 
-    def __init__(self, specification: StrategySpecification, proxy_or_cls: DatabaseQueryProxy) -> None:
+    def __init__(self, specification: StrategySpecification | None = None, proxy_or_cls: BaseRepository | Type[BaseRepository] | None = None) -> None:
         super().__init__(specification, proxy_or_cls)
 
         provider_name: str = ConfigValue("llm.provider").resolve() or "ollama"
+
+        assert provider_name in Providers.items, f"LLM provider '{provider_name}' is not registered"
         self.llm_provider: LLMProvider = Providers.items[provider_name]()
 
-        self.prompt_template: str = ConfigValue("llm.prompts.reconciliation").resolve()
+        self.prompt_template: str = ConfigValue("llm.prompts.reconciliation").resolve() or ""
 
         logger.info(f"Initialized {self.__class__.__name__} with provider: {provider_name}")
 
@@ -66,14 +68,16 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
         lookup_data: list[dict[str, Any]] = await self.get_lookup_data()
         logger.info(f"Retrieved {len(lookup_data)} lookup entries")
 
+        format_type = cast(Literal["auto", "markdown", "csv", "json"], self.get_lookup_format())
         lookup_format, lookup_text = format_rows_for_llm(
             lookup_data,
-            target_format=self.get_lookup_format(),
+            target_format=format_type,
             column_map=self.get_lookup_fields_map() or None,
         )
+        format_type2 = cast(Literal["auto", "markdown", "csv", "json"], lookup_format)
         _, data_text = format_rows_for_llm(
             [{"input_id": 1, "input_value": query}],
-            target_format=lookup_format,
+            target_format=format_type2,
             logical_keys=["input_id", "input_value"],
         )
         # What to do with properties? For now we ignore them
@@ -153,7 +157,7 @@ class LLMReconciliationStrategy(ReconciliationStrategy):
                 prompt=prompt,
                 roles=ConfigValue(f"policy.{self.key}.roles,policy.roles").resolve() or {},
                 response_model=ReconciliationResponse,
-                **ConfigValue(f"llm.{self.llm_provider.key}.options,llm.options", default={}).resolve(),
+                **(ConfigValue(f"llm.{self.llm_provider.key}.options,llm.options", default={}).resolve() or {}),
             )
 
             candidates: list[dict[str, Any]] = self._response_to_candidates(response, limit)

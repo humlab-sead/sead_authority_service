@@ -14,6 +14,7 @@ from httpx import ASGITransport, AsyncClient, Response
 
 from src.api.router import router
 from src.configuration import MockConfigProvider
+from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 
 # pylint: disable=redefined-outer-name, unused-argument, too-many-locals
@@ -181,7 +182,7 @@ async def test_suggest_property_with_prefix(test_app: FastAPI, mock_results: lis
 
 @pytest.mark.asyncio
 @with_test_config
-async def test_flyout_entity_valid(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: MockConfigProvider):
+async def test_flyout_entity_valid(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: ExtendedMockConfigProvider):
     """Test flyout preview with valid entity ID"""
     location_row_data = {
         "location_id": 806,

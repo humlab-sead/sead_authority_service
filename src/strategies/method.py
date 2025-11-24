@@ -1,54 +1,34 @@
-from .query import DatabaseQueryProxy
+# from src.utility import load_resource_yaml
+from .query import BaseRepository
+from .rag_hybrid.rag_hybrid_strategy import RAGHybridReconciliationStrategy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
-SPECIFICATION: StrategySpecification = {
-    "key": "method",
-    "display_name": "Methods",
+RAG_SPECIFICATION: StrategySpecification = {
+    "key": "method (rag hybrid)",
+    "display_name": "Methods (RAG Hybrid)",
     "id_field": "method_id",
     "label_field": "label",
     "alternate_identity_field": "method_abbreviation",
-    "properties": [
-        {
-            "id": "method_abbreviation",
-            "name": "Method Abbreviation",
-            "type": "string",
-            "description": "Abbreviation for the method used",
-        }
-    ],
+    "properties": [],
     "property_settings": {},
-    "sql_queries": {
-        "fuzzy_label_sql": """
-        select * from authority.methods(%(q)s, %(n)s);
-    """,
-        "details_sql": """
-            select 
-                m.method_id as "ID", 
-                m.method_name as "Name", 
-                m.description as "Description", 
-                m.method_abbrev_or_alt_name as "Abbreviation",
-                mg.group_name as "Group",
-                mg.description as "Group Description"
-            from tbl_methods as m
-            join tbl_method_groups mg using (method_group_id)
-            where method_id = %(id)s
-    """,
-        "alternate_identity_sql": """
-        select method_id, label, 1.0 as name_sim
-        from authority.methods
-        where method_abbrev_or_alt_name = %(alternate_identity)s
-        limit 1
-    """,
-    },
+    "sql_queries": {},
 }
 
 
-class MethodQueryProxy(DatabaseQueryProxy):
+class MethodRepository(BaseRepository):
     """Method-specific query proxy"""
 
 
-@Strategies.register(key="method")
+@Strategies.register(key="method", repository_cls=MethodRepository)
 class MethodReconciliationStrategy(ReconciliationStrategy):
     """Method-specific reconciliation with place names and coordinates"""
 
-    def __init__(self) -> None:
-        super().__init__(SPECIFICATION, MethodQueryProxy)
+    def __init__(self, specification: StrategySpecification | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None) -> None:
+        super().__init__(specification=specification, repository_or_cls=repository_or_cls)
+
+
+@Strategies.register(key="rag_methods", repository_cls=MethodRepository)
+class RAGMethodsReconciliationStrategy(RAGHybridReconciliationStrategy):
+
+    def __init__(self):
+        super().__init__(specification=RAG_SPECIFICATION, repository_or_cls=self.repository_cls)

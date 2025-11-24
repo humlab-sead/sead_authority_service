@@ -75,7 +75,7 @@ def mock_config_context(test_config_provider: MockConfigProvider) -> Generator[M
 
 
 # Convenience functions for manual testing
-def setup_test_config(config_dict: Dict[str, Any] = None) -> MockConfigProvider:
+def setup_test_config(config_dict: Dict[str, Any] | None = None) -> MockConfigProvider:
     """Manually set up test configuration (for use outside pytest)"""
     if config_dict is None:
         config_dict = {"options": {"id_base": "https://test.example.com/sead/id/", "database": {"host": "localhost"}}}

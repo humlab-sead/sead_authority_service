@@ -76,3 +76,20 @@ requirements.txt: pyproject.toml
 .PHONY: test-coverage
 test-coverage:
 	@uv run pytest test_main.py --cov=main --cov-report=html --cov-report=term
+
+.PHONY: dead-code
+dead-code:
+	@uv run vulture src tests main.py
+
+.PHONY: generate-schema
+generate-schema:
+	@echo "Generating entity schema files from templates..."
+	@uv run python src/scripts/generate_entity_schema.py --all
+	@echo "✅ Schema generation complete!"
+
+.PHONY: generate-schema-force
+generate-schema-force:
+	@echo "Regenerating all entity schema files..."
+	@uv run python src/scripts/generate_entity_schema.py --all --force
+	@echo "✅ Schema regeneration complete!"
+	

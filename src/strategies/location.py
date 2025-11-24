@@ -1,46 +1,14 @@
-from .query import DatabaseQueryProxy
+from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
-SPECIFICATION: StrategySpecification = {
-    "key": "location",
-    "display_name": "Locations & Places",
-    "id_field": "location_id",
-    "label_field": "label",
-    "properties": [
-        {
-            "id": "place_name",
-            "name": "Place Name",
-            "type": "string",
-            "description": "Geographic place, locality, or administrative area name",
-        },
-    ],
-    "property_settings": {},
-    "sql_queries": {
-        "fuzzy_label_sql": """
-        select * from authority.fuzzy_locations(%(q)s, %(n)s);
-    """,
-        "details_sql": """
-            select  location_id as "ID",
-                    label as "Place Name",
-                    latitude as "Latitude",
-                    longitude as "Longitude",
-                    location_type as "Location Type",
-                    description as "Description"
-            from authority.locations
-            where location_id = %(id)s::int
-    """,
-    },
-}
 
-
-class LocationQueryProxy(DatabaseQueryProxy):
+class LocationRepository(BaseRepository):
     """Location-specific query proxy"""
 
 
-@Strategies.register(key="location")
+@Strategies.register(key="location", repository_cls=LocationRepository)
 class LocationReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 
-    def __init__(self, specification: dict[str, str] = None) -> None:
-        specification = specification or SPECIFICATION
-        super().__init__(specification, LocationQueryProxy)
+    def __init__(self, specification: StrategySpecification | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None) -> None:
+        super().__init__(specification=specification, repository_or_cls=repository_or_cls)

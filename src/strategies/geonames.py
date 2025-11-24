@@ -1,34 +1,27 @@
 import math
-from typing import Any
+from typing import Any, Literal
 
 from src.configuration.resolve import ConfigValue
 from src.geonames.proxy import GeoNamesProxy
+from src.utility import resolve_specification
 
-from .query import QueryProxy
+from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
-SPECIFICATION: StrategySpecification = {
-    "key": "geonames",
-    "display_name": "GeoNames Places",
-    "id_field": "geoname_id",
-    "label_field": "label",
-    "properties": [],
-    "property_settings": {},
-    "sql_queries": {},
-}
+# pylint: disable=unused-argument, too-many-instance-attributes
 
 
-class GeoNamesQueryProxy(QueryProxy):  # pylint: disable=too-many-instance-attributes
+class GeoNamesRepository(BaseRepository):
 
-    def __init__(self, specification: StrategySpecification, **kwargs) -> None:
+    def __init__(self, specification: StrategySpecification | str, **kwargs) -> None:
         super().__init__(specification, **kwargs)
-        self.username: str = kwargs.get("username") or ConfigValue("geonames.username", default="demo").resolve()
-        self.lang: str = kwargs.get("lang") or ConfigValue("geonames.lang", default="en").resolve()
+        self.username: str | None = kwargs.get("username") or ConfigValue("geonames.username").resolve() or "demo"
+        self.lang: str | None = kwargs.get("lang") or ConfigValue("geonames.lang").resolve() or "en"
         self.country_bias: str | None = kwargs.get("country_bias") or ConfigValue("geonames.country_bias").resolve()
-        self.fuzzy = float(kwargs.get("fuzzy") or ConfigValue("geonames.fuzzy", default=0.8).resolve())
-        self.feature_classes: tuple[str, ...] = tuple(kwargs.get("feature_classes") or ConfigValue("geonames.feature_classes", default=("P", "A")).resolve())
-        self.orderby: str = kwargs.get("orderby") or ConfigValue("geonames.orderby", default="relevance").resolve()
-        self.style: str = kwargs.get("style") or ConfigValue("geonames.style", default="FULL").resolve()
+        self.fuzzy: float = float(kwargs.get("fuzzy") or ConfigValue("geonames.fuzzy").resolve() or 0.8)
+        self.feature_classes: tuple[str, ...] = tuple(kwargs.get("feature_classes") or ConfigValue("geonames.feature_classes").resolve() or ("P", "A"))
+        self.orderby: Literal["relevance", "population"] = kwargs.get("orderby") or ConfigValue("geonames.orderby").resolve() or "relevance"
+        self.style: Literal["FULL", "SHORT", "MEDIUM"] = kwargs.get("style") or ConfigValue("geonames.style").resolve() or "FULL"
 
         self.proxy: GeoNamesProxy = GeoNamesProxy(username=self.username, lang=self.lang)
 
@@ -43,27 +36,27 @@ class GeoNamesQueryProxy(QueryProxy):  # pylint: disable=too-many-instance-attri
             style=self.style,
         )
 
-    async def get_details(self, entity_id: str, **kwargs) -> dict[str, Any] | None:  # pylint: disable=unused-argument
+    async def get_details(self, entity_id: str, **kwargs) -> dict[str, Any] | None:
         return await self.proxy.get_details(entity_id, **kwargs)
 
     async def fetch_by_alternate_identity(self, alternate_identity: str, **kwargs) -> list[dict[str, Any]]:
         raise NotImplementedError("Alternate identity lookup not implemented for GeoNames")
 
 
-@Strategies.register(key="geonames")
+@Strategies.register(key="geonames", repository_cls=GeoNamesRepository)
 class GeoNamesReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 
-    def __init__(self, specification: dict[str, str] = None) -> None:
-        key = (specification or SPECIFICATION).get("key", "geonames")
-        strategy_options: dict[str, Any] = ConfigValue(f"policy.{key}.geonames.options").resolve() or {}
-        proxy: QueryProxy = GeoNamesQueryProxy(SPECIFICATION, **strategy_options)
-        super().__init__(specification or SPECIFICATION, proxy)
+    def __init__(self, specification: dict[str, str] | str | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None) -> None:
+        specification = resolve_specification(specification=specification or self.key)
+        strategy_options: dict[str, Any] = ConfigValue(f"policy.{self.key}.geonames.options").resolve() or {}
+        proxy: BaseRepository = (repository_or_cls or self.repository_cls)(specification, **strategy_options)  # type: ignore[arg-type]
+        super().__init__(specification, proxy)
 
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:
         """Convert Geonames data to OpenRefine candidate format"""
         entity_id: str = str(entity_data["geonameId"])
-        admin_bits: list[str] = [entity_data.get("adminName1"), entity_data.get("countryName")]
+        admin_bits: list[Any] = [entity_data.get("adminName1"), entity_data.get("countryName")]
         admin_str: str = ", ".join([b for b in admin_bits if b])
         label: str = entity_data["name"] + (f", {admin_str}" if admin_str else "")
         candidate: dict[str, Any] = {
@@ -99,14 +92,14 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
         """
         properties = properties or {}
 
-        candidates: list[dict] = await self.get_proxy().find(query, limit, properties=properties)
+        candidates: list[dict] = await self.get_repository().find(query, limit, properties=properties)
 
         return sorted(candidates, key=lambda x: x.get("name_sim", 0), reverse=True)[:limit]
 
     async def get_details(self, entity_id: str, **kwargs) -> dict[str, Any] | None:
         """Fetch details for a specific entity."""
         options: dict[str, Any] = {k: v for k, v in kwargs.items() if k in ("lang", "style")}
-        return await self.get_proxy().get_details(entity_id=entity_id, **options)
+        return await self.get_repository().get_details(entity_id=entity_id, **options)
 
     def _geonames_type_for_refine(self, g: dict[str, Any]) -> dict[str, str]:
         fc = g.get("fcl")

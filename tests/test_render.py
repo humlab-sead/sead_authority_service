@@ -1,4 +1,4 @@
-from typing import LiteralString
+from typing import Any, LiteralString
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -13,7 +13,7 @@ ID_BASE = "https://w3id.org/sead/id/"
 # pylint: disable=attribute-defined-outside-init,protected-access, redefined-outer-name, unused-argument
 
 
-GET_DETAILS_DATA: dict[str, dict[str, str]] = {
+GET_DETAILS_DATA: dict[str, Any] = {
     "123": {
         "Name": "Test Site",
         "label": "Test Site Label",
@@ -141,6 +141,7 @@ class TestRenderPreview:
             mock_strategy_with_get_details(mock_strategies, GET_DETAILS_DATA["123"])
             result = await render_preview(uri)
 
+        assert isinstance(result, str)
         assert result.startswith("<!DOCTYPE html>")
         assert result.endswith("</html>")
         assert "<body>" in result

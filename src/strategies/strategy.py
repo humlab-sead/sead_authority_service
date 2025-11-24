@@ -1,41 +1,42 @@
 from abc import ABC
-from typing import Any, Type
+from typing import Any
 
 from src.configuration import ConfigValue
-from src.utility import Registry
+from src.utility import Registry, resolve_specification
 
 from . import StrategySpecification
-from .query import QueryProxy
+from .query import BaseRepository
 
 
 class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
-    def __init__(self, specification: StrategySpecification, proxy_or_cls: Type[QueryProxy] | QueryProxy) -> None:
-        self.specification: StrategySpecification = specification or {
-            "key": "unknown",
-            "id_field": "id",
-            "label_field": "name",
-            "properties": [],
-            "property_settings": {},
-            "sql_queries": {},
-        }
-        self._proxy_or_cls: Type[QueryProxy] = proxy_or_cls
-        self._proxy: QueryProxy | None = None
+    repository_cls: type[BaseRepository] = BaseRepository
+
+    def __init__(
+        self, specification: StrategySpecification | str | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None
+    ) -> None:
+
+        self.specification: StrategySpecification = resolve_specification(specification=specification or self.key)
+        self.entity_config: dict[str, Any] = ConfigValue(f"table_specs.{self.key}").resolve() or {}
+        self.repository_instance_or_cls: type[BaseRepository] | BaseRepository | None = repository_or_cls or self.repository_cls
+        self.repository: BaseRepository | None = None
 
     @property
     def key(self) -> str:
         """Return the unique key for this strategy, if registered, else 'unknown'"""
         return getattr(self, "_registry_key", "unknown")
 
-    def get_proxy(self) -> QueryProxy:
+    def get_repository(self) -> BaseRepository:
         """Return an instance of the query proxy for this strategy"""
-        if not self._proxy:
-            if isinstance(self._proxy_or_cls, QueryProxy):
-                self._proxy = self._proxy_or_cls
+        if not self.repository:
+            if isinstance(self.repository_instance_or_cls, BaseRepository):
+                self.repository = self.repository_instance_or_cls
+            elif self.repository_instance_or_cls is not None:
+                self.repository = self.repository_instance_or_cls(self.specification)
             else:
-                self._proxy = self._proxy_or_cls(self.specification)
-        return self._proxy
+                raise ValueError(f"No proxy configured for strategy {self.key}")
+        return self.repository
 
     def get_entity_id_field(self) -> str:
         """Return the ID field name for this entity type"""
@@ -51,7 +52,9 @@ class ReconciliationStrategy(ABC):
 
     def get_display_name(self) -> str:
         """Return human-readable display name for this entity type"""
-        return self.specification.get("display_name", self.get_id_path().replace("_", " ").title())
+        if "display_name" in self.specification:
+            return self.specification["display_name"]
+        return self.key.replace("_", " ").title()
 
     def get_properties_meta(self) -> list[dict[str, str]]:
         """Return metadata for entity-specific properties used in enhanced reconciliation"""
@@ -64,7 +67,7 @@ class ReconciliationStrategy(ABC):
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:
         """Convert entity data to OpenRefine candidate format"""
         auto_accept_threshold: float = ConfigValue("options:auto_accept_threshold").resolve() or 0.85
-        id_base: str = ConfigValue("options:id_base").resolve()
+        id_base: str = ConfigValue("options:id_base").resolve() or ""
 
         entity_id: str = entity_data[self.get_entity_id_field()]
         label: str = entity_data[self.get_label_field()]
@@ -93,14 +96,14 @@ class ReconciliationStrategy(ABC):
         """
         properties = properties or {}
 
-        candidates: list[dict] = await self._find_candidates(query, properties, limit, self.get_proxy())
+        candidates: list[dict] = await self._find_candidates(query, properties, limit, self.get_repository())
 
         return sorted(candidates, key=lambda x: x.get("name_sim", x.get("score", 0)), reverse=True)[:limit]
 
     async def _find_candidates(self, query, properties, limit, proxy) -> list[dict]:
         """Internal method to find candidates, can be overridden by subclasses"""
         candidates: list[dict] = []
-        alternate_identity_field: str = self.specification.get("alternate_identity_field")
+        alternate_identity_field: str | None = self.specification.get("alternate_identity_field")
 
         if alternate_identity_field and properties.get(alternate_identity_field, None):
             candidates.extend(await proxy.fetch_by_alternate_identity(properties[alternate_identity_field]))
@@ -110,12 +113,20 @@ class ReconciliationStrategy(ABC):
 
     async def get_details(self, entity_id: str) -> dict[str, Any] | None:
         """Fetch details for a specific entity."""
-        return await self.get_proxy().get_details(entity_id)
+        return await self.get_repository().get_details(entity_id)
 
 
 class StrategyRegistry(Registry):
 
-    items: dict[str, ReconciliationStrategy] = {}
+    items: dict[str, type[ReconciliationStrategy]] = {}
+
+    @classmethod
+    def registered_class_hook(cls, fn_or_class: Any, **args) -> Any:
+        if args.get("type") != "function":
+            if args.get("repository_cls"):
+                if hasattr(fn_or_class, "repository_cls"):
+                    setattr(fn_or_class, "repository_cls", staticmethod(args["repository_cls"]))
+        return fn_or_class
 
 
 Strategies: StrategyRegistry = StrategyRegistry()

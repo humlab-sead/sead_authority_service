@@ -9,7 +9,9 @@ from typing import Any, Type
 import yaml
 from dotenv import load_dotenv
 
-from src.utility import dget, dotexists, dotset, env2dict, replace_env_vars
+from src.utility import dget, dotexists, dotset, env2dict, replace_env_vars, replace_references
+
+from .interface import ConfigLike
 
 # pylint: disable=too-many-arguments
 
@@ -22,7 +24,7 @@ def yaml_path_join(loader: yaml.Loader, node: yaml.SequenceNode) -> str:
     return join(*[str(i) for i in loader.construct_sequence(node)])
 
 
-def nj(*paths: str | None) -> str | None:
+def nj(*paths: str) -> str | None:
     return normpath(join(*paths)) if None not in paths else None
 
 
@@ -38,23 +40,23 @@ class SafeLoaderIgnoreUnknown(yaml.SafeLoader):  # pylint: disable=too-many-ance
         return None
 
 
-SafeLoaderIgnoreUnknown.add_constructor(None, SafeLoaderIgnoreUnknown.let_unknown_through)
+SafeLoaderIgnoreUnknown.add_constructor(None, SafeLoaderIgnoreUnknown.let_unknown_through)  # type: ignore
 SafeLoaderIgnoreUnknown.add_constructor("!join", yaml_str_join)
 SafeLoaderIgnoreUnknown.add_constructor("!jj", yaml_path_join)
 SafeLoaderIgnoreUnknown.add_constructor("!path_join", yaml_path_join)
 
 
-class Config:
+class Config(ConfigLike):
     """Container for configuration elements."""
 
     def __init__(
         self,
         *,
-        data: dict = None,
+        data: dict[str, Any] | None = None,
         context: str = "default",
         filename: str | None = None,
-    ):
-        self.data: dict = data
+    ) -> None:
+        self.data: dict[str, Any] = data or {}
         self.context: str = context
         self.filename: str | None = filename
 
@@ -93,21 +95,21 @@ class ConfigFactory:
     def load(
         self,
         *,
-        source: str | dict | Config = None,
-        context: str = None,
+        source: str | dict[str, Any] | ConfigLike | None = None,
+        context: str | None = None,
         env_filename: str | None = None,
-        env_prefix: str = None,
-    ) -> "Config":
+        env_prefix: str | None = None,
+    ) -> Config | ConfigLike:
 
         load_dotenv(dotenv_path=env_filename)
 
-        if isinstance(source, Config):
+        if isinstance(source, (Config, ConfigLike)):
             return source
 
         if source is None:
             source = {}
 
-        data: dict = (
+        data: dict[str, Any] = (
             (
                 yaml.load(
                     Path(source).read_text(encoding="utf-8"),
@@ -120,19 +122,30 @@ class ConfigFactory:
             else source
         )
 
-        if not isinstance(data, dict):
-            raise TypeError(f"expected dict, found '{type(data)}'")
+        # Handle empty YAML files (loads as None)
+        if data is None:
+            data = {}
+
+        assert isinstance(data, dict)
+
+        # Resolve sub-configurations by loading referenced files recursively
+        data = self._resolve_sub_configs(
+            data, context=context, env_filename=env_filename, env_prefix=env_prefix, source_path=source if isinstance(source, str) else None
+        )
 
         # Update data based on environment variables with a name that starts with `env_prefix`
-        data = env2dict(env_prefix, data)
+        if env_prefix:
+            data = env2dict(env_prefix, data)
 
         # Do a recursive replace of values with pattern "${ENV_NAME}" with value of environment
-        data = replace_env_vars(data)
+        data = replace_env_vars(data)  # type: ignore
+
+        data = replace_references(data)  # type: ignore
 
         return Config(
             data=data,
             context=context or "default",
-            filename=source if self.is_config_path(source) else None,
+            filename=source if isinstance(source, str) and self.is_config_path(source) else None,
         )
 
     @staticmethod
@@ -145,3 +158,40 @@ class ConfigFactory:
         if raise_if_missing and not Path(source).exists():
             raise FileNotFoundError(f"Configuration file not found: {source}")
         return True
+
+    def _resolve_sub_configs(
+        self,
+        data: dict,
+        *,
+        context: str | None = None,
+        env_filename: str | None = None,
+        env_prefix: str | None = None,
+        source_path: str | None = None,
+    ) -> dict:
+        """Recursively resolve sub-configurations referenced in the main configuration.
+
+        A sub-config is referenced using the @include: prefix, e.g. "@include:path/to/subconfig.yaml"
+        Relative paths are resolved relative to the main configuration file.
+        Sub-configs can themselves reference further sub-configs.
+
+        Example:
+            database: "@include:config/database.yml"
+            api: "@include:config/api.yml"
+        """
+
+        def _resolve(value: Any, base_path: Path | None) -> Any:
+            if isinstance(value, dict):
+                return {k: _resolve(v, base_path) for k, v in value.items()}
+            if isinstance(value, list):
+                return [_resolve(v, base_path) for v in value]
+            if isinstance(value, str) and value.startswith("@include"):
+                sub_config_path: str = value[8:].lstrip(":").strip()  # Remove "@include:" prefix
+                if not Path(sub_config_path).is_absolute() and base_path is not None:
+                    sub_config_path = str(base_path.parent / sub_config_path)
+                loaded_data = ConfigFactory().load(source=sub_config_path, context=context, env_filename=env_filename, env_prefix=env_prefix).data
+                return _resolve(loaded_data, Path(sub_config_path))
+            return value
+
+        # Determine base path from source_path if available
+        initial_base_path = Path(source_path) if source_path and self.is_config_path(source_path, raise_if_missing=False) else None
+        return _resolve(data, initial_base_path)

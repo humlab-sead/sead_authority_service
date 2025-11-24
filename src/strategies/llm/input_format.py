@@ -133,7 +133,7 @@ def format_rows_for_llm(  # pylint: disable=too-many-arguments, too-many-locals
     target_format: Literal["auto", "markdown", "csv", "json"] = "auto",
     sep: str = "|",
     column_map: dict[str, str] | None = None,  # e.g. {"id": "biblio_id", "label": "title", "description": "authors"},
-    logical_keys: list[str] = None,
+    logical_keys: list[str] | None = None,
 ) -> tuple[str, str]:
     """
     Format SQL-style rows into markdown/csv/json for LLM use.
@@ -150,22 +150,22 @@ def format_rows_for_llm(  # pylint: disable=too-many-arguments, too-many-locals
     if len(rows or []) == 0:
         return "_(no rows)_", "No records available."
 
-    logical_keys: list[str] = logical_keys or ["id", "label", "description"]
+    keys: list[str] = logical_keys or ["id", "label", "description"]
     data_keys: set[str] = set(rows[0].keys())
 
     """ Build default mapping from logical keys that exist in the data """
-    default_map: dict[str, str] = {k: k for k in logical_keys if k in data_keys}
+    default_map: dict[str, str] = {k: k for k in keys if k in data_keys}
     if not default_map:
         default_map = {"id": list(data_keys)[0]}  # Fallback to first column as 'id'
     """ Merge with user-provided mapping, prioritizing user map """
     column_map = default_map | (column_map or {})
 
     """ Validate that all map keys are from the logical keys """
-    if not all(k in logical_keys for k in (column_map or {}).keys()):
-        raise KeyError(f"Map keys must all be from ({', '.join(logical_keys)})")
+    if not all(k in keys for k in (column_map or {}).keys()):
+        raise KeyError(f"Map keys must all be from ({', '.join(keys)})")
 
     """ Ensure correct  column order """
-    normalized_column_keys: list[str] = [k for k in logical_keys if k in column_map]
+    normalized_column_keys: list[str] = [k for k in keys if k in column_map]
 
     # if "id" not in normalized_column_keys or "label" not in normalized_column_keys:
     #     raise ValueError("column_map must at least map 'id' and 'label' keys")

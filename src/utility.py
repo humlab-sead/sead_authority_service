@@ -1,10 +1,37 @@
 import importlib
 import os
 import sys
+import unicodedata
 from datetime import datetime
 from typing import Any, Callable, Literal
 
+import yaml
 from loguru import logger
+
+
+def normalize_text(text: str) -> str:
+    """
+    Normalize text to match PostgreSQL's authority.immutable_unaccent(lower(text)).
+
+    Steps:
+    1. Convert to lowercase
+    2. Remove accents/diacritics using Unicode NFD normalization
+
+    This ensures consistency with PostgreSQL trigram matching and embeddings.
+    """
+    if not text:
+        return ""
+
+    # Step 1: Lowercase
+    text = text.lower()
+
+    # Step 2: Remove accents (unaccent equivalent)
+    # NFD = Canonical Decomposition (separates base chars from combining diacritics)
+    # Filter out combining characters (category 'Mn' = Mark, nonspacing)
+    text = unicodedata.normalize("NFD", text)
+    text = "".join(char for char in text if unicodedata.category(char) != "Mn")
+
+    return text
 
 
 def recursive_update(d1: dict, d2: dict) -> dict:
@@ -42,11 +69,11 @@ def recursive_filter_dict(data: dict[str, Any], filter_keys: set[str], filter_mo
     }
 
 
-def dget(data: dict, *path: str | list[str], default: Any = None) -> Any:
+def dget(data: dict, *path: str, default: Any = None) -> Any:
     if path is None or not data:
         return default
 
-    ps: list[str] = path if isinstance(path, (list, tuple)) else [path]
+    ps: list[str] = list(path)
 
     d = None
 
@@ -59,7 +86,7 @@ def dget(data: dict, *path: str | list[str], default: Any = None) -> Any:
     return d or default
 
 
-def dotexists(data: dict, *paths: list[str]) -> bool:
+def dotexists(data: dict, *paths: str) -> bool:
     for path in paths:
         if dotget(data, path, default="@@") != "@@":
             return True
@@ -90,9 +117,9 @@ def dotget(data: dict, path: str, default: Any = None) -> Any:
     if path is x:y:y then element is search using borh x.y.y or x_y_y."""
 
     for key in dotexpand(path):
-        d: dict = data
+        d: dict | None = data
         for attr in key.split("."):
-            d: dict = d.get(attr) if isinstance(d, dict) else None
+            d = d.get(attr) if isinstance(d, dict) else None
             if d is None:
                 break
         if d is not None:
@@ -130,7 +157,7 @@ def env2dict(prefix: str, data: dict[str, str] | None = None, lower_key: bool = 
     return data
 
 
-def configure_logging(opts: dict[str, str]) -> None:
+def configure_logging(opts: dict[str, Any] | None = None) -> None:
 
     logger.remove()
     logger.add(
@@ -180,7 +207,7 @@ def _ensure_key_property(cls):
     return cls
 
 
-def replace_env_vars(data: Any) -> Any:
+def replace_env_vars(data: dict[str, Any] | list[Any] | str) -> dict[str, Any] | list[Any] | str:
     """Searches dict data recursively for values that are strings and matches £´${ENV_VAR} and replaces value with os.getenv("ENV_VAR", "")"""
     if isinstance(data, dict):
         return {k: replace_env_vars(v) for k, v in data.items()}
@@ -190,6 +217,26 @@ def replace_env_vars(data: Any) -> Any:
         env_var: str = data[2:-1]
         return os.getenv(env_var, "")
     return data
+
+
+def _replace_references(data: dict[str, Any] | list[Any] | str, full_data: dict[str, Any] | list[Any] | str) -> dict[str, Any] | list[Any] | str:
+    """Helper function for replace_references"""
+    if isinstance(data, dict):
+        return {k: _replace_references(v, full_data=full_data) for k, v in data.items()}
+    if isinstance(data, list):
+        return [_replace_references(i, full_data=full_data) for i in data]
+    if isinstance(data, str) and data.startswith("include:"):
+        ref_path: str = data[len("include:") :]
+        ref_value: Any = dotget(full_data, ref_path)  # type: ignore
+        ref_value = _replace_references(ref_value, full_data=full_data)
+        return ref_value if ref_value is not None else data
+    return data
+
+
+def replace_references(data: dict[str, Any] | list[Any] | str) -> dict[str, Any] | list[Any] | str:
+    """Searches dict recursively for values that are 1) strings and 2) matches £´include:some.path.to.value}
+    and replaces this reference with value found at some.path.to.value"""
+    return _replace_references(data, full_data=data)
 
 
 class Registry:
@@ -212,6 +259,8 @@ class Registry:
                 fn_or_class = _ensure_key_property(fn_or_class)
 
             cls.items[key] = fn_or_class
+
+            fn_or_class = cls.registered_class_hook(fn_or_class, **args)
             return fn_or_class
 
         return decorator
@@ -219,6 +268,10 @@ class Registry:
     @classmethod
     def is_registered(cls, key: str) -> bool:
         return key in cls.items
+
+    @classmethod
+    def registered_class_hook(cls, fn_or_class: Any, **args) -> Any:  # pylint: disable=unused-argument
+        return fn_or_class
 
 
 def create_db_uri(*, host: str, port: int | str, user: str, dbname: str) -> str:
@@ -236,3 +289,30 @@ def get_connection_uri(connection: Any) -> str:
     dbname: str = conn_info.get("dbname")
     uri: str = f"postgresql://{user}@{host}:{port}/{dbname}"
     return uri
+
+
+def load_resource_yaml(key: str) -> dict[str, Any] | None:
+    """Loads a resource YAML file from the resources folder."""
+
+    resource_path: str = os.path.join(os.path.dirname(__file__), "resources", f"{key}.yml")
+    if not os.path.exists(resource_path):
+        return None
+
+    with open(resource_path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def resolve_specification(specification: dict[str, Any] | str | None) -> dict[str, Any]:
+    """Resolves a specification which can be either a dict or a resource key string."""
+    if isinstance(specification, dict):
+        return specification
+    if isinstance(specification, str):
+        return load_resource_yaml(specification)  # type: ignore
+    return {
+        "key": "unknown",
+        "id_field": "id",
+        "label_field": "name",
+        "properties": [],
+        "property_settings": {},
+        "sql_queries": {},
+    }
