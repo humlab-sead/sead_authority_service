@@ -14,9 +14,9 @@ import psycopg
 import pytest
 from loguru import logger
 
-from configuration.config import Config
-from configuration.interface import ConfigLike
 from src.configuration import ConfigFactory, MockConfigProvider, set_config_provider
+from src.configuration.config import Config
+from src.configuration.interface import ConfigLike
 from src.reconcile import reconcile_queries
 from src.strategies.query import BaseRepository
 from src.strategies.site import SiteReconciliationStrategy, SiteRepository
