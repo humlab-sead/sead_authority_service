@@ -218,8 +218,9 @@ def replace_env_vars(data: dict[str, Any] | list[Any] | str) -> dict[str, Any] |
         return os.getenv(env_var, "")
     return data
 
+
 def _replace_references(data: dict[str, Any] | list[Any] | str, full_data: dict[str, Any] | list[Any] | str) -> dict[str, Any] | list[Any] | str:
-    """Searches dict data recursively for values that are strings and matches £´include:some.path.to.value} and replaces value with data at some.path.to.value"""
+    """Helper function for replace_references"""
     if isinstance(data, dict):
         return {k: _replace_references(v, full_data=full_data) for k, v in data.items()}
     if isinstance(data, list):
@@ -231,9 +232,12 @@ def _replace_references(data: dict[str, Any] | list[Any] | str, full_data: dict[
         return ref_value if ref_value is not None else data
     return data
 
+
 def replace_references(data: dict[str, Any] | list[Any] | str) -> dict[str, Any] | list[Any] | str:
-    """Searches dict data recursively for values that are strings and matches £´include:some.path.to.value} and replaces value with data at some.path.to.value"""
+    """Searches dict recursively for values that are 1) strings and 2) matches £´include:some.path.to.value}
+    and replaces this reference with value found at some.path.to.value"""
     return _replace_references(data, full_data=data)
+
 
 class Registry:
     items: dict = {}
