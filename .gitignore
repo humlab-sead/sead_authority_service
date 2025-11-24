@@ -116,3 +116,4 @@ bin
 *.out
 deprecated
 output.xlsx
+**/output
