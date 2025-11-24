@@ -15,12 +15,12 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from configuration.config import ConfigFactory
-from configuration.interface import ConfigLike
-from configuration.setup import _setup_connection_factory
 from src.configuration import get_connection
+from src.configuration.config import ConfigFactory
+from src.configuration.interface import ConfigLike
 from src.configuration.provider import MockConfigProvider
 from src.configuration.resolve import ConfigValue
+from src.configuration.setup import _setup_connection_factory
 from src.mcp import (
     Candidate,
     GetByIdParams,
