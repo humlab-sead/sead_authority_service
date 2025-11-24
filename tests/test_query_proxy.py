@@ -7,8 +7,8 @@ from src.strategies.dimension import DimensionRepository
 from src.strategies.feature_type import FeatureTypeRepository
 from src.strategies.location import LocationRepository
 from src.strategies.method import MethodRepository
+from src.strategies.query import BaseRepository
 from src.strategies.site import SiteRepository
-from strategies.query import BaseRepository
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 

@@ -7,7 +7,7 @@ from psycopg.rows import dict_row, tuple_row
 
 from src.configuration.resolve import ConfigValue
 from src.configuration.setup import get_connection
-from utility import resolve_specification
+from src.utility import resolve_specification
 
 from . import StrategySpecification
 

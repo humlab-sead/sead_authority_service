@@ -7,10 +7,9 @@ from dataclasses import dataclass
 
 from loguru import logger
 
-from llm.providers.provider import LLMProvider
-
 # from llm.providers.client import LLMClient
 from src.configuration import ConfigValue
+from src.llm.providers.provider import LLMProvider
 
 
 @dataclass

@@ -1,6 +1,6 @@
 from typing import Any
 
-from strategies.query import BaseRepository
+from src.strategies.query import BaseRepository
 
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
