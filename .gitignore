@@ -115,3 +115,4 @@ bin
 *.pid
 *.out
 deprecated
+output.xlsx
