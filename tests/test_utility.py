@@ -644,7 +644,11 @@ class TestReplaceReferences:
 
     def test_replace_references_nested_path_reference(self):
         """Test replace_references with nested dotpath reference."""
-        data = {"config": {"database": {"host": "localhost", "port": 5432}}, "db_host": "include:config.database.host", "db_port": "include:config.database.port"}
+        data = {
+            "config": {"database": {"host": "localhost", "port": 5432}},
+            "db_host": "include:config.database.host",
+            "db_port": "include:config.database.port",
+        }
         result = replace_references(data)
         assert result == {"config": {"database": {"host": "localhost", "port": 5432}}, "db_host": "localhost", "db_port": 5432}
 
@@ -682,9 +686,17 @@ class TestReplaceReferences:
     def test_replace_references_mixed_list_and_dict(self):
         """Test replace_references with mixed list and dict structures."""
         # dotget doesn't support numeric indices, so we reference the whole list instead
-        data = {"primary_server": {"name": "server1", "host": "host1.com"}, "servers": [{"name": "server1", "host": "host1.com"}, {"name": "server2", "host": "host2.com"}], "primary_host": "include:primary_server.host"}
+        data = {
+            "primary_server": {"name": "server1", "host": "host1.com"},
+            "servers": [{"name": "server1", "host": "host1.com"}, {"name": "server2", "host": "host2.com"}],
+            "primary_host": "include:primary_server.host",
+        }
         result = replace_references(data)
-        assert result == {"primary_server": {"name": "server1", "host": "host1.com"}, "servers": [{"name": "server1", "host": "host1.com"}, {"name": "server2", "host": "host2.com"}], "primary_host": "host1.com"}
+        assert result == {
+            "primary_server": {"name": "server1", "host": "host1.com"},
+            "servers": [{"name": "server1", "host": "host1.com"}, {"name": "server2", "host": "host2.com"}],
+            "primary_host": "host1.com",
+        }
 
     def test_replace_references_recursive_resolution(self):
         """Test replace_references with reference pointing to another reference."""
