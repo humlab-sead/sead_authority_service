@@ -14,6 +14,8 @@ from src.configuration.resolve import ConfigValue
 
 from .models import Candidate, GetByIdParams, GetByIdResult, RawScores, SearchLookupParams, SearchLookupResult
 
+# pylint: disable=fixme
+
 
 class MCPTools:
     """Implements MCP tool operations over SEAD authority database"""

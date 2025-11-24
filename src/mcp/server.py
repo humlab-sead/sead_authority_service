@@ -16,6 +16,7 @@ from .resources import MCPResources
 from .tools import MCPTools
 
 # pylint: disable=too-many-positional-arguments
+# pylint: disable=fixme
 
 
 class SEADMCPServer:
