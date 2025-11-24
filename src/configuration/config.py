@@ -9,8 +9,9 @@ from typing import Any, Type
 import yaml
 from dotenv import load_dotenv
 
-from .interface import ConfigLike
 from src.utility import dget, dotexists, dotset, env2dict, replace_env_vars, replace_references
+
+from .interface import ConfigLike
 
 # pylint: disable=too-many-arguments
 
@@ -140,7 +141,7 @@ class ConfigFactory:
         data = replace_env_vars(data)  # type: ignore
 
         data = replace_references(data)  # type: ignore
-        
+
         return Config(
             data=data,
             context=context or "default",
