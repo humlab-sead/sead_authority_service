@@ -9,9 +9,10 @@ from typing import Any, Type
 import yaml
 from dotenv import load_dotenv
 
-from src.utility import dget, dotexists, dotset, env2dict, replace_env_vars, replace_references
+from src.utility import dget, dotexists, dotset, env2dict, replace_env_vars
 
 from .interface import ConfigLike
+from .utility import replace_references
 
 # pylint: disable=too-many-arguments
 
