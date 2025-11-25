@@ -218,6 +218,7 @@ def replace_env_vars(data: dict[str, Any] | list[Any] | str) -> dict[str, Any] |
         return os.getenv(env_var, "")
     return data
 
+
 class Registry:
     items: dict = {}
 

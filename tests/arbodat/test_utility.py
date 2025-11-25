@@ -1,7 +1,8 @@
 """Unit tests for arbodat utility configuration classes."""
 
 import pytest
-from src.arbodat.utility import UnnestConfig, TableConfig, TablesConfig, ForeignKeyConfig
+
+from src.arbodat.utility import ForeignKeyConfig, TableConfig, TablesConfig, UnnestConfig
 
 
 class TestUnnestConfig:

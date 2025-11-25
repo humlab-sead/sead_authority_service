@@ -1,7 +1,9 @@
 import asyncio
 import os
+
 from src.arbodat.workflow import workflow
 from src.configuration.setup import setup_config_store
+
 
 def test_workflow():
 
@@ -11,7 +13,7 @@ def test_workflow():
 
     if os.path.exists("output.xlsx"):
         os.remove("output.xlsx")
-        
+
     assert not os.path.exists("output.xlsx")
     workflow(
         input_csv="src/arbodat/input/arbodat_mal_elena_input.csv",

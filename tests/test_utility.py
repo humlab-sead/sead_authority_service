@@ -629,6 +629,8 @@ class TestDatabaseUtilities:
         uri = get_connection_uri(mock_connection)
         expected = "postgresql://None@localhost:5432/testdb"
         assert uri == expected
+
+
 class TestIntegration:
     """Integration tests combining multiple utility functions."""
 

@@ -7,7 +7,6 @@ import pytest
 
 from src.configuration import Config, ConfigFactory, ConfigProvider, ConfigStore, ConfigValue, MockConfigProvider, set_config_provider
 from src.configuration.utility import replace_references
-
 from src.utility import replace_env_vars
 from tests.decorators import with_test_config
 
