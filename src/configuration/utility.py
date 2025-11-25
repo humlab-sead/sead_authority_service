@@ -2,6 +2,8 @@ from typing import Any
 
 import yaml
 
+from src.utility import dotget
+
 
 def _parse_list_expression(expr: str, full_data: dict[str, Any]) -> list[Any] | str:
     """
@@ -25,7 +27,6 @@ def _parse_list_expression(expr: str, full_data: dict[str, Any]) -> list[Any] | 
     Returns:
         Evaluated list or original expression if not a list operation or if parsing fails
     """
-    import re
 
     # Quick check: no list operations present
     if "include:" not in expr and "[" not in expr:
@@ -112,7 +113,7 @@ def _parse_list_expression(expr: str, full_data: dict[str, Any]) -> list[Any] | 
                     result.extend(list_value)
                 else:
                     result.append(list_value)
-            except Exception:
+            except:  # pylint: disable=bare-except
                 return expr  # Parse error: return original
 
     return result if result else expr
