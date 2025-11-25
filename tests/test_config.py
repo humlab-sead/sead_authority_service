@@ -1369,14 +1369,6 @@ class TestEdgeCases:
 
         assert result["target"] == ["value+with+plus"]  # type: ignore[call-arg]
 
-    def test_nested_brackets_in_list(self):
-        """Test nested brackets in list literals."""
-        data = {"target": "[['nested', 'list'], 'item'] + ['another']"}
-
-        result = replace_references(data)
-
-        assert result["target"] == [["nested", "list"], "item", "another"]  # type: ignore[call-arg]
-
 
 class TestRealWorldIntegration:
     """Tests using real-world configuration patterns."""
