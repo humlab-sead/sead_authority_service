@@ -135,7 +135,7 @@ class TestTableConfig:
             "site": {
                 "surrogate_id": "site_id",
                 "columns": ["site_name"],
-                "foreign_keys": [{"entity": "location", "local_keys": ["location_id"], "remote_keys": ["location_id"]}]
+                "foreign_keys": [{"entity": "location", "local_keys": ["location_id"], "remote_keys": ["location_id"]}],
             },
             "location": {"surrogate_id": "location_id", "columns": ["location_name"]},
         }
@@ -214,7 +214,7 @@ class TestTableConfig:
                 "foreign_keys": [
                     {"entity": "location", "local_keys": ["location_id", "location_type"], "remote_keys": ["location_id", "location_type"]},
                     {"entity": "region", "local_keys": ["region_id"], "remote_keys": ["region_id"]},
-                ]
+                ],
             },
             "location": {"surrogate_id": "location_id"},
             "region": {"surrogate_id": "region_id"},
@@ -235,7 +235,7 @@ class TestTableConfig:
                 "surrogate_id": "site_id",
                 "keys": ["site_name"],
                 "columns": ["site_name", "description", "location_id"],
-                "foreign_keys": [{"entity": "location", "local_keys": ["location_id", "location_type"], "remote_keys": ["location_id", "location_type"]}]
+                "foreign_keys": [{"entity": "location", "local_keys": ["location_id", "location_type"], "remote_keys": ["location_id", "location_type"]}],
             },
             "location": {"surrogate_id": "location_id"},
         }
@@ -383,9 +383,7 @@ class TestIntegration:
                 "options": {
                     "drop_duplicates": ["ProjektNr", "Fustel"],
                 },
-                "foreign_keys": [
-                    {"entity": "location", "local_keys": ["location_type", "location_name"], "remote_keys": ["location_type", "location_name"]}
-                ],
+                "foreign_keys": [{"entity": "location", "local_keys": ["location_type", "location_name"], "remote_keys": ["location_type", "location_name"]}],
                 "depends_on": ["location"],
             },
         }

@@ -355,7 +355,7 @@ class TestRegistry:
 
     def setup_method(self):
         """Clear registry before each test."""
-        Registry.items = {}
+        Registry[object].items = {}  # type: ignore
 
     def test_register_function(self):
         """Test registering a function."""
