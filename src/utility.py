@@ -3,7 +3,7 @@ import os
 import sys
 import unicodedata
 from datetime import datetime
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Generic, Literal, TypeVar
 
 import yaml
 from loguru import logger
@@ -219,14 +219,17 @@ def replace_env_vars(data: dict[str, Any] | list[Any] | str) -> dict[str, Any] |
     return data
 
 
-class Registry:
-    items: dict = {}
+T = TypeVar("T")
+
+
+class Registry(Generic[T]):
+    items: dict[str, T] = {}
 
     @classmethod
-    def get(cls, key: str) -> Any | None:
+    def get(cls, key: str) -> T:
         if key not in cls.items:
             raise KeyError(f"preprocessor {key} is not registered")
-        return cls.items.get(key)
+        return cls.items[key]
 
     @classmethod
     def register(cls, **args) -> Callable[..., Any]:
