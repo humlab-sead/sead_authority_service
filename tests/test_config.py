@@ -1,10 +1,14 @@
+import os
 from pathlib import Path
+from typing import Any
+from unittest.mock import patch
 
 import pytest
 
 from src.configuration import Config, ConfigFactory, ConfigProvider, ConfigStore, ConfigValue, MockConfigProvider, set_config_provider
 from src.configuration.utility import replace_references
 
+from src.utility import replace_env_vars
 from tests.decorators import with_test_config
 
 # pylint: disable=unused-argument
@@ -1144,3 +1148,434 @@ class TestReplaceReferences:
         assert result == {"value": "original", "ref": "original"}
 
 
+class TestListOperations:
+    """Tests for list operations with include directives."""
+
+    def test_simple_include_still_works(self):
+        """Test that simple include directive still works as before."""
+        data = {"source": ["a", "b", "c"], "target": "include: source"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c"]  # type: ignore[call-arg]
+
+    def test_prepend_items_to_included_list(self):
+        """Test prepending items to an included list."""
+        data = {"source": ["b", "c"], "target": "['a'] + include: source"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c"]  # type: ignore[call-arg]
+
+    def test_append_items_to_included_list(self):
+        """Test appending items to an included list."""
+        data = {"source": ["a", "b"], "target": "include: source + ['c']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c"]  # type: ignore[call-arg]
+
+    def test_prepend_and_append(self):
+        """Test prepending and appending items to an included list."""
+        data = {"source": ["b", "c"], "target": "['a'] + include: source + ['d']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c", "d"]  # type: ignore[call-arg]
+
+    def test_multiple_includes(self):
+        """Test concatenating multiple included lists."""
+        data = {"list1": ["a", "b"], "list2": ["c", "d"], "target": "include: list1 + include: list2"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c", "d"]  # type: ignore[call-arg]
+
+    def test_multiple_includes_with_literals(self):
+        """Test complex expression with multiple includes and literals."""
+        data = {"list1": ["b"], "list2": ["d"], "target": "['a'] + include: list1 + ['c'] + include: list2 + ['e']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c", "d", "e"]  # type: ignore[call-arg]
+
+    def test_nested_path_reference(self):
+        """Test include with nested path."""
+        data = {"entities": {"sample": {"columns": ["col1", "col2", "col3"]}}, "target": "include: entities.sample.columns"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["col1", "col2", "col3"]  # type: ignore[call-arg]
+
+    def test_nested_path_with_operations(self):
+        """Test list operations with nested path references."""
+        data = {"entities": {"sample": {"columns": ["col2", "col3"]}}, "target": "['col1'] + include: entities.sample.columns"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["col1", "col2", "col3"]  # type: ignore[call-arg]
+
+    def test_list_with_strings(self):
+        """Test list operations with string values."""
+        data = {"source": ["value1", "value2"], "target": "['prefix'] + include: source + ['suffix']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["prefix", "value1", "value2", "suffix"]  # type: ignore[call-arg]
+
+    def test_list_with_numbers(self):
+        """Test list operations with numeric values."""
+        data = {"source": [2, 3], "target": "[1] + include: source + [4]"}
+
+        result = replace_references(data)
+
+        assert result["target"] == [1, 2, 3, 4]  # type: ignore[call-arg]
+
+    def test_multiple_list_literals(self):
+        """Test multiple list literals without include."""
+        data = {"target": "['a', 'b'] + ['c', 'd']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c", "d"]  # type: ignore[call-arg]
+
+    def test_empty_list_operations(self):
+        """Test operations with empty lists."""
+        data = {"source": [], "target": "['a'] + include: source + ['b']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b"]  # type: ignore[call-arg]
+
+    def test_whitespace_handling(self):
+        """Test that whitespace in expressions is handled correctly."""
+        data = {"source": ["b"], "target": "  ['a']   +   include: source   +   ['c']  "}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c"]  # type: ignore[call-arg]
+
+    def test_recursive_includes(self):
+        """Test that included lists can themselves contain include directives."""
+        data = {"base": ["a", "b"], "extended": "include: base", "target": "['x'] + include: extended + ['y']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["x", "a", "b", "y"]  # type: ignore[call-arg]
+
+    def test_nonexistent_path_in_operation(self):
+        """Test handling of nonexistent paths in list operations."""
+        data = {"target": "['a'] + include: nonexistent.path + ['b']"}
+
+        result = replace_references(data)
+
+        # Should skip the nonexistent reference and concatenate what exists
+        assert result["target"] == ["a", "b"]  # type: ignore[call-arg]
+
+    def test_non_list_value_in_include(self):
+        """Test including a non-list value in a list operation."""
+        data = {"source": "single_value", "target": "['a'] + include: source + ['b']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "single_value", "b"]  # type: ignore[call-arg]
+
+    def test_nested_dict_values_unaffected(self):
+        """Test that non-string values in dicts are not affected."""
+        data = {"source": ["a", "b"], "nested": {"list": ["x", "y"], "ref": "include: source"}}
+
+        result = replace_references(data)
+
+        assert result["nested"]["list"] == ["x", "y"]  # type: ignore[call-arg]
+        assert result["nested"]["ref"] == ["a", "b"]  # type: ignore[call-arg]
+
+    def test_list_within_list_not_processed(self):
+        """Test that list items themselves aren't treated as expressions."""
+        data = {"source": ["a", "b"], "target": ["include: source", "literal_string"]}  # This should be replaced
+
+        result = replace_references(data)
+
+        assert result["target"][0] == ["a", "b"]  # type: ignore[call-arg]
+        assert result["target"][1] == "literal_string"  # type: ignore[call-arg]
+
+    def test_complex_nested_structure(self):
+        """Test complex nested configuration structure."""
+        data = {
+            "entities": {
+                "location": {"keys": ["Ort", "Kreis", "Land"]},
+                "site": {"keys": ["ProjektNr", "Fustel"], "columns": "include: entities.site.keys"},
+                "site_location": {"keys": [], "columns": "['extra_col'] + include: entities.site.columns + include: entities.location.keys"},
+            }
+        }
+
+        result = replace_references(data)
+
+        # site.columns should resolve to site.keys
+        assert result["entities"]["site"]["columns"] == ["ProjektNr", "Fustel"]  # type: ignore[call-arg]
+
+        # site_location.columns should concatenate all parts
+        assert result["entities"]["site_location"]["columns"] == ["extra_col", "ProjektNr", "Fustel", "Ort", "Kreis", "Land"]  # type: ignore[call-arg]
+
+    def test_real_world_example(self):
+        """Test a real-world configuration scenario."""
+        data = {
+            "entities": {
+                "sample": {
+                    "surrogate_id": "sample_id",
+                    "keys": ["ProjektNr", "Befu", "ProbNr"],
+                    "columns": ["ProjektNr", "Befu", "ProbNr", "EDatProb", "Strat"],
+                },
+                "sample_taxa": {"keys": [], "columns": "['PCODE', 'RTyp'] + include: entities.sample.keys + ['Anmerkung']"},
+            }
+        }
+
+        result = replace_references(data)
+
+        assert result["entities"]["sample_taxa"]["columns"] == ["PCODE", "RTyp", "ProjektNr", "Befu", "ProbNr", "Anmerkung"]  # type: ignore[call-arg]
+
+
+class TestEdgeCases:
+    """Tests for edge cases and error conditions."""
+
+    def test_malformed_list_literal(self):
+        """Test handling of malformed list literal."""
+        data = {"target": "['a', 'b' + include: source"}  # Missing closing bracket
+
+        # Should not crash, return original or best effort
+        result = replace_references(data)
+        assert result["target"] is not None  # type: ignore[call-arg]
+
+    def test_empty_include_path(self):
+        """Test handling of empty include path."""
+        data = {"target": "include: "}
+
+        result = replace_references(data)
+        # Should return original string if path is empty/invalid
+        assert result["target"] == "include: "  # type: ignore[call-arg]
+
+    def test_only_plus_operators(self):
+        """Test string with plus operators but no lists or includes."""
+        data = {"target": "a + b + c"}
+
+        result = replace_references(data)
+
+        # Should remain unchanged as it's not a valid list operation
+        assert result["target"] == "a + b + c"  # type: ignore[call-arg]
+
+    def test_plus_in_string_values(self):
+        """Test that plus signs within list values don't break parsing."""
+        data = {"source": ["value+with+plus"], "target": "include: source"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["value+with+plus"]  # type: ignore[call-arg]
+
+    def test_nested_brackets_in_list(self):
+        """Test nested brackets in list literals."""
+        data = {"target": "[['nested', 'list'], 'item'] + ['another']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == [["nested", "list"], "item", "another"]  # type: ignore[call-arg]
+
+
+class TestRealWorldIntegration:
+    """Tests using real-world configuration patterns."""
+
+    def test_arbodat_config_pattern(self):
+        """Test the actual pattern from arbodat config.yml."""
+        config = {
+            "entities": {
+                "location": {"surrogate_id": "location_id", "keys": ["Ort", "Kreis", "Land", "Staat", "FlurStr"], "columns": "include: entities.location.keys"},
+                "site": {
+                    "surrogate_id": "site_id",
+                    "keys": ["ProjektNr", "Fustel", "EVNr"],
+                    "columns": [
+                        "ProjektNr",
+                        "Fustel",
+                        "EVNr",
+                        "FustelTyp?",
+                        "okFustel",
+                        "Limes",
+                    ],
+                },
+                "site_location": {"keys": [], "columns": "include: entities.site.columns + include: entities.location.keys"},
+            }
+        }
+
+        result = replace_references(config)
+
+        # location.columns should resolve to its keys
+        assert result["entities"]["location"]["columns"] == ["Ort", "Kreis", "Land", "Staat", "FlurStr"]  # type: ignore[call-arg]
+
+        # site_location.columns should concatenate site columns + location keys
+        expected = [
+            "ProjektNr",
+            "Fustel",
+            "EVNr",
+            "FustelTyp?",
+            "okFustel",
+            "Limes",  # site.columns
+            "Ort",
+            "Kreis",
+            "Land",
+            "Staat",
+            "FlurStr",  # location.keys
+        ]
+        assert result["entities"]["site_location"]["columns"] == expected  # type: ignore[call-arg]
+
+    def test_foreign_key_pattern(self):
+        """Test foreign key configuration with include directives."""
+        config = {
+            "entities": {
+                "sample": {
+                    "surrogate_id": "sample_id",
+                    "keys": ["ProjektNr", "Befu", "ProbNr"],
+                    "columns": ["ProjektNr", "Befu", "ProbNr", "EDatProb", "Strat"],
+                },
+                "taxa": {"surrogate_id": "taxon_id", "keys": ["BNam", "TaxAut"], "columns": ["BNam", "TaxAut", "Familie"]},
+                "sample_taxa": {
+                    "keys": [],
+                    "columns": "include: entities.sample.keys + include: entities.taxa.keys + ['SumFAnzahl', 'SumFGewicht']",
+                    "foreign_keys": [
+                        {"entity": "sample", "local_keys": "include: entities.sample.keys", "remote_keys": "include: entities.sample.keys"},
+                        {"entity": "taxa", "local_keys": "include: entities.taxa.keys", "remote_keys": "include: entities.taxa.keys"},
+                    ],
+                },
+            }
+        }
+
+        result = replace_references(config)
+
+        # Check columns concatenation
+        expected_columns = ["ProjektNr", "Befu", "ProbNr", "BNam", "TaxAut", "SumFAnzahl", "SumFGewicht"]  # sample.keys  # taxa.keys  # additional columns
+        assert result["entities"]["sample_taxa"]["columns"] == expected_columns  # type: ignore[call-arg]
+
+        # Check foreign key references
+        assert result["entities"]["sample_taxa"]["foreign_keys"][0]["local_keys"] == ["ProjektNr", "Befu", "ProbNr"]  # type: ignore[call-arg]
+        assert result["entities"]["sample_taxa"]["foreign_keys"][1]["local_keys"] == ["BNam", "TaxAut"]  # type: ignore[call-arg]
+
+    def test_unnest_configuration_pattern(self):
+        """Test unnest configuration with include directives."""
+        config = {
+            "entities": {
+                "location": {
+                    "surrogate_id": "location_id",
+                    "keys": ["Ort", "Kreis", "Land"],
+                    "unnest": {
+                        "id_vars": "include: entities.location.surrogate_id",
+                        "value_vars": "include: entities.location.keys",
+                        "var_name": "location_type",
+                        "value_name": "location_name",
+                    },
+                }
+            }
+        }
+
+        result = replace_references(config)
+
+        assert result["entities"]["location"]["unnest"]["id_vars"] == "location_id"  # type: ignore[call-arg]
+        assert result["entities"]["location"]["unnest"]["value_vars"] == ["Ort", "Kreis", "Land"]  # type: ignore[call-arg]
+
+    def test_prepend_surrogate_id_to_columns(self):
+        """Test prepending surrogate_id to columns list."""
+        config = {
+            "entities": {
+                "sample": {"surrogate_id": "sample_id", "keys": ["ProjektNr", "Befu", "ProbNr"], "all_columns": "['sample_id'] + include: entities.sample.keys"}
+            }
+        }
+
+        result = replace_references(config)
+
+        assert result["entities"]["sample"]["all_columns"] == ["sample_id", "ProjektNr", "Befu", "ProbNr"]  # type: ignore[call-arg]
+
+    def test_deeply_nested_references(self):
+        """Test that references can chain through multiple levels."""
+        config = {
+            "base": {"common_fields": ["id", "created_at", "updated_at"]},
+            "entities": {
+                "sample": {
+                    "keys": ["project_nr", "sample_nr"],
+                    "base_columns": "include: base.common_fields + include: entities.sample.keys",
+                    "extended_columns": "include: entities.sample.base_columns + ['notes', 'status']",
+                }
+            },
+        }
+
+        result = replace_references(config)
+
+        # base_columns should resolve first
+        assert result["entities"]["sample"]["base_columns"] == [  # type: ignore[call-arg]
+            "id",
+            "created_at",
+            "updated_at",  # from base.common_fields
+            "project_nr",
+            "sample_nr",  # from sample.keys
+        ]
+
+        # extended_columns should use the resolved base_columns
+        assert result["entities"]["sample"]["extended_columns"] == [  # type: ignore[call-arg]
+            "id",
+            "created_at",
+            "updated_at",
+            "project_nr",
+            "sample_nr",  # from base_columns
+            "notes",
+            "status",  # additional fields
+        ]
+
+    def test_complex_multi_entity_relationship(self):
+        """Test complex configuration with multiple entity relationships."""
+        config = {
+            "entities": {
+                "project": {"keys": ["ProjektNr"], "columns": "include: entities.project.keys"},
+                "site": {"keys": ["ProjektNr", "Fustel"], "columns": "include: entities.site.keys + ['site_type']"},
+                "feature": {"keys": ["ProjektNr", "Fustel", "Befu"], "columns": "include: entities.feature.keys + ['feature_type']"},
+                "sample": {"keys": "include: entities.feature.keys + ['ProbNr']", "columns": "include: entities.sample.keys + ['sample_date', 'depth']"},
+            }
+        }
+
+        result = replace_references(config)
+
+        # Check cascading keys
+        assert result["entities"]["project"]["columns"] == ["ProjektNr"]  # type: ignore[call-arg]
+        assert result["entities"]["site"]["columns"] == ["ProjektNr", "Fustel", "site_type"]  # type: ignore[call-arg]
+        assert result["entities"]["feature"]["columns"] == ["ProjektNr", "Fustel", "Befu", "feature_type"]  # type: ignore[call-arg]
+        assert result["entities"]["sample"]["keys"] == ["ProjektNr", "Fustel", "Befu", "ProbNr"]  # type: ignore[call-arg]
+        assert result["entities"]["sample"]["columns"] == ["ProjektNr", "Fustel", "Befu", "ProbNr", "sample_date", "depth"]  # type: ignore[call-arg]
+
+    def test_mixed_types_in_config(self):
+        """Test that includes work alongside regular values."""
+        config = {
+            "defaults": {"system_columns": ["created_by", "modified_by"]},
+            "entities": {
+                "sample": {
+                    "keys": ["id"],
+                    "columns": "['name', 'type'] + include: entities.sample.keys + include: defaults.system_columns",
+                    "static_value": "this is not processed",
+                    "numeric_value": 42,
+                    "bool_value": True,
+                    "nested": {"also_processed": "include: defaults.system_columns"},
+                }
+            },
+        }
+
+        result = replace_references(config)
+
+        assert result["entities"]["sample"]["columns"] == ["name", "type", "id", "created_by", "modified_by"]  # type: ignore[call-arg]
+        assert result["entities"]["sample"]["static_value"] == "this is not processed"  # type: ignore[call-arg]
+        assert result["entities"]["sample"]["numeric_value"] == 42  # type: ignore[call-arg]
+        assert result["entities"]["sample"]["bool_value"] is True  # type: ignore[call-arg]
+        assert result["entities"]["sample"]["nested"]["also_processed"] == ["created_by", "modified_by"]  # type: ignore[call-arg]
+
+    def test_replace_references_and_replace_env_vars_integration(self):
+        """Test replace_references works after replace_env_vars."""
+        with patch.dict(os.environ, {"DB_HOST": "env-host.example.com"}):
+            # First replace env vars, then references
+            data = {"env_value": "${DB_HOST}", "reference": "include:env_value"}
+
+            step1: dict[str, Any] | list[Any] | str = replace_env_vars(data)
+            assert step1 == {"env_value": "env-host.example.com", "reference": "include:env_value"}
+
+            step2: dict[str, Any] | list[Any] | str = replace_references(step1)
+            assert step2 == {"env_value": "env-host.example.com", "reference": "env-host.example.com"}
