@@ -2,6 +2,11 @@ SHELL := /bin/bash
 
 UVICORN_PORT := 8000
 
+arbodat-normalize:
+	@PYTHONPATH=. python src/arbodat/survey2excel.py  --sep ";" \
+		--config-file src/arbodat/input/arbodat.yml \
+		src/arbodat/input/arbodat_mal_elena_input.csv output.xlsx
+
 .PHONY: dev-serve
 dev-serve: dev-kill
 	@echo "Starting uvicorn on port $(UVICORN_PORT)..."
