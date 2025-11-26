@@ -3,7 +3,7 @@ import os
 import sys
 import unicodedata
 from datetime import datetime
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Generic, Literal, TypeVar
 
 import yaml
 from loguru import logger
@@ -219,34 +219,17 @@ def replace_env_vars(data: dict[str, Any] | list[Any] | str) -> dict[str, Any] |
     return data
 
 
-def _replace_references(data: dict[str, Any] | list[Any] | str, full_data: dict[str, Any] | list[Any] | str) -> dict[str, Any] | list[Any] | str:
-    """Helper function for replace_references"""
-    if isinstance(data, dict):
-        return {k: _replace_references(v, full_data=full_data) for k, v in data.items()}
-    if isinstance(data, list):
-        return [_replace_references(i, full_data=full_data) for i in data]
-    if isinstance(data, str) and data.startswith("include:"):
-        ref_path: str = data[len("include:") :]
-        ref_value: Any = dotget(full_data, ref_path)  # type: ignore
-        ref_value = _replace_references(ref_value, full_data=full_data)
-        return ref_value if ref_value is not None else data
-    return data
+T = TypeVar("T")
 
 
-def replace_references(data: dict[str, Any] | list[Any] | str) -> dict[str, Any] | list[Any] | str:
-    """Searches dict recursively for values that are 1) strings and 2) matches £´include:some.path.to.value}
-    and replaces this reference with value found at some.path.to.value"""
-    return _replace_references(data, full_data=data)
-
-
-class Registry:
-    items: dict = {}
+class Registry(Generic[T]):
+    items: dict[str, T] = {}
 
     @classmethod
-    def get(cls, key: str) -> Any | None:
+    def get(cls, key: str) -> T:
         if key not in cls.items:
             raise KeyError(f"preprocessor {key} is not registered")
-        return cls.items.get(key)
+        return cls.items[key]
 
     @classmethod
     def register(cls, **args) -> Callable[..., Any]:
