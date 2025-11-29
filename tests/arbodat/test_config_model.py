@@ -496,6 +496,284 @@ class TestTablesConfig:
         assert nat_region_table.drop_duplicates is True
 
 
+    def test_get_sorted_columns_basic(self):
+        """Test get_sorted_columns with basic configuration."""
+        config: dict[str, dict[str, Any]] = {
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["site_id", "name", "description", "location"],
+            }
+        }
+
+        tables = TablesConfig(cfg=config)
+        sorted_cols = tables.get_sorted_columns("site")
+
+        # Surrogate ID should be first, then other columns
+        assert sorted_cols[0] == "site_id"
+        assert set(sorted_cols[1:]) == {"name", "description", "location"}
+
+    def test_get_sorted_columns_with_foreign_keys(self):
+        """Test get_sorted_columns places foreign key surrogate IDs after primary surrogate ID."""
+        config: dict[str, dict[str, Any]] = {
+            "location": {
+                "surrogate_id": "location_id",
+                "columns": ["location_name"],
+            },
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["site_id", "location_id", "site_name", "location_name", "description"],
+                "foreign_keys": [
+                    {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]}
+                ],
+            }
+        }
+
+        tables = TablesConfig(cfg=config)
+        sorted_cols = tables.get_sorted_columns("site")
+
+        # Order: site_id, location_id (FK), then other columns
+        assert sorted_cols[0] == "site_id"
+        assert sorted_cols[1] == "location_id"
+        assert set(sorted_cols[2:]) == {"site_name", "location_name", "description"}
+
+    def test_get_sorted_columns_multiple_foreign_keys(self):
+        """Test get_sorted_columns with multiple foreign keys."""
+        config: dict[str, dict[str, Any]] = {
+            "location": {"surrogate_id": "location_id", "columns": ["location_name"]},
+            "region": {"surrogate_id": "region_id", "columns": ["region_name"]},
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["site_id", "location_id", "region_id", "site_name", "location_name", "region_name", "description"],
+                "foreign_keys": [
+                    {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]},
+                    {"entity": "region", "local_keys": ["region_name"], "remote_keys": ["region_name"]},
+                ],
+            }
+        }
+
+        tables = TablesConfig(cfg=config)
+        sorted_cols = tables.get_sorted_columns("site")
+
+        # Order: site_id, location_id, region_id, then other columns
+        assert sorted_cols[0] == "site_id"
+        assert sorted_cols[1] == "location_id"
+        assert sorted_cols[2] == "region_id"
+        assert set(sorted_cols[3:]) == {"site_name", "location_name", "region_name", "description"}
+
+    def test_reorder_columns_basic(self):
+        """Test reorder_columns with basic DataFrame."""
+        import pandas as pd
+
+        config: dict[str, dict[str, Any]] = {
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["name", "description"],
+            }
+        }
+
+        tables = TablesConfig(cfg=config)
+        df = pd.DataFrame({
+            "name": ["Site A", "Site B"],
+            "description": ["Desc A", "Desc B"],
+            "site_id": [1, 2]
+        })
+
+        reordered = tables.reorder_columns("site", df)
+
+        # site_id should be first
+        assert list(reordered.columns) == ["site_id", "name", "description"]
+
+    def test_reorder_columns_with_foreign_keys(self):
+        """Test reorder_columns places foreign key IDs after primary ID."""
+        import pandas as pd
+
+        config: dict[str, dict[str, Any]] = {
+            "location": {"surrogate_id": "location_id", "columns": ["location_name"]},
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["site_name", "location_name"],
+                "foreign_keys": [
+                    {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]}
+                ],
+            }
+        }
+
+        tables = TablesConfig(cfg=config)
+        df = pd.DataFrame({
+            "site_name": ["Site A", "Site B"],
+            "location_name": ["Loc A", "Loc B"],
+            "location_id": [10, 20],
+            "site_id": [1, 2]
+        })
+
+        reordered = tables.reorder_columns("site", df)
+
+        # Order: site_id, location_id, then other columns
+        assert list(reordered.columns) == ["site_id", "location_id", "site_name", "location_name"]
+
+    def test_reorder_columns_with_extra_columns(self):
+        """Test reorder_columns places extra_columns after foreign keys."""
+        import pandas as pd
+
+        config: dict[str, dict[str, Any]] = {
+            "location": {"surrogate_id": "location_id", "columns": ["location_name"]},
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["site_name", "location_name"],
+                "extra_columns": {
+                    "default_lat": 0.0,
+                    "default_lon": 0.0
+                },
+                "foreign_keys": [
+                    {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]}
+                ],
+            }
+        }
+
+        tables = TablesConfig(cfg=config)
+        df = pd.DataFrame({
+            "site_name": ["Site A", "Site B"],
+            "location_name": ["Loc A", "Loc B"],
+            "location_id": [10, 20],
+            "site_id": [1, 2],
+            "default_lat": [1.0, 2.0],
+            "default_lon": [3.0, 4.0],
+            "other_col": ["X", "Y"]
+        })
+
+        reordered = tables.reorder_columns("site", df)
+
+        # Order: site_id, location_id, extra columns (default_lat, default_lon), then other columns
+        assert reordered.columns[0] == "site_id"
+        assert reordered.columns[1] == "location_id"
+        assert "default_lat" in reordered.columns[:4]
+        assert "default_lon" in reordered.columns[:4]
+        # Other columns come last
+        assert "site_name" in list(reordered.columns)[4:]
+        assert "location_name" in list(reordered.columns)[4:]
+        assert "other_col" in list(reordered.columns)[4:]
+
+    def test_reorder_columns_missing_surrogate_id(self):
+        """Test reorder_columns when surrogate_id not in DataFrame."""
+        import pandas as pd
+
+        config: dict[str, dict[str, Any]] = {
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["name", "description"],
+            }
+        }
+
+        tables = TablesConfig(cfg=config)
+        df = pd.DataFrame({
+            "name": ["Site A", "Site B"],
+            "description": ["Desc A", "Desc B"]
+        })
+
+        reordered = tables.reorder_columns("site", df)
+
+        # Should still work, just without site_id in front
+        assert list(reordered.columns) == ["name", "description"]
+
+    def test_reorder_columns_with_table_config_object(self):
+        """Test reorder_columns accepts TableConfig object instead of string."""
+        import pandas as pd
+
+        config: dict[str, dict[str, Any]] = {
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["name"],
+            }
+        }
+
+        tables = TablesConfig(cfg=config)
+        table_cfg = tables.get_table("site")
+        df = pd.DataFrame({
+            "name": ["Site A", "Site B"],
+            "site_id": [1, 2]
+        })
+
+        reordered = tables.reorder_columns(table_cfg, df)
+
+        assert list(reordered.columns) == ["site_id", "name"]
+
+    def test_reorder_columns_complex_scenario(self):
+        """Test reorder_columns with multiple foreign keys and extra columns."""
+        import pandas as pd
+
+        config: dict[str, dict[str, Any]] = {
+            "location": {"surrogate_id": "location_id", "columns": ["location_name"]},
+            "region": {"surrogate_id": "region_id", "columns": ["region_name"]},
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["site_name", "location_name", "region_name"],
+                "extra_columns": {
+                    "created_at": None,
+                    "updated_at": None
+                },
+                "foreign_keys": [
+                    {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]},
+                    {"entity": "region", "local_keys": ["region_name"], "remote_keys": ["region_name"]},
+                ],
+            }
+        }
+
+        tables = TablesConfig(cfg=config)
+        df = pd.DataFrame({
+            "site_name": ["Site A", "Site B"],
+            "description": ["Desc A", "Desc B"],
+            "location_name": ["Loc A", "Loc B"],
+            "region_name": ["Reg A", "Reg B"],
+            "location_id": [10, 20],
+            "region_id": [100, 200],
+            "site_id": [1, 2],
+            "created_at": ["2021-01-01", "2021-01-02"],
+            "updated_at": ["2021-02-01", "2021-02-02"]
+        })
+
+        reordered = tables.reorder_columns("site", df)
+
+        # Expected order: site_id, location_id, region_id, created_at, updated_at, then other columns
+        cols = list(reordered.columns)
+        assert cols[0] == "site_id"
+        assert cols[1] == "location_id"
+        assert cols[2] == "region_id"
+        # Extra columns should come next
+        assert "created_at" in cols[3:5]
+        assert "updated_at" in cols[3:5]
+        # Other columns come last
+        assert "site_name" in cols[5:]
+        assert "description" in cols[5:]
+        assert "location_name" in cols[5:]
+        assert "region_name" in cols[5:]
+
+    def test_reorder_columns_preserves_data(self):
+        """Test that reorder_columns preserves all data correctly."""
+        import pandas as pd
+
+        config: dict[str, dict[str, Any]] = {
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["name", "value"],
+            }
+        }
+
+        tables = TablesConfig(cfg=config)
+        df = pd.DataFrame({
+            "name": ["A", "B", "C"],
+            "value": [1, 2, 3],
+            "site_id": [10, 20, 30]
+        })
+
+        reordered = tables.reorder_columns("site", df)
+
+        # Check data is preserved
+        assert len(reordered) == 3
+        assert reordered["site_id"].tolist() == [10, 20, 30]
+        assert reordered["name"].tolist() == ["A", "B", "C"]
+        assert reordered["value"].tolist() == [1, 2, 3]
+
+
 class TestIntegration:
     """Integration tests for all classes working together."""
 
