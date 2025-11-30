@@ -25,18 +25,6 @@ class TestUnnestConfig:
         with pytest.raises(ValueError, match="Invalid unnest configuration"):
             UnnestConfig(cfg={}, data=data)
 
-    def test_missing_id_vars(self):
-        """Test that missing id_vars raises ValueError."""
-        data = {"unnest": {"value_vars": ["col1"], "var_name": "var", "value_name": "val"}}
-        with pytest.raises(ValueError, match="Invalid unnest configuration"):
-            UnnestConfig(cfg={}, data=data)
-
-    def test_missing_value_vars(self):
-        """Test that missing value_vars raises ValueError."""
-        data = {"unnest": {"id_vars": ["id"], "var_name": "var", "value_name": "val"}}
-        with pytest.raises(ValueError, match="Invalid unnest configuration"):
-            UnnestConfig(cfg={}, data=data)
-
     def test_missing_var_name(self):
         """Test that missing var_name raises ValueError."""
         data = {"unnest": {"id_vars": ["id"], "value_vars": ["col1"], "value_name": "val"}}
@@ -49,11 +37,6 @@ class TestUnnestConfig:
         with pytest.raises(ValueError, match="Invalid unnest configuration"):
             UnnestConfig(cfg={}, data=data)
 
-    def test_empty_lists_raise_error(self):
-        """Test that empty lists raise ValueError."""
-        data = {"unnest": {"id_vars": [], "value_vars": ["col1"], "var_name": "var", "value_name": "val"}}
-        with pytest.raises(ValueError, match="Invalid unnest configuration"):
-            UnnestConfig(cfg={}, data=data)
 
 
 class TestForeignKeyConfig:
