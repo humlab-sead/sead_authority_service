@@ -1,11 +1,8 @@
 """Unit tests for configuration validation specifications."""
 
-import pytest
-
 from src.arbodat.specifications import (
     CircularDependencySpecification,
     CompositeConfigSpecification,
-    DropDuplicatesSpecification,
     EntityExistsSpecification,
     FixedDataSpecification,
     ForeignKeySpecification,

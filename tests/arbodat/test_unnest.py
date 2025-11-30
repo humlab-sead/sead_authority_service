@@ -1,7 +1,5 @@
 """Unit tests for unnest module."""
 
-from typing import Any
-
 import pandas as pd
 import pytest
 

@@ -1,15 +1,17 @@
 """Unit tests for arbodat dispatch module."""
 
 from pathlib import Path
-from typing import Any
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
 
 from src.arbodat.dispatch import CSVDispatcher, DatabaseDispatcher, Dispatcher, Dispatchers, DispatchRegistry, ExcelDispatcher
 from src.configuration import MockConfigProvider
+from src.utility import Registry
 from tests.decorators import with_test_config
+
+# pylint: disable=unused-argument
 
 
 class TestDispatchRegistry:
@@ -17,7 +19,6 @@ class TestDispatchRegistry:
 
     def test_dispatch_registry_inherits_from_registry(self):
         """Test that DispatchRegistry inherits from Registry."""
-        from src.utility import Registry
 
         assert issubclass(DispatchRegistry, Registry)
 
@@ -139,7 +140,7 @@ class TestCSVDispatcher:
         dispatcher.dispatch(str(output_dir), data)
 
         # Read the file and check it doesn't have an unnamed index column
-        with open(output_dir / "table1.csv") as f:
+        with open(output_dir / "table1.csv", encoding="utf-8") as f:
             first_line = f.readline()
             assert "Unnamed" not in first_line
             assert first_line.strip() == "col1"

@@ -2,6 +2,7 @@
 
 from typing import Any
 
+import pandas as pd
 import pytest
 
 from src.arbodat.config_model import ForeignKeyConfig, TableConfig, TablesConfig, UnnestConfig
@@ -560,7 +561,6 @@ class TestTablesConfig:
 
     def test_reorder_columns_basic(self):
         """Test reorder_columns with basic DataFrame."""
-        import pandas as pd
 
         config: dict[str, dict[str, Any]] = {
             "site": {
@@ -579,7 +579,6 @@ class TestTablesConfig:
 
     def test_reorder_columns_with_foreign_keys(self):
         """Test reorder_columns places foreign key IDs after primary ID."""
-        import pandas as pd
 
         config: dict[str, dict[str, Any]] = {
             "location": {"surrogate_id": "location_id", "columns": ["location_name"]},
@@ -600,7 +599,6 @@ class TestTablesConfig:
 
     def test_reorder_columns_with_extra_columns(self):
         """Test reorder_columns places extra_columns after foreign keys."""
-        import pandas as pd
 
         config: dict[str, dict[str, Any]] = {
             "location": {"surrogate_id": "location_id", "columns": ["location_name"]},
@@ -639,7 +637,6 @@ class TestTablesConfig:
 
     def test_reorder_columns_missing_surrogate_id(self):
         """Test reorder_columns when surrogate_id not in DataFrame."""
-        import pandas as pd
 
         config: dict[str, dict[str, Any]] = {
             "site": {
@@ -658,7 +655,6 @@ class TestTablesConfig:
 
     def test_reorder_columns_with_table_config_object(self):
         """Test reorder_columns accepts TableConfig object instead of string."""
-        import pandas as pd
 
         config: dict[str, dict[str, Any]] = {
             "site": {
@@ -677,7 +673,6 @@ class TestTablesConfig:
 
     def test_reorder_columns_complex_scenario(self):
         """Test reorder_columns with multiple foreign keys and extra columns."""
-        import pandas as pd
 
         config: dict[str, dict[str, Any]] = {
             "location": {"surrogate_id": "location_id", "columns": ["location_name"]},
@@ -726,7 +721,6 @@ class TestTablesConfig:
 
     def test_reorder_columns_preserves_data(self):
         """Test that reorder_columns preserves all data correctly."""
-        import pandas as pd
 
         config: dict[str, dict[str, Any]] = {
             "site": {
