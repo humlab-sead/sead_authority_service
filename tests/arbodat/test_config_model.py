@@ -110,17 +110,18 @@ class TestForeignKeyConfig:
 
     def test_extra_columns_as_dict(self):
         """Test extra_columns as a dictionary mapping local to remote column names."""
-        config = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
+        extra_columns_cfg: dict[str, str] = {"local_col1": "remote_col1", "local_col2": "remote_col2"}
+        config: dict[str, dict[str, str]] = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
         fk_data = {
             "entity": "location",
             "local_keys": ["location_name"],
             "remote_keys": ["location_name"],
-            "extra_columns": {"local_col1": "remote_col1", "local_col2": "remote_col2"},
+            "extra_columns": extra_columns_cfg,
         }
 
         fk = ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
 
-        assert fk.remote_extra_columns == {"local_col1": "remote_col1", "local_col2": "remote_col2"}
+        assert fk.remote_extra_columns == { v:k for k, v in extra_columns_cfg.items() }
 
     def test_extra_columns_as_list(self):
         """Test extra_columns as a list (maps column names to themselves)."""
@@ -815,6 +816,7 @@ class TestIntegration:
 
     def test_foreign_key_with_extra_columns_workflow(self):
         """Test foreign key configuration with extra_columns in full workflow."""
+        extra_columns_cfg: dict[str, str] = {"site_latitude": "latitude", "site_longitude": "longitude"}
         config: dict[str, dict[str, Any]] = {
             "location": {
                 "surrogate_id": "location_id",
@@ -830,7 +832,7 @@ class TestIntegration:
                         "entity": "location",
                         "local_keys": ["location_name"],
                         "remote_keys": ["location_name"],
-                        "extra_columns": {"site_latitude": "latitude", "site_longitude": "longitude"},
+                        "extra_columns": extra_columns_cfg,
                         "drop_remote_id": False,
                     }
                 ],
@@ -848,5 +850,5 @@ class TestIntegration:
         assert fk.remote_entity == "location"
         assert fk.local_keys == ["location_name"]
         assert fk.remote_keys == ["location_name"]
-        assert fk.remote_extra_columns == {"site_latitude": "latitude", "site_longitude": "longitude"}
+        assert fk.remote_extra_columns == { v:k for k, v in extra_columns_cfg.items() }
         assert fk.drop_remote_id is False
