@@ -257,11 +257,11 @@ class Registry(Generic[T]):
         return fn_or_class
 
 
-def create_db_uri(*, host: str, port: int | str, user: str, dbname: str) -> str:
+def create_db_uri(*, host: str, port: int | str, user: str, dbname: str, driver: str = "postgresql") -> str:
     """
     Builds database URI from the individual config elements.
     """
-    return f"postgresql://{user}@{host}:{port}/{dbname}"
+    return f"{driver}://{user}@{host}:{port}/{dbname}"
 
 
 def get_connection_uri(connection: Any) -> str:

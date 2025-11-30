@@ -1,17 +1,19 @@
-import asyncio
 import os
+
+import pytest
 
 from src.arbodat.survey2excel import workflow
 from src.configuration.setup import setup_config_store
 
 
-def test_workflow():
+@pytest.mark.asyncio
+async def test_workflow():
 
     config_file: str = "src/arbodat/input/arbodat.yml"
-    translate: bool = True
+    translate: bool = False
 
     output_filename: str = f"output{'' if not translate else '_translated'}.xlsx"
-    asyncio.run(setup_config_store(config_file))
+    await setup_config_store(config_file)
 
     if os.path.exists(output_filename):
         os.remove(output_filename)

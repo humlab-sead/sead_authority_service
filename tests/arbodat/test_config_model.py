@@ -2,6 +2,7 @@
 
 from typing import Any
 
+import pandas as pd
 import pytest
 
 from src.arbodat.config_model import ForeignKeyConfig, TableConfig, TablesConfig, UnnestConfig
@@ -26,17 +27,19 @@ class TestUnnestConfig:
         with pytest.raises(ValueError, match="Invalid unnest configuration"):
             UnnestConfig(cfg={}, data=data)
 
-    def test_missing_id_vars(self):
-        """Test that missing id_vars raises ValueError."""
+    def test_missing_id_vars_allowed(self):
+        """Test that missing id_vars is allowed (defaults to empty list)."""
         data = {"unnest": {"value_vars": ["col1"], "var_name": "var", "value_name": "val"}}
-        with pytest.raises(ValueError, match="Invalid unnest configuration"):
-            UnnestConfig(cfg={}, data=data)
+        config = UnnestConfig(cfg={}, data=data)
+        assert config.id_vars == []
+        assert config.value_vars == ["col1"]
 
-    def test_missing_value_vars(self):
-        """Test that missing value_vars raises ValueError."""
+    def test_missing_value_vars_allowed(self):
+        """Test that missing value_vars is allowed (defaults to empty list)."""
         data = {"unnest": {"id_vars": ["id"], "var_name": "var", "value_name": "val"}}
-        with pytest.raises(ValueError, match="Invalid unnest configuration"):
-            UnnestConfig(cfg={}, data=data)
+        config = UnnestConfig(cfg={}, data=data)
+        assert config.id_vars == ["id"]
+        assert config.value_vars == []
 
     def test_missing_var_name(self):
         """Test that missing var_name raises ValueError."""
@@ -50,11 +53,12 @@ class TestUnnestConfig:
         with pytest.raises(ValueError, match="Invalid unnest configuration"):
             UnnestConfig(cfg={}, data=data)
 
-    def test_empty_lists_raise_error(self):
-        """Test that empty lists raise ValueError."""
+    def test_empty_lists_allowed(self):
+        """Test that empty lists are allowed."""
         data = {"unnest": {"id_vars": [], "value_vars": ["col1"], "var_name": "var", "value_name": "val"}}
-        with pytest.raises(ValueError, match="Invalid unnest configuration"):
-            UnnestConfig(cfg={}, data=data)
+        config = UnnestConfig(cfg={}, data=data)
+        assert config.id_vars == []
+        assert config.value_vars == ["col1"]
 
 
 class TestForeignKeyConfig:
@@ -72,15 +76,6 @@ class TestForeignKeyConfig:
         assert fk.local_keys == ["location_name"]
         assert fk.remote_keys == ["location_name"]
         assert fk.remote_surrogate_id == "location_id"
-        assert fk.remote_drop_duplicates is False
-
-    def test_foreign_key_with_drop_duplicates(self):
-        """Test foreign key with drop_duplicates setting."""
-        config: dict[str, dict[str, Any]] = {"site": {"surrogate_id": "site_id"}, "taxa": {"surrogate_id": "taxon_id"}}
-        fk_data: dict[str, Any] = {"entity": "taxa", "local_keys": ["BNam", "TaxAut"], "remote_keys": ["BNam", "TaxAut"], "drop_duplicates": ["taxon_id"]}
-
-        fk = ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
-        assert fk.remote_drop_duplicates == ["taxon_id"]
 
     def test_missing_remote_entity(self):
         """Test that missing remote entity raises ValueError."""
@@ -113,6 +108,113 @@ class TestForeignKeyConfig:
 
         with pytest.raises(ValueError, match="missing remote_keys"):
             ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
+
+    def test_extra_columns_as_dict(self):
+        """Test extra_columns as a dictionary mapping local to remote column names."""
+        extra_columns_cfg: dict[str, str] = {"local_col1": "remote_col1", "local_col2": "remote_col2"}
+        config: dict[str, dict[str, str]] = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
+        fk_data = {
+            "entity": "location",
+            "local_keys": ["location_name"],
+            "remote_keys": ["location_name"],
+            "extra_columns": extra_columns_cfg,
+        }
+
+        fk = ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
+
+        assert fk.remote_extra_columns == {v: k for k, v in extra_columns_cfg.items()}
+
+    def test_extra_columns_as_list(self):
+        """Test extra_columns as a list (maps column names to themselves)."""
+        config = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
+        fk_data = {
+            "entity": "location",
+            "local_keys": ["location_name"],
+            "remote_keys": ["location_name"],
+            "extra_columns": ["col1", "col2", "col3"],
+        }
+
+        fk = ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
+
+        assert fk.remote_extra_columns == {"col1": "col1", "col2": "col2", "col3": "col3"}
+
+    def test_extra_columns_as_string(self):
+        """Test extra_columns as a single string (converted to list, then dict)."""
+        config = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
+        fk_data = {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"], "extra_columns": "column1"}
+
+        fk = ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
+
+        assert fk.remote_extra_columns == {"column1": "column1"}
+
+    def test_extra_columns_empty_dict(self):
+        """Test extra_columns with empty dict returns empty dict."""
+        config = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
+        fk_data = {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"], "extra_columns": {}}
+
+        fk = ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
+
+        assert fk.remote_extra_columns == {}
+
+    def test_extra_columns_missing(self):
+        """Test that missing extra_columns defaults to empty dict."""
+        config = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
+        fk_data = {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]}
+
+        fk = ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
+
+        assert fk.remote_extra_columns == {}
+
+    def test_extra_columns_invalid_type(self):
+        """Test that invalid extra_columns type raises ValueError."""
+        config = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
+        fk_data = {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"], "extra_columns": 123}
+
+        with pytest.raises(ValueError, match="Invalid extra_columns format"):
+            ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
+
+    def test_drop_remote_id_true(self):
+        """Test drop_remote_id set to True."""
+        config = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
+        fk_data = {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"], "drop_remote_id": True}
+
+        fk = ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
+
+        assert fk.drop_remote_id is True
+
+    def test_drop_remote_id_false(self):
+        """Test drop_remote_id set to False."""
+        config = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
+        fk_data = {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"], "drop_remote_id": False}
+
+        fk = ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
+
+        assert fk.drop_remote_id is False
+
+    def test_drop_remote_id_default(self):
+        """Test that drop_remote_id defaults to False when not specified."""
+        config = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
+        fk_data = {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]}
+
+        fk = ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
+
+        assert fk.drop_remote_id is False
+
+    def test_combined_extra_columns_and_drop_remote_id(self):
+        """Test using both extra_columns and drop_remote_id together."""
+        config = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
+        fk_data = {
+            "entity": "location",
+            "local_keys": ["location_name"],
+            "remote_keys": ["location_name"],
+            "extra_columns": ["description", "code"],
+            "drop_remote_id": True,
+        }
+
+        fk = ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
+
+        assert fk.remote_extra_columns == {"description": "description", "code": "code"}
+        assert fk.drop_remote_id is True
 
 
 class TestTableConfig:
@@ -148,16 +250,43 @@ class TestTableConfig:
         assert table.foreign_keys[0].remote_entity == "location"
         assert table.foreign_keys[0].local_keys == ["location_id"]
 
+    def test_table_with_foreign_keys_extra_columns(self):
+        """Test table configuration with foreign keys including extra_columns."""
+        config: dict[str, dict[str, Any]] = {
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["site_name"],
+                "foreign_keys": [
+                    {
+                        "entity": "location",
+                        "local_keys": ["location_id"],
+                        "remote_keys": ["location_id"],
+                        "extra_columns": ["latitude", "longitude"],
+                        "drop_remote_id": True,
+                    }
+                ],
+            },
+            "location": {"surrogate_id": "location_id", "columns": ["location_name", "latitude", "longitude"]},
+        }
+
+        table = TableConfig(cfg=config, entity_name="site")
+
+        assert len(table.foreign_keys) == 1
+        fk = table.foreign_keys[0]
+        assert fk.remote_entity == "location"
+        assert fk.remote_extra_columns == {"latitude": "latitude", "longitude": "longitude"}
+        assert fk.drop_remote_id is True
+
     def test_table_drop_duplicates_bool(self):
         """Test drop_duplicates as boolean."""
-        config: dict[str, dict[str, Any]] = {"site": {"surrogate_id": "site_id", "options": {"drop_duplicates": True}}}
+        config: dict[str, dict[str, Any]] = {"site": {"surrogate_id": "site_id", "drop_duplicates": True}}
 
         table = TableConfig(cfg=config, entity_name="site")
         assert table.drop_duplicates is True
 
     def test_table_drop_duplicates_list(self):
         """Test drop_duplicates as list of columns."""
-        config: dict[str, dict[str, Any]] = {"site": {"surrogate_id": "site_id", "options": {"drop_duplicates": ["col1", "col2"]}}}
+        config: dict[str, dict[str, Any]] = {"site": {"surrogate_id": "site_id", "drop_duplicates": ["col1", "col2"]}}
 
         table = TableConfig(cfg=config, entity_name="site")
         assert table.drop_duplicates == ["col1", "col2"]
@@ -349,13 +478,11 @@ class TestTablesConfig:
                 "surrogate_id": "site_id",
                 "keys": ["ProjektNr", "Fustel"],
                 "columns": ["ProjektNr", "Fustel", "EVNr"],
-                "options": {
-                    "drop_duplicates": ["ProjektNr", "Fustel"],
-                },
+                "drop_duplicates": ["ProjektNr", "Fustel"],
                 "foreign_keys": [{"entity": "natural_region", "local_keys": ["NaturE"], "remote_keys": ["NaturE"]}],
                 "depends_on": ["natural_region"],
             },
-            "natural_region": {"surrogate_id": "natural_region_id", "columns": ["NaturE", "NaturrEinh"], "options": {"drop_duplicates": True}},
+            "natural_region": {"surrogate_id": "natural_region_id", "columns": ["NaturE", "NaturrEinh"], "drop_duplicates": True},
         }
 
         tables = TablesConfig(cfg=config)
@@ -370,6 +497,249 @@ class TestTablesConfig:
         nat_region_table: TableConfig = tables.get_table("natural_region")
         assert nat_region_table.drop_duplicates is True
 
+    def test_get_sorted_columns_basic(self):
+        """Test get_sorted_columns with basic configuration."""
+        config: dict[str, dict[str, Any]] = {
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["site_id", "name", "description", "location"],
+            }
+        }
+
+        tables = TablesConfig(cfg=config)
+        sorted_cols = tables.get_sorted_columns("site")
+
+        # Surrogate ID should be first, then other columns
+        assert sorted_cols[0] == "site_id"
+        assert set(sorted_cols[1:]) == {"name", "description", "location"}
+
+    def test_get_sorted_columns_with_foreign_keys(self):
+        """Test get_sorted_columns places foreign key surrogate IDs after primary surrogate ID."""
+        config: dict[str, dict[str, Any]] = {
+            "location": {
+                "surrogate_id": "location_id",
+                "columns": ["location_name"],
+            },
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["site_id", "location_id", "site_name", "location_name", "description"],
+                "foreign_keys": [{"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]}],
+            },
+        }
+
+        tables = TablesConfig(cfg=config)
+        sorted_cols = tables.get_sorted_columns("site")
+
+        # Order: site_id, location_id (FK), then other columns
+        assert sorted_cols[0] == "site_id"
+        assert sorted_cols[1] == "location_id"
+        assert set(sorted_cols[2:]) == {"site_name", "location_name", "description"}
+
+    def test_get_sorted_columns_multiple_foreign_keys(self):
+        """Test get_sorted_columns with multiple foreign keys."""
+        config: dict[str, dict[str, Any]] = {
+            "location": {"surrogate_id": "location_id", "columns": ["location_name"]},
+            "region": {"surrogate_id": "region_id", "columns": ["region_name"]},
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["site_id", "location_id", "region_id", "site_name", "location_name", "region_name", "description"],
+                "foreign_keys": [
+                    {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]},
+                    {"entity": "region", "local_keys": ["region_name"], "remote_keys": ["region_name"]},
+                ],
+            },
+        }
+
+        tables = TablesConfig(cfg=config)
+        sorted_cols = tables.get_sorted_columns("site")
+
+        # Order: site_id, location_id, region_id, then other columns
+        assert sorted_cols[0] == "site_id"
+        assert sorted_cols[1] == "location_id"
+        assert sorted_cols[2] == "region_id"
+        assert set(sorted_cols[3:]) == {"site_name", "location_name", "region_name", "description"}
+
+    def test_reorder_columns_basic(self):
+        """Test reorder_columns with basic DataFrame."""
+
+        config: dict[str, dict[str, Any]] = {
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["name", "description"],
+            }
+        }
+
+        tables = TablesConfig(cfg=config)
+        df = pd.DataFrame({"name": ["Site A", "Site B"], "description": ["Desc A", "Desc B"], "site_id": [1, 2]})
+
+        reordered = tables.reorder_columns("site", df)
+
+        # site_id should be first
+        assert list(reordered.columns) == ["site_id", "name", "description"]
+
+    def test_reorder_columns_with_foreign_keys(self):
+        """Test reorder_columns places foreign key IDs after primary ID."""
+
+        config: dict[str, dict[str, Any]] = {
+            "location": {"surrogate_id": "location_id", "columns": ["location_name"]},
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["site_name", "location_name"],
+                "foreign_keys": [{"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]}],
+            },
+        }
+
+        tables = TablesConfig(cfg=config)
+        df = pd.DataFrame({"site_name": ["Site A", "Site B"], "location_name": ["Loc A", "Loc B"], "location_id": [10, 20], "site_id": [1, 2]})
+
+        reordered = tables.reorder_columns("site", df)
+
+        # Order: site_id, location_id, then other columns
+        assert list(reordered.columns) == ["site_id", "location_id", "site_name", "location_name"]
+
+    def test_reorder_columns_with_extra_columns(self):
+        """Test reorder_columns places extra_columns after foreign keys."""
+
+        config: dict[str, dict[str, Any]] = {
+            "location": {"surrogate_id": "location_id", "columns": ["location_name"]},
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["site_name", "location_name"],
+                "extra_columns": {"default_lat": 0.0, "default_lon": 0.0},
+                "foreign_keys": [{"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]}],
+            },
+        }
+
+        tables = TablesConfig(cfg=config)
+        df = pd.DataFrame(
+            {
+                "site_name": ["Site A", "Site B"],
+                "location_name": ["Loc A", "Loc B"],
+                "location_id": [10, 20],
+                "site_id": [1, 2],
+                "default_lat": [1.0, 2.0],
+                "default_lon": [3.0, 4.0],
+                "other_col": ["X", "Y"],
+            }
+        )
+
+        reordered = tables.reorder_columns("site", df)
+
+        # Order: site_id, location_id, extra columns (default_lat, default_lon), then other columns
+        assert reordered.columns[0] == "site_id"
+        assert reordered.columns[1] == "location_id"
+        assert "default_lat" in reordered.columns[:4]
+        assert "default_lon" in reordered.columns[:4]
+        # Other columns come last
+        assert "site_name" in list(reordered.columns)[4:]
+        assert "location_name" in list(reordered.columns)[4:]
+        assert "other_col" in list(reordered.columns)[4:]
+
+    def test_reorder_columns_missing_surrogate_id(self):
+        """Test reorder_columns when surrogate_id not in DataFrame."""
+
+        config: dict[str, dict[str, Any]] = {
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["name", "description"],
+            }
+        }
+
+        tables = TablesConfig(cfg=config)
+        df = pd.DataFrame({"name": ["Site A", "Site B"], "description": ["Desc A", "Desc B"]})
+
+        reordered = tables.reorder_columns("site", df)
+
+        # Should still work, just without site_id in front
+        assert list(reordered.columns) == ["name", "description"]
+
+    def test_reorder_columns_with_table_config_object(self):
+        """Test reorder_columns accepts TableConfig object instead of string."""
+
+        config: dict[str, dict[str, Any]] = {
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["name"],
+            }
+        }
+
+        tables = TablesConfig(cfg=config)
+        table_cfg = tables.get_table("site")
+        df = pd.DataFrame({"name": ["Site A", "Site B"], "site_id": [1, 2]})
+
+        reordered = tables.reorder_columns(table_cfg, df)
+
+        assert list(reordered.columns) == ["site_id", "name"]
+
+    def test_reorder_columns_complex_scenario(self):
+        """Test reorder_columns with multiple foreign keys and extra columns."""
+
+        config: dict[str, dict[str, Any]] = {
+            "location": {"surrogate_id": "location_id", "columns": ["location_name"]},
+            "region": {"surrogate_id": "region_id", "columns": ["region_name"]},
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["site_name", "location_name", "region_name"],
+                "extra_columns": {"created_at": None, "updated_at": None},
+                "foreign_keys": [
+                    {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]},
+                    {"entity": "region", "local_keys": ["region_name"], "remote_keys": ["region_name"]},
+                ],
+            },
+        }
+
+        tables = TablesConfig(cfg=config)
+        df = pd.DataFrame(
+            {
+                "site_name": ["Site A", "Site B"],
+                "description": ["Desc A", "Desc B"],
+                "location_name": ["Loc A", "Loc B"],
+                "region_name": ["Reg A", "Reg B"],
+                "location_id": [10, 20],
+                "region_id": [100, 200],
+                "site_id": [1, 2],
+                "created_at": ["2021-01-01", "2021-01-02"],
+                "updated_at": ["2021-02-01", "2021-02-02"],
+            }
+        )
+
+        reordered = tables.reorder_columns("site", df)
+
+        # Expected order: site_id, location_id, region_id, created_at, updated_at, then other columns
+        cols = list(reordered.columns)
+        assert cols[0] == "site_id"
+        assert cols[1] == "location_id"
+        assert cols[2] == "region_id"
+        # Extra columns should come next
+        assert "created_at" in cols[3:5]
+        assert "updated_at" in cols[3:5]
+        # Other columns come last
+        assert "site_name" in cols[5:]
+        assert "description" in cols[5:]
+        assert "location_name" in cols[5:]
+        assert "region_name" in cols[5:]
+
+    def test_reorder_columns_preserves_data(self):
+        """Test that reorder_columns preserves all data correctly."""
+
+        config: dict[str, dict[str, Any]] = {
+            "site": {
+                "surrogate_id": "site_id",
+                "columns": ["name", "value"],
+            }
+        }
+
+        tables = TablesConfig(cfg=config)
+        df = pd.DataFrame({"name": ["A", "B", "C"], "value": [1, 2, 3], "site_id": [10, 20, 30]})
+
+        reordered = tables.reorder_columns("site", df)
+
+        # Check data is preserved
+        assert len(reordered) == 3
+        assert reordered["site_id"].tolist() == [10, 20, 30]
+        assert reordered["name"].tolist() == ["A", "B", "C"]
+        assert reordered["value"].tolist() == [1, 2, 3]
+
 
 class TestIntegration:
     """Integration tests for all classes working together."""
@@ -382,16 +752,14 @@ class TestIntegration:
                 "keys": ["Ort", "Kreis", "Land"],
                 "columns": ["Ort", "Kreis", "Land"],
                 "unnest": {"id_vars": ["site_id"], "value_vars": ["Ort", "Kreis", "Land"], "var_name": "location_type", "value_name": "location_name"},
-                "options": {"drop_duplicates": ["Ort", "Kreis", "Land"]},
+                "drop_duplicates": ["Ort", "Kreis", "Land"],
                 "depends_on": [],
             },
             "site": {
                 "surrogate_id": "site_id",
                 "keys": ["ProjektNr", "Fustel"],
                 "columns": ["ProjektNr", "Fustel", "EVNr"],
-                "options": {
-                    "drop_duplicates": ["ProjektNr", "Fustel"],
-                },
+                "drop_duplicates": ["ProjektNr", "Fustel"],
                 "foreign_keys": [{"entity": "location", "local_keys": ["location_type", "location_name"], "remote_keys": ["location_type", "location_name"]}],
                 "depends_on": ["location"],
             },
@@ -411,3 +779,42 @@ class TestIntegration:
         assert site.foreign_keys[0].remote_entity == "location"
         assert site.foreign_keys[0].remote_surrogate_id == "location_id"
         assert site.depends_on == ["location"]
+
+    def test_foreign_key_with_extra_columns_workflow(self):
+        """Test foreign key configuration with extra_columns in full workflow."""
+        extra_columns_cfg: dict[str, str] = {"site_latitude": "latitude", "site_longitude": "longitude"}
+        config: dict[str, dict[str, Any]] = {
+            "location": {
+                "surrogate_id": "location_id",
+                "keys": ["location_name"],
+                "columns": ["location_name", "latitude", "longitude", "elevation"],
+            },
+            "site": {
+                "surrogate_id": "site_id",
+                "keys": ["site_name"],
+                "columns": ["site_name", "description"],
+                "foreign_keys": [
+                    {
+                        "entity": "location",
+                        "local_keys": ["location_name"],
+                        "remote_keys": ["location_name"],
+                        "extra_columns": extra_columns_cfg,
+                        "drop_remote_id": False,
+                    }
+                ],
+                "depends_on": ["location"],
+            },
+        }
+
+        tables = TablesConfig(cfg=config)
+
+        # Test site foreign key configuration
+        site: TableConfig = tables.get_table("site")
+        assert len(site.foreign_keys) == 1
+
+        fk = site.foreign_keys[0]
+        assert fk.remote_entity == "location"
+        assert fk.local_keys == ["location_name"]
+        assert fk.remote_keys == ["location_name"]
+        assert fk.remote_extra_columns == {v: k for k, v in extra_columns_cfg.items()}
+        assert fk.drop_remote_id is False
