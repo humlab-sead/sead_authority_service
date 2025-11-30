@@ -295,9 +295,7 @@ class TestUnnestSpecification:
 
     def test_unnest_missing_var_name(self):
         """Test that unnest without var_name is caught."""
-        config = {
-            "entities": {"table": {"columns": ["id"], "unnest": {"id_vars": ["id"], "value_vars": ["col1"], "value_name": "val"}}}
-        }
+        config = {"entities": {"table": {"columns": ["id"], "unnest": {"id_vars": ["id"], "value_vars": ["col1"], "value_name": "val"}}}}
         spec = UnnestSpecification()
         assert spec.is_satisfied_by(config) is False
         assert spec.has_errors()
@@ -378,11 +376,7 @@ class TestFixedDataSpecification:
 
     def test_valid_fixed_data_with_sql(self):
         """Test that valid fixed data with SQL passes."""
-        config = {
-            "entities": {
-                "table": {"type": "fixed", "surrogate_id": "id", "columns": ["name"], "values": "sql: SELECT name FROM table"}
-            }
-        }
+        config = {"entities": {"table": {"type": "fixed", "surrogate_id": "id", "columns": ["name"], "values": "sql: SELECT name FROM table"}}}
         spec = FixedDataSpecification()
         assert spec.is_satisfied_by(config) is True
         assert not spec.has_errors()
@@ -457,9 +451,7 @@ class TestCompositeConfigSpecification:
         config = {
             "entities": {
                 "table": {
-                    "foreign_keys": [
-                        {"entity": "nonexistent", "local_keys": ["a", "b"], "remote_keys": ["c"]}  # Multiple errors
-                    ],
+                    "foreign_keys": [{"entity": "nonexistent", "local_keys": ["a", "b"], "remote_keys": ["c"]}],  # Multiple errors
                     "depends_on": ["nonexistent2"],
                 }
             }

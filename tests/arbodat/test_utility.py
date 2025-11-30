@@ -1,6 +1,7 @@
 """Unit tests for arbodat utility configuration classes."""
 
 from typing import Any
+
 import pytest
 
 from src.arbodat.config_model import ForeignKeyConfig, TableConfig, TablesConfig, UnnestConfig
@@ -36,7 +37,6 @@ class TestUnnestConfig:
         data = {"unnest": {"id_vars": ["id"], "value_vars": ["col1"], "var_name": "var"}}
         with pytest.raises(ValueError, match="Invalid unnest configuration"):
             UnnestConfig(cfg={}, data=data)
-
 
 
 class TestForeignKeyConfig:

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pandas as pd
 import pytest
 
-from src.arbodat.dispatch import CSVDispatcher, DatabaseDispatcher, DispatchRegistry, Dispatcher, Dispatchers, ExcelDispatcher
+from src.arbodat.dispatch import CSVDispatcher, DatabaseDispatcher, Dispatcher, Dispatchers, DispatchRegistry, ExcelDispatcher
 from src.configuration import MockConfigProvider
 from tests.decorators import with_test_config
 
@@ -173,7 +173,7 @@ class TestCSVDispatcher:
         dispatcher = CSVDispatcher()
         output_dir = tmp_path / "csv_output"
         output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         data = {"table1": pd.DataFrame({"col1": [1, 2]})}
         dispatcher.dispatch(str(output_dir), data)
 
@@ -273,9 +273,9 @@ class TestExcelDispatcher:
         with patch("pandas.ExcelWriter") as mock_writer:
             mock_writer.return_value.__enter__ = Mock()
             mock_writer.return_value.__exit__ = Mock()
-            
+
             dispatcher.dispatch(str(output_file), data)
-            
+
             mock_writer.assert_called_once_with(str(output_file), engine="openpyxl")
 
 
@@ -294,7 +294,7 @@ class TestDatabaseDispatcher:
         """Test that DatabaseDispatcher calls create_db_uri."""
         dispatcher = DatabaseDispatcher()
         data = {"table1": pd.DataFrame({"col1": [1, 2]})}
-        
+
         # Setup mocks
         mock_create_uri.return_value = "postgresql://user@localhost:5432/db"
         mock_engine = Mock()
@@ -316,7 +316,7 @@ class TestDatabaseDispatcher:
         """Test that DatabaseDispatcher creates database URI."""
         dispatcher = DatabaseDispatcher()
         data = {"table1": pd.DataFrame({"col1": [1, 2]})}
-        
+
         mock_create_uri.return_value = "postgresql://testuser@localhost:5432/testdb"
         mock_engine = Mock()
         mock_connection = Mock()
@@ -337,7 +337,7 @@ class TestDatabaseDispatcher:
         """Test that DatabaseDispatcher creates SQLAlchemy engine."""
         dispatcher = DatabaseDispatcher()
         data = {"table1": pd.DataFrame({"col1": [1, 2]})}
-        
+
         db_url = "postgresql://user@localhost:5432/db"
         mock_create_uri.return_value = db_url
         mock_engine = Mock()
@@ -360,7 +360,7 @@ class TestDatabaseDispatcher:
         df1 = pd.DataFrame({"col1": [1, 2]})
         df2 = pd.DataFrame({"col2": [3, 4]})
         data = {"table1": df1, "table2": df2}
-        
+
         mock_create_uri.return_value = "postgresql://user@localhost:5432/db"
         mock_engine = Mock()
         mock_connection = Mock()
@@ -370,7 +370,7 @@ class TestDatabaseDispatcher:
 
         with patch.object(pd.DataFrame, "to_sql") as mock_to_sql:
             dispatcher.dispatch("target", data)
-            
+
             assert mock_to_sql.call_count == 2
 
     @with_test_config
@@ -380,7 +380,7 @@ class TestDatabaseDispatcher:
         """Test that DatabaseDispatcher replaces existing tables."""
         dispatcher = DatabaseDispatcher()
         data = {"table1": pd.DataFrame({"col1": [1, 2]})}
-        
+
         mock_create_uri.return_value = "postgresql://user@localhost:5432/db"
         mock_engine = Mock()
         mock_connection = Mock()
@@ -390,7 +390,7 @@ class TestDatabaseDispatcher:
 
         with patch.object(pd.DataFrame, "to_sql") as mock_to_sql:
             dispatcher.dispatch("target", data)
-            
+
             # Verify if_exists parameter is set to "replace"
             call_kwargs = mock_to_sql.call_args[1]
             assert call_kwargs["if_exists"] == "replace"
@@ -402,7 +402,7 @@ class TestDatabaseDispatcher:
         """Test that DatabaseDispatcher writes tables without index."""
         dispatcher = DatabaseDispatcher()
         data = {"table1": pd.DataFrame({"col1": [1, 2]})}
-        
+
         mock_create_uri.return_value = "postgresql://user@localhost:5432/db"
         mock_engine = Mock()
         mock_connection = Mock()
@@ -412,7 +412,7 @@ class TestDatabaseDispatcher:
 
         with patch.object(pd.DataFrame, "to_sql") as mock_to_sql:
             dispatcher.dispatch("target", data)
-            
+
             # Verify index parameter is set to False
             call_kwargs = mock_to_sql.call_args[1]
             assert call_kwargs["index"] is False
@@ -424,7 +424,7 @@ class TestDatabaseDispatcher:
         """Test that DatabaseDispatcher uses transaction context."""
         dispatcher = DatabaseDispatcher()
         data = {"table1": pd.DataFrame({"col1": [1, 2]})}
-        
+
         mock_create_uri.return_value = "postgresql://user@localhost:5432/db"
         mock_engine = Mock()
         mock_connection = Mock()
@@ -434,7 +434,7 @@ class TestDatabaseDispatcher:
 
         with patch.object(pd.DataFrame, "to_sql"):
             dispatcher.dispatch("target", data)
-            
+
             # Verify begin() was called to start transaction
             mock_engine.begin.assert_called_once()
 
@@ -445,7 +445,7 @@ class TestDatabaseDispatcher:
         """Test that DatabaseDispatcher calls create_db_uri to build connection string."""
         dispatcher = DatabaseDispatcher()
         data = {"table1": pd.DataFrame({"col1": [1, 2]})}
-        
+
         mock_create_uri.return_value = "postgresql://user@localhost:5432/db"
         mock_engine = Mock()
         mock_connection = Mock()
@@ -455,7 +455,7 @@ class TestDatabaseDispatcher:
 
         with patch.object(pd.DataFrame, "to_sql"):
             dispatcher.dispatch("target", data)
-            
+
             # Should call create_db_uri
             mock_create_uri.assert_called_once()
 
@@ -467,16 +467,18 @@ class TestIntegration:
         """Test writing and reading CSV data maintains integrity."""
         dispatcher = CSVDispatcher()
         output_dir = tmp_path / "csv_output"
-        
-        original_df = pd.DataFrame({
-            "id": [1, 2, 3],
-            "name": ["Alice", "Bob", "Charlie"],
-            "value": [10.5, 20.3, 30.7],
-        })
+
+        original_df = pd.DataFrame(
+            {
+                "id": [1, 2, 3],
+                "name": ["Alice", "Bob", "Charlie"],
+                "value": [10.5, 20.3, 30.7],
+            }
+        )
         data = {"test_table": original_df}
 
         dispatcher.dispatch(str(output_dir), data)
-        
+
         # Read back and verify
         result_df = pd.read_csv(output_dir / "test_table.csv")
         pd.testing.assert_frame_equal(result_df, original_df)
@@ -485,16 +487,18 @@ class TestIntegration:
         """Test writing and reading Excel data maintains integrity."""
         dispatcher = ExcelDispatcher()
         output_file = tmp_path / "output.xlsx"
-        
-        original_df = pd.DataFrame({
-            "id": [1, 2, 3],
-            "name": ["Alice", "Bob", "Charlie"],
-            "value": [10.5, 20.3, 30.7],
-        })
+
+        original_df = pd.DataFrame(
+            {
+                "id": [1, 2, 3],
+                "name": ["Alice", "Bob", "Charlie"],
+                "value": [10.5, 20.3, 30.7],
+            }
+        )
         data = {"test_sheet": original_df}
 
         dispatcher.dispatch(str(output_file), data)
-        
+
         # Read back and verify
         result_df = pd.read_excel(output_file, sheet_name="test_sheet")
         pd.testing.assert_frame_equal(result_df, original_df)
@@ -519,7 +523,7 @@ class TestIntegration:
         """Test dispatching multiple related tables to CSV."""
         dispatcher = CSVDispatcher()
         output_dir = tmp_path / "csv_output"
-        
+
         data = {
             "users": pd.DataFrame({"user_id": [1, 2], "name": ["Alice", "Bob"]}),
             "orders": pd.DataFrame({"order_id": [1, 2], "user_id": [1, 2], "amount": [100, 200]}),
@@ -537,7 +541,7 @@ class TestIntegration:
         """Test dispatching multiple related tables to Excel sheets."""
         dispatcher = ExcelDispatcher()
         output_file = tmp_path / "output.xlsx"
-        
+
         data = {
             "users": pd.DataFrame({"user_id": [1, 2], "name": ["Alice", "Bob"]}),
             "orders": pd.DataFrame({"order_id": [1, 2], "user_id": [1, 2], "amount": [100, 200]}),

@@ -121,7 +121,7 @@ class TestForeignKeyConfig:
 
         fk = ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
 
-        assert fk.remote_extra_columns == { v:k for k, v in extra_columns_cfg.items() }
+        assert fk.remote_extra_columns == {v: k for k, v in extra_columns_cfg.items()}
 
     def test_extra_columns_as_list(self):
         """Test extra_columns as a list (maps column names to themselves)."""
@@ -496,7 +496,6 @@ class TestTablesConfig:
         nat_region_table: TableConfig = tables.get_table("natural_region")
         assert nat_region_table.drop_duplicates is True
 
-
     def test_get_sorted_columns_basic(self):
         """Test get_sorted_columns with basic configuration."""
         config: dict[str, dict[str, Any]] = {
@@ -523,10 +522,8 @@ class TestTablesConfig:
             "site": {
                 "surrogate_id": "site_id",
                 "columns": ["site_id", "location_id", "site_name", "location_name", "description"],
-                "foreign_keys": [
-                    {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]}
-                ],
-            }
+                "foreign_keys": [{"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]}],
+            },
         }
 
         tables = TablesConfig(cfg=config)
@@ -549,7 +546,7 @@ class TestTablesConfig:
                     {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]},
                     {"entity": "region", "local_keys": ["region_name"], "remote_keys": ["region_name"]},
                 ],
-            }
+            },
         }
 
         tables = TablesConfig(cfg=config)
@@ -573,11 +570,7 @@ class TestTablesConfig:
         }
 
         tables = TablesConfig(cfg=config)
-        df = pd.DataFrame({
-            "name": ["Site A", "Site B"],
-            "description": ["Desc A", "Desc B"],
-            "site_id": [1, 2]
-        })
+        df = pd.DataFrame({"name": ["Site A", "Site B"], "description": ["Desc A", "Desc B"], "site_id": [1, 2]})
 
         reordered = tables.reorder_columns("site", df)
 
@@ -593,19 +586,12 @@ class TestTablesConfig:
             "site": {
                 "surrogate_id": "site_id",
                 "columns": ["site_name", "location_name"],
-                "foreign_keys": [
-                    {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]}
-                ],
-            }
+                "foreign_keys": [{"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]}],
+            },
         }
 
         tables = TablesConfig(cfg=config)
-        df = pd.DataFrame({
-            "site_name": ["Site A", "Site B"],
-            "location_name": ["Loc A", "Loc B"],
-            "location_id": [10, 20],
-            "site_id": [1, 2]
-        })
+        df = pd.DataFrame({"site_name": ["Site A", "Site B"], "location_name": ["Loc A", "Loc B"], "location_id": [10, 20], "site_id": [1, 2]})
 
         reordered = tables.reorder_columns("site", df)
 
@@ -621,26 +607,23 @@ class TestTablesConfig:
             "site": {
                 "surrogate_id": "site_id",
                 "columns": ["site_name", "location_name"],
-                "extra_columns": {
-                    "default_lat": 0.0,
-                    "default_lon": 0.0
-                },
-                "foreign_keys": [
-                    {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]}
-                ],
-            }
+                "extra_columns": {"default_lat": 0.0, "default_lon": 0.0},
+                "foreign_keys": [{"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]}],
+            },
         }
 
         tables = TablesConfig(cfg=config)
-        df = pd.DataFrame({
-            "site_name": ["Site A", "Site B"],
-            "location_name": ["Loc A", "Loc B"],
-            "location_id": [10, 20],
-            "site_id": [1, 2],
-            "default_lat": [1.0, 2.0],
-            "default_lon": [3.0, 4.0],
-            "other_col": ["X", "Y"]
-        })
+        df = pd.DataFrame(
+            {
+                "site_name": ["Site A", "Site B"],
+                "location_name": ["Loc A", "Loc B"],
+                "location_id": [10, 20],
+                "site_id": [1, 2],
+                "default_lat": [1.0, 2.0],
+                "default_lon": [3.0, 4.0],
+                "other_col": ["X", "Y"],
+            }
+        )
 
         reordered = tables.reorder_columns("site", df)
 
@@ -666,10 +649,7 @@ class TestTablesConfig:
         }
 
         tables = TablesConfig(cfg=config)
-        df = pd.DataFrame({
-            "name": ["Site A", "Site B"],
-            "description": ["Desc A", "Desc B"]
-        })
+        df = pd.DataFrame({"name": ["Site A", "Site B"], "description": ["Desc A", "Desc B"]})
 
         reordered = tables.reorder_columns("site", df)
 
@@ -689,10 +669,7 @@ class TestTablesConfig:
 
         tables = TablesConfig(cfg=config)
         table_cfg = tables.get_table("site")
-        df = pd.DataFrame({
-            "name": ["Site A", "Site B"],
-            "site_id": [1, 2]
-        })
+        df = pd.DataFrame({"name": ["Site A", "Site B"], "site_id": [1, 2]})
 
         reordered = tables.reorder_columns(table_cfg, df)
 
@@ -708,29 +685,28 @@ class TestTablesConfig:
             "site": {
                 "surrogate_id": "site_id",
                 "columns": ["site_name", "location_name", "region_name"],
-                "extra_columns": {
-                    "created_at": None,
-                    "updated_at": None
-                },
+                "extra_columns": {"created_at": None, "updated_at": None},
                 "foreign_keys": [
                     {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]},
                     {"entity": "region", "local_keys": ["region_name"], "remote_keys": ["region_name"]},
                 ],
-            }
+            },
         }
 
         tables = TablesConfig(cfg=config)
-        df = pd.DataFrame({
-            "site_name": ["Site A", "Site B"],
-            "description": ["Desc A", "Desc B"],
-            "location_name": ["Loc A", "Loc B"],
-            "region_name": ["Reg A", "Reg B"],
-            "location_id": [10, 20],
-            "region_id": [100, 200],
-            "site_id": [1, 2],
-            "created_at": ["2021-01-01", "2021-01-02"],
-            "updated_at": ["2021-02-01", "2021-02-02"]
-        })
+        df = pd.DataFrame(
+            {
+                "site_name": ["Site A", "Site B"],
+                "description": ["Desc A", "Desc B"],
+                "location_name": ["Loc A", "Loc B"],
+                "region_name": ["Reg A", "Reg B"],
+                "location_id": [10, 20],
+                "region_id": [100, 200],
+                "site_id": [1, 2],
+                "created_at": ["2021-01-01", "2021-01-02"],
+                "updated_at": ["2021-02-01", "2021-02-02"],
+            }
+        )
 
         reordered = tables.reorder_columns("site", df)
 
@@ -760,11 +736,7 @@ class TestTablesConfig:
         }
 
         tables = TablesConfig(cfg=config)
-        df = pd.DataFrame({
-            "name": ["A", "B", "C"],
-            "value": [1, 2, 3],
-            "site_id": [10, 20, 30]
-        })
+        df = pd.DataFrame({"name": ["A", "B", "C"], "value": [1, 2, 3], "site_id": [10, 20, 30]})
 
         reordered = tables.reorder_columns("site", df)
 
@@ -850,5 +822,5 @@ class TestIntegration:
         assert fk.remote_entity == "location"
         assert fk.local_keys == ["location_name"]
         assert fk.remote_keys == ["location_name"]
-        assert fk.remote_extra_columns == { v:k for k, v in extra_columns_cfg.items() }
+        assert fk.remote_extra_columns == {v: k for k, v in extra_columns_cfg.items()}
         assert fk.drop_remote_id is False
