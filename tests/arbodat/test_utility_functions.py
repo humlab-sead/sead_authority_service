@@ -108,7 +108,7 @@ class TestGetSubset:
     def test_raises_on_none_source(self):
         """Test that None source raises ValueError."""
         with pytest.raises(ValueError, match="Source DataFrame must be provided"):
-            get_subset(None, ["A"])
+            get_subset(None, ["A"])  # type: ignore
 
     def test_missing_columns_raises_error(self):
         """Test that missing columns raise error by default."""

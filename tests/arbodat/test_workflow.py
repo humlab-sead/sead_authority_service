@@ -8,7 +8,7 @@ from src.configuration.setup import setup_config_store
 def test_workflow():
 
     config_file: str = "src/arbodat/input/arbodat.yml"
-    translate: bool = True
+    translate: bool = False
 
     output_filename: str = f"output{'' if not translate else '_translated'}.xlsx"
     asyncio.run(setup_config_store(config_file))
