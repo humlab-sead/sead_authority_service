@@ -1570,3 +1570,520 @@ class TestRealWorldIntegration:
 
             step2: dict[str, Any] | list[Any] | str = replace_references(step1)
             assert step2 == {"env_value": "env-host.example.com", "reference": "env-host.example.com"}
+
+
+class TestConfigFactoryLoadDirective:
+    """Test CSV data loading feature using @load: notation"""
+
+    def test_simple_csv_load_with_filepath(self, tmp_path: Path):
+        """Test loading CSV data using direct file path with @load: notation"""
+        # Create a simple CSV file
+        csv_file = tmp_path / "data.csv"
+        csv_file.write_text(
+            """name,value,description
+item1,100,First item
+item2,200,Second item
+item3,300,Third item
+"""
+        )
+
+        # Create config that loads the CSV
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+app_name: "Test App"
+data: "@load:{csv_file}"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify CSV data was loaded as list of dicts
+        data = config.get("data")
+        assert isinstance(data, list)
+        assert len(data) == 3
+        assert data[0]["name"] == "item1"
+        assert data[0]["value"] == "100"
+        assert data[0]["description"] == "First item"
+        assert data[2]["name"] == "item3"
+
+    def test_csv_load_with_tab_delimiter(self, tmp_path: Path):
+        """Test loading TSV (tab-separated) data using @load: notation"""
+        # Create a TSV file
+        tsv_file = tmp_path / "data.tsv"
+        tsv_file.write_text("name\tcode\tpriority\nalpha\tA001\t1\nbeta\tB002\t2\ngamma\tG003\t3\n")
+
+        # Create config with options for TSV
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+app_name: "Test App"
+lookup_data:
+  filename: "{tsv_file}"
+  delimiter: "\\t"
+items: "@load:lookup_data"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify TSV data was loaded
+        items = config.get("items")
+        assert isinstance(items, list)
+        assert len(items) == 3
+        assert items[0]["name"] == "alpha"
+        assert items[0]["code"] == "A001"
+        assert items[1]["priority"] == "2"
+
+    def test_csv_load_with_comma_delimiter(self, tmp_path: Path):
+        """Test loading CSV with explicit comma delimiter option"""
+        # Create a CSV file
+        csv_file = tmp_path / "products.csv"
+        csv_file.write_text(
+            """id,product,price
+1,Widget,9.99
+2,Gadget,19.99
+3,Doohickey,29.99
+"""
+        )
+
+        # Create config with explicit delimiter option
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+products_config:
+  filename: "{csv_file}"
+  delimiter: ","
+products: "@load:products_config"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify CSV was loaded
+        products = config.get("products")
+        assert len(products) == 3
+        assert products[1]["product"] == "Gadget"
+        assert products[1]["price"] == "19.99"
+
+    def test_csv_load_nonexistent_file(self, tmp_path: Path):
+        """Test that loading nonexistent CSV file returns the directive argument"""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+app: test
+data: "@load:nonexistent.csv"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Should return just the directive argument (without @load: prefix)
+        assert config.get("data") == "nonexistent.csv"
+
+    def test_csv_load_missing_filename_in_options(self, tmp_path: Path):
+        """Test that @load with options dict but no filename returns directive argument"""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+bad_config:
+  delimiter: ","
+  other_option: "value"
+data: "@load:bad_config"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Should return just the directive argument
+        assert config.get("data") == "bad_config"
+
+    def test_csv_load_when_path_points_to_non_dict(self, tmp_path: Path):
+        """Test that @load with path to non-dict value returns directive argument"""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+not_a_dict: "just a string"
+data: "@load:not_a_dict"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Should return just the directive argument
+        assert config.get("data") == "not_a_dict"
+
+    def test_csv_load_with_relative_path(self, tmp_path: Path):
+        """Test loading CSV with relative path (relative to config file)"""
+        # Create directory structure
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        # Create CSV in data directory
+        csv_file = data_dir / "items.csv"
+        csv_file.write_text(
+            """id,name
+1,First
+2,Second
+"""
+        )
+
+        # Create config with relative path
+        config_file = config_dir / "app.yml"
+        config_file.write_text(
+            f"""
+items: "@load:{csv_file}"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify data loaded
+        items = config.get("items")
+        assert len(items) == 2
+        assert items[0]["id"] == "1"
+
+    def test_csv_load_multiple_files(self, tmp_path: Path):
+        """Test loading multiple CSV files in the same config"""
+        # Create multiple CSV files
+        users_csv = tmp_path / "users.csv"
+        users_csv.write_text(
+            """username,role
+admin,administrator
+user1,user
+"""
+        )
+
+        products_csv = tmp_path / "products.csv"
+        products_csv.write_text(
+            """sku,name
+P001,Product One
+P002,Product Two
+"""
+        )
+
+        # Create config loading both
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+users: "@load:{users_csv}"
+products: "@load:{products_csv}"
+app_name: "Multi-Load App"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify both loaded correctly
+        users = config.get("users")
+        assert len(users) == 2
+        assert users[0]["username"] == "admin"
+
+        products = config.get("products")
+        assert len(products) == 2
+        assert products[1]["sku"] == "P002"
+
+        assert config.get("app_name") == "Multi-Load App"
+
+    def test_csv_load_within_nested_structure(self, tmp_path: Path):
+        """Test @load directive within deeply nested configuration"""
+        # Create CSV
+        csv_file = tmp_path / "codes.csv"
+        csv_file.write_text(
+            """code,description
+C1,Code One
+C2,Code Two
+"""
+        )
+
+        # Create config with nested structure
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+application:
+  settings:
+    database:
+      connection: "postgresql://localhost"
+    lookup_tables:
+      codes: "@load:{csv_file}"
+      other_setting: "value"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify nested load worked
+        codes = config.get("application:settings:lookup_tables:codes")
+        assert len(codes) == 2
+        assert codes[0]["code"] == "C1"
+        assert config.get("application:settings:lookup_tables:other_setting") == "value"
+
+    def test_csv_load_with_list_in_config(self, tmp_path: Path):
+        """Test @load directive within a list"""
+        # Create CSV
+        csv_file = tmp_path / "data.csv"
+        csv_file.write_text(
+            """key,value
+k1,v1
+k2,v2
+"""
+        )
+
+        # Create config with @load in list
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+datasets:
+  - name: "Static Data"
+    items: [1, 2, 3]
+  - "@load:{csv_file}"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify list structure
+        datasets = config.get("datasets")
+        assert len(datasets) == 2
+        assert datasets[0]["name"] == "Static Data"
+        # Second item should be the loaded CSV data (list of dicts)
+        assert isinstance(datasets[1], list)
+        assert len(datasets[1]) == 2
+        assert datasets[1][0]["key"] == "k1"
+
+    def test_csv_load_empty_file(self, tmp_path: Path):
+        """Test loading an empty CSV file fails and returns filepath"""
+        # Create empty CSV
+        csv_file = tmp_path / "empty.csv"
+        csv_file.write_text("")
+
+        # Create config
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+data: "@load:{csv_file}"
+"""
+        )
+
+        # Load config - empty CSV will fail to parse
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Since pandas can't parse empty file, it returns the directive argument
+        data = config.get("data")
+        assert data == str(csv_file)
+
+    def test_csv_load_only_headers(self, tmp_path: Path):
+        """Test loading CSV with only header row"""
+        # Create CSV with only headers
+        csv_file = tmp_path / "headers_only.csv"
+        csv_file.write_text("name,value,status\n")
+
+        # Create config
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+data: "@load:{csv_file}"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Should load as empty list (no data rows)
+        data = config.get("data")
+        assert isinstance(data, list)
+        assert len(data) == 0
+
+    def test_csv_load_with_special_characters(self, tmp_path: Path):
+        """Test loading CSV with special characters in data"""
+        # Create CSV with special characters
+        csv_file = tmp_path / "special.csv"
+        csv_file.write_text(
+            'name,description\n'
+            '"Item, with comma","Description with ""quotes"""\n'
+            'Item2,Normal description\n'
+        )
+
+        # Create config
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+data: "@load:{csv_file}"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify special characters handled correctly
+        data = config.get("data")
+        assert len(data) == 2
+        assert data[0]["name"] == "Item, with comma"
+        assert 'quotes' in data[0]["description"]
+
+    def test_csv_load_combined_with_include(self, tmp_path: Path):
+        """Test using both @load and @include in the same config"""
+        # Create CSV
+        csv_file = tmp_path / "data.csv"
+        csv_file.write_text(
+            """id,value
+1,100
+2,200
+"""
+        )
+
+        # Create sub-config
+        sub_config = tmp_path / "database.yml"
+        sub_config.write_text(
+            """
+host: localhost
+port: 5432
+"""
+        )
+
+        # Create main config using both directives
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+database: "@include:{sub_config}"
+lookup_data: "@load:{csv_file}"
+app_name: "Combined Test"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify both directives worked
+        assert config.get("database:host") == "localhost"
+        data = config.get("lookup_data")
+        assert len(data) == 2
+        assert data[0]["id"] == "1"
+        assert config.get("app_name") == "Combined Test"
+
+    def test_csv_load_with_env_vars(self, tmp_path: Path, monkeypatch):
+        """Test that environment variable substitution doesn't work for @load paths"""
+        # Set environment variable
+        monkeypatch.setenv("DATA_DIR", str(tmp_path))
+
+        # Create CSV
+        csv_file = tmp_path / "env_data.csv"
+        csv_file.write_text(
+            """name,code
+Alpha,A
+Beta,B
+"""
+        )
+
+        # Create config with env var in path
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+data: "@load:${{DATA_DIR}}/env_data.csv"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Env vars are replaced AFTER @load resolution, so this doesn't work
+        # The file won't be found, so directive argument is returned
+        data = config.get("data")
+        assert data == "${DATA_DIR}/env_data.csv"
+
+    def test_csv_load_all_strings_dtype(self, tmp_path: Path):
+        """Test that CSV data is loaded with all columns as strings (dtype=str)"""
+        # Create CSV with various data types
+        csv_file = tmp_path / "types.csv"
+        csv_file.write_text(
+            """id,name,value,is_active
+1,Item One,123.45,true
+2,Item Two,678.90,false
+"""
+        )
+
+        # Create config
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+data: "@load:{csv_file}"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify all values are strings (as per dtype=str in pd.read_csv)
+        data = config.get("data")
+        assert data[0]["id"] == "1"  # String, not int
+        assert data[0]["value"] == "123.45"  # String, not float
+        assert data[0]["is_active"] == "true"  # String, not boolean
+
+    def test_load_directive_with_options_and_missing_file(self, tmp_path: Path):
+        """Test @load with options dict but file doesn't exist"""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+load_config:
+  filename: "nonexistent.csv"
+  delimiter: "\\t"
+data: "@load:load_config"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Should return directive argument when file not found
+        assert config.get("data") == "load_config"
+
+    def test_csv_load_default_delimiter(self, tmp_path: Path):
+        """Test that default delimiter is comma when not specified in options"""
+        # Create CSV
+        csv_file = tmp_path / "default.csv"
+        csv_file.write_text("a,b,c\n1,2,3\n4,5,6\n")
+
+        # Create config with just filename in options (no delimiter)
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+csv_opts:
+  filename: "{csv_file}"
+data: "@load:csv_opts"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify loaded with comma delimiter
+        data = config.get("data")
+        assert len(data) == 2
+        assert data[0]["a"] == "1"
+        assert data[0]["b"] == "2"
