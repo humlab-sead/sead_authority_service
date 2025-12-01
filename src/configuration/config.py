@@ -263,6 +263,9 @@ class LoadResolver(BaseResolver):
         else:
             filename, sep = directive_argument, ","
 
+        if not Path(filename).is_absolute() and base_path is not None:
+            filename = str(base_path / filename)
+            
         if not is_path_to_existing_file(filename):
             logger.warning(f"ignoring load directive for path '{directive_argument}' since file '{filename}' does not exist")
             return directive_argument
