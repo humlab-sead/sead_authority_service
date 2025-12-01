@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from src.arbodat.utility import _rename_last_occurence, add_surrogate_id, check_functional_dependency, get_subset, extract_translation_map, translate
+from src.arbodat.utility import _rename_last_occurence, add_surrogate_id, check_functional_dependency, extract_translation_map, get_subset, translate
 
 
 class TestAddSurrogateId:
@@ -411,7 +411,7 @@ class TestRenameLastOccurrence:
 class TestTranslate:
     """Tests for translate function."""
 
-    def test_translate_with_valid_translations(self, monkeypatch):
+    def test_translate_with_valid_translations(self):
         """Test translating column names with valid translation configuration."""
         # Mock translation config
         fields_metadata: list[dict[str, str]] = [
@@ -439,7 +439,7 @@ class TestTranslate:
         assert "Count" in result["species"].columns
         assert "Art" not in result["species"].columns
 
-    def test_translate_preserves_untranslated_columns(self, monkeypatch):
+    def test_translate_preserves_untranslated_columns(self):
         """Test that columns without translations are fields_metadata."""
         translations: list[dict[str, str]] = [
             {"arbodat_field": "Ort", "english_column_name": "location"},
@@ -455,7 +455,7 @@ class TestTranslate:
         assert "location" in result["sites"].columns
         assert "untranslated_col" in result["sites"].columns
 
-    def test_translate_with_no_translations_config(self, monkeypatch):
+    def test_translate_with_no_translations_config(self):
         """Test translate when no translation configuration is available."""
 
         data: dict[str, pd.DataFrame] = {
@@ -468,7 +468,7 @@ class TestTranslate:
         assert "Ort" in result["sites"].columns
         assert "Datum" in result["sites"].columns
 
-    def test_translate_with_empty_translations(self, monkeypatch):
+    def test_translate_with_empty_translations(self):
         """Test translate with empty translations list."""
 
         data: dict[str, pd.DataFrame] = {
@@ -480,10 +480,10 @@ class TestTranslate:
         # Columns should remain unchanged
         assert "Ort" in result["sites"].columns
 
-    def test_translate_with_missing_required_fields(self, monkeypatch):
+    def test_translate_with_missing_required_fields(self):
         """Test translate when translation config is missing required fields."""
         # Translation missing 'english_column_name' field
-        fields_metadata = [
+        fields_metadata: list[dict[str, str]] = [
             {"arbodat_field": "Ort", "wrong_field": "location"},
         ]
         translations: dict[str, str] = extract_translation_map(fields_metadata=fields_metadata)
@@ -497,9 +497,9 @@ class TestTranslate:
         # Should skip translation and keep original columns
         assert "Ort" in result["sites"].columns
 
-    def test_translate_with_duplicate_target_names(self, monkeypatch):
+    def test_translate_with_duplicate_target_names(self):
         """Test translate when target column name already exists."""
-        fields_metadata = [
+        fields_metadata: list[dict[str, str]] = [
             {"arbodat_field": "Ort", "english_column_name": "location"},
         ]
         translations: dict[str, str] = extract_translation_map(fields_metadata=fields_metadata)
@@ -514,7 +514,7 @@ class TestTranslate:
         assert "location" in result["sites"].columns
         assert result["sites"]["location"].tolist() == ["existing"]
 
-    def test_translate_multiple_tables(self, monkeypatch):
+    def test_translate_multiple_tables(self):
         """Test translating multiple tables."""
         fields_metadata: list[dict[str, str]] = [
             {"arbodat_field": "Ort", "english_column_name": "location"},
@@ -529,8 +529,6 @@ class TestTranslate:
             "other": pd.DataFrame({"name": ["test"]}),
         }
 
-        from src.arbodat.utility import translate
-
         result: dict[str, pd.DataFrame] = translate(data, translations_map=translations)
 
         # Check all tables translated correctly
@@ -540,7 +538,7 @@ class TestTranslate:
         assert "count" in result["species"].columns
         assert "name" in result["other"].columns
 
-    def test_translate_with_custom_field_names(self, monkeypatch):
+    def test_translate_with_custom_field_names(self):
         """Test translate with custom from_field and to_field parameters."""
         fields_metadata: list[dict[str, str]] = [
             {"german": "Ort", "swedish": "plats"},
@@ -559,7 +557,7 @@ class TestTranslate:
         assert "Ort" not in result["sites"].columns
         assert "Art" not in result["sites"].columns
 
-    def test_translate_preserves_data_values(self, monkeypatch):
+    def test_translate_preserves_data_values(self):
         """Test that translate only changes column names, not data values."""
         fields_metadata: list[dict[str, str]] = [
             {"arbodat_field": "Ort", "english_column_name": "location"},
@@ -577,7 +575,7 @@ class TestTranslate:
         assert result["sites"]["location"].tolist() == ["Berlin", "Munich"]
         assert result["sites"]["value"].tolist() == [10, 20]
 
-    def test_translate_empty_dataframe(self, monkeypatch):
+    def test_translate_empty_dataframe(self):
         """Test translate with empty DataFrame."""
         fields_metadata: list[dict[str, str]] = [
             {"arbodat_field": "Ort", "english_column_name": "location"},
@@ -594,7 +592,7 @@ class TestTranslate:
         assert "Datum" in result["sites"].columns
         assert len(result["sites"]) == 0
 
-    def test_translate_returns_modified_dict(self, monkeypatch):
+    def test_translate_returns_modified_dict(self):
         """Test that translate returns the modified data dictionary."""
         fields_metadata: list[dict[str, str]] = [
             {"arbodat_field": "Ort", "english_column_name": "location"},

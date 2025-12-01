@@ -6,6 +6,7 @@ from src.utility import dotget
 
 REF_TAG = "@value:"
 
+
 def _parse_list_expression(expr: str, full_data: dict[str, Any]) -> list[Any] | str:
     """
     Parse and evaluate list expressions with "@value:" directives and list operations.
@@ -80,7 +81,7 @@ def _parse_list_expression(expr: str, full_data: dict[str, Any]) -> list[Any] | 
     for token in tokens:
         if token.startswith(REF_TAG):
             # Resolve include directive
-            ref_path = token[len(REF_TAG):].strip()
+            ref_path = token[len(REF_TAG) :].strip()
             ref_value = dotget(full_data, ref_path)  # type: ignore
 
             if ref_value is None:

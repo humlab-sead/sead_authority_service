@@ -10,7 +10,7 @@ from src.configuration.utility import replace_references
 from src.utility import replace_env_vars
 from tests.decorators import with_test_config
 
-# pylint: disable=unused-argument
+# pylint: disable=unused-argument, implicit-str-concat, f-string-without-interpolation
 
 
 class TestConfigProvider:
@@ -1919,11 +1919,7 @@ data: "@load:{csv_file}"
         """Test loading CSV with special characters in data"""
         # Create CSV with special characters
         csv_file = tmp_path / "special.csv"
-        csv_file.write_text(
-            'name,description\n'
-            '"Item, with comma","Description with ""quotes"""\n'
-            'Item2,Normal description\n'
-        )
+        csv_file.write_text("name,description\n" '"Item, with comma","Description with ""quotes"""\n' "Item2,Normal description\n")
 
         # Create config
         config_file = tmp_path / "config.yml"
@@ -1941,7 +1937,7 @@ data: "@load:{csv_file}"
         data = config.get("data")
         assert len(data) == 2
         assert data[0]["name"] == "Item, with comma"
-        assert 'quotes' in data[0]["description"]
+        assert "quotes" in data[0]["description"]
 
     def test_csv_load_combined_with_include(self, tmp_path: Path):
         """Test using both @load and @include in the same config"""

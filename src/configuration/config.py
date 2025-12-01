@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from abc import abstractmethod
 import contextlib
 import io
+from abc import abstractmethod
 from inspect import isclass
 from os.path import join, normpath
 from pathlib import Path
-from turtle import st
 from typing import Any
 
-from loguru import logger
 import pandas as pd
 import yaml
 from dotenv import load_dotenv
+from loguru import logger
 
 from src.utility import dget, dotexists, dotset, env2dict, replace_env_vars
 
@@ -173,9 +172,10 @@ class ConfigFactory:
             filename=source if isinstance(source, str) and is_config_path(source) else None,
         )
 
+
 class BaseResolver:
     """Base class for configuration resolvers.
-    
+
     Resolvers process configuration data to resolve specific directives.
     Example directives include:
         - @include: to include sub-configuration files
@@ -210,6 +210,7 @@ class BaseResolver:
     def resolve_directive(self, directive_argument: str, base_path: Path | None) -> dict[str, Any]:
         pass
 
+
 class SubConfigResolver(BaseResolver):
     """Recursively resolve sub-configurations referenced in the main configuration.
 
@@ -227,19 +228,21 @@ class SubConfigResolver(BaseResolver):
     def __init__(self, context: str | None = None, env_filename: str | None = None, env_prefix: str | None = None, source_path: str | None = None) -> None:
         super().__init__(context=context, env_filename=env_filename, env_prefix=env_prefix, source_path=source_path)
 
-
     def resolve_directive(self, directive_argument: str, base_path: Path | None) -> dict[str, Any]:
         filename: str = directive_argument
         if not Path(filename).is_absolute() and base_path is not None:
             filename = str(base_path / filename)
-        loaded_data: dict[str, Any] = ConfigFactory().load(source=filename, context=self.context, env_filename=self.env_filename, env_prefix=self.env_prefix).data
+        loaded_data: dict[str, Any] = (
+            ConfigFactory().load(source=filename, context=self.context, env_filename=self.env_filename, env_prefix=self.env_prefix).data
+        )
         return self._resolve(loaded_data, Path(filename).parent)
-    
+
+
 class LoadResolver(BaseResolver):
 
     directive: str = "@load"
 
-    def __init__(self, context: str | None = None, env_filename: str | None = None, env_prefix: str | None = None, source_path: str | None = None ) -> None:
+    def __init__(self, context: str | None = None, env_filename: str | None = None, env_prefix: str | None = None, source_path: str | None = None) -> None:
         super().__init__(context=context, env_filename=env_filename, env_prefix=env_prefix, source_path=source_path)
 
     def resolve_directive(self, directive_argument: str, base_path: Path | None) -> Any:
@@ -265,14 +268,14 @@ class LoadResolver(BaseResolver):
 
         if not Path(filename).is_absolute() and base_path is not None:
             filename = str(base_path / filename)
-            
+
         if not is_path_to_existing_file(filename):
             logger.warning(f"ignoring load directive for path '{directive_argument}' since file '{filename}' does not exist")
             return directive_argument
 
         try:
             loaded_data: list[dict[Any, Any]] = pd.read_csv(filename, sep=sep, dtype=str).to_dict(orient="records")
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             logger.warning(f"ignoring load directive for path '{directive_argument}' since file '{filename}' could not be parsed: {e}")
             return directive_argument
 
