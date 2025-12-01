@@ -76,7 +76,7 @@ class TestForeignKeyConfig:
         config = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
         fk_data = {"entity": "location", "local_keys": ["col1"]}
 
-        with pytest.raises(ValueError, match="missing remote_keys"):
+        with pytest.raises(ValueError, match="missing local and/or remote keys"):
             ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
 
     def test_empty_remote_keys(self):
@@ -84,7 +84,7 @@ class TestForeignKeyConfig:
         config = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
         fk_data = {"entity": "location", "local_keys": ["col1"], "remote_keys": []}
 
-        with pytest.raises(ValueError, match="missing remote_keys"):
+        with pytest.raises(ValueError, match="missing local and/or remote keys"):
             ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
 
 

@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from src.arbodat.config_model import TableConfig
-from src.arbodat.fixed import create_fixed_table
+from src.arbodat.create_fixed import create_fixed_table
 
 
 class TestCreateFixedTable:
