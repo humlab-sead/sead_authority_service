@@ -4,24 +4,26 @@ import yaml
 
 from src.utility import dotget
 
+REF_TAG = "@value:"
+
 
 def _parse_list_expression(expr: str, full_data: dict[str, Any]) -> list[Any] | str:
     """
-    Parse and evaluate list expressions with include directives and list operations.
+    Parse and evaluate list expressions with "@value:" directives and list operations.
 
     Constraints:
     - No nested lists allowed (flat lists only)
     - No brackets in list values
 
     Supports:
-    - Simple include: "include: path.to.list"
-    - Prepend: "['a', 'b'] + include: path.to.list"
-    - Append: "include: path.to.list + ['c', 'd']"
-    - Multiple includes: "include: path1 + include: path2"
-    - Chaining: "['a'] + include: path1 + include: path2 + ['b']"
+    - Simple value: "@value: path.to.list"
+    - Prepend: "['a', 'b'] + @value: path.to.list"
+    - Append: "@value: path.to.list + ['c', 'd']"
+    - Multiple values: "@value: path1 + @value: path2"
+    - Chaining: "['a'] + @value: path1 + @value: path2 + ['b']"
 
     Args:
-        expr: String expression containing include directives and/or list operations
+        expr: String expression containing @value directives and/or list operations
         full_data: Full configuration data for resolving includes
 
     Returns:
@@ -29,7 +31,7 @@ def _parse_list_expression(expr: str, full_data: dict[str, Any]) -> list[Any] | 
     """
 
     # Quick check: no list operations present
-    if "include:" not in expr and "[" not in expr:
+    if REF_TAG not in expr and "[" not in expr:
         return expr
 
     # Validate bracket balance
@@ -38,7 +40,7 @@ def _parse_list_expression(expr: str, full_data: dict[str, Any]) -> list[Any] | 
 
     # If no + operator found, not a list operation
     if "+" not in expr:
-        return expr if not expr.startswith("include:") else expr
+        return expr if not expr.startswith(REF_TAG) else expr
 
     # Split by '+' while tracking bracket depth (simple state machine)
     tokens: list[str] = []
@@ -70,16 +72,16 @@ def _parse_list_expression(expr: str, full_data: dict[str, Any]) -> list[Any] | 
         return expr
 
     # If only one token and it's a simple include, return for normal processing
-    if len(tokens) == 1 and tokens[0].startswith("include:"):
+    if len(tokens) == 1 and tokens[0].startswith(REF_TAG):
         return tokens[0]
 
     # Process each token and build result list
     result: list[Any] = []
 
     for token in tokens:
-        if token.startswith("include:"):
+        if token.startswith(REF_TAG):
             # Resolve include directive
-            ref_path = token[8:].strip()
+            ref_path = token[len(REF_TAG) :].strip()
             ref_value = dotget(full_data, ref_path)  # type: ignore
 
             if ref_value is None:
@@ -127,7 +129,7 @@ def _replace_references(data: dict[str, Any] | list[Any] | str, full_data: dict[
         return [_replace_references(i, full_data=full_data) for i in data]
     if isinstance(data, str):
         # Check for list expressions with operations
-        if ("include:" in data and "+" in data) or (data.count("[") > 0 and "+" in data):
+        if (REF_TAG in data and "+" in data) or (data.count("[") > 0 and "+" in data):
             parsed = _parse_list_expression(data, full_data)  # type: ignore
             # Only recurse if parsing actually changed the value and it's not a string
             if parsed != data and not isinstance(parsed, str):
@@ -137,8 +139,8 @@ def _replace_references(data: dict[str, Any] | list[Any] | str, full_data: dict[
                 data = parsed
 
         # Handle simple include directive
-        if data.startswith("include:"):
-            ref_path: str = data[len("include:") :].strip()
+        if data.startswith(REF_TAG):
+            ref_path: str = data[len(REF_TAG) :].strip()
             ref_value: Any = dotget(full_data, ref_path)  # type: ignore
             ref_value = _replace_references(ref_value, full_data=full_data)
             return ref_value if ref_value is not None else data
@@ -147,12 +149,12 @@ def _replace_references(data: dict[str, Any] | list[Any] | str, full_data: dict[
 
 def replace_references(data: dict[str, Any] | list[Any] | str) -> dict[str, Any] | list[Any] | str:
     """
-    Recursively searches dict for values matching include directives and list operations.
+    Recursively searches dict for values matching @value directives optionally with list operations.
 
     Supports:
-    - Simple include: "include: some.path.to.value"
-    - List concatenation: "['item'] + include: path.to.list"
-    - Multiple operations: "include: path1 + ['item'] + include: path2"
+    - Simple value: "@value: some.path.to.value"
+    - List concatenation: "['item'] + @value: path.to.list"
+    - Multiple operations: "@value: path1 + ['item'] + @value: path2"
 
     Args:
         data: Configuration data to process
