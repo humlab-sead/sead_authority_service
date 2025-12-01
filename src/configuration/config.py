@@ -4,7 +4,7 @@ import io
 from inspect import isclass
 from os.path import join, normpath
 from pathlib import Path
-from typing import Any, Type
+from typing import Any
 
 import yaml
 from dotenv import load_dotenv
@@ -61,7 +61,7 @@ class Config(ConfigLike):
         self.context: str = context
         self.filename: str | None = filename
 
-    def get(self, *keys: str, default: Any | Type[Any] = None, mandatory: bool = False) -> Any:
+    def get(self, *keys: str, default: Any | type[Any] = None, mandatory: bool = False) -> Any:
         if self.data is None:
             raise ValueError("Configuration not initialized")
 

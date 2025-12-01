@@ -295,7 +295,7 @@ drop_duplicates: true
 drop_duplicates: ["column1", "column2"]
 
 # Use keys from entity definition
-drop_duplicates: "include: entities.sample.keys"
+drop_duplicates: "@value: entities.sample.keys"
 ```
 
 #### `check_functional_dependency`
@@ -341,7 +341,7 @@ foreign_keys:
 ```yaml
 local_keys: ["parent_id", "parent_type"]
 # Or reference another entity's keys:
-local_keys: "include: entities.site.keys"
+local_keys: "@value: entities.site.keys"
 ```
 
 ##### `remote_keys`
@@ -352,7 +352,7 @@ local_keys: "include: entities.site.keys"
 ```yaml
 remote_keys: ["id", "type"]
 # Or reference another entity's keys:
-remote_keys: "include: entities.site.keys"
+remote_keys: "@value: entities.site.keys"
 ```
 
 ##### `extra_columns`
@@ -401,16 +401,16 @@ Reference values from other parts of the configuration:
 
 ```yaml
 # Reference another entity's keys
-local_keys: "include: entities.site.keys"
+local_keys: "@value: entities.site.keys"
 
 # Reference another entity's values
-value_vars: "include: entities.location_type.values"
+value_vars: "@value: entities.location_type.values"
 
 # Reference surrogate_id
-id_vars: ["include: entities.sample.surrogate_id"]
+id_vars: ["@value: entities.sample.surrogate_id"]
 
 # Complex reference
-drop_duplicates: "include: entities.natural_region.keys + include: entities.site.keys"
+drop_duplicates: "@value: entities.natural_region.keys + @value: entities.site.keys"
 ```
 
 ### Pending Columns
@@ -472,7 +472,7 @@ remain_type:
     - entity: remain_type_group
       local_keys: ["RTypGrup"]
       remote_keys: ["RTypGrup"]
-  drop_duplicates: "include: entities.remain_type.keys"
+  drop_duplicates: "@value: entities.remain_type.keys"
   depends_on: ["remain_type_group"]
 ```
 
@@ -485,11 +485,11 @@ site_site_type:
   columns: []  # Gets columns from foreign keys
   foreign_keys:
     - entity: site_type
-      local_keys: "include: entities.site_type.keys"
-      remote_keys: "include: entities.site_type.keys"
+      local_keys: "@value: entities.site_type.keys"
+      remote_keys: "@value: entities.site_type.keys"
     - entity: site
-      local_keys: "include: entities.site.keys"
-      remote_keys: "include: entities.site.keys"
+      local_keys: "@value: entities.site.keys"
+      remote_keys: "@value: entities.site.keys"
   drop_duplicates: true
   depends_on: ["site", "site_type"]
 ```
@@ -519,7 +519,7 @@ sample_coordinate:
   
   # First unnest the data
   unnest:
-    id_vars: ["include: entities.sample.surrogate_id"]
+    id_vars: ["@value: entities.sample.surrogate_id"]
     value_vars: ["KoordX", "KoordY", "KoordZ", "TiefeBis", "TiefeVon"]
     var_name: coordinate_type
     value_name: coordinate_value
@@ -527,8 +527,8 @@ sample_coordinate:
   # Then link to related entities
   foreign_keys:
     - entity: sample
-      local_keys: "include: entities.sample.keys"
-      remote_keys: "include: entities.sample.keys"
+      local_keys: "@value: entities.sample.keys"
+      remote_keys: "@value: entities.sample.keys"
     - entity: coordinate_method_dimensions
       local_keys: ["coordinate_type"]
       remote_keys: ["coordinate_type"]
@@ -553,8 +553,8 @@ site:
   # Link to coordinates and copy extra fields
   foreign_keys:
     - entity: site_coordinate
-      local_keys: "include: entities.site.keys"
-      remote_keys: "include: entities.site.keys"
+      local_keys: "@value: entities.site.keys"
+      remote_keys: "@value: entities.site.keys"
       extra_columns:
         coordinate_system: "Koordinatensystem"
         easting: "Easting"
@@ -562,7 +562,7 @@ site:
         elevation: "Höhe"
       drop_remote_id: true  # Don't keep site_coordinate_id
   
-  drop_duplicates: "include: entities.site.keys"
+  drop_duplicates: "@value: entities.site.keys"
   depends_on: ["site_coordinate"]
 ```
 
@@ -613,7 +613,7 @@ site:
 2. **Specify `keys`** explicitly for meaningful deduplication
    ```yaml
    keys: ["natural_key1", "natural_key2"]
-   drop_duplicates: "include: entities.table.keys"
+   drop_duplicates: "@value: entities.table.keys"
    ```
 
 3. **Use meaningful deduplication** - not just `drop_duplicates: true`
@@ -631,7 +631,7 @@ site:
 
 2. **Use include directives** for consistency
    ```yaml
-   local_keys: "include: entities.site.keys"  # DRY principle
+   local_keys: "@value: entities.site.keys"  # DRY principle
    ```
 
 3. **Document complex relationships** with comments
@@ -754,7 +754,7 @@ Use include directives to build configuration dynamically:
 
 ```yaml
 site_properties:
-  value_vars: "include: entities.site_property_type.values"
+  value_vars: "@value: entities.site_property_type.values"
 ```
 
 This pulls values from another entity definition at runtime.

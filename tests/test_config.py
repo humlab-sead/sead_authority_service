@@ -608,7 +608,7 @@ features:
             """
 app: test
 database: "some/path/that/looks/like/file.yml"
-message: "include:something"
+message: "@value:something"
 """
         )
 
@@ -617,13 +617,13 @@ message: "include:something"
 
         # These should be treated as regular string values, not file references
         assert config.get("database") == "some/path/that/looks/like/file.yml"
-        # Note: "include:something" will be treated as a reference by replace_references
+        # Note: "@value:something" will be treated as a reference by replace_references
         # Since "something" doesn't exist in the config, it will remain as the original string
-        assert config.get("message") == "include:something"
+        assert config.get("message") == "@value:something"
 
 
 class TestConfigFactoryReferences:
-    """Test internal reference replacement feature using include: notation"""
+    """Test internal reference replacement feature using @value: notation"""
 
     def test_simple_internal_reference(self, tmp_path: Path):
         """Test simple internal reference replacement."""
@@ -631,7 +631,7 @@ class TestConfigFactoryReferences:
         config_file.write_text(
             """
 base_url: "https://api.example.com"
-api_endpoint: "include:base_url"
+api_endpoint: "@value:base_url"
 """
         )
 
@@ -655,9 +655,9 @@ database:
     port: 5433
     
 connection:
-  primary_host: "include:database.primary.host"
-  primary_port: "include:database.primary.port"
-  replica_host: "include:database.replica.host"
+  primary_host: "@value:database.primary.host"
+  primary_port: "@value:database.primary.port"
+  replica_host: "@value:database.replica.host"
 """
         )
 
@@ -678,8 +678,8 @@ app:
     timeout: 30
     retries: 3
     
-timeout_value: "include:app:settings:timeout"
-retry_count: "include:app:settings:retries"
+timeout_value: "@value:app:settings:timeout"
+retry_count: "@value:app:settings:retries"
 """
         )
 
@@ -700,10 +700,10 @@ defaults:
   cache: true
   
 service_a:
-  config: "include:defaults"
+  config: "@value:defaults"
   
 service_b:
-  config: "include:defaults"
+  config: "@value:defaults"
 """
         )
 
@@ -724,7 +724,7 @@ allowed_hosts:
   - example.com
   - api.example.com
   
-cors_origins: "include:allowed_hosts"
+cors_origins: "@value:allowed_hosts"
 """
         )
 
@@ -745,8 +745,8 @@ primary_db: "db1.example.com"
 backup_db: "db2.example.com"
 
 database_hosts:
-  - "include:primary_db"
-  - "include:backup_db"
+  - "@value:primary_db"
+  - "@value:backup_db"
   - "static.example.com"
 """
         )
@@ -763,9 +763,9 @@ database_hosts:
         config_file.write_text(
             """
 base_value: "final_value"
-level1: "include:base_value"
-level2: "include:level1"
-level3: "include:level2"
+level1: "@value:base_value"
+level2: "@value:level1"
+level3: "@value:level2"
 """
         )
 
@@ -783,8 +783,8 @@ level3: "include:level2"
         config_file.write_text(
             """
 value: "test"
-missing_ref: "include:nonexistent.path"
-another_ref: "include:value"
+missing_ref: "@value:nonexistent.path"
+another_ref: "@value:value"
 """
         )
 
@@ -792,7 +792,7 @@ another_ref: "include:value"
         config = factory.load(source=str(config_file))
 
         assert config.get("value") == "test"
-        assert config.get("missing_ref") == "include:nonexistent.path"
+        assert config.get("missing_ref") == "@value:nonexistent.path"
         assert config.get("another_ref") == "test"
 
     def test_reference_with_environment_variables(self, tmp_path: Path, monkeypatch):
@@ -807,8 +807,8 @@ database:
   host: "${DB_HOST}"
   port: ${DB_PORT}
   
-connection_string: "include:database.host"
-connection_port: "include:database.port"
+connection_string: "@value:database.host"
+connection_port: "@value:database.port"
 """
         )
 
@@ -833,14 +833,14 @@ name: mydb
 """
         )
 
-        # Create main config with both @include: and include: references
+        # Create main config with both @include: and @value: references
         main_config = tmp_path / "main.yml"
         main_config.write_text(
             f"""
 database: "@include:{db_config}"
 app:
-  db_host: "include:database.host"
-  db_name: "include:database.name"
+  db_host: "@value:database.host"
+  db_name: "@value:database.name"
 """
         )
 
@@ -864,15 +864,15 @@ defaults:
 services:
   api:
     name: "API Service"
-    settings: "include:defaults"
+    settings: "@value:defaults"
   worker:
     name: "Worker Service"
-    settings: "include:defaults"
+    settings: "@value:defaults"
     
 monitoring:
   # Direct references to values that exist in the original structure
-  default_timeout: "include:defaults.timeout"
-  api_name: "include:services.api.name"
+  default_timeout: "@value:defaults.timeout"
+  api_name: "@value:services.api.name"
 """
         )
 
@@ -892,7 +892,7 @@ monitoring:
         config_file.write_text(
             """
 app_config_value: 42
-reference: "include:app:config:value"
+reference: "@value:app:config:value"
 """
         )
 
@@ -912,8 +912,8 @@ log_path: !path_join [/var/app, logs, app.log]
 message: !join ["Hello", " ", "World"]
 
 app:
-  directory: "include:base_dir"
-  greeting: "include:message"
+  directory: "@value:base_dir"
+  greeting: "@value:message"
 """
         )
 
@@ -934,10 +934,10 @@ base_url: "https://api.example.com"
 version: "v1"
 
 endpoints:
-  users: "include:base_url"
-  posts: "include:base_url"
+  users: "@value:base_url"
+  posts: "@value:base_url"
   static_endpoint: "https://static.example.com"
-  version: "include:version"
+  version: "@value:version"
 """
         )
 
@@ -955,7 +955,7 @@ endpoints:
         config_file.write_text(
             """
 # Reference defined before the target
-early_ref: "include:late_value"
+early_ref: "@value:late_value"
 
 # Other config
 app_name: "Test App"
@@ -978,7 +978,7 @@ class TestReplaceReferences:
 
     def test_replace_references_simple_string_reference(self):
         """Test replace_references with simple string reference."""
-        data = {"target": "value123", "ref": "include:target"}
+        data = {"target": "value123", "ref": "@value:target"}
         result = replace_references(data)
         assert result == {"target": "value123", "ref": "value123"}
 
@@ -986,23 +986,23 @@ class TestReplaceReferences:
         """Test replace_references with nested dotpath reference."""
         data = {
             "config": {"database": {"host": "localhost", "port": 5432}},
-            "db_host": "include:config.database.host",
-            "db_port": "include:config.database.port",
+            "db_host": "@value:config.database.host",
+            "db_port": "@value:config.database.port",
         }
         result = replace_references(data)
         assert result == {"config": {"database": {"host": "localhost", "port": 5432}}, "db_host": "localhost", "db_port": 5432}
 
     def test_replace_references_colon_notation(self):
         """Test replace_references with colon notation in path."""
-        data = {"app": {"settings": {"timeout": 30}}, "ref": "include:app:settings:timeout"}
+        data = {"app": {"settings": {"timeout": 30}}, "ref": "@value:app:settings:timeout"}
         result = replace_references(data)
         assert result == {"app": {"settings": {"timeout": 30}}, "ref": 30}
 
     def test_replace_references_missing_path(self):
         """Test replace_references with nonexistent path (returns original string)."""
-        data = {"value": "test", "ref": "include:nonexistent.path"}
+        data = {"value": "test", "ref": "@value:nonexistent.path"}
         result = replace_references(data)
-        assert result == {"value": "test", "ref": "include:nonexistent.path"}
+        assert result == {"value": "test", "ref": "@value:nonexistent.path"}
 
     def test_replace_references_non_reference_string(self):
         """Test replace_references leaves non-reference strings unchanged."""
@@ -1012,14 +1012,14 @@ class TestReplaceReferences:
 
     def test_replace_references_dict_structure(self):
         """Test replace_references with nested dict structure."""
-        data = {"base": {"value": "original"}, "nested": {"config": {"ref": "include:base.value"}}}
+        data = {"base": {"value": "original"}, "nested": {"config": {"ref": "@value:base.value"}}}
         result = replace_references(data)
         assert result == {"base": {"value": "original"}, "nested": {"config": {"ref": "original"}}}
 
     def test_replace_references_list_structure(self):
         """Test replace_references with list containing references."""
         # Note: dotget doesn't support numeric indices, so list item references won't resolve
-        data = {"values": ["a", "b", "c"], "whole_list": "include:values", "refs": ["include:whole_list", "static"]}
+        data = {"values": ["a", "b", "c"], "whole_list": "@value:values", "refs": ["@value:whole_list", "static"]}
         result = replace_references(data)
         assert result == {"values": ["a", "b", "c"], "whole_list": ["a", "b", "c"], "refs": [["a", "b", "c"], "static"]}
 
@@ -1029,7 +1029,7 @@ class TestReplaceReferences:
         data = {
             "primary_server": {"name": "server1", "host": "host1.com"},
             "servers": [{"name": "server1", "host": "host1.com"}, {"name": "server2", "host": "host2.com"}],
-            "primary_host": "include:primary_server.host",
+            "primary_host": "@value:primary_server.host",
         }
         result = replace_references(data)
         assert result == {
@@ -1040,26 +1040,26 @@ class TestReplaceReferences:
 
     def test_replace_references_recursive_resolution(self):
         """Test replace_references with reference pointing to another reference."""
-        data = {"value": "final_value", "ref1": "include:value", "ref2": "include:ref1"}
+        data = {"value": "final_value", "ref1": "@value:value", "ref2": "@value:ref1"}
         result = replace_references(data)
         # ref2 should resolve to ref1's value, which resolves to "final_value"
         assert result == {"value": "final_value", "ref1": "final_value", "ref2": "final_value"}
 
     def test_replace_references_reference_to_dict(self):
         """Test replace_references with reference pointing to dict."""
-        data = {"settings": {"timeout": 30, "retries": 3}, "copied": "include:settings"}
+        data = {"settings": {"timeout": 30, "retries": 3}, "copied": "@value:settings"}
         result = replace_references(data)
         assert result == {"settings": {"timeout": 30, "retries": 3}, "copied": {"timeout": 30, "retries": 3}}
 
     def test_replace_references_reference_to_list(self):
         """Test replace_references with reference pointing to list."""
-        data = {"items": [1, 2, 3], "copied_items": "include:items"}
+        data = {"items": [1, 2, 3], "copied_items": "@value:items"}
         result = replace_references(data)
         assert result == {"items": [1, 2, 3], "copied_items": [1, 2, 3]}
 
     def test_replace_references_multiple_refs_to_same_path(self):
         """Test replace_references with multiple references to same path."""
-        data = {"source": "shared_value", "ref1": "include:source", "ref2": "include:source", "ref3": "include:source"}
+        data = {"source": "shared_value", "ref1": "@value:source", "ref2": "@value:source", "ref3": "@value:source"}
         result = replace_references(data)
         assert result == {"source": "shared_value", "ref1": "shared_value", "ref2": "shared_value", "ref3": "shared_value"}
 
@@ -1071,7 +1071,7 @@ class TestReplaceReferences:
         result = replace_references([])
         assert result == []
 
-        data = {"empty_dict": {}, "empty_list": [], "ref_to_empty": "include:empty_dict"}
+        data = {"empty_dict": {}, "empty_list": [], "ref_to_empty": "@value:empty_dict"}
         result = replace_references(data)
         assert result == {"empty_dict": {}, "empty_list": [], "ref_to_empty": {}}
 
@@ -1079,8 +1079,8 @@ class TestReplaceReferences:
         """Test replace_references with complex nested structure."""
         data = {
             "database": {"primary": {"host": "db1.example.com", "port": 5432}, "replica": {"host": "db2.example.com", "port": 5433}},
-            "app": {"db_config": {"main": "include:database.primary", "backup": "include:database.replica.host"}},
-            "monitoring": {"targets": ["include:database.primary.host", "include:database.replica.host"]},
+            "app": {"db_config": {"main": "@value:database.primary", "backup": "@value:database.replica.host"}},
+            "monitoring": {"targets": ["@value:database.primary.host", "@value:database.replica.host"]},
         }
         result = replace_references(data)
         expected = {
@@ -1092,13 +1092,13 @@ class TestReplaceReferences:
 
     def test_replace_references_deep_nesting(self):
         """Test replace_references with deeply nested path."""
-        data = {"level1": {"level2": {"level3": {"level4": {"value": "deep"}}}}, "ref": "include:level1.level2.level3.level4.value"}
+        data = {"level1": {"level2": {"level3": {"level4": {"value": "deep"}}}}, "ref": "@value:level1.level2.level3.level4.value"}
         result = replace_references(data)
         assert result == {"level1": {"level2": {"level3": {"level4": {"value": "deep"}}}}, "ref": "deep"}
 
     def test_replace_references_underscore_fallback(self):
         """Test replace_references with underscore notation fallback."""
-        data = {"app_config_value": 42, "ref": "include:app:config:value"}
+        data = {"app_config_value": 42, "ref": "@value:app:config:value"}
         result = replace_references(data)
         assert result == {"app_config_value": 42, "ref": 42}
 
@@ -1110,11 +1110,11 @@ class TestReplaceReferences:
             "float": 45.67,
             "boolean": True,
             "none_value": None,
-            "ref_string": "include:string",
-            "ref_number": "include:number",
-            "ref_float": "include:float",
-            "ref_boolean": "include:boolean",
-            "ref_none": "include:none_value",
+            "ref_string": "@value:string",
+            "ref_number": "@value:number",
+            "ref_float": "@value:float",
+            "ref_boolean": "@value:boolean",
+            "ref_none": "@value:none_value",
         }
         result = replace_references(data)
         expected = {
@@ -1129,14 +1129,14 @@ class TestReplaceReferences:
             "ref_boolean": True,
             # Note: When the referenced value is None, dotget returns None as default,
             # and _replace_references returns the original string if ref_value is None
-            "ref_none": "include:none_value",
+            "ref_none": "@value:none_value",
         }
         assert result == expected
 
     def test_replace_references_does_not_modify_original(self):
         """Test that replace_references doesn't modify the original data."""
-        original_data = {"value": "original", "ref": "include:value"}
-        original_copy = {"value": "original", "ref": "include:value"}
+        original_data = {"value": "original", "ref": "@value:value"}
+        original_copy = {"value": "original", "ref": "@value:value"}
 
         result = replace_references(original_data)
 
@@ -1152,7 +1152,7 @@ class TestListOperations:
 
     def test_simple_include_still_works(self):
         """Test that simple include directive still works as before."""
-        data = {"source": ["a", "b", "c"], "target": "include: source"}
+        data = {"source": ["a", "b", "c"], "target": "@value: source"}
 
         result = replace_references(data)
 
@@ -1160,7 +1160,7 @@ class TestListOperations:
 
     def test_prepend_items_to_included_list(self):
         """Test prepending items to an included list."""
-        data = {"source": ["b", "c"], "target": "['a'] + include: source"}
+        data = {"source": ["b", "c"], "target": "['a'] + @value: source"}
 
         result = replace_references(data)
 
@@ -1168,7 +1168,7 @@ class TestListOperations:
 
     def test_append_items_to_included_list(self):
         """Test appending items to an included list."""
-        data = {"source": ["a", "b"], "target": "include: source + ['c']"}
+        data = {"source": ["a", "b"], "target": "@value: source + ['c']"}
 
         result = replace_references(data)
 
@@ -1176,7 +1176,7 @@ class TestListOperations:
 
     def test_prepend_and_append(self):
         """Test prepending and appending items to an included list."""
-        data = {"source": ["b", "c"], "target": "['a'] + include: source + ['d']"}
+        data = {"source": ["b", "c"], "target": "['a'] + @value: source + ['d']"}
 
         result = replace_references(data)
 
@@ -1184,7 +1184,7 @@ class TestListOperations:
 
     def test_multiple_includes(self):
         """Test concatenating multiple included lists."""
-        data = {"list1": ["a", "b"], "list2": ["c", "d"], "target": "include: list1 + include: list2"}
+        data = {"list1": ["a", "b"], "list2": ["c", "d"], "target": "@value: list1 + @value: list2"}
 
         result = replace_references(data)
 
@@ -1192,7 +1192,7 @@ class TestListOperations:
 
     def test_multiple_includes_with_literals(self):
         """Test complex expression with multiple includes and literals."""
-        data = {"list1": ["b"], "list2": ["d"], "target": "['a'] + include: list1 + ['c'] + include: list2 + ['e']"}
+        data = {"list1": ["b"], "list2": ["d"], "target": "['a'] + @value: list1 + ['c'] + @value: list2 + ['e']"}
 
         result = replace_references(data)
 
@@ -1200,7 +1200,7 @@ class TestListOperations:
 
     def test_nested_path_reference(self):
         """Test include with nested path."""
-        data = {"entities": {"sample": {"columns": ["col1", "col2", "col3"]}}, "target": "include: entities.sample.columns"}
+        data = {"entities": {"sample": {"columns": ["col1", "col2", "col3"]}}, "target": "@value: entities.sample.columns"}
 
         result = replace_references(data)
 
@@ -1208,7 +1208,7 @@ class TestListOperations:
 
     def test_nested_path_with_operations(self):
         """Test list operations with nested path references."""
-        data = {"entities": {"sample": {"columns": ["col2", "col3"]}}, "target": "['col1'] + include: entities.sample.columns"}
+        data = {"entities": {"sample": {"columns": ["col2", "col3"]}}, "target": "['col1'] + @value: entities.sample.columns"}
 
         result = replace_references(data)
 
@@ -1216,7 +1216,7 @@ class TestListOperations:
 
     def test_list_with_strings(self):
         """Test list operations with string values."""
-        data = {"source": ["value1", "value2"], "target": "['prefix'] + include: source + ['suffix']"}
+        data = {"source": ["value1", "value2"], "target": "['prefix'] + @value: source + ['suffix']"}
 
         result = replace_references(data)
 
@@ -1224,7 +1224,7 @@ class TestListOperations:
 
     def test_list_with_numbers(self):
         """Test list operations with numeric values."""
-        data = {"source": [2, 3], "target": "[1] + include: source + [4]"}
+        data = {"source": [2, 3], "target": "[1] + @value: source + [4]"}
 
         result = replace_references(data)
 
@@ -1240,7 +1240,7 @@ class TestListOperations:
 
     def test_empty_list_operations(self):
         """Test operations with empty lists."""
-        data = {"source": [], "target": "['a'] + include: source + ['b']"}
+        data = {"source": [], "target": "['a'] + @value: source + ['b']"}
 
         result = replace_references(data)
 
@@ -1248,7 +1248,7 @@ class TestListOperations:
 
     def test_whitespace_handling(self):
         """Test that whitespace in expressions is handled correctly."""
-        data = {"source": ["b"], "target": "  ['a']   +   include: source   +   ['c']  "}
+        data = {"source": ["b"], "target": "  ['a']   +   @value: source   +   ['c']  "}
 
         result = replace_references(data)
 
@@ -1256,7 +1256,7 @@ class TestListOperations:
 
     def test_recursive_includes(self):
         """Test that included lists can themselves contain include directives."""
-        data = {"base": ["a", "b"], "extended": "include: base", "target": "['x'] + include: extended + ['y']"}
+        data = {"base": ["a", "b"], "extended": "@value: base", "target": "['x'] + @value: extended + ['y']"}
 
         result = replace_references(data)
 
@@ -1264,7 +1264,7 @@ class TestListOperations:
 
     def test_nonexistent_path_in_operation(self):
         """Test handling of nonexistent paths in list operations."""
-        data = {"target": "['a'] + include: nonexistent.path + ['b']"}
+        data = {"target": "['a'] + @value: nonexistent.path + ['b']"}
 
         result = replace_references(data)
 
@@ -1273,7 +1273,7 @@ class TestListOperations:
 
     def test_non_list_value_in_include(self):
         """Test including a non-list value in a list operation."""
-        data = {"source": "single_value", "target": "['a'] + include: source + ['b']"}
+        data = {"source": "single_value", "target": "['a'] + @value: source + ['b']"}
 
         result = replace_references(data)
 
@@ -1281,7 +1281,7 @@ class TestListOperations:
 
     def test_nested_dict_values_unaffected(self):
         """Test that non-string values in dicts are not affected."""
-        data = {"source": ["a", "b"], "nested": {"list": ["x", "y"], "ref": "include: source"}}
+        data = {"source": ["a", "b"], "nested": {"list": ["x", "y"], "ref": "@value: source"}}
 
         result = replace_references(data)
 
@@ -1290,7 +1290,7 @@ class TestListOperations:
 
     def test_list_within_list_not_processed(self):
         """Test that list items themselves aren't treated as expressions."""
-        data = {"source": ["a", "b"], "target": ["include: source", "literal_string"]}  # This should be replaced
+        data = {"source": ["a", "b"], "target": ["@value: source", "literal_string"]}  # This should be replaced
 
         result = replace_references(data)
 
@@ -1302,8 +1302,8 @@ class TestListOperations:
         data = {
             "entities": {
                 "location": {"keys": ["Ort", "Kreis", "Land"]},
-                "site": {"keys": ["ProjektNr", "Fustel"], "columns": "include: entities.site.keys"},
-                "site_location": {"keys": [], "columns": "['extra_col'] + include: entities.site.columns + include: entities.location.keys"},
+                "site": {"keys": ["ProjektNr", "Fustel"], "columns": "@value: entities.site.keys"},
+                "site_location": {"keys": [], "columns": "['extra_col'] + @value: entities.site.columns + @value: entities.location.keys"},
             }
         }
 
@@ -1324,7 +1324,7 @@ class TestListOperations:
                     "keys": ["ProjektNr", "Befu", "ProbNr"],
                     "columns": ["ProjektNr", "Befu", "ProbNr", "EDatProb", "Strat"],
                 },
-                "sample_taxa": {"keys": [], "columns": "['PCODE', 'RTyp'] + include: entities.sample.keys + ['Anmerkung']"},
+                "sample_taxa": {"keys": [], "columns": "['PCODE', 'RTyp'] + @value: entities.sample.keys + ['Anmerkung']"},
             }
         }
 
@@ -1338,7 +1338,7 @@ class TestEdgeCases:
 
     def test_malformed_list_literal(self):
         """Test handling of malformed list literal."""
-        data = {"target": "['a', 'b' + include: source"}  # Missing closing bracket
+        data = {"target": "['a', 'b' + @value: source"}  # Missing closing bracket
 
         # Should not crash, return original or best effort
         result = replace_references(data)
@@ -1346,11 +1346,11 @@ class TestEdgeCases:
 
     def test_empty_include_path(self):
         """Test handling of empty include path."""
-        data = {"target": "include: "}
+        data = {"target": "@value: "}
 
         result = replace_references(data)
         # Should return original string if path is empty/invalid
-        assert result["target"] == "include: "  # type: ignore[call-arg]
+        assert result["target"] == "@value: "  # type: ignore[call-arg]
 
     def test_only_plus_operators(self):
         """Test string with plus operators but no lists or includes."""
@@ -1363,7 +1363,7 @@ class TestEdgeCases:
 
     def test_plus_in_string_values(self):
         """Test that plus signs within list values don't break parsing."""
-        data = {"source": ["value+with+plus"], "target": "include: source"}
+        data = {"source": ["value+with+plus"], "target": "@value: source"}
 
         result = replace_references(data)
 
@@ -1377,7 +1377,7 @@ class TestRealWorldIntegration:
         """Test the actual pattern from arbodat config.yml."""
         config = {
             "entities": {
-                "location": {"surrogate_id": "location_id", "keys": ["Ort", "Kreis", "Land", "Staat", "FlurStr"], "columns": "include: entities.location.keys"},
+                "location": {"surrogate_id": "location_id", "keys": ["Ort", "Kreis", "Land", "Staat", "FlurStr"], "columns": "@value: entities.location.keys"},
                 "site": {
                     "surrogate_id": "site_id",
                     "keys": ["ProjektNr", "Fustel", "EVNr"],
@@ -1390,7 +1390,7 @@ class TestRealWorldIntegration:
                         "Limes",
                     ],
                 },
-                "site_location": {"keys": [], "columns": "include: entities.site.columns + include: entities.location.keys"},
+                "site_location": {"keys": [], "columns": "@value: entities.site.columns + @value: entities.location.keys"},
             }
         }
 
@@ -1427,10 +1427,10 @@ class TestRealWorldIntegration:
                 "taxa": {"surrogate_id": "taxon_id", "keys": ["BNam", "TaxAut"], "columns": ["BNam", "TaxAut", "Familie"]},
                 "sample_taxa": {
                     "keys": [],
-                    "columns": "include: entities.sample.keys + include: entities.taxa.keys + ['SumFAnzahl', 'SumFGewicht']",
+                    "columns": "@value: entities.sample.keys + @value: entities.taxa.keys + ['SumFAnzahl', 'SumFGewicht']",
                     "foreign_keys": [
-                        {"entity": "sample", "local_keys": "include: entities.sample.keys", "remote_keys": "include: entities.sample.keys"},
-                        {"entity": "taxa", "local_keys": "include: entities.taxa.keys", "remote_keys": "include: entities.taxa.keys"},
+                        {"entity": "sample", "local_keys": "@value: entities.sample.keys", "remote_keys": "@value: entities.sample.keys"},
+                        {"entity": "taxa", "local_keys": "@value: entities.taxa.keys", "remote_keys": "@value: entities.taxa.keys"},
                     ],
                 },
             }
@@ -1454,8 +1454,8 @@ class TestRealWorldIntegration:
                     "surrogate_id": "location_id",
                     "keys": ["Ort", "Kreis", "Land"],
                     "unnest": {
-                        "id_vars": "include: entities.location.surrogate_id",
-                        "value_vars": "include: entities.location.keys",
+                        "id_vars": "@value: entities.location.surrogate_id",
+                        "value_vars": "@value: entities.location.keys",
                         "var_name": "location_type",
                         "value_name": "location_name",
                     },
@@ -1472,7 +1472,7 @@ class TestRealWorldIntegration:
         """Test prepending surrogate_id to columns list."""
         config = {
             "entities": {
-                "sample": {"surrogate_id": "sample_id", "keys": ["ProjektNr", "Befu", "ProbNr"], "all_columns": "['sample_id'] + include: entities.sample.keys"}
+                "sample": {"surrogate_id": "sample_id", "keys": ["ProjektNr", "Befu", "ProbNr"], "all_columns": "['sample_id'] + @value: entities.sample.keys"}
             }
         }
 
@@ -1487,8 +1487,8 @@ class TestRealWorldIntegration:
             "entities": {
                 "sample": {
                     "keys": ["project_nr", "sample_nr"],
-                    "base_columns": "include: base.common_fields + include: entities.sample.keys",
-                    "extended_columns": "include: entities.sample.base_columns + ['notes', 'status']",
+                    "base_columns": "@value: base.common_fields + @value: entities.sample.keys",
+                    "extended_columns": "@value: entities.sample.base_columns + ['notes', 'status']",
                 }
             },
         }
@@ -1519,10 +1519,10 @@ class TestRealWorldIntegration:
         """Test complex configuration with multiple entity relationships."""
         config = {
             "entities": {
-                "project": {"keys": ["ProjektNr"], "columns": "include: entities.project.keys"},
-                "site": {"keys": ["ProjektNr", "Fustel"], "columns": "include: entities.site.keys + ['site_type']"},
-                "feature": {"keys": ["ProjektNr", "Fustel", "Befu"], "columns": "include: entities.feature.keys + ['feature_type']"},
-                "sample": {"keys": "include: entities.feature.keys + ['ProbNr']", "columns": "include: entities.sample.keys + ['sample_date', 'depth']"},
+                "project": {"keys": ["ProjektNr"], "columns": "@value: entities.project.keys"},
+                "site": {"keys": ["ProjektNr", "Fustel"], "columns": "@value: entities.site.keys + ['site_type']"},
+                "feature": {"keys": ["ProjektNr", "Fustel", "Befu"], "columns": "@value: entities.feature.keys + ['feature_type']"},
+                "sample": {"keys": "@value: entities.feature.keys + ['ProbNr']", "columns": "@value: entities.sample.keys + ['sample_date', 'depth']"},
             }
         }
 
@@ -1542,11 +1542,11 @@ class TestRealWorldIntegration:
             "entities": {
                 "sample": {
                     "keys": ["id"],
-                    "columns": "['name', 'type'] + include: entities.sample.keys + include: defaults.system_columns",
+                    "columns": "['name', 'type'] + @value: entities.sample.keys + @value: defaults.system_columns",
                     "static_value": "this is not processed",
                     "numeric_value": 42,
                     "bool_value": True,
-                    "nested": {"also_processed": "include: defaults.system_columns"},
+                    "nested": {"also_processed": "@value: defaults.system_columns"},
                 }
             },
         }
@@ -1563,10 +1563,10 @@ class TestRealWorldIntegration:
         """Test replace_references works after replace_env_vars."""
         with patch.dict(os.environ, {"DB_HOST": "env-host.example.com"}):
             # First replace env vars, then references
-            data = {"env_value": "${DB_HOST}", "reference": "include:env_value"}
+            data = {"env_value": "${DB_HOST}", "reference": "@value:env_value"}
 
             step1: dict[str, Any] | list[Any] | str = replace_env_vars(data)
-            assert step1 == {"env_value": "env-host.example.com", "reference": "include:env_value"}
+            assert step1 == {"env_value": "env-host.example.com", "reference": "@value:env_value"}
 
             step2: dict[str, Any] | list[Any] | str = replace_references(step1)
             assert step2 == {"env_value": "env-host.example.com", "reference": "env-host.example.com"}

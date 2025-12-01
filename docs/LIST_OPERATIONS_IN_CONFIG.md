@@ -2,7 +2,7 @@
 
 ## Overview
 
-The configuration system now supports list operations with `include:` directives, allowing you to build lists dynamically by referencing and combining other configuration values.
+The configuration system now supports list operations with `@value:` directives, allowing you to build lists dynamically by referencing and combining other configuration values.
 
 ## Constraints
 
@@ -22,7 +22,7 @@ entities:
     keys: ["ProjektNr", "Befu", "ProbNr"]
   
   another_entity:
-    columns: "include: entities.sample.keys"
+    columns: "@value: entities.sample.keys"
     # Result: ["ProjektNr", "Befu", "ProbNr"]
 ```
 
@@ -33,7 +33,7 @@ entities:
     keys: ["ProjektNr", "Befu", "ProbNr"]
   
   extended:
-    columns: "['sample_id'] + include: entities.sample.keys"
+    columns: "['sample_id'] + @value: entities.sample.keys"
     # Result: ["sample_id", "ProjektNr", "Befu", "ProbNr"]
 ```
 
@@ -44,7 +44,7 @@ entities:
     keys: ["ProjektNr", "Befu", "ProbNr"]
   
   extended:
-    columns: "include: entities.sample.keys + ['notes', 'status']"
+    columns: "@value: entities.sample.keys + ['notes', 'status']"
     # Result: ["ProjektNr", "Befu", "ProbNr", "notes", "status"]
 ```
 
@@ -55,7 +55,7 @@ entities:
     keys: ["ProjektNr", "Befu", "ProbNr"]
   
   extended:
-    columns: "['sample_id'] + include: entities.sample.keys + ['created_at']"
+    columns: "['sample_id'] + @value: entities.sample.keys + ['created_at']"
     # Result: ["sample_id", "ProjektNr", "Befu", "ProbNr", "created_at"]
 ```
 
@@ -69,7 +69,7 @@ entities:
     keys: ["ProjektNr", "Fustel"]
   
   site_location:
-    columns: "include: entities.site.keys + include: entities.location.keys"
+    columns: "@value: entities.site.keys + @value: entities.location.keys"
     # Result: ["ProjektNr", "Fustel", "Ort", "Kreis", "Land"]
 ```
 
@@ -80,15 +80,15 @@ entities:
     keys: ["ProjektNr"]
   
   site:
-    keys: "include: entities.project.keys + ['Fustel', 'EVNr']"
+    keys: "@value: entities.project.keys + ['Fustel', 'EVNr']"
     # Result: ["ProjektNr", "Fustel", "EVNr"]
   
   feature:
-    keys: "include: entities.site.keys + ['Befu']"
+    keys: "@value: entities.site.keys + ['Befu']"
     # Result: ["ProjektNr", "Fustel", "EVNr", "Befu"]
   
   sample:
-    keys: "include: entities.feature.keys + ['ProbNr']"
+    keys: "@value: entities.feature.keys + ['ProbNr']"
     # Result: ["ProjektNr", "Fustel", "EVNr", "Befu", "ProbNr"]
 ```
 
@@ -107,16 +107,16 @@ entities:
   
   sample_taxa:
     keys: []
-    columns: "include: entities.sample.keys + include: entities.taxa.keys + ['SumFAnzahl']"
+    columns: "@value: entities.sample.keys + @value: entities.taxa.keys + ['SumFAnzahl']"
     # Result: ["ProjektNr", "Befu", "ProbNr", "BNam", "TaxAut", "SumFAnzahl"]
     
     foreign_keys:
       - entity: sample
-        local_keys: "include: entities.sample.keys"
-        remote_keys: "include: entities.sample.keys"
+        local_keys: "@value: entities.sample.keys"
+        remote_keys: "@value: entities.sample.keys"
       - entity: taxa
-        local_keys: "include: entities.taxa.keys"
-        remote_keys: "include: entities.taxa.keys"
+        local_keys: "@value: entities.taxa.keys"
+        remote_keys: "@value: entities.taxa.keys"
 ```
 
 ### Unnest Configuration
@@ -126,10 +126,10 @@ entities:
     surrogate_id: location_id
     keys: ["Ort", "Kreis", "Land", "Staat", "FlurStr"]
     unnest:
-      id_vars: "include: entities.location.surrogate_id"
+      id_vars: "@value: entities.location.surrogate_id"
       # Result: "location_id"
       
-      value_vars: "include: entities.location.keys"
+      value_vars: "@value: entities.location.keys"
       # Result: ["Ort", "Kreis", "Land", "Staat", "FlurStr"]
       
       var_name: location_type
@@ -147,7 +147,7 @@ entities:
     keys: ["ProjektNr", "Befu", "ProbNr"]
     
     # All columns = surrogate + keys + data columns + audit
-    columns: "['sample_id'] + include: entities.sample.keys + ['depth', 'notes'] + include: defaults.audit_columns"
+    columns: "['sample_id'] + @value: entities.sample.keys + ['depth', 'notes'] + @value: defaults.audit_columns"
     # Result: ["sample_id", "ProjektNr", "Befu", "ProbNr", "depth", "notes", "created_at", "created_by", "updated_at", "updated_by"]
 ```
 
@@ -156,19 +156,19 @@ entities:
 entities:
   project:
     keys: ["ProjektNr"]
-    columns: "include: entities.project.keys"
+    columns: "@value: entities.project.keys"
   
   site:
-    keys: "include: entities.project.keys + ['Fustel']"
-    columns: "include: entities.site.keys + ['site_type']"
+    keys: "@value: entities.project.keys + ['Fustel']"
+    columns: "@value: entities.site.keys + ['site_type']"
   
   feature:
-    keys: "include: entities.site.keys + ['Befu']"
-    columns: "include: entities.feature.keys + ['feature_type']"
+    keys: "@value: entities.site.keys + ['Befu']"
+    columns: "@value: entities.feature.keys + ['feature_type']"
   
   sample:
-    keys: "include: entities.feature.keys + ['ProbNr']"
-    columns: "include: entities.sample.keys + ['sample_date', 'depth']"
+    keys: "@value: entities.feature.keys + ['ProbNr']"
+    columns: "@value: entities.sample.keys + ['sample_date', 'depth']"
 ```
 
 ## Features
@@ -179,21 +179,21 @@ entities:
 - **Recursive Resolution**: Include directives within referenced values are also resolved
 - **Type Flexibility**: Works with strings, numbers, and mixed types in lists
 - **Error Handling**: Malformed expressions or constraint violations return the original string
-- **Backward Compatibility**: Simple `include:` directives work exactly as before
+- **Backward Compatibility**: Simple `@value:` directives work exactly as before
 
 ## Constraint Examples
 
 ```yaml
 # ✅ ALLOWED
 columns: "['a', 'b', 'c']"                      # Flat list
-columns: "include: entities.sample.keys"         # Simple include
-columns: "['id'] + include: path + ['status']"  # List operations
+columns: "@value: entities.sample.keys"         # Simple include
+columns: "['id'] + @value: path + ['status']"  # List operations
 
 # ❌ NOT ALLOWED (returns original string)
 columns: "[['nested'], 'item']"                 # Nested list (constraint #1)
 columns: "['value[with]brackets']"              # Brackets in values (constraint #4)
 source: [["nested"], "item"]
-columns: "include: source"                       # References nested list (constraint #1)
+columns: "@value: source"                       # References nested list (constraint #1)
 ```
 
 ## Notes
