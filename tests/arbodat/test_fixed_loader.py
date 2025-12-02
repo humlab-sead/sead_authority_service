@@ -6,6 +6,7 @@ import pytest
 from src.arbodat.config_model import TableConfig
 from src.arbodat.loaders.fixed_loader import FixedLoader
 
+
 class TestCreateFixedTable:
     """Tests for await FixedLoader().load function."""
 
