@@ -250,7 +250,7 @@ class TestTablesConfig:
         """Test TablesConfig with provided configuration."""
         config = {"site": {"surrogate_id": "site_id", "columns": ["site_name"]}, "location": {"surrogate_id": "location_id", "columns": ["location_name"]}}
 
-        tables = TablesConfig(cfg=config)
+        tables = TablesConfig(entities_cfg=config)
 
         assert len(tables.tables) == 2
         assert "site" in tables.tables
@@ -261,7 +261,7 @@ class TestTablesConfig:
         """Test getting a specific table configuration."""
         config = {"site": {"surrogate_id": "site_id", "columns": ["site_name"]}}
 
-        tables = TablesConfig(cfg=config)
+        tables = TablesConfig(entities_cfg=config)
         site_table = tables.get_table("site")
 
         assert site_table.entity_name == "site"
@@ -271,7 +271,7 @@ class TestTablesConfig:
         """Test that getting nonexistent table raises KeyError."""
         config = {"site": {"surrogate_id": "site_id"}}
 
-        tables = TablesConfig(cfg=config)
+        tables = TablesConfig(entities_cfg=config)
 
         with pytest.raises(KeyError):
             tables.get_table("nonexistent")
@@ -281,7 +281,7 @@ class TestTablesConfig:
         # Note: TablesConfig uses 'or' logic, so empty dict will try to load from ConfigValue
         # We need to provide a dict with at least one entity or use None to avoid the config loader
         config = {"dummy": {"surrogate_id": "id"}}
-        tables = TablesConfig(cfg=config)
+        tables = TablesConfig(entities_cfg=config)
 
         assert len(tables.tables) == 1
         assert "dummy" in tables.tables
@@ -290,7 +290,7 @@ class TestTablesConfig:
         """Test has_table method."""
         config = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
 
-        tables = TablesConfig(cfg=config)
+        tables = TablesConfig(entities_cfg=config)
 
         assert tables.has_table("site") is True
         assert tables.has_table("location") is True
@@ -304,7 +304,7 @@ class TestTablesConfig:
             "region": {"surrogate_id": "region_id"},
         }
 
-        tables = TablesConfig(cfg=config)
+        tables = TablesConfig(entities_cfg=config)
         names = tables.table_names
 
         assert len(names) == 3
@@ -326,7 +326,7 @@ class TestTablesConfig:
             "natural_region": {"surrogate_id": "natural_region_id", "columns": ["NaturE", "NaturrEinh"], "drop_duplicates": True},
         }
 
-        tables = TablesConfig(cfg=config)
+        tables = TablesConfig(entities_cfg=config)
 
         site_table = tables.get_table("site")
         assert site_table.keys == ["ProjektNr", "Fustel"]
@@ -363,7 +363,7 @@ class TestIntegration:
             },
         }
 
-        tables = TablesConfig(cfg=config)
+        tables = TablesConfig(entities_cfg=config)
 
         # Test location table
         location = tables.get_table("location")
