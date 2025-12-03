@@ -16,7 +16,14 @@ from src.configuration.setup import setup_config_store
 def setup_config():
     """Initialize the config store before running tests."""
     config_file = "src/arbodat/input/arbodat.yml"
-    asyncio.run(setup_config_store(config_file, env_prefix="SEAD_NORMALIZER", env_filename="src/arbodat/input/.env", db_opts_path=""))
+    asyncio.run(
+        setup_config_store(
+            config_file,
+            env_prefix="SEAD_NORMALIZER",
+            env_filename="src/arbodat/input/.env",
+            db_opts_path=None,
+        )
+    )
 
 
 class TestProcessState:
