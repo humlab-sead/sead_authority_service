@@ -36,7 +36,7 @@ def test_csv_workflow():
     translate: bool = False
 
     output_path: str = "tmp/arbodat/"
-    asyncio.run(setup_config_store(config_file))
+    asyncio.run(setup_config_store(config_file, env_prefix="SEAD_NORMALIZER", env_filename="src/arbodat/input/.env", db_opts_path="options:database"))
     asyncio.sleep(0.1)  # type: ignore ; ensure config is fully loaded;
 
     if os.path.exists(output_path):
