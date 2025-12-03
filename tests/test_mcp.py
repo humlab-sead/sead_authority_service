@@ -623,7 +623,7 @@ async def test_search_lookup_integration(test_provider):
 
     config: ConfigLike = ConfigFactory().load(source="./config/config.yml", env_prefix="SEAD_AUTHORITY", env_filename=".env")
     test_provider.set_config(config)
-    await _setup_connection_factory(config)
+    await _setup_connection_factory(config, "options:database")
 
     async with await get_connection() as conn:
         server = SEADMCPServer(conn)

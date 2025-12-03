@@ -12,7 +12,9 @@ from .provider import ConfigStore, get_config_provider
 dotenv.load_dotenv(dotenv_path=os.getenv("ENV_FILE", ".env"))
 
 
-async def setup_config_store(filename: str | None = None, force: bool = False) -> None:
+async def setup_config_store(
+    filename: str | None = None, force: bool = False, env_prefix="SEAD_AUTHORITY", env_filename=".env", db_opts_path: str = "options:database"
+) -> None:
 
     config_file: str | None = filename or os.getenv("CONFIG_FILE", "config.yml")
 
@@ -21,19 +23,22 @@ async def setup_config_store(filename: str | None = None, force: bool = False) -
     if store.is_configured() and not force:
         return
 
-    store.configure_context(source=config_file, env_filename=".env", env_prefix="SEAD_AUTHORITY")
-
+    store.configure_context(source=config_file, env_filename=env_filename, env_prefix=env_prefix)
     assert store.is_configured(), "Config Store failed to configure properly"
 
     cfg: ConfigLike | None = store.config()
     if not cfg:
         raise ValueError("Config Store did not return a config")
 
-    cfg.update({"runtime:config_file": config_file})
+    cfg.update({"runtime:config_file": config_file, "runtime:env_file": env_filename})
 
     configure_logging(cfg.get("logging") or {})
 
-    await _setup_connection_factory(cfg)
+    if db_opts_path:
+        if not cfg.get(db_opts_path):
+            logger.warning(f"Database options not found in default config at path '{db_opts_path}'")
+        else:
+            await _setup_connection_factory(cfg, db_opts_path=db_opts_path)
 
     logger.info("Config Store initialized successfully.")
 
@@ -48,8 +53,8 @@ async def connection_factory(cfg) -> psycopg.AsyncConnection:
     return cfg.get("runtime:connection")
 
 
-async def _setup_connection_factory(cfg):
-    dsn: str = create_db_uri(**cfg.get("options:database"))
+async def _setup_connection_factory(cfg: ConfigLike, db_opts_path: str = "options:database") -> None:
+    dsn: str = create_db_uri(**cfg.get(db_opts_path))
 
     if not dsn:
         raise ValueError("Database DSN is not configured properly")
