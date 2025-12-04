@@ -64,7 +64,7 @@ class TestUnnest:
         }
         table_cfg = TableConfig(cfg=config, entity_name=entity)
 
-        with pytest.raises(ValueError, match="missing id_vars columns"):
+        with pytest.raises(ValueError, match="missing `id_vars` columns"):
             unnest(entity, table, table_cfg)
 
     def test_unnest_defers_when_value_vars_missing(self):
