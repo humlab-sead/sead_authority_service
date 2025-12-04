@@ -54,7 +54,7 @@ def test_csv_workflow():
             db_opts_path=None,
         )
     )
-    asyncio.sleep(0.1)  # type: ignore ; ensure config is fully loaded;
+    asyncio.run(asyncio.sleep(0.1))  # type: ignore ; ensure config is fully loaded;
 
     if os.path.exists(output_path):
         shutil.rmtree(output_path, ignore_errors=True)
