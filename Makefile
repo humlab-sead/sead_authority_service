@@ -3,13 +3,13 @@ SHELL := /bin/bash
 UVICORN_PORT := 8000
 
 arbodat-normalize:
-	@PYTHONPATH=. uv run python src/arbodat/survey2excel.py \
+	@PYTHONPATH=. python src/arbodat/survey2excel.py \ 
+		--env-file src/arbodat/input/.env \
 		--sep ";" \
-		--verbose \
-		--mode xlsx \
+		--mode csv \
 		--config-file src/arbodat/input/arbodat.yml \
 		src/arbodat/input/arbodat_mal_elena_input.csv \
-		output.xlsx
+		tmp/arbodat
 
 .PHONY: dev-serve
 dev-serve: dev-kill
