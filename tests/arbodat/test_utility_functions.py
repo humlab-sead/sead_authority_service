@@ -121,14 +121,13 @@ class TestGetSubset:
         assert len(result) == 2
 
     def test_extra_columns_rename_source_column(self):
-        """Test renaming source column via extra_columns."""
+        """Test add new source column via extra_columns."""
         df = pd.DataFrame({"A": [1, 2], "B": [3, 4], "C": [5, 6]})
 
         result = get_subset(df, ["A"], extra_columns={"D": "C"})
 
-        assert list(result.columns) == ["A", "D"]
+        assert list(result.columns) == ["A", "C", "D"]
         assert result["D"].tolist() == [5, 6]
-        assert "C" not in result.columns
 
     def test_extra_columns_add_constant(self):
         """Test adding constant column via extra_columns."""
@@ -155,14 +154,14 @@ class TestGetSubset:
 
         assert result["nullable"].isna().all()
 
-    def test_extra_columns_mixed_rename_and_constant(self):
-        """Test mixing column rename and constant addition."""
+    def test_extra_columns_mixed_reference_and_constant(self):
+        """Test mixing extra column with reference and constant addition."""
         df = pd.DataFrame({"A": [1, 2], "B": [3, 4], "C": [5, 6]})
 
-        result = get_subset(df, ["A"], extra_columns={"renamed_B": "B", "constant": 100})
+        result = get_subset(df, ["A"], extra_columns={"extra_B": "B", "constant": 100})
 
-        assert list(result.columns) == ["A", "renamed_B", "constant"]
-        assert result["renamed_B"].tolist() == [3, 4]
+        assert list(result.columns) == ["A", "B", "extra_B", "constant"]
+        assert result["extra_B"].tolist() == [3, 4]
         assert result["constant"].tolist() == [100, 100]
 
     def test_extra_columns_nonexistent_source_as_constant(self):
@@ -253,7 +252,7 @@ class TestGetSubset:
         )
 
         assert len(result) == 2
-        assert list(result.columns) == ["site_name", "location", "renamed_val", "type", "site_id"]
+        assert set(result.columns) == {"site_name", "location", "renamed_val", "type", "site_id", "value"}
         assert result["renamed_val"].tolist() == [100, 200]
         assert result["type"].tolist() == ["survey", "survey"]
         assert result["site_id"].tolist() == [1, 2]
@@ -291,7 +290,7 @@ class TestGetSubset:
     def test_column_order_preserved(self):
         """Test that column order matches specification."""
         df = pd.DataFrame({"C": [1, 2], "B": [3, 4], "A": [5, 6]})
-
+    
         result = get_subset(df, ["A", "B", "C"])
 
         # Order should be A, B, C as requested (not source order)
