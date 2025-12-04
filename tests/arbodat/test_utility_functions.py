@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from src.arbodat.utility import (
+from src.arbodat.extract import (
     _rename_last_occurence,
     add_surrogate_id,
     check_functional_dependency,
