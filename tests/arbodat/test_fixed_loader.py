@@ -57,7 +57,14 @@ class TestCreateFixedTable:
     async def test_single_column_with_surrogate_name_and_surrogate_id(self):
         """Test creates fixed table with surrogate_id added."""
         entity = "location_type"
-        config = {"location_type": {"type": "fixed", "surrogate_id": "location_type_id", "surrogate_name": "location_type", "values": ["Ort", "Kreis", "Land"]}}
+        config = {
+            "location_type": {
+                "type": "fixed",
+                "surrogate_id": "location_type_id",
+                "surrogate_name": "location_type",
+                "values": ["Ort", "Kreis", "Land"],
+            }
+        }
         table_cfg = TableConfig(cfg=config, entity_name=entity)
 
         result: pd.DataFrame = await FixedLoader().load(entity, table_cfg)
@@ -121,7 +128,12 @@ class TestCreateFixedTable:
         """Test multiple columns with surrogate_id added."""
         entity = "test_entity"
         config = {
-            "test_entity": {"type": "fixed", "surrogate_id": "id", "columns": ["name", "code"], "values": [["First", "A"], ["Second", "B"], ["Third", "C"]]}
+            "test_entity": {
+                "type": "fixed",
+                "surrogate_id": "id",
+                "columns": ["name", "code"],
+                "values": [["First", "A"], ["Second", "B"], ["Third", "C"]],
+            }
         }
         table_cfg = TableConfig(cfg=config, entity_name=entity)
 
@@ -149,7 +161,9 @@ class TestCreateFixedTable:
     async def test_raises_when_row_length_mismatch(self):
         """Test raises ValueError when row length doesn't match columns length."""
         entity = "test_entity"
-        config = {"test_entity": {"type": "fixed", "columns": ["col1", "col2", "col3"], "values": [["a", "b", "c"], ["d", "e"]]}}  # Missing one value
+        config = {
+            "test_entity": {"type": "fixed", "columns": ["col1", "col2", "col3"], "values": [["a", "b", "c"], ["d", "e"]]}
+        }  # Missing one value
         table_cfg = TableConfig(cfg=config, entity_name=entity)
 
         with pytest.raises(ValueError, match="has mismatched number of columns and values"):
@@ -256,7 +270,13 @@ class TestCreateFixedTable:
     async def test_multiple_columns_with_none_values(self):
         """Test multiple columns with None values."""
         entity = "test_entity"
-        config = {"test_entity": {"type": "fixed", "columns": ["col1", "col2", "col3"], "values": [["A", None, 1], [None, "B", None], ["C", "D", 3]]}}
+        config = {
+            "test_entity": {
+                "type": "fixed",
+                "columns": ["col1", "col2", "col3"],
+                "values": [["A", None, 1], [None, "B", None], ["C", "D", 3]],
+            }
+        }
         table_cfg = TableConfig(cfg=config, entity_name=entity)
 
         result: pd.DataFrame = await FixedLoader().load(entity, table_cfg)
@@ -297,7 +317,13 @@ class TestCreateFixedTable:
     async def test_special_characters_in_values(self):
         """Test values with special characters."""
         entity = "test_entity"
-        config = {"test_entity": {"type": "fixed", "surrogate_name": "text", "values": ["Normal", "With spaces", "With-dash", "With_underscore", "With.dot"]}}
+        config = {
+            "test_entity": {
+                "type": "fixed",
+                "surrogate_name": "text",
+                "values": ["Normal", "With spaces", "With-dash", "With_underscore", "With.dot"],
+            }
+        }
         table_cfg = TableConfig(cfg=config, entity_name=entity)
 
         result: pd.DataFrame = await FixedLoader().load(entity, table_cfg)
@@ -358,7 +384,13 @@ class TestCreateFixedTable:
     async def test_two_column_table(self):
         """Test create fixed table with exactly two columns."""
         entity = "test_entity"
-        config = {"test_entity": {"type": "fixed", "columns": ["dimension_id", "dimension_name"], "values": [[1, "Width"], [2, "Height"], [3, "Depth"]]}}
+        config = {
+            "test_entity": {
+                "type": "fixed",
+                "columns": ["dimension_id", "dimension_name"],
+                "values": [[1, "Width"], [2, "Height"], [3, "Depth"]],
+            }
+        }
         table_cfg = TableConfig(cfg=config, entity_name=entity)
 
         result: pd.DataFrame = await FixedLoader().load(entity, table_cfg)

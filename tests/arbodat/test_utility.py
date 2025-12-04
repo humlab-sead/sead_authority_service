@@ -12,7 +12,14 @@ class TestUnnestConfig:
 
     def test_valid_unnest_config(self):
         """Test creating a valid unnest configuration."""
-        data = {"unnest": {"id_vars": ["site_id"], "value_vars": ["Ort", "Kreis", "Land"], "var_name": "location_type", "value_name": "location_name"}}
+        data = {
+            "unnest": {
+                "id_vars": ["site_id"],
+                "value_vars": ["Ort", "Kreis", "Land"],
+                "var_name": "location_type",
+                "value_name": "location_name",
+            }
+        }
         config = UnnestConfig(cfg={}, data=data)
 
         assert config.id_vars == ["site_id"]
@@ -44,7 +51,10 @@ class TestForeignKeyConfig:
 
     def test_valid_foreign_key_config(self):
         """Test creating a valid foreign key configuration."""
-        config = {"site": {"surrogate_id": "site_id", "keys": ["site_name"]}, "location": {"surrogate_id": "location_id", "keys": ["location_name"]}}
+        config = {
+            "site": {"surrogate_id": "site_id", "keys": ["site_name"]},
+            "location": {"surrogate_id": "location_id", "keys": ["location_name"]},
+        }
         fk_data = {"entity": "location", "local_keys": ["location_name"], "remote_keys": ["location_name"]}
 
         fk = ForeignKeyConfig(cfg=config, local_entity="site", data=fk_data)
@@ -93,7 +103,9 @@ class TestTableConfig:
 
     def test_basic_table_config(self):
         """Test creating a basic table configuration."""
-        config = {"site": {"surrogate_id": "site_id", "keys": ["site_name"], "columns": ["site_name", "description"], "depends_on": ["location"]}}
+        config = {
+            "site": {"surrogate_id": "site_id", "keys": ["site_name"], "columns": ["site_name", "description"], "depends_on": ["location"]}
+        }
 
         table = TableConfig(cfg=config, entity_name="site")
 
@@ -147,7 +159,12 @@ class TestTableConfig:
         config = {
             "location": {
                 "surrogate_id": "location_id",
-                "unnest": {"id_vars": ["site_id"], "value_vars": ["Ort", "Kreis"], "var_name": "location_type", "value_name": "location_name"},
+                "unnest": {
+                    "id_vars": ["site_id"],
+                    "value_vars": ["Ort", "Kreis"],
+                    "var_name": "location_type",
+                    "value_name": "location_name",
+                },
             }
         }
 
@@ -210,7 +227,9 @@ class TestTableConfig:
                 "surrogate_id": "site_id",
                 "keys": ["site_name"],
                 "columns": ["site_name", "description", "location_id"],
-                "foreign_keys": [{"entity": "location", "local_keys": ["location_id", "location_type"], "remote_keys": ["location_id", "location_type"]}],
+                "foreign_keys": [
+                    {"entity": "location", "local_keys": ["location_id", "location_type"], "remote_keys": ["location_id", "location_type"]}
+                ],
             },
             "location": {"surrogate_id": "location_id"},
         }
@@ -248,7 +267,10 @@ class TestTablesConfig:
 
     def test_tables_config_with_provided_config(self):
         """Test TablesConfig with provided configuration."""
-        config = {"site": {"surrogate_id": "site_id", "columns": ["site_name"]}, "location": {"surrogate_id": "location_id", "columns": ["location_name"]}}
+        config = {
+            "site": {"surrogate_id": "site_id", "columns": ["site_name"]},
+            "location": {"surrogate_id": "location_id", "columns": ["location_name"]},
+        }
 
         tables = TablesConfig(entities_cfg=config)
 
@@ -349,7 +371,12 @@ class TestIntegration:
                 "surrogate_id": "location_id",
                 "keys": ["Ort", "Kreis", "Land"],
                 "columns": ["Ort", "Kreis", "Land"],
-                "unnest": {"id_vars": ["site_id"], "value_vars": ["Ort", "Kreis", "Land"], "var_name": "location_type", "value_name": "location_name"},
+                "unnest": {
+                    "id_vars": ["site_id"],
+                    "value_vars": ["Ort", "Kreis", "Land"],
+                    "var_name": "location_type",
+                    "value_name": "location_name",
+                },
                 "drop_duplicates": ["Ort", "Kreis", "Land"],
                 "depends_on": [],
             },
@@ -358,7 +385,13 @@ class TestIntegration:
                 "keys": ["ProjektNr", "Fustel"],
                 "columns": ["ProjektNr", "Fustel", "EVNr"],
                 "drop_duplicates": ["ProjektNr", "Fustel"],
-                "foreign_keys": [{"entity": "location", "local_keys": ["location_type", "location_name"], "remote_keys": ["location_type", "location_name"]}],
+                "foreign_keys": [
+                    {
+                        "entity": "location",
+                        "local_keys": ["location_type", "location_name"],
+                        "remote_keys": ["location_type", "location_name"],
+                    }
+                ],
                 "depends_on": ["location"],
             },
         }

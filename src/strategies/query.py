@@ -79,14 +79,18 @@ class BaseRepository(AbstractRepository):
             self.connection = await get_connection()
         return self.connection
 
-    async def fetch_all(self, sql: str, params: Params | None = None, *, row_factory: Literal["dict", "tuple"] = "dict") -> list[dict[str, Any]]:
+    async def fetch_all(
+        self, sql: str, params: Params | None = None, *, row_factory: Literal["dict", "tuple"] = "dict"
+    ) -> list[dict[str, Any]]:
         connection: psycopg.AsyncConnection[Tuple[Any, ...]] = await self.get_connection()
         async with connection.cursor(row_factory=self.row_factories[row_factory]) as cursor:
             await cursor.execute(sql.strip(), params)  # type: ignore
             rows: list[dict[str, Any]] = await cursor.fetchall()
             return [d if isinstance(d, dict) else dict(d) for d in rows]
 
-    async def fetch_one(self, sql: str, params: Params | None = None, *, row_factory: Literal["dict", "tuple"] = "dict") -> dict[str, Any] | None:
+    async def fetch_one(
+        self, sql: str, params: Params | None = None, *, row_factory: Literal["dict", "tuple"] = "dict"
+    ) -> dict[str, Any] | None:
         connection: psycopg.AsyncConnection[Tuple[Any, ...]] = await self.get_connection()
         async with connection.cursor(row_factory=self.row_factories[row_factory]) as cursor:
             await cursor.execute(sql.strip(), params)  # type: ignore
@@ -109,7 +113,9 @@ class BaseRepository(AbstractRepository):
         """Perform fuzzy name search"""
         return await self.fetch_all(self.get_find_fuzzy_sql(), {"q": name, "n": limit})
 
-    async def fetch_by_alternate_identity(self, alternate_identity: str, **kwargs) -> list[dict[str, Any]]:  # pylint: disable=unused-argument
+    async def fetch_by_alternate_identity(
+        self, alternate_identity: str, **kwargs
+    ) -> list[dict[str, Any]]:  # pylint: disable=unused-argument
         """Fetch entity by alternate identity"""
         sql: str = self.get_sql_query("alternate_identity_sql")
         if not sql:

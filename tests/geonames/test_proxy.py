@@ -29,7 +29,9 @@ class TestGeoNamesProxy:
 
     def test_init_custom_params(self):
         """Test GeoNamesProxy initialization with custom parameters"""
-        proxy = GeoNamesProxy(username="custom_user", base_url="https://custom.geonames.org/", lang="sv", timeout=30.0, user_agent="CustomApp/2.0")
+        proxy = GeoNamesProxy(
+            username="custom_user", base_url="https://custom.geonames.org/", lang="sv", timeout=30.0, user_agent="CustomApp/2.0"
+        )
 
         assert proxy.username == "custom_user"
         assert proxy.base_url == "https://custom.geonames.org"  # Should strip trailing slash
@@ -72,7 +74,9 @@ class TestGeoNamesProxy:
         """Test basic search functionality"""
         # Mock response data
         mock_response_data = {
-            "geonames": [{"geonameId": 2666199, "name": "Umeå", "lat": "63.82842", "lng": "20.25972", "countryName": "Sweden", "population": 83249}]
+            "geonames": [
+                {"geonameId": 2666199, "name": "Umeå", "lat": "63.82842", "lng": "20.25972", "countryName": "Sweden", "population": 83249}
+            ]
         }
 
         mock_client = AsyncMock()

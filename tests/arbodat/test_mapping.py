@@ -154,7 +154,12 @@ class TestRemoteLinker:
         linker = LinkToRemoteService(config)
 
         df = pd.DataFrame(
-            {"PCODE": ["PLANT001", "PLANT002"], "name": ["Plant A", "Plant B"], "family": ["Family X", "Family Y"], "order": ["Order M", "Order N"]}
+            {
+                "PCODE": ["PLANT001", "PLANT002"],
+                "name": ["Plant A", "Plant B"],
+                "family": ["Family X", "Family Y"],
+                "order": ["Order M", "Order N"],
+            }
         )
 
         result = linker.link_to_remote("taxa", df)

@@ -56,7 +56,12 @@ class TestUnnest:
         """Test that unnest raises ValueError when id_vars columns missing."""
         entity = "test_entity"
         table = pd.DataFrame({"col1": [1, 2], "col2": [3, 4]})
-        config = {"test_entity": {"columns": ["col1", "col2"], "unnest": {"id_vars": ["missing_col"], "var_name": "variable", "value_name": "value"}}}
+        config = {
+            "test_entity": {
+                "columns": ["col1", "col2"],
+                "unnest": {"id_vars": ["missing_col"], "var_name": "variable", "value_name": "value"},
+            }
+        }
         table_cfg = TableConfig(cfg=config, entity_name=entity)
 
         with pytest.raises(ValueError, match="missing id_vars columns"):
@@ -99,7 +104,9 @@ class TestUnnest:
         """
         entity = "test_entity"
         table = pd.DataFrame({"id": [1, 2], "col1": [10, 20], "col2": [30, 40]})
-        config = {"test_entity": {"columns": ["id", "col1", "col2"], "unnest": {"id_vars": ["id"], "var_name": "variable", "value_name": "value"}}}
+        config = {
+            "test_entity": {"columns": ["id", "col1", "col2"], "unnest": {"id_vars": ["id"], "var_name": "variable", "value_name": "value"}}
+        }
         table_cfg = TableConfig(cfg=config, entity_name=entity)
 
         result = unnest(entity, table, table_cfg)
@@ -131,13 +138,18 @@ class TestUnnest:
         entity = "test_entity"
         table = pd.DataFrame({"id1": [1, 2], "id2": ["a", "b"], "col1": [10, 20], "col2": [30, 40]})
         config = {
-            "test_entity": {"columns": ["id1", "id2", "col1", "col2"], "unnest": {"id_vars": ["id1", "id2"], "var_name": "variable", "value_name": "value"}}
+            "test_entity": {
+                "columns": ["id1", "id2", "col1", "col2"],
+                "unnest": {"id_vars": ["id1", "id2"], "var_name": "variable", "value_name": "value"},
+            }
         }
         table_cfg = TableConfig(cfg=config, entity_name=entity)
 
         result = unnest(entity, table, table_cfg)
 
-        expected = pd.DataFrame({"id1": [1, 2, 1, 2], "id2": ["a", "b", "a", "b"], "variable": ["col1", "col1", "col2", "col2"], "value": [10, 20, 30, 40]})
+        expected = pd.DataFrame(
+            {"id1": [1, 2, 1, 2], "id2": ["a", "b", "a", "b"], "variable": ["col1", "col1", "col2", "col2"], "value": [10, 20, 30, 40]}
+        )
         pd.testing.assert_frame_equal(result, expected)
 
     def test_unnest_custom_var_and_value_names(self):
@@ -157,7 +169,9 @@ class TestUnnest:
         """Test that unnest preserves data types where possible."""
         entity = "test_entity"
         table = pd.DataFrame({"id": [1, 2], "col1": [10, 20], "col2": [30, 40]})
-        config = {"test_entity": {"columns": ["id", "col1", "col2"], "unnest": {"id_vars": ["id"], "var_name": "variable", "value_name": "value"}}}
+        config = {
+            "test_entity": {"columns": ["id", "col1", "col2"], "unnest": {"id_vars": ["id"], "var_name": "variable", "value_name": "value"}}
+        }
         table_cfg = TableConfig(cfg=config, entity_name=entity)
 
         result = unnest(entity, table, table_cfg)
@@ -206,7 +220,11 @@ class TestUnnest:
             "location": {
                 "surrogate_id": "location_id",
                 "columns": ["Ort", "Kreis", "Land", "Staat", "FlurStr"],
-                "unnest": {"value_vars": ["Ort", "Kreis", "Land", "Staat", "FlurStr"], "var_name": "location_type", "value_name": "location_name"},
+                "unnest": {
+                    "value_vars": ["Ort", "Kreis", "Land", "Staat", "FlurStr"],
+                    "var_name": "location_type",
+                    "value_name": "location_name",
+                },
             },
         }
         table_cfg = TableConfig(cfg=config, entity_name=entity)
@@ -265,7 +283,10 @@ class TestUnnest:
         entity = "test_entity"
         table = pd.DataFrame({"id": [1, 2], "col1": [10, 20], "col2": [30, 40]})
         config = {
-            "test_entity": {"columns": ["id", "col1", "col2"], "unnest": {"id_vars": ["id"], "value_vars": [], "var_name": "variable", "value_name": "value"}}
+            "test_entity": {
+                "columns": ["id", "col1", "col2"],
+                "unnest": {"id_vars": ["id"], "value_vars": [], "var_name": "variable", "value_name": "value"},
+            }
         }
         table_cfg = TableConfig(cfg=config, entity_name=entity)
 
@@ -297,7 +318,9 @@ class TestUnnest:
         """Test unnest handles null values correctly."""
         entity = "test_entity"
         table = pd.DataFrame({"id": [1, 2], "col1": [10, None], "col2": [None, 40]})
-        config = {"test_entity": {"columns": ["id", "col1", "col2"], "unnest": {"id_vars": ["id"], "var_name": "variable", "value_name": "value"}}}
+        config = {
+            "test_entity": {"columns": ["id", "col1", "col2"], "unnest": {"id_vars": ["id"], "var_name": "variable", "value_name": "value"}}
+        }
         table_cfg = TableConfig(cfg=config, entity_name=entity)
 
         result = unnest(entity, table, table_cfg)
@@ -310,7 +333,14 @@ class TestUnnest:
         """Test unnest with sample_coordinates example from arbodat.yml."""
         entity = "sample_coordinates"
         table = pd.DataFrame(
-            {"sample_id": [1, 2], "KoordX": [100.5, 200.5], "KoordY": [300.5, 400.5], "KoordZ": [10.0, 20.0], "TiefeBis": [50.0, 60.0], "TiefeVon": [0.0, 0.0]}
+            {
+                "sample_id": [1, 2],
+                "KoordX": [100.5, 200.5],
+                "KoordY": [300.5, 400.5],
+                "KoordZ": [10.0, 20.0],
+                "TiefeBis": [50.0, 60.0],
+                "TiefeVon": [0.0, 0.0],
+            }
         )
         config = {
             "sample": {"surrogate_id": "sample_id", "keys": ["ProjektNr", "Befu", "ProbNr"]},

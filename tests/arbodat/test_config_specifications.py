@@ -373,7 +373,9 @@ class TestFixedDataSpecification:
 
     def test_valid_fixed_data_with_sql(self):
         """Test that valid fixed data with SQL passes."""
-        config = {"entities": {"table": {"type": "fixed", "surrogate_id": "id", "columns": ["name"], "values": "sql: SELECT name FROM table"}}}
+        config = {
+            "entities": {"table": {"type": "fixed", "surrogate_id": "id", "columns": ["name"], "values": "sql: SELECT name FROM table"}}
+        }
         spec = FixedDataSpecification()
         assert spec.is_satisfied_by(config) is True
         assert not spec.has_errors()

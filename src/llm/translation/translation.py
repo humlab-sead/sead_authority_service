@@ -33,7 +33,9 @@ class TranslationService:
         if context:
             context = f"Context:\n{context}"
 
-        prompt_template: str = ConfigValue("llm.prompts.language_detection").resolve() or "Detect the language of the following text: {text}\n{context}"
+        prompt_template: str = (
+            ConfigValue("llm.prompts.language_detection").resolve() or "Detect the language of the following text: {text}\n{context}"
+        )
         prompt: str = prompt_template.format(text=text, context=context)
         try:
             response: str = await self.llm_client.complete(prompt, max_tokens=50, temperature=0.1)

@@ -47,7 +47,9 @@ def recursive_update(d1: dict, d2: dict) -> dict:
     return d1
 
 
-def recursive_filter_dict(data: dict[str, Any], filter_keys: set[str], filter_mode: Literal["keep", "exclude"] = "exclude") -> dict[str, Any]:
+def recursive_filter_dict(
+    data: dict[str, Any], filter_keys: set[str], filter_mode: Literal["keep", "exclude"] = "exclude"
+) -> dict[str, Any]:
     """
     Recursively filters a dictionary to include only keys in the given set.
 

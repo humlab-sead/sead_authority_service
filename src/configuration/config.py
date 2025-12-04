@@ -184,12 +184,16 @@ class BaseResolver:
 
     directive: str = ""
 
-    def __init__(self, context: str | None = None, env_filename: str | None = None, env_prefix: str | None = None, source_path: str | None = None) -> None:
+    def __init__(
+        self, context: str | None = None, env_filename: str | None = None, env_prefix: str | None = None, source_path: str | None = None
+    ) -> None:
         self.context: str | None = context
         self.env_filename: str | None = env_filename
         self.env_prefix: str | None = env_prefix
         self.source_path: str | None = source_path
-        self.source_folder: Path | None = Path(source_path).parent if source_path and is_config_path(source_path, raise_if_missing=False) else None
+        self.source_folder: Path | None = (
+            Path(source_path).parent if source_path and is_config_path(source_path, raise_if_missing=False) else None
+        )
         self.data: dict[str, Any] = {}
 
     def resolve(self, data: dict[str, Any]) -> dict[str, Any]:
@@ -225,14 +229,18 @@ class SubConfigResolver(BaseResolver):
 
     directive: str = "@include"
 
-    def __init__(self, context: str | None = None, env_filename: str | None = None, env_prefix: str | None = None, source_path: str | None = None) -> None:
+    def __init__(
+        self, context: str | None = None, env_filename: str | None = None, env_prefix: str | None = None, source_path: str | None = None
+    ) -> None:
         super().__init__(context=context, env_filename=env_filename, env_prefix=env_prefix, source_path=source_path)
 
     def resolve_directive(self, directive_argument: str, base_path: Path | None) -> dict[str, Any]:
         filename: str = directive_argument
         if not Path(filename).is_absolute() and base_path is not None:
             filename = str(base_path / filename)
-        loaded_data: dict[str, Any] = ConfigFactory().load(source=filename, context=self.context, env_filename=self.env_filename, env_prefix=None).data
+        loaded_data: dict[str, Any] = (
+            ConfigFactory().load(source=filename, context=self.context, env_filename=self.env_filename, env_prefix=None).data
+        )
         return self._resolve(loaded_data, Path(filename).parent)
 
 
@@ -240,7 +248,9 @@ class LoadResolver(BaseResolver):
 
     directive: str = "@load"
 
-    def __init__(self, context: str | None = None, env_filename: str | None = None, env_prefix: str | None = None, source_path: str | None = None) -> None:
+    def __init__(
+        self, context: str | None = None, env_filename: str | None = None, env_prefix: str | None = None, source_path: str | None = None
+    ) -> None:
         super().__init__(context=context, env_filename=env_filename, env_prefix=env_prefix, source_path=source_path)
 
     def resolve_directive(self, directive_argument: str, base_path: Path | None) -> Any:

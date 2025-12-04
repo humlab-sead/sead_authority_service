@@ -277,7 +277,10 @@ class TestArbodatSurveyNormalizer:
         df = pd.DataFrame({"col1": [1, 2]})
         normalizer = ArbodatSurveyNormalizer(df)
         normalizer.config.data_sources = {
-            "test_data_source": {"driver": "postgres", "options": {"host": "localhost", "port": 5432, "user": "test_user", "dbname": "test_db"}}
+            "test_data_source": {
+                "driver": "postgres",
+                "options": {"host": "localhost", "port": 5432, "user": "test_user", "dbname": "test_db"},
+            }
         }
         table_cfg = Mock()
         table_cfg.is_fixed_data = False

@@ -214,7 +214,14 @@ class SuggestEntityResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "result": [{"id": "https://w3id.org/sead/id/site/123", "name": "Uppsala Site", "type": [{"id": "site", "name": "Site"}], "score": 95.0}]
+                "result": [
+                    {
+                        "id": "https://w3id.org/sead/id/site/123",
+                        "name": "Uppsala Site",
+                        "type": [{"id": "site", "name": "Site"}],
+                        "score": 95.0,
+                    }
+                ]
             }
         }
     )

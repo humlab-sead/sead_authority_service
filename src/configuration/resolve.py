@@ -47,7 +47,9 @@ class ConfigValue(Generic[T]):
     @staticmethod
     def create_field(key: str, default: Any = None, description: str | None = None) -> Any:
         """Create a field for a dataclass that will be resolved at creation time."""
-        return field(default_factory=lambda: ConfigValue(key=key, default=default, description=description).resolve())  # pylint: disable=invalid-field-call
+        return field(
+            default_factory=lambda: ConfigValue(key=key, default=default, description=description).resolve()
+        )  # pylint: disable=invalid-field-call
 
 
 def resolve_arguments(fn_or_cls, args, kwargs):

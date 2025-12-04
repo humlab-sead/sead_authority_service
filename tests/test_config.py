@@ -1377,7 +1377,11 @@ class TestRealWorldIntegration:
         """Test the actual pattern from arbodat config.yml."""
         config = {
             "entities": {
-                "location": {"surrogate_id": "location_id", "keys": ["Ort", "Kreis", "Land", "Staat", "FlurStr"], "columns": "@value: entities.location.keys"},
+                "location": {
+                    "surrogate_id": "location_id",
+                    "keys": ["Ort", "Kreis", "Land", "Staat", "FlurStr"],
+                    "columns": "@value: entities.location.keys",
+                },
                 "site": {
                     "surrogate_id": "site_id",
                     "keys": ["ProjektNr", "Fustel", "EVNr"],
@@ -1439,7 +1443,15 @@ class TestRealWorldIntegration:
         result = replace_references(config)
 
         # Check columns concatenation
-        expected_columns = ["ProjektNr", "Befu", "ProbNr", "BNam", "TaxAut", "SumFAnzahl", "SumFGewicht"]  # sample.keys  # taxa.keys  # additional columns
+        expected_columns = [
+            "ProjektNr",
+            "Befu",
+            "ProbNr",
+            "BNam",
+            "TaxAut",
+            "SumFAnzahl",
+            "SumFGewicht",
+        ]  # sample.keys  # taxa.keys  # additional columns
         assert result["entities"]["sample_taxa"]["columns"] == expected_columns  # type: ignore[call-arg]
 
         # Check foreign key references
@@ -1472,7 +1484,11 @@ class TestRealWorldIntegration:
         """Test prepending surrogate_id to columns list."""
         config = {
             "entities": {
-                "sample": {"surrogate_id": "sample_id", "keys": ["ProjektNr", "Befu", "ProbNr"], "all_columns": "['sample_id'] + @value: entities.sample.keys"}
+                "sample": {
+                    "surrogate_id": "sample_id",
+                    "keys": ["ProjektNr", "Befu", "ProbNr"],
+                    "all_columns": "['sample_id'] + @value: entities.sample.keys",
+                }
             }
         }
 
@@ -1522,7 +1538,10 @@ class TestRealWorldIntegration:
                 "project": {"keys": ["ProjektNr"], "columns": "@value: entities.project.keys"},
                 "site": {"keys": ["ProjektNr", "Fustel"], "columns": "@value: entities.site.keys + ['site_type']"},
                 "feature": {"keys": ["ProjektNr", "Fustel", "Befu"], "columns": "@value: entities.feature.keys + ['feature_type']"},
-                "sample": {"keys": "@value: entities.feature.keys + ['ProbNr']", "columns": "@value: entities.sample.keys + ['sample_date', 'depth']"},
+                "sample": {
+                    "keys": "@value: entities.feature.keys + ['ProbNr']",
+                    "columns": "@value: entities.sample.keys + ['sample_date', 'depth']",
+                },
             }
         }
 

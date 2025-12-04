@@ -88,7 +88,16 @@ class TestOllamaProvider:
     async def test_complete_basic(self, test_provider: MockConfigProvider):
         """Test basic completion without typed response"""
         test_provider.get_config().update(
-            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+            {
+                "llm": {
+                    "ollama": {
+                        "host": "http://localhost:11434",
+                        "model": "llama2",
+                        "timeout": 30,
+                        "options": {"max_tokens": 1000, "temperature": 0.7},
+                    }
+                }
+            }
         )
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
@@ -125,7 +134,16 @@ class TestOllamaProvider:
     async def test_complete_with_custom_options(self, test_provider: MockConfigProvider):
         """Test completion with custom options passed via kwargs"""
         test_provider.get_config().update(
-            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+            {
+                "llm": {
+                    "ollama": {
+                        "host": "http://localhost:11434",
+                        "model": "llama2",
+                        "timeout": 30,
+                        "options": {"max_tokens": 1000, "temperature": 0.7},
+                    }
+                }
+            }
         )
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
@@ -202,7 +220,16 @@ class TestOllamaProvider:
     async def test_complete_with_typed_response(self, test_provider: MockConfigProvider):
         """Test completion with Pydantic model for typed response"""
         test_provider.get_config().update(
-            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.1}}}}
+            {
+                "llm": {
+                    "ollama": {
+                        "host": "http://localhost:11434",
+                        "model": "llama2",
+                        "timeout": 30,
+                        "options": {"max_tokens": 1000, "temperature": 0.1},
+                    }
+                }
+            }
         )
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
@@ -251,7 +278,16 @@ class TestOllamaProvider:
     async def test_complete_network_error_handling(self, test_provider: MockConfigProvider):
         """Test that network errors are properly propagated"""
         test_provider.get_config().update(
-            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+            {
+                "llm": {
+                    "ollama": {
+                        "host": "http://localhost:11434",
+                        "model": "llama2",
+                        "timeout": 30,
+                        "options": {"max_tokens": 1000, "temperature": 0.7},
+                    }
+                }
+            }
         )
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
@@ -272,7 +308,16 @@ class TestOllamaProvider:
     async def test_complete_malformed_json_response(self, test_provider: MockConfigProvider):
         """Test handling of malformed JSON response"""
         test_provider.get_config().update(
-            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+            {
+                "llm": {
+                    "ollama": {
+                        "host": "http://localhost:11434",
+                        "model": "llama2",
+                        "timeout": 30,
+                        "options": {"max_tokens": 1000, "temperature": 0.7},
+                    }
+                }
+            }
         )
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
@@ -314,7 +359,16 @@ class TestOllamaProvider:
     async def test_complete_empty_prompt(self, test_provider: MockConfigProvider):
         """Test completion with empty prompt"""
         test_provider.get_config().update(
-            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+            {
+                "llm": {
+                    "ollama": {
+                        "host": "http://localhost:11434",
+                        "model": "llama2",
+                        "timeout": 30,
+                        "options": {"max_tokens": 1000, "temperature": 0.7},
+                    }
+                }
+            }
         )
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:
@@ -352,7 +406,16 @@ class TestOllamaProvider:
     async def test_complete_long_prompt(self, test_provider: MockConfigProvider):
         """Test completion with very long prompt"""
         test_provider.get_config().update(
-            {"llm": {"ollama": {"host": "http://localhost:11434", "model": "llama2", "timeout": 30, "options": {"max_tokens": 1000, "temperature": 0.7}}}}
+            {
+                "llm": {
+                    "ollama": {
+                        "host": "http://localhost:11434",
+                        "model": "llama2",
+                        "timeout": 30,
+                        "options": {"max_tokens": 1000, "temperature": 0.7},
+                    }
+                }
+            }
         )
 
         with patch("ollama.Client"), patch("ollama.AsyncClient") as mock_async_client_class:

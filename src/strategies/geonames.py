@@ -19,7 +19,9 @@ class GeoNamesRepository(BaseRepository):
         self.lang: str | None = kwargs.get("lang") or ConfigValue("geonames.lang").resolve() or "en"
         self.country_bias: str | None = kwargs.get("country_bias") or ConfigValue("geonames.country_bias").resolve()
         self.fuzzy: float = float(kwargs.get("fuzzy") or ConfigValue("geonames.fuzzy").resolve() or 0.8)
-        self.feature_classes: tuple[str, ...] = tuple(kwargs.get("feature_classes") or ConfigValue("geonames.feature_classes").resolve() or ("P", "A"))
+        self.feature_classes: tuple[str, ...] = tuple(
+            kwargs.get("feature_classes") or ConfigValue("geonames.feature_classes").resolve() or ("P", "A")
+        )
         self.orderby: Literal["relevance", "population"] = kwargs.get("orderby") or ConfigValue("geonames.orderby").resolve() or "relevance"
         self.style: Literal["FULL", "SHORT", "MEDIUM"] = kwargs.get("style") or ConfigValue("geonames.style").resolve() or "FULL"
 
@@ -47,7 +49,9 @@ class GeoNamesRepository(BaseRepository):
 class GeoNamesReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 
-    def __init__(self, specification: dict[str, str] | str | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None) -> None:
+    def __init__(
+        self, specification: dict[str, str] | str | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None
+    ) -> None:
         specification = resolve_specification(specification=specification or self.key)
         strategy_options: dict[str, Any] = ConfigValue(f"policy.{self.key}.geonames.options").resolve() or {}
         proxy: BaseRepository = (repository_or_cls or self.repository_cls)(specification, **strategy_options)  # type: ignore[arg-type]

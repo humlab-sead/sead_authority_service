@@ -52,16 +52,22 @@ class BibliographicReferenceRepository(BaseRepository):
 
     async def fuzzy_full_reference_partial(self, text: str, limit: int, threshold: float = 0.45) -> list[dict]:
         # best-substring match on full_reference
-        rows: list[dict[str, Any]] = await self.fetch_all(self.get_sql_query("full_reference_fuzzy_word_similarity_sql"), (text, limit, threshold))
+        rows: list[dict[str, Any]] = await self.fetch_all(
+            self.get_sql_query("full_reference_fuzzy_word_similarity_sql"), (text, limit, threshold)
+        )
         return [r | {"name_sim": max(0.8, float(r["name_sim"]))} for r in rows]
 
     async def fuzzy_authors_partial_and_year(self, authors: str, year: str | int, limit: int, threshold: float = 0.45) -> list[dict]:
-        rows: list[dict[str, Any]] = await self.fetch_all(self.get_sql_query("authors_fuzzy_sql"), params=(authors, limit, threshold), row_factory="tuple")
+        rows: list[dict[str, Any]] = await self.fetch_all(
+            self.get_sql_query("authors_fuzzy_sql"), params=(authors, limit, threshold), row_factory="tuple"
+        )
         # filter to exact year; promote to 0.8 if matches
         ids: list[int] = [r[1] for r in rows]  # type: ignore
         if not ids:
             return []
-        year_ok: dict[str, Any] | None = await self.fetch_one(self.get_sql_query("biblio_ids_sql"), params=(ids, str(year)), row_factory="tuple")
+        year_ok: dict[str, Any] | None = await self.fetch_one(
+            self.get_sql_query("biblio_ids_sql"), params=(ids, str(year)), row_factory="tuple"
+        )
         out = []
         for r in rows:
             bid, label, sim = r[1], r[2], float(r[3])  # type: ignore
@@ -94,7 +100,9 @@ class BibliographicReferenceRepository(BaseRepository):
     #     return out
 
     async def fuzzy_full_reference_fallback(self, text: str, limit: int, threshold: float = 0.30) -> list[dict]:
-        rows: list[dict[str, Any]] = await self.fetch_all(self.get_sql_query("full_reference_fuzzy_similarity_sql"), (text, limit, threshold))
+        rows: list[dict[str, Any]] = await self.fetch_all(
+            self.get_sql_query("full_reference_fuzzy_similarity_sql"), (text, limit, threshold)
+        )
         return [r | {"name_sim": min(0.7, float(r["name_sim"]))} for r in rows]
 
 
@@ -102,7 +110,9 @@ class BibliographicReferenceRepository(BaseRepository):
 class BibliographicReferenceReconciliationStrategy(ReconciliationStrategy):
     """Reconcile bibliographic references using exact identifiers and fuzzy text."""
 
-    def __init__(self, specification: StrategySpecification | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None) -> None:
+    def __init__(
+        self, specification: StrategySpecification | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None
+    ) -> None:
         super().__init__(specification, repository_or_cls=repository_or_cls)
 
     @staticmethod

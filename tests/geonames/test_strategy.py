@@ -52,7 +52,14 @@ class TestGeoNamesRepository:
         )
 
         proxy = GeoNamesRepository(
-            "geonames", username="override_user", lang="fr", country_bias="FR", fuzzy=0.7, feature_classes=["P"], orderby="relevance", style="MEDIUM"
+            "geonames",
+            username="override_user",
+            lang="fr",
+            country_bias="FR",
+            fuzzy=0.7,
+            feature_classes=["P"],
+            orderby="relevance",
+            style="MEDIUM",
         )
 
         assert proxy.username == "override_user"
@@ -131,7 +138,14 @@ class TestGeoNamesRepository:
     @patch("src.strategies.geonames.GeoNamesProxy")
     async def test_get_details(self, mock_proxy_class, test_provider: MockConfigProvider):
         """Test get_details functionality"""
-        mock_details = {"geonameId": 2666199, "name": "Umeå", "lat": "63.82842", "lng": "20.25972", "countryName": "Sweden", "population": 83249}
+        mock_details = {
+            "geonameId": 2666199,
+            "name": "Umeå",
+            "lat": "63.82842",
+            "lng": "20.25972",
+            "countryName": "Sweden",
+            "population": 83249,
+        }
 
         mock_proxy = AsyncMock()
         mock_proxy.get_details.return_value = mock_details
@@ -186,7 +200,9 @@ class TestGeoNamesReconciliationStrategy:
     @with_test_config
     def test_init_with_strategy_options(self, test_provider: MockConfigProvider):
         """Test initialization with strategy options from config"""
-        test_provider.get_config().update({"policy.geonames.geonames.options": {"username": "strategy_user", "lang": "sv", "country_bias": "SE"}})
+        test_provider.get_config().update(
+            {"policy.geonames.geonames.options": {"username": "strategy_user", "lang": "sv", "country_bias": "SE"}}
+        )
 
         mock_proxy = MagicMock()
         mock_query_proxy_class = MagicMock()
@@ -257,7 +273,13 @@ class TestGeoNamesReconciliationStrategy:
         """Test candidate conversion for administrative area"""
         strategy = GeoNamesReconciliationStrategy()
 
-        geonames_data = {"geonameId": 456, "name": "Västerbotten", "fcl": "A", "fcode": "ADM1", "fcodeName": "first-order administrative division"}
+        geonames_data = {
+            "geonameId": 456,
+            "name": "Västerbotten",
+            "fcl": "A",
+            "fcode": "ADM1",
+            "fcodeName": "first-order administrative division",
+        }
 
         result = strategy.as_candidate(geonames_data, "vasterbotten")
 

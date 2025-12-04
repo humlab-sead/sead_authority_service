@@ -11,7 +11,14 @@ from loguru import logger
 from starlette.datastructures import UploadFile
 
 # Not used: ReconBatchRequest, ReconBatchRequestHandler, ReconQueryRequest
-from src.api.model import ReconBatchResponse, ReconQuery, ReconServiceManifest, SuggestEntityResponse, SuggestPropertyResponse, SuggestTypeResponse
+from src.api.model import (
+    ReconBatchResponse,
+    ReconQuery,
+    ReconServiceManifest,
+    SuggestEntityResponse,
+    SuggestPropertyResponse,
+    SuggestTypeResponse,
+)
 from src.configuration import Config, ConfigValue, get_config_provider, setup_config_store
 from src.configuration.interface import ConfigLike
 from src.metadata import get_reconcile_properties, get_reconciliation_metadata
@@ -279,7 +286,9 @@ async def preview(id: str, config: Config = Depends(get_config_dependency)) -> H
 
 
 @router.get("/suggest/entity", response_model=SuggestEntityResponse)
-async def suggest_entity(prefix: str = "", type: str = "", config: Config = Depends(get_config_dependency)) -> Union[SuggestEntityResponse, JSONResponse]:
+async def suggest_entity(
+    prefix: str = "", type: str = "", config: Config = Depends(get_config_dependency)
+) -> Union[SuggestEntityResponse, JSONResponse]:
     """
     Entity autocomplete endpoint for OpenRefine Suggest API.
 
@@ -340,7 +349,9 @@ async def suggest_type(prefix: str = "", config: Config = Depends(get_config_dep
 
 
 @router.get("/suggest/property", response_model=SuggestPropertyResponse)
-async def suggest_property(prefix: str = "", type: str = "", config: Config = Depends(get_config_dependency)) -> Union[SuggestPropertyResponse, JSONResponse]:
+async def suggest_property(
+    prefix: str = "", type: str = "", config: Config = Depends(get_config_dependency)
+) -> Union[SuggestPropertyResponse, JSONResponse]:
     """
     Property autocomplete endpoint for OpenRefine Suggest API.
 

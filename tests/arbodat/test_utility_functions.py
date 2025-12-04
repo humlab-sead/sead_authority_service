@@ -3,7 +3,14 @@
 import pandas as pd
 import pytest
 
-from src.arbodat.utility import _rename_last_occurence, add_surrogate_id, check_functional_dependency, extract_translation_map, get_subset, translate
+from src.arbodat.utility import (
+    _rename_last_occurence,
+    add_surrogate_id,
+    check_functional_dependency,
+    extract_translation_map,
+    get_subset,
+    translate,
+)
 
 
 class TestAddSurrogateId:

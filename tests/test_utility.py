@@ -572,7 +572,9 @@ class TestReplaceEnvVars:
     def test_replace_env_vars_multiple_vars_in_structure(self):
         """Test replace_env_vars with multiple environment variables."""
         with patch.dict(
-            os.environ, {"VAR1": "value1", "VAR2": "value2", "VAR3": "value3", "MISSING_VAR": ""}, clear=True  # This will be missing from environment
+            os.environ,
+            {"VAR1": "value1", "VAR2": "value2", "VAR3": "value3", "MISSING_VAR": ""},
+            clear=True,  # This will be missing from environment
         ):
             # Remove MISSING_VAR to test missing behavior
             if "MISSING_VAR" in os.environ:
