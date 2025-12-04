@@ -232,9 +232,7 @@ class SubConfigResolver(BaseResolver):
         filename: str = directive_argument
         if not Path(filename).is_absolute() and base_path is not None:
             filename = str(base_path / filename)
-        loaded_data: dict[str, Any] = (
-            ConfigFactory().load(source=filename, context=self.context, env_filename=self.env_filename, env_prefix=self.env_prefix).data
-        )
+        loaded_data: dict[str, Any] = ConfigFactory().load(source=filename, context=self.context, env_filename=self.env_filename, env_prefix=None).data
         return self._resolve(loaded_data, Path(filename).parent)
 
 
