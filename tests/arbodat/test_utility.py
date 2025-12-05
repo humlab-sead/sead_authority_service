@@ -113,7 +113,7 @@ class TestTableConfig:
         assert table.surrogate_id == "site_id"
         assert table.keys == ["site_name"]
         assert table.columns == ["site_name", "description"]
-        assert table.depends_on == ["location"]
+        assert table.depends_on == {"location"}
         assert table.foreign_keys == []
 
     def test_table_with_foreign_keys(self):
@@ -195,7 +195,7 @@ class TestTableConfig:
         table = TableConfig(cfg=config, entity_name="site")
         assert table.keys == []
         assert table.columns == []
-        assert table.depends_on == []
+        assert table.depends_on == {}
 
     def test_fk_column_set(self):
         """Test fk_column_set returns all foreign key columns."""
@@ -355,7 +355,7 @@ class TestTablesConfig:
         assert site_table.drop_duplicates == ["ProjektNr", "Fustel"]
         assert len(site_table.foreign_keys) == 1
         assert site_table.foreign_keys[0].remote_entity == "natural_region"
-        assert site_table.depends_on == ["natural_region"]
+        assert site_table.depends_on == {"natural_region"}
 
         nat_region_table = tables.get_table("natural_region")
         assert nat_region_table.drop_duplicates is True
@@ -409,4 +409,4 @@ class TestIntegration:
         assert len(site.foreign_keys) == 1
         assert site.foreign_keys[0].remote_entity == "location"
         assert site.foreign_keys[0].remote_surrogate_id == "location_id"
-        assert site.depends_on == ["location"]
+        assert site.depends_on == {"location"}
