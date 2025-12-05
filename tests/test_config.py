@@ -10,7 +10,7 @@ from src.configuration.utility import replace_references
 from src.utility import replace_env_vars
 from tests.decorators import with_test_config
 
-# pylint: disable=unused-argument, implicit-str-concat, f-string-without-interpolation
+# pylint: disable=unused-argument, implicit-str-concat, f-string-without-interpolation, invalid-field-call
 
 
 class TestConfigProvider:
@@ -1313,7 +1313,14 @@ class TestListOperations:
         assert result["entities"]["site"]["columns"] == ["ProjektNr", "Fustel"]  # type: ignore[call-arg]
 
         # site_location.columns should concatenate all parts
-        assert result["entities"]["site_location"]["columns"] == ["extra_col", "ProjektNr", "Fustel", "Ort", "Kreis", "Land"]  # type: ignore[call-arg]
+        assert result["entities"]["site_location"]["columns"] == [  # type: ignore[call-arg]
+            "extra_col",
+            "ProjektNr",
+            "Fustel",
+            "Ort",
+            "Kreis",
+            "Land",
+        ]
 
     def test_real_world_example(self):
         """Test a real-world configuration scenario."""
@@ -1330,7 +1337,14 @@ class TestListOperations:
 
         result = replace_references(data)
 
-        assert result["entities"]["sample_taxa"]["columns"] == ["PCODE", "RTyp", "ProjektNr", "Befu", "ProbNr", "Anmerkung"]  # type: ignore[call-arg]
+        assert result["entities"]["sample_taxa"]["columns"] == [  # type: ignore[call-arg]
+            "PCODE",
+            "RTyp",
+            "ProjektNr",
+            "Befu",
+            "ProbNr",
+            "Anmerkung",
+        ]
 
 
 class TestEdgeCases:
@@ -1455,7 +1469,11 @@ class TestRealWorldIntegration:
         assert result["entities"]["sample_taxa"]["columns"] == expected_columns  # type: ignore[call-arg]
 
         # Check foreign key references
-        assert result["entities"]["sample_taxa"]["foreign_keys"][0]["local_keys"] == ["ProjektNr", "Befu", "ProbNr"]  # type: ignore[call-arg]
+        assert result["entities"]["sample_taxa"]["foreign_keys"][0]["local_keys"] == [  # type: ignore[call-arg]
+            "ProjektNr",
+            "Befu",
+            "ProbNr",
+        ]
         assert result["entities"]["sample_taxa"]["foreign_keys"][1]["local_keys"] == ["BNam", "TaxAut"]  # type: ignore[call-arg]
 
     def test_unnest_configuration_pattern(self):
@@ -1552,7 +1570,14 @@ class TestRealWorldIntegration:
         assert result["entities"]["site"]["columns"] == ["ProjektNr", "Fustel", "site_type"]  # type: ignore[call-arg]
         assert result["entities"]["feature"]["columns"] == ["ProjektNr", "Fustel", "Befu", "feature_type"]  # type: ignore[call-arg]
         assert result["entities"]["sample"]["keys"] == ["ProjektNr", "Fustel", "Befu", "ProbNr"]  # type: ignore[call-arg]
-        assert result["entities"]["sample"]["columns"] == ["ProjektNr", "Fustel", "Befu", "ProbNr", "sample_date", "depth"]  # type: ignore[call-arg]
+        assert result["entities"]["sample"]["columns"] == [  # type: ignore[call-arg]
+            "ProjektNr",
+            "Fustel",
+            "Befu",
+            "ProbNr",
+            "sample_date",
+            "depth",
+        ]
 
     def test_mixed_types_in_config(self):
         """Test that includes work alongside regular values."""

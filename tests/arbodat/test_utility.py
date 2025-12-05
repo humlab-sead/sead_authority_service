@@ -193,7 +193,7 @@ class TestTableConfig:
         config = {"site": {"surrogate_id": "site_id", "keys": [], "columns": [], "depends_on": []}}
 
         table = TableConfig(cfg=config, entity_name="site")
-        assert table.keys == []
+        assert not table.keys
         assert table.columns == []
         assert table.depends_on == {}
 

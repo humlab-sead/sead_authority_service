@@ -290,7 +290,7 @@ class TestGetSubset:
     def test_column_order_preserved(self):
         """Test that column order matches specification."""
         df = pd.DataFrame({"C": [1, 2], "B": [3, 4], "A": [5, 6]})
-    
+
         result = get_subset(df, ["A", "B", "C"])
 
         # Order should be A, B, C as requested (not source order)
