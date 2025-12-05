@@ -111,7 +111,7 @@ class TestTableConfig:
 
         assert table.entity_name == "site"
         assert table.surrogate_id == "site_id"
-        assert table.keys == ["site_name"]
+        assert table.keys == {"site_name"}
         assert table.columns == ["site_name", "description"]
         assert table.depends_on == {"location"}
         assert table.foreign_keys == []
@@ -195,7 +195,7 @@ class TestTableConfig:
         table = TableConfig(cfg=config, entity_name="site")
         assert not table.keys
         assert table.columns == []
-        assert table.depends_on == {}
+        assert table.depends_on == set()
 
     def test_fk_column_set(self):
         """Test fk_column_set returns all foreign key columns."""
@@ -272,7 +272,7 @@ class TestTablesConfig:
             "location": {"surrogate_id": "location_id", "columns": ["location_name"]},
         }
 
-        tables = TablesConfig(entities_cfg=config)
+        tables = TablesConfig(entities_cfg=config, options={})
 
         assert len(tables.tables) == 2
         assert "site" in tables.tables
@@ -283,7 +283,7 @@ class TestTablesConfig:
         """Test getting a specific table configuration."""
         config = {"site": {"surrogate_id": "site_id", "columns": ["site_name"]}}
 
-        tables = TablesConfig(entities_cfg=config)
+        tables = TablesConfig(entities_cfg=config, options={})
         site_table = tables.get_table("site")
 
         assert site_table.entity_name == "site"
@@ -293,7 +293,7 @@ class TestTablesConfig:
         """Test that getting nonexistent table raises KeyError."""
         config = {"site": {"surrogate_id": "site_id"}}
 
-        tables = TablesConfig(entities_cfg=config)
+        tables = TablesConfig(entities_cfg=config, options={})
 
         with pytest.raises(KeyError):
             tables.get_table("nonexistent")
@@ -303,7 +303,7 @@ class TestTablesConfig:
         # Note: TablesConfig uses 'or' logic, so empty dict will try to load from ConfigValue
         # We need to provide a dict with at least one entity or use None to avoid the config loader
         config = {"dummy": {"surrogate_id": "id"}}
-        tables = TablesConfig(entities_cfg=config)
+        tables = TablesConfig(entities_cfg=config, options={})
 
         assert len(tables.tables) == 1
         assert "dummy" in tables.tables
@@ -312,7 +312,7 @@ class TestTablesConfig:
         """Test has_table method."""
         config = {"site": {"surrogate_id": "site_id"}, "location": {"surrogate_id": "location_id"}}
 
-        tables = TablesConfig(entities_cfg=config)
+        tables = TablesConfig(entities_cfg=config, options={})
 
         assert tables.has_table("site") is True
         assert tables.has_table("location") is True
@@ -326,7 +326,7 @@ class TestTablesConfig:
             "region": {"surrogate_id": "region_id"},
         }
 
-        tables = TablesConfig(entities_cfg=config)
+        tables = TablesConfig(entities_cfg=config, options={})
         names = tables.table_names
 
         assert len(names) == 3
@@ -348,10 +348,10 @@ class TestTablesConfig:
             "natural_region": {"surrogate_id": "natural_region_id", "columns": ["NaturE", "NaturrEinh"], "drop_duplicates": True},
         }
 
-        tables = TablesConfig(entities_cfg=config)
+        tables = TablesConfig(entities_cfg=config, options={})
 
         site_table = tables.get_table("site")
-        assert site_table.keys == ["ProjektNr", "Fustel"]
+        assert site_table.keys == {"ProjektNr", "Fustel"}
         assert site_table.drop_duplicates == ["ProjektNr", "Fustel"]
         assert len(site_table.foreign_keys) == 1
         assert site_table.foreign_keys[0].remote_entity == "natural_region"
@@ -396,7 +396,7 @@ class TestIntegration:
             },
         }
 
-        tables = TablesConfig(entities_cfg=config)
+        tables = TablesConfig(entities_cfg=config, options={})
 
         # Test location table
         location = tables.get_table("location")

@@ -1,8 +1,12 @@
 import asyncio
 import os
 import shutil
+from typing import Any
+
+import pandas as pd
 
 from src.arbodat.survey2excel import workflow
+from src.configuration.resolve import ConfigValue
 from src.configuration.setup import setup_config_store
 
 # def test_workflow():
@@ -38,6 +42,14 @@ from src.configuration.setup import setup_config_store
 
 #     assert os.path.exists(output_filename)
 
+EXPECTED_FILE_SHEETS = {
+    "site": {
+        "filename": "site.csv",
+        "expected_rows": 7,
+        "expected_columns": 10,
+    }
+}
+
 
 def test_csv_workflow():
 
@@ -65,7 +77,7 @@ def test_csv_workflow():
             input_csv="src/arbodat/input/arbodat_mal_elena_input.csv",
             target=output_path,
             sep=";",
-            verbose=False,
+            verbose=True,
             translate=translate,
             mode="csv",
             drop_foreign_keys=False,
@@ -73,3 +85,12 @@ def test_csv_workflow():
     )
 
     assert os.path.exists(output_path)
+
+    # Check individual files
+    entities: dict[str, Any] | None = ConfigValue("entities").resolve()
+    for entity in entities or {}:
+        df = pd.read_csv(os.path.join(output_path, f"{entity}.csv"))
+        expected_info = EXPECTED_FILE_SHEETS.get(entity, None)
+        if expected_info:
+            assert df.shape[0] == expected_info["expected_rows"]
+            assert df.shape[1] == expected_info["expected_columns"]
