@@ -49,7 +49,7 @@ class TestProcessState:
         # Mock table configs with no dependencies
         with patch.object(config, "get_table") as mock_get_table:
             mock_table = Mock()
-            mock_table.depends_on = []
+            mock_table.depends_on = set()
             mock_get_table.return_value = mock_table
 
             state = ProcessState(config=config)
@@ -65,9 +65,9 @@ class TestProcessState:
         def mock_get_table(entity_name):
             mock_table = Mock()
             if entity_name == "sample":
-                mock_table.depends_on = ["site"]
+                mock_table.depends_on = {"site"}
             else:
-                mock_table.depends_on = []
+                mock_table.depends_on = set()
             return mock_table
 
         with patch.object(config, "get_table", side_effect=mock_get_table):
@@ -91,7 +91,7 @@ class TestProcessState:
 
         with patch.object(config, "get_table") as mock_get_table:
             mock_table = Mock()
-            mock_table.depends_on = []
+            mock_table.depends_on = set()
             mock_get_table.return_value = mock_table
 
             state = ProcessState(config=config)
@@ -108,9 +108,9 @@ class TestProcessState:
         def mock_get_table(entity_name):
             mock_table = Mock()
             if entity_name == "sample":
-                mock_table.depends_on = ["site", "taxa"]
+                mock_table.depends_on = {"site", "taxa"}
             else:
-                mock_table.depends_on = []
+                mock_table.depends_on = set()
             return mock_table
 
         with patch.object(config, "get_table", side_effect=mock_get_table):
@@ -147,11 +147,11 @@ class TestProcessState:
         def mock_get_table(entity_name):
             mock_table = Mock()
             if entity_name == "sample":
-                mock_table.depends_on = ["site"]
+                mock_table.depends_on = {"site"}
             elif entity_name == "feature":
-                mock_table.depends_on = ["site", "sample"]
+                mock_table.depends_on = {"site", "sample"}
             else:
-                mock_table.depends_on = []
+                mock_table.depends_on = set()
             return mock_table
 
         with patch.object(config, "get_table", side_effect=mock_get_table):
@@ -527,14 +527,14 @@ class TestArbodatSurveyNormalizer:
         mock_table_cfg.surrogate_id = "site_id"
         mock_table_cfg.drop_empty_rows = False
         mock_table_cfg.unnest = None
-        mock_table_cfg.depends_on = []
+        mock_table_cfg.depends_on = set()
         mock_table_cfg.is_fixed_data = False
         mock_table_cfg.is_sql_data = False
         mock_table_cfg.source = None
 
         with patch.object(normalizer.config, "get_table", return_value=mock_table_cfg):
             with patch("src.arbodat.normalizer.get_subset") as mock_get_subset:
-                with patch("src.arbodat.normalizer.add_surrogate_id") as mock_add_id:
+                with patch("src.arbodat.extract.add_surrogate_id") as mock_add_id:
                     with patch("src.arbodat.normalizer.link_entity"):
                         # Setup return values
                         subset_df = pd.DataFrame({"site_name": ["A", "B"]})
@@ -561,9 +561,9 @@ class TestArbodatSurveyNormalizer:
         def mock_get_table(entity_name):
             mock_cfg = Mock()
             if entity_name == "site":
-                mock_cfg.depends_on = ["sample"]
+                mock_cfg.depends_on = {"sample"}
             else:
-                mock_cfg.depends_on = ["site"]
+                mock_cfg.depends_on = {"site"}
             return mock_cfg
 
         with patch.object(normalizer.config, "get_table", side_effect=mock_get_table):
