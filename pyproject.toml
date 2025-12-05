@@ -127,6 +127,9 @@ markers = [
   "manual: marks tests requiring manual setup (e.g., real database)",
 ]
 # python_files = "test_*.py" "*_test.py"
+# Uncomment to see logs during test runs:
+# log_cli = true
+# log_cli_level = "DEBUG"
 
 # --------------------
 # coverage.py
