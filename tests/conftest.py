@@ -1,12 +1,21 @@
+import sys
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import psycopg
 import pytest
+from loguru import logger
 
 from src.configuration import Config, ConfigFactory, MockConfigProvider
 
 # pylint: disable=unused-argument
+
+
+@pytest.fixture(autouse=True, scope="session")
+def setup_test_logging():
+    """Configure logging for all tests with DEBUG level."""
+    logger.remove()
+    logger.add(sys.stderr, level="DEBUG", format="{time} | {level} | {name}:{function}:{line} - {message}")
 
 
 # def pytest_sessionstart(session) -> None:
