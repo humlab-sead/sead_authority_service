@@ -159,12 +159,12 @@ def env2dict(prefix: str, data: dict[str, str] | None = None, lower_key: bool = 
     return data
 
 
-def configure_logging(opts: dict[str, Any] | None = None) -> None:
+def configure_logging(opts: dict[str, Any] | None = None, default_level: str = "INFO") -> None:
 
     logger.remove()
     logger.add(
         sys.stdout,
-        level="INFO",
+        level=default_level,
         format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",
     )
     if not opts:
