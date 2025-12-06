@@ -418,14 +418,15 @@ class TestArbodatSurveyNormalizer:
 
     def test_unnest_entity(self):
         """Test unnesting a single entity."""
-        df = pd.DataFrame({"col1": [1, 2]})
-        normalizer = ArbodatSurveyNormalizer(df)
+        survey = pd.DataFrame({"col1": [1, 2]})
+        normalizer = ArbodatSurveyNormalizer(survey)
 
         site_df = pd.DataFrame({"site_id": [1], "Ort": ["Berlin"], "Kreis": ["Mitte"]})
         normalizer.table_store["site"] = site_df
 
         mock_table_cfg = Mock()
         mock_table_cfg.unnest = True
+        mock_table_cfg.surrogate_id = None
 
         unnested_df = pd.DataFrame({"site_id": [1, 1], "location_type": ["Ort", "Kreis"], "location_name": ["Berlin", "Mitte"]})
 
@@ -533,7 +534,7 @@ class TestArbodatSurveyNormalizer:
         mock_table_cfg.source = None
 
         with patch.object(normalizer.config, "get_table", return_value=mock_table_cfg):
-            with patch("src.arbodat.normalizer.get_subset") as mock_get_subset:
+            with patch("src.arbodat.extract.get_subset") as mock_get_subset:
                 with patch("src.arbodat.extract.add_surrogate_id") as mock_add_id:
                     with patch("src.arbodat.normalizer.link_entity"):
                         # Setup return values
