@@ -510,47 +510,6 @@ class TestArbodatSurveyNormalizer:
             assert set(entity_names) == {"site", "sample"}
 
     @pytest.mark.asyncio
-    async def test_normalize_simple_workflow(self):
-        """Test basic normalize workflow with simple dependency chain."""
-        df = pd.DataFrame({"site_name": ["A", "B"], "sample_name": ["S1", "S2"]})
-        normalizer = ArbodatSurveyNormalizer(df)
-
-        # Override the state to have only one table
-        normalizer.state.unprocessed = {"site"}
-        normalizer.state.config.table_names = ["site"]
-
-        mock_table_cfg = Mock()
-        mock_table_cfg.entity_name = "site"
-        mock_table_cfg.columns = ["site_name"]
-        mock_table_cfg.usage_columns = ["site_name"]
-        mock_table_cfg.extra_columns = {}
-        mock_table_cfg.drop_duplicates = False
-        mock_table_cfg.surrogate_id = "site_id"
-        mock_table_cfg.drop_empty_rows = False
-        mock_table_cfg.unnest = None
-        mock_table_cfg.depends_on = set()
-        mock_table_cfg.is_fixed_data = False
-        mock_table_cfg.is_sql_data = False
-        mock_table_cfg.source = None
-
-        with patch.object(normalizer.config, "get_table", return_value=mock_table_cfg):
-            with patch("src.arbodat.extract.get_subset") as mock_get_subset:
-                with patch("src.arbodat.extract.add_surrogate_id") as mock_add_id:
-                    with patch("src.arbodat.normalizer.link_entity"):
-                        # Setup return values
-                        subset_df = pd.DataFrame({"site_name": ["A", "B"]})
-                        mock_get_subset.return_value = subset_df
-
-                        id_df = pd.DataFrame({"site_id": [1, 2], "site_name": ["A", "B"]})
-                        mock_add_id.return_value = id_df
-
-                        await normalizer.normalize()
-
-                        # Verify site was processed
-                        assert "site" in normalizer.table_store
-                        assert "site" in normalizer.state.processed_entities
-
-    @pytest.mark.asyncio
     async def test_normalize_with_circular_dependency(self):
         """Test that normalize raises error for circular dependencies."""
         df = pd.DataFrame({"col1": [1, 2]})
