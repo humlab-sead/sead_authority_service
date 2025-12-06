@@ -189,8 +189,8 @@ class TestArbodatSurveyNormalizer:
 
         normalizer = ArbodatSurveyNormalizer(df)
 
-        assert "survey" in normalizer.data
-        pd.testing.assert_frame_equal(normalizer.data["survey"], df)
+        assert "survey" in normalizer.table_store
+        pd.testing.assert_frame_equal(normalizer.table_store["survey"], df)
         assert isinstance(normalizer.config, TablesConfig)
         assert isinstance(normalizer.state, ProcessState)
 
@@ -223,7 +223,7 @@ class TestArbodatSurveyNormalizer:
         site_df = pd.DataFrame({"site_name": ["A", "B"]})
 
         normalizer = ArbodatSurveyNormalizer(df)
-        normalizer.data["site"] = site_df
+        normalizer.table_store["site"] = site_df
 
         table_cfg = Mock()
         table_cfg.is_fixed_data = False
@@ -308,8 +308,8 @@ class TestArbodatSurveyNormalizer:
         new_df = pd.DataFrame({"site_name": ["A", "B"]})
         result = normalizer.register("site", new_df)
 
-        assert "site" in normalizer.data
-        pd.testing.assert_frame_equal(normalizer.data["site"], new_df)
+        assert "site" in normalizer.table_store
+        pd.testing.assert_frame_equal(normalizer.table_store["site"], new_df)
         pd.testing.assert_frame_equal(result, new_df)
 
     def test_load_from_file(self, tmp_path):
@@ -321,7 +321,7 @@ class TestArbodatSurveyNormalizer:
 
         normalizer = ArbodatSurveyNormalizer.load(csv_file, sep="\t")
 
-        assert "survey" in normalizer.data
+        assert "survey" in normalizer.table_store
         assert list(normalizer.survey.columns) == ["col1", "col2"]
         assert len(normalizer.survey) == 2
 
@@ -339,7 +339,7 @@ class TestArbodatSurveyNormalizer:
         """Test translating column names."""
         df = pd.DataFrame({"Ort": ["Berlin"], "Datum": ["2020-01-01"]})
         normalizer = ArbodatSurveyNormalizer(df)
-        normalizer.data["site"] = pd.DataFrame({"Ort": ["Munich"]})
+        normalizer.table_store["site"] = pd.DataFrame({"Ort": ["Munich"]})
 
         translations_map = {"Ort": "location", "Datum": "date"}
 
@@ -355,8 +355,8 @@ class TestArbodatSurveyNormalizer:
             assert mock_translate.call_count == 1
             call_args = mock_translate.call_args
             assert call_args.kwargs.get("translations_map") == translations_map
-            assert list(normalizer.data["survey"].columns) == ["location", "date"]
-            assert list(normalizer.data["site"].columns) == ["location"]
+            assert list(normalizer.table_store["survey"].columns) == ["location", "date"]
+            assert list(normalizer.table_store["site"].columns) == ["location"]
 
     def test_drop_foreign_key_columns(self):
         """Test dropping foreign key columns."""
@@ -365,7 +365,7 @@ class TestArbodatSurveyNormalizer:
 
         # Add a table with FK columns
         site_df = pd.DataFrame({"site_id": [1, 2], "location_id": [10, 20], "name": ["A", "B"]})
-        normalizer.data["site"] = site_df
+        normalizer.table_store["site"] = site_df
 
         # Mock config
         mock_table_cfg = Mock()
@@ -376,7 +376,7 @@ class TestArbodatSurveyNormalizer:
                 normalizer.drop_foreign_key_columns()
 
                 mock_table_cfg.drop_fk_columns.assert_called_once()
-                assert "location_id" not in normalizer.data["site"].columns
+                assert "location_id" not in normalizer.table_store["site"].columns
 
     def test_add_system_id_columns(self):
         """Test adding system_id columns."""
@@ -384,7 +384,7 @@ class TestArbodatSurveyNormalizer:
         normalizer = ArbodatSurveyNormalizer(df)
 
         site_df = pd.DataFrame({"site_id": [1, 2], "name": ["A", "B"]})
-        normalizer.data["site"] = site_df
+        normalizer.table_store["site"] = site_df
 
         # Mock config
         mock_table_cfg = Mock()
@@ -396,7 +396,7 @@ class TestArbodatSurveyNormalizer:
                 normalizer.add_system_id_columns()
 
                 mock_table_cfg.add_system_id_column.assert_called_once()
-                assert "system_id" in normalizer.data["site"].columns
+                assert "system_id" in normalizer.table_store["site"].columns
 
     def test_move_keys_to_front(self):
         """Test moving key columns to front."""
@@ -404,7 +404,7 @@ class TestArbodatSurveyNormalizer:
         normalizer = ArbodatSurveyNormalizer(df)
 
         site_df = pd.DataFrame({"name": ["A", "B"], "site_id": [1, 2], "location": ["X", "Y"]})
-        normalizer.data["site"] = site_df
+        normalizer.table_store["site"] = site_df
 
         # Mock config to reorder columns
         reordered_df = pd.DataFrame({"site_id": [1, 2], "name": ["A", "B"], "location": ["X", "Y"]})
@@ -414,7 +414,7 @@ class TestArbodatSurveyNormalizer:
                 normalizer.move_keys_to_front()
 
                 # Verify site_id is first column
-                assert normalizer.data["site"].columns[0] == "site_id"
+                assert normalizer.table_store["site"].columns[0] == "site_id"
 
     def test_unnest_entity(self):
         """Test unnesting a single entity."""
@@ -422,7 +422,7 @@ class TestArbodatSurveyNormalizer:
         normalizer = ArbodatSurveyNormalizer(df)
 
         site_df = pd.DataFrame({"site_id": [1], "Ort": ["Berlin"], "Kreis": ["Mitte"]})
-        normalizer.data["site"] = site_df
+        normalizer.table_store["site"] = site_df
 
         mock_table_cfg = Mock()
         mock_table_cfg.unnest = True
@@ -434,7 +434,7 @@ class TestArbodatSurveyNormalizer:
                 result = normalizer.unnest_entity(entity="site")
 
                 pd.testing.assert_frame_equal(result, unnested_df)
-                assert len(normalizer.data["site"]) == 2
+                assert len(normalizer.table_store["site"]) == 2
 
     def test_unnest_entity_no_unnest_config(self):
         """Test unnesting when no unnest configuration exists."""
@@ -442,7 +442,7 @@ class TestArbodatSurveyNormalizer:
         normalizer = ArbodatSurveyNormalizer(df)
 
         site_df = pd.DataFrame({"site_id": [1], "name": ["A"]})
-        normalizer.data["site"] = site_df
+        normalizer.table_store["site"] = site_df
 
         mock_table_cfg = Mock()
         mock_table_cfg.unnest = None
@@ -464,7 +464,7 @@ class TestArbodatSurveyNormalizer:
         with patch("src.arbodat.normalizer.Dispatchers.get", return_value=lambda: mock_dispatcher):
             normalizer.store(target="output.xlsx", mode="xlsx")
 
-            mock_dispatcher.dispatch.assert_called_once_with(target="output.xlsx", data=normalizer.data)
+            mock_dispatcher.dispatch.assert_called_once_with(target="output.xlsx", data=normalizer.table_store)
 
     def test_store_csv(self):
         """Test storing data as CSV."""
@@ -477,7 +477,7 @@ class TestArbodatSurveyNormalizer:
         with patch("src.arbodat.normalizer.Dispatchers.get", return_value=lambda: mock_dispatcher):
             normalizer.store(target="output_dir", mode="csv")
 
-            mock_dispatcher.dispatch.assert_called_once_with(target="output_dir", data=normalizer.data)
+            mock_dispatcher.dispatch.assert_called_once_with(target="output_dir", data=normalizer.table_store)
 
     def test_store_unsupported_mode(self):
         """Test storing with unsupported mode."""
@@ -546,7 +546,7 @@ class TestArbodatSurveyNormalizer:
                         await normalizer.normalize()
 
                         # Verify site was processed
-                        assert "site" in normalizer.data
+                        assert "site" in normalizer.table_store
                         assert "site" in normalizer.state.processed_entities
 
     @pytest.mark.asyncio
@@ -577,11 +577,11 @@ class TestArbodatSurveyNormalizer:
 
         site_df = pd.DataFrame({"site_id": [1], "Ort": ["Berlin"]})
         sample_df = pd.DataFrame({"sample_id": [1], "Type": ["Soil"]})
-        normalizer.data["site"] = site_df
-        normalizer.data["sample"] = sample_df
+        normalizer.table_store["site"] = site_df
+        normalizer.table_store["sample"] = sample_df
 
         with patch.object(normalizer, "unnest_entity") as mock_unnest:
-            mock_unnest.side_effect = lambda entity: normalizer.data[entity]
+            mock_unnest.side_effect = lambda entity: normalizer.table_store[entity]
 
             normalizer.unnest_all()
 
