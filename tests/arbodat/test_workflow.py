@@ -1,7 +1,6 @@
 import asyncio
 import os
 import shutil
-from typing import Any
 
 import pandas as pd
 
@@ -42,14 +41,6 @@ from src.configuration.setup import setup_config_store
 
 #     assert os.path.exists(output_filename)
 
-EXPECTED_FILE_SHEETS = {
-    "site": {
-        "filename": "site.csv",
-        "expected_rows": 7,
-        "expected_columns": 10,
-    }
-}
-
 
 def test_csv_workflow():
 
@@ -72,7 +63,7 @@ def test_csv_workflow():
 
     assert not os.path.exists(output_path)
 
-    asyncio.run(
+    data = asyncio.run(
         workflow(
             input_csv="src/arbodat/input/arbodat_mal_elena_input.csv",
             target=output_path,
@@ -85,12 +76,27 @@ def test_csv_workflow():
     )
 
     assert os.path.exists(output_path)
+    assert os.path.exists(os.path.join(output_path, "table_shapes.tsv"))
 
-    # Check individual files
-    entities: dict[str, Any] | None = ConfigValue("entities").resolve()
-    for entity in entities or {}:
-        df = pd.read_csv(os.path.join(output_path, f"{entity}.csv"))
-        expected_info = EXPECTED_FILE_SHEETS.get(entity, None)
-        if expected_info:
-            assert df.shape[0] == expected_info["expected_rows"]
-            assert df.shape[1] == expected_info["expected_columns"]
+    if not os.path.exists(output_path):
+        raise FileNotFoundError(f"Output path not found: {output_path}")
+
+    # Load and verify table shapes
+    # Truth is stored in src/arbodat/input/table_shapes.tsv
+    # We need to compare this against the generated tsv-files in output_path
+    truth_shapes: dict[str, tuple[int, int]] = load_shape_file(filename="src/arbodat/input/table_shapes.tsv")
+    new_shapes: dict[str, tuple[int, int]] = load_shape_file(filename=os.path.join(output_path, "table_shapes.tsv"))
+
+    entities_with_different_shapes = [
+        (entity, truth_shapes.get(entity), new_shapes.get(entity))
+        for entity in set(truth_shapes.keys()).union(set(new_shapes.keys()))
+        if truth_shapes.get(entity) != new_shapes.get(entity)
+    ]
+
+    assert len(entities_with_different_shapes) == 0, f"Entities with different shapes: {entities_with_different_shapes}"
+
+
+def load_shape_file(filename: str) -> dict[str, tuple[int, int]]:
+    df: pd.DataFrame = pd.read_csv(filename, sep="\t")
+    truth_shapes: dict[str, tuple[int, int]] = {x["entity"]: (x["num_rows"], x["num_columns"]) for x in df.to_dict(orient="records")}
+    return truth_shapes
