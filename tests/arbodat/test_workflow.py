@@ -4,9 +4,10 @@ import shutil
 
 import pandas as pd
 
-from src.arbodat.survey2excel import workflow
+from src.arbodat.survey2excel import validate_entity_shapes, workflow
 from src.configuration.resolve import ConfigValue
 from src.configuration.setup import setup_config_store
+from src.arbodat.utility import load_shape_file
 
 # def test_workflow():
 
@@ -92,11 +93,6 @@ def test_csv_workflow():
         for entity in set(truth_shapes.keys()).union(set(new_shapes.keys()))
         if truth_shapes.get(entity) != new_shapes.get(entity)
     ]
+    validate_entity_shapes(output_path, "csv", "src/arbodat/input/table_shapes.tsv")
 
-    assert len(entities_with_different_shapes) == 0, f"Entities with different shapes: {entities_with_different_shapes}"
-
-
-def load_shape_file(filename: str) -> dict[str, tuple[int, int]]:
-    df: pd.DataFrame = pd.read_csv(filename, sep="\t")
-    truth_shapes: dict[str, tuple[int, int]] = {x["entity"]: (x["num_rows"], x["num_columns"]) for x in df.to_dict(orient="records")}
-    return truth_shapes
+    # assert len(entities_with_different_shapes) == 0, f"Entities with different shapes: {entities_with_different_shapes}"
