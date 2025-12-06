@@ -369,7 +369,7 @@ class TestTableConfig:
         }
 
         table = TableConfig(cfg=config, entity_name="site")
-        fk_cols: set[str] = table.fk_column_set
+        fk_cols: set[str] = table.fk_columns
 
         assert len(fk_cols) == 3
         assert "location_id" in fk_cols
@@ -410,7 +410,7 @@ class TestTableConfig:
         }
 
         table = TableConfig(cfg=config, entity_name="site")
-        usage_cols: list[str] = table.usage_columns
+        usage_cols: list[str] = table.keys_columns_and_fks
 
         assert "site_name" in usage_cols
         assert "description" in usage_cols
