@@ -112,3 +112,14 @@ generate-schema-force:
 	@uv run python src/scripts/generate_entity_schema.py --all --force
 	@echo "✅ Schema regeneration complete!"
 	
+
+arbodat-data-schema:
+	@mdb-schema --no-drop-table --not-null --default-values --no-not_empty --comments --indexes --relations \
+		src/arbodat/input/ArchBotDaten.mdb postgres > src/arbodat/input/ArchBotDaten_schema.sql 
+		
+arbodat-lookup-schema:
+	@mdb-schema --no-drop-table --not-null --default-values --no-not_empty --comments --indexes --relations \
+		src/arbodat/input/ArchBotStrukDat.mdb postgres > src/arbodat/input/ArchBotStrukDat_schema.sql 
+
+arbodat-schema: arbodat-data-schema arbodat-lookup-schema
+	@echo "✅ Schema extraction complete!"
