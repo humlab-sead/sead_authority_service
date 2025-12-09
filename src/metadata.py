@@ -4,7 +4,9 @@ from src.configuration import ConfigValue
 from src.strategies.strategy import ReconciliationStrategy, StrategyRegistry
 
 
-def get_reconcile_properties(strategies: StrategyRegistry, query: str | None = None, entity_type: str | None = None) -> list[dict[str, str]] | Any:
+def get_reconcile_properties(
+    strategies: StrategyRegistry, query: str | None = None, entity_type: str | None = None
+) -> list[dict[str, str]] | Any:
     """
     Collects property suggestions returned by the `/properties endpoint` for OpenRefine.
 
@@ -32,7 +34,9 @@ def get_reconcile_properties(strategies: StrategyRegistry, query: str | None = N
         filtered_properties = [
             prop
             for prop in unique_properties
-            if query_lower in prop["id"].lower() or query_lower in prop["name"].lower() or query_lower in prop.get("description", "").lower()
+            if query_lower in prop["id"].lower()
+            or query_lower in prop["name"].lower()
+            or query_lower in prop.get("description", "").lower()
         ]
     else:
         filtered_properties: list[dict[str, str]] = unique_properties

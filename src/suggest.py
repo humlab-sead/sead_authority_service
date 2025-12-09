@@ -163,12 +163,16 @@ async def suggest_types(prefix: str = "") -> dict[str, Any]:
     """
     logger.info(f"Type suggest: prefix='{prefix}'")
 
-    all_types: list[dict[str, str]] = [{"id": type_key, "name": strategy_class().get_display_name()} for type_key, strategy_class in Strategies.items.items()]
+    all_types: list[dict[str, str]] = [
+        {"id": type_key, "name": strategy_class().get_display_name()} for type_key, strategy_class in Strategies.items.items()
+    ]
 
     # Filter by prefix if provided
     if prefix:
         prefix_lower: str = prefix.lower()
-        filtered_types: list[dict[str, str]] = [t for t in all_types if prefix_lower in t["id"].lower() or prefix_lower in t["name"].lower()]
+        filtered_types: list[dict[str, str]] = [
+            t for t in all_types if prefix_lower in t["id"].lower() or prefix_lower in t["name"].lower()
+        ]
     else:
         filtered_types = all_types
 

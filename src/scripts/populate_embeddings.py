@@ -95,7 +95,9 @@ class EmbeddingPopulator:
         text_expr: str = self.construct_text_field(entity_config)
         embeddings_table: str = f"authority.{entity_key}_embeddings"
 
-        where_clause: str = f"where not exists (select 1 from {embeddings_table} e where e.{id_column} = t.{id_column})" if not self.force else ""
+        where_clause: str = (
+            f"where not exists (select 1 from {embeddings_table} e where e.{id_column} = t.{id_column})" if not self.force else ""
+        )
 
         query: str = f"""
             select t.{id_column} as id, {text_expr} as text

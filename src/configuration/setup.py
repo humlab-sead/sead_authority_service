@@ -13,7 +13,11 @@ dotenv.load_dotenv(dotenv_path=os.getenv("ENV_FILE", ".env"))
 
 
 async def setup_config_store(
-    filename: str | None = None, force: bool = False, env_prefix="SEAD_AUTHORITY", env_filename=".env", db_opts_path: str = "options:database"
+    filename: str | None = None,
+    force: bool = False,
+    env_prefix="SEAD_AUTHORITY",
+    env_filename=".env",
+    db_opts_path: str | None = "options:database",
 ) -> None:
 
     config_file: str | None = filename or os.getenv("CONFIG_FILE", "config.yml")
@@ -43,8 +47,8 @@ async def setup_config_store(
     logger.info("Config Store initialized successfully.")
 
 
-async def connection_factory(cfg) -> psycopg.AsyncConnection:
-    dsn: str = create_db_uri(**cfg.get("options:database"))
+async def connection_factory(cfg: ConfigLike, db_opts_path: str) -> psycopg.AsyncConnection:
+    dsn: str = create_db_uri(**cfg.get(db_opts_path))
     if cfg.get("runtime:connection") is None:
         logger.info("Creating new database connection")
         con = await psycopg.AsyncConnection.connect(dsn)
@@ -53,7 +57,7 @@ async def connection_factory(cfg) -> psycopg.AsyncConnection:
     return cfg.get("runtime:connection")
 
 
-async def _setup_connection_factory(cfg: ConfigLike, db_opts_path: str = "options:database") -> None:
+async def _setup_connection_factory(cfg: ConfigLike, db_opts_path: str) -> None:
     dsn: str = create_db_uri(**cfg.get(db_opts_path))
 
     if not dsn:
@@ -63,7 +67,7 @@ async def _setup_connection_factory(cfg: ConfigLike, db_opts_path: str = "option
         {
             "runtime:connection": None,
             "runtime:dsn": dsn,
-            "runtime:connection_factory": lambda: connection_factory(cfg),
+            "runtime:connection_factory": lambda: connection_factory(cfg, db_opts_path=db_opts_path),
         }
     )
 

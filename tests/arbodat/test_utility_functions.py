@@ -1,10 +1,41 @@
 """Unit tests for arbodat utility functions."""
 
+from typing import Any
 import pandas as pd
 import pytest
 
-from src.arbodat.utility import _rename_last_occurence, add_surrogate_id, check_functional_dependency, extract_translation_map, get_subset, translate
+from src.arbodat.extract import (
+    SubsetService,
+    _rename_last_occurence,
+    add_surrogate_id,
+    check_functional_dependency,
+    extract_translation_map,
+    translate,
+)
 
+
+def get_subset(
+    source: pd.DataFrame,
+    columns: list[str],
+    *,
+    entity_name: str | None = None,
+    extra_columns: None | dict[str, Any] = None,
+    drop_duplicates: bool | list[str] = False,
+    fd_check: bool = False,
+    raise_if_missing: bool = True,
+    drop_empty_rows: bool | list[str] = False,
+) -> pd.DataFrame:
+    """Backward-compatible convenience function to get subset using SubsetService."""
+    return SubsetService().get_subset(
+        source=source,
+        columns=columns,
+        entity_name=entity_name,
+        extra_columns=extra_columns,
+        drop_duplicates=drop_duplicates,
+        fd_check=fd_check,
+        raise_if_missing=raise_if_missing,
+        drop_empty=drop_empty_rows,
+    )
 
 class TestAddSurrogateId:
     """Tests for add_surrogate_id function."""
@@ -114,14 +145,13 @@ class TestGetSubset:
         assert len(result) == 2
 
     def test_extra_columns_rename_source_column(self):
-        """Test renaming source column via extra_columns."""
+        """Test add new source column via extra_columns."""
         df = pd.DataFrame({"A": [1, 2], "B": [3, 4], "C": [5, 6]})
 
         result = get_subset(df, ["A"], extra_columns={"D": "C"})
 
-        assert list(result.columns) == ["A", "D"]
+        assert list(result.columns) == ["A", "C", "D"]
         assert result["D"].tolist() == [5, 6]
-        assert "C" not in result.columns
 
     def test_extra_columns_add_constant(self):
         """Test adding constant column via extra_columns."""
@@ -148,14 +178,14 @@ class TestGetSubset:
 
         assert result["nullable"].isna().all()
 
-    def test_extra_columns_mixed_rename_and_constant(self):
-        """Test mixing column rename and constant addition."""
+    def test_extra_columns_mixed_reference_and_constant(self):
+        """Test mixing extra column with reference and constant addition."""
         df = pd.DataFrame({"A": [1, 2], "B": [3, 4], "C": [5, 6]})
 
-        result = get_subset(df, ["A"], extra_columns={"renamed_B": "B", "constant": 100})
+        result = get_subset(df, ["A"], extra_columns={"extra_B": "B", "constant": 100})
 
-        assert list(result.columns) == ["A", "renamed_B", "constant"]
-        assert result["renamed_B"].tolist() == [3, 4]
+        assert list(result.columns) == ["A", "B", "extra_B", "constant"]
+        assert result["extra_B"].tolist() == [3, 4]
         assert result["constant"].tolist() == [100, 100]
 
     def test_extra_columns_nonexistent_source_as_constant(self):
@@ -207,32 +237,6 @@ class TestGetSubset:
         with pytest.raises(ValueError, match="inconsistent"):
             get_subset(df, ["key", "value"], drop_duplicates=["key"], fd_check=True)
 
-    def test_add_surrogate_id_when_not_present(self):
-        """Test adding surrogate ID when not in result."""
-        df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
-
-        result = get_subset(df, ["A", "B"], surrogate_id="id")
-
-        assert "id" in result.columns
-        assert result["id"].tolist() == [1, 2]
-
-    def test_dont_add_surrogate_id_when_present(self):
-        """Test not adding surrogate ID when already present."""
-        df = pd.DataFrame({"A": [1, 2], "id": [10, 20]})
-
-        result = get_subset(df, ["A", "id"], surrogate_id="id")
-
-        assert result["id"].tolist() == [10, 20]
-
-    def test_surrogate_id_none_skips_addition(self):
-        """Test that None surrogate_id skips ID addition."""
-        df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
-
-        result = get_subset(df, ["A", "B"], surrogate_id=None)
-
-        assert "id" not in result.columns
-        assert len(result.columns) == 2
-
     def test_complex_workflow(self):
         """Test complex workflow with all features."""
         df = pd.DataFrame({"site_name": ["Site A", "Site A", "Site B"], "location": ["Loc1", "Loc1", "Loc2"], "value": [100, 100, 200]})
@@ -242,25 +246,22 @@ class TestGetSubset:
             ["site_name", "location"],
             extra_columns={"renamed_val": "value", "type": "survey"},
             drop_duplicates=["site_name", "location"],
-            surrogate_id="site_id",
         )
 
         assert len(result) == 2
-        assert list(result.columns) == ["site_name", "location", "renamed_val", "type", "site_id"]
+        assert set(result.columns) == {"site_name", "location", "renamed_val", "type", "value"}
         assert result["renamed_val"].tolist() == [100, 200]
         assert result["type"].tolist() == ["survey", "survey"]
-        assert result["site_id"].tolist() == [1, 2]
 
     def test_empty_dataframe(self):
         """Test with empty DataFrame."""
         df = pd.DataFrame({"A": [], "B": []})
 
-        result = get_subset(df, ["A"], extra_columns={"C": 1}, surrogate_id="id")
+        result = get_subset(df, ["A"], extra_columns={"C": 1})
 
         assert len(result) == 0
         assert "A" in result.columns
         assert "C" in result.columns
-        assert "id" in result.columns
 
     def test_single_row(self):
         """Test with single row DataFrame."""

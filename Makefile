@@ -2,14 +2,24 @@ SHELL := /bin/bash
 
 UVICORN_PORT := 8000
 
-arbodat-normalize:
-	@PYTHONPATH=. uv run python src/arbodat/survey2excel.py \
+.PHONY: csv excel
+excel:
+	@export PYTHONPATH=. && python src/arbodat/survey2excel.py \ 
+		--env-file src/arbodat/input/.env \
 		--sep ";" \
-		--verbose \
-		--mode xlsx \
+		--mode excel \
 		--config-file src/arbodat/input/arbodat.yml \
 		src/arbodat/input/arbodat_mal_elena_input.csv \
-		output.xlsx
+		tmp/arbodat.xlsx
+
+csv:
+	@export PYTHONPATH=. && python src/arbodat/survey2excel.py \ 
+		--env-file src/arbodat/input/.env \
+		--sep ';' \
+		--mode csv \
+		--config-file src/arbodat/input/arbodat.yml \
+		src/arbodat/input/arbodat_mal_elena_input.csv \
+		tmp/arbodat
 
 .PHONY: dev-serve
 dev-serve: dev-kill
@@ -102,3 +112,15 @@ generate-schema-force:
 	@uv run python src/scripts/generate_entity_schema.py --all --force
 	@echo "✅ Schema regeneration complete!"
 	
+
+SCHEMA_OPTS = --no-drop-table --not-null --default-values --no-not_empty --comments --indexes --relations
+BACKEND = postgres
+
+arbodat-data-schema:
+	@mdb-schema $(SCHEMA_OPTS) src/arbodat/input/ArchBotDaten.mdb $(BACKEND) > src/arbodat/input/ArchBotDaten_$(BACKEND)_schema.sql 
+
+arbodat-lookup-schema:
+	@mdb-schema $(SCHEMA_OPTS) src/arbodat/input/ArchBotStrukDat.mdb $(BACKEND) > src/arbodat/input/ArchBotStrukDat_$(BACKEND)_schema.sql 
+
+arbodat-schema: arbodat-data-schema arbodat-lookup-schema
+	@echo "✅ Schema extraction complete!"

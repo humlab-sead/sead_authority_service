@@ -35,7 +35,9 @@ class SiteRepository(BaseRepository):
 class SiteReconciliationStrategy(ReconciliationStrategy):
     """Site-specific reconciliation with place names and coordinates"""
 
-    def __init__(self, specification: dict[str, Any] | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None) -> None:
+    def __init__(
+        self, specification: dict[str, Any] | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None
+    ) -> None:
         self.entity_config: dict[str, Any] = ConfigValue("table_specs.site").resolve() or {}
         super().__init__(specification=specification, repository_or_cls=repository_or_cls)
 

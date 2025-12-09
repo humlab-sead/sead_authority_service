@@ -150,7 +150,17 @@ class TestReconcileEndpoint:
         """Test successful reconciliation query"""
         # Mock reconcile_queries response
         mock_reconcile_queries.return_value = {
-            "q0": {"result": [{"id": f"{ID_BASE}site/123", "name": "Test Site", "score": 95.0, "match": True, "type": [{"id": "site", "name": "Site"}]}]}
+            "q0": {
+                "result": [
+                    {
+                        "id": f"{ID_BASE}site/123",
+                        "name": "Test Site",
+                        "score": 95.0,
+                        "match": True,
+                        "type": [{"id": "site", "name": "Site"}],
+                    }
+                ]
+            }
         }
 
         query_data = {"queries": {"q0": {"query": "test site", "type": "site"}}}
@@ -437,7 +447,9 @@ class TestEndpointIntegration:
     @patch("src.api.router.reconcile_queries")
     @patch("src.api.router.render_preview")
     @with_test_config
-    def test_full_reconciliation_workflow(self, mock_render_preview, mock_reconcile_queries, client: TestClient, test_provider: MockConfigProvider):
+    def test_full_reconciliation_workflow(
+        self, mock_render_preview, mock_reconcile_queries, client: TestClient, test_provider: MockConfigProvider
+    ):
         """Test a complete reconciliation workflow"""
         # Step 1: Get service metadata
         meta_response = client.get("/reconcile")
@@ -453,11 +465,22 @@ class TestEndpointIntegration:
 
         # Step 3: Perform reconciliation
         mock_reconcile_queries.return_value = {
-            "q0": {"result": [{"id": f"{ID_BASE}site/123", "name": "Test Site", "score": 95.0, "match": True, "type": [{"id": "site", "name": "Site"}]}]}
+            "q0": {
+                "result": [
+                    {
+                        "id": f"{ID_BASE}site/123",
+                        "name": "Test Site",
+                        "score": 95.0,
+                        "match": True,
+                        "type": [{"id": "site", "name": "Site"}],
+                    }
+                ]
+            }
         }
 
         reconcile_response = client.post(
-            "/reconcile", json={"queries": {"q0": {"query": "test site", "type": "site", "properties": [{"pid": "country", "v": "Sweden"}]}}}
+            "/reconcile",
+            json={"queries": {"q0": {"query": "test site", "type": "site", "properties": [{"pid": "country", "v": "Sweden"}]}}},
         )
         assert reconcile_response.status_code == 200
         reconcile_data = reconcile_response.json()

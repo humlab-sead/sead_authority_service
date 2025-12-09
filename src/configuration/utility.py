@@ -121,7 +121,9 @@ def _parse_list_expression(expr: str, full_data: dict[str, Any]) -> list[Any] | 
     return result if result else expr
 
 
-def _replace_references(data: dict[str, Any] | list[Any] | str, full_data: dict[str, Any] | list[Any] | str) -> dict[str, Any] | list[Any] | str:
+def _replace_references(
+    data: dict[str, Any] | list[Any] | str, full_data: dict[str, Any] | list[Any] | str
+) -> dict[str, Any] | list[Any] | str:
     """Helper function for replace_references"""
     if isinstance(data, dict):
         return {k: _replace_references(v, full_data=full_data) for k, v in data.items()}

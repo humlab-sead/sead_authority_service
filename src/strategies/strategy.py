@@ -14,7 +14,9 @@ class ReconciliationStrategy(ABC):
     repository_cls: type[BaseRepository] = BaseRepository
 
     def __init__(
-        self, specification: StrategySpecification | str | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None
+        self,
+        specification: StrategySpecification | str | None = None,
+        repository_or_cls: type[BaseRepository] | BaseRepository | None = None,
     ) -> None:
 
         self.specification: StrategySpecification = resolve_specification(specification=specification or self.key)

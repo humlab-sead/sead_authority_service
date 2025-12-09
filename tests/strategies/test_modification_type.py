@@ -105,8 +105,16 @@ class TestModificationTypeReconciliationStrategy:
     async def test_get_lookup_data(self, test_provider: ExtendedMockConfigProvider):
         """Test fetching lookup data from database"""
         mock_data = [
-            {"modification_type_id": 1, "modification_type_name": "Carbonised", "modification_type_description": "Organic matter converted to carbon"},
-            {"modification_type_id": 2, "modification_type_name": "Calcified", "modification_type_description": "Organic matter replaced by calcium"},
+            {
+                "modification_type_id": 1,
+                "modification_type_name": "Carbonised",
+                "modification_type_description": "Organic matter converted to carbon",
+            },
+            {
+                "modification_type_id": 2,
+                "modification_type_name": "Calcified",
+                "modification_type_description": "Organic matter replaced by calcium",
+            },
         ]
         test_provider.create_connection_mock(fetchall=mock_data)
 
@@ -123,8 +131,16 @@ class TestModificationTypeReconciliationStrategy:
         strategy: LLMModificationTypeReconciliationStrategy = LLMModificationTypeReconciliationStrategy()
 
         lookup_data = [
-            {"modification_type_id": 1, "modification_type_name": "Carbonised", "modification_type_description": "Organic matter converted to carbon"},
-            {"modification_type_id": 2, "modification_type_name": "Calcified", "modification_type_description": "Organic matter replaced by calcium"},
+            {
+                "modification_type_id": 1,
+                "modification_type_name": "Carbonised",
+                "modification_type_description": "Organic matter converted to carbon",
+            },
+            {
+                "modification_type_id": 2,
+                "modification_type_name": "Calcified",
+                "modification_type_description": "Organic matter replaced by calcium",
+            },
         ]
 
         test_provider.create_connection_mock(fetchall=lookup_data)
@@ -142,7 +158,9 @@ class TestModificationTypeReconciliationStrategy:
         """Test successful LLM-based candidate finding"""
 
         # Configure the test to use ollama provider with required settings
-        test_provider.get_config().update({"llm": {"provider": "ollama", "prompts": {"reconciliation": "Find matches for {{ query }} in: {{ lookup_data }}"}}})
+        test_provider.get_config().update(
+            {"llm": {"provider": "ollama", "prompts": {"reconciliation": "Find matches for {{ query }} in: {{ lookup_data }}"}}}
+        )
 
         # Mock the LLM response
         mock_response = ReconciliationResponse(
@@ -151,7 +169,9 @@ class TestModificationTypeReconciliationStrategy:
                     input_id="1",
                     input_value="charred",
                     candidates=[
-                        Candidate(id="1", value="Carbonised", score=0.92, reasons=["Similar process", "Both involve heating", "Carbon formation"]),
+                        Candidate(
+                            id="1", value="Carbonised", score=0.92, reasons=["Similar process", "Both involve heating", "Carbon formation"]
+                        ),
                         Candidate(id="8", value="Petrified", score=0.15, reasons=["Different process", "Stone formation"]),
                     ],
                 )
@@ -194,7 +214,8 @@ class TestModificationTypeReconciliationStrategy:
         """Test fallback to traditional matching when LLM fails"""
 
         test_provider.create_connection_mock(
-            fetchone=Exception("LLM failed"), fetchall=[{"modification_type_id": 1, "modification_type_name": "Carbonised", "name_sim": 0.8}]
+            fetchone=Exception("LLM failed"),
+            fetchall=[{"modification_type_id": 1, "modification_type_name": "Carbonised", "name_sim": 0.8}],
         )
 
         # with patch("src.strategies.llm.llm_strategy.Providers") as mock_providers:

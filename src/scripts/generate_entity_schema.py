@@ -140,8 +140,15 @@ def generate_semantic_sql(entity_key: str, entity: dict[str, Any], env: Environm
 @click.option("--all", "generate_all", is_flag=True, help="Generate schema for all entities")
 @click.option("--force", is_flag=True, help="Force regeneration even if output files exist")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
-@click.option("--config", type=click.Path(exists=True, path_type=Path), default=Path("config/entities.yml"), help="Path to entities configuration file")
-@click.option("--template-dir", type=click.Path(exists=True, path_type=Path), default=Path("schema/templates"), help="Path to templates directory")
+@click.option(
+    "--config",
+    type=click.Path(exists=True, path_type=Path),
+    default=Path("config/entities.yml"),
+    help="Path to entities configuration file",
+)
+@click.option(
+    "--template-dir", type=click.Path(exists=True, path_type=Path), default=Path("schema/templates"), help="Path to templates directory"
+)
 @click.option("--output-dir", type=click.Path(path_type=Path), default=Path("schema/generated"), help="Path to output directory")
 def main(entities: str | None, generate_all: bool, force: bool, verbose: bool, config: Path, template_dir: Path, output_dir: Path) -> None:
     """

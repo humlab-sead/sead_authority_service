@@ -119,7 +119,14 @@ class TestSiteRepository:
         test_provider.create_connection_mock(fetchall=None, execute=None)
 
         proxy = SiteRepository("site")
-        mock_row = {"ID": 123, "Name": "Test Site", "Description": "A test site", "National ID": "TEST123", "Latitude": 59.3293, "Longitude": 18.0686}
+        mock_row = {
+            "ID": 123,
+            "Name": "Test Site",
+            "Description": "A test site",
+            "National ID": "TEST123",
+            "Latitude": 59.3293,
+            "Longitude": 18.0686,
+        }
         test_provider.cursor_mock.fetchone.return_value = mock_row
 
         result: dict[str, Any] | None = await proxy.get_details("123")
@@ -290,7 +297,10 @@ class TestSiteReconciliationStrategy:
         mock_query_proxy_class.return_value = mock_proxy
 
         mock_proxy.fetch_site_by_national_id.return_value = []
-        mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Test Site", "name_sim": 0.9}, {"site_id": 2, "label": "Another Site", "name_sim": 0.7}]
+        mock_sites: list[dict[str, Any]] = [
+            {"site_id": 1, "label": "Test Site", "name_sim": 0.9},
+            {"site_id": 2, "label": "Another Site", "name_sim": 0.7},
+        ]
         mock_proxy.find.return_value = mock_sites
 
         with patch.object(strategy, "get_repository", return_value=mock_proxy):
@@ -310,7 +320,10 @@ class TestSiteReconciliationStrategy:
         mock_query_proxy_class.return_value = mock_proxy
 
         mock_proxy.fetch_site_by_national_id.return_value = []
-        mock_sites: list[dict[str, Any]] = [{"site_id": 1, "label": "Near Site", "name_sim": 0.8}, {"site_id": 2, "label": "Far Site", "name_sim": 0.9}]
+        mock_sites: list[dict[str, Any]] = [
+            {"site_id": 1, "label": "Near Site", "name_sim": 0.8},
+            {"site_id": 2, "label": "Far Site", "name_sim": 0.9},
+        ]
         mock_proxy.find.return_value = mock_sites
 
         # Mock the geographic scoring method
@@ -355,7 +368,10 @@ class TestSiteReconciliationStrategy:
         mock_config_instance.resolve.side_effect = [0.2, 10.0]  # very_near_distance_km, too_far_distance_km
         mock_config_value.return_value = mock_config_instance
 
-        candidates: list[dict[str, Any]] = [{"site_id": 1, "label": "Near Site", "name_sim": 0.7}, {"site_id": 2, "label": "Far Site", "name_sim": 0.8}]
+        candidates: list[dict[str, Any]] = [
+            {"site_id": 1, "label": "Near Site", "name_sim": 0.7},
+            {"site_id": 2, "label": "Far Site", "name_sim": 0.8},
+        ]
 
         coordinate: dict[str, float] = {"lat": 59.3293, "lon": 18.0686}
         distances: dict[int, float] = {1: 0.5, 2: 15.0}  # 0.5km and 15km away
@@ -507,7 +523,9 @@ class TestSiteReconciliationStrategy:
 
             mock_proxy.fetch_site_by_national_id.return_value = []
             # More candidates than limit
-            mock_sites: list[dict[str, Any]] = [{"site_id": i, "label": f"Site {i}", "name_sim": 1.0 - i * 0.1} for i in range(15)]  # 15 candidates
+            mock_sites: list[dict[str, Any]] = [
+                {"site_id": i, "label": f"Site {i}", "name_sim": 1.0 - i * 0.1} for i in range(15)
+            ]  # 15 candidates
             mock_proxy.find.return_value = mock_sites
 
             strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
@@ -541,7 +559,10 @@ class TestSiteStrategyIntegration:
             mock_proxy.fetch_site_by_national_id.return_value = []
 
             # Fuzzy search results
-            candidates = [{"site_id": 1, "label": "Stockholm Archaeological Site", "name_sim": 0.8}, {"site_id": 2, "label": "Uppsala Site", "name_sim": 0.7}]
+            candidates = [
+                {"site_id": 1, "label": "Stockholm Archaeological Site", "name_sim": 0.8},
+                {"site_id": 2, "label": "Uppsala Site", "name_sim": 0.7},
+            ]
             mock_proxy.find.return_value = candidates
 
             # Geographic distances

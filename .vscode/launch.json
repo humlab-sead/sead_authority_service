@@ -15,40 +15,6 @@
             }
         },
         {
-            "name": "Debug: Integration Test (Transaction Error)",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "pytest",
-            "args": [
-                "tests/test_reconcile_integration.py::TestReconcileWithDebugger::test_debug_transaction_error",
-                "-v",
-                "-s",
-                "--log-cli-level=INFO"
-            ],
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            }
-        },
-        {
-            "name": "Debug: All Integration Tests",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "pytest",
-            "args": [
-                "tests/test_reconcile_integration.py",
-                "-v",
-                "-s",
-                "--log-cli-level=DEBUG"
-            ],
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            }
-        },
-        {
             "name": "Debug: Manual Database Tests",
             "type": "debugpy",
             "request": "launch",
@@ -56,10 +22,10 @@
             "args": [
                 "-m",
                 "manual",
-                "tests/test_reconcile_integration.py",
+                "tests/integration/test_reconcile_integration.py",
                 "-v",
                 "-s",
-                "--log-cli-level=INFO"
+                "--log-cli-level=DEBUG"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,

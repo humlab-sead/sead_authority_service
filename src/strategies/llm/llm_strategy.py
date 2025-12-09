@@ -25,7 +25,9 @@ JINJA = Environment(loader=BaseLoader(), autoescape=False)
 class LLMReconciliationStrategy(ReconciliationStrategy):
     """Base class for LLM-powered reconciliation strategies"""
 
-    def __init__(self, specification: StrategySpecification | None = None, proxy_or_cls: BaseRepository | Type[BaseRepository] | None = None) -> None:
+    def __init__(
+        self, specification: StrategySpecification | None = None, proxy_or_cls: BaseRepository | Type[BaseRepository] | None = None
+    ) -> None:
         super().__init__(specification, proxy_or_cls)
 
         provider_name: str = ConfigValue("llm.provider").resolve() or "ollama"

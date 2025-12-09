@@ -47,7 +47,9 @@ def recursive_update(d1: dict, d2: dict) -> dict:
     return d1
 
 
-def recursive_filter_dict(data: dict[str, Any], filter_keys: set[str], filter_mode: Literal["keep", "exclude"] = "exclude") -> dict[str, Any]:
+def recursive_filter_dict(
+    data: dict[str, Any], filter_keys: set[str], filter_mode: Literal["keep", "exclude"] = "exclude"
+) -> dict[str, Any]:
     """
     Recursively filters a dictionary to include only keys in the given set.
 
@@ -157,12 +159,12 @@ def env2dict(prefix: str, data: dict[str, str] | None = None, lower_key: bool = 
     return data
 
 
-def configure_logging(opts: dict[str, Any] | None = None) -> None:
+def configure_logging(opts: dict[str, Any] | None = None, default_level: str = "INFO") -> None:
 
     logger.remove()
     logger.add(
         sys.stdout,
-        level="INFO",
+        level=default_level,
         format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",
     )
     if not opts:
@@ -208,7 +210,7 @@ def _ensure_key_property(cls):
 
 
 def replace_env_vars(data: dict[str, Any] | list[Any] | str) -> dict[str, Any] | list[Any] | str:
-    """Searches dict data recursively for values that are strings and matches £´${ENV_VAR} and replaces value with os.getenv("ENV_VAR", "")"""
+    """Replaces recursively values in `data` that matches `${ENV_VAR}` with os.getenv("ENV_VAR", "") """
     if isinstance(data, dict):
         return {k: replace_env_vars(v) for k, v in data.items()}
     if isinstance(data, list):
