@@ -113,13 +113,14 @@ generate-schema-force:
 	@echo "✅ Schema regeneration complete!"
 	
 
+SCHEMA_OPTS = --no-drop-table --not-null --default-values --no-not_empty --comments --indexes --relations
+BACKEND = postgres
+
 arbodat-data-schema:
-	@mdb-schema --no-drop-table --not-null --default-values --no-not_empty --comments --indexes --relations \
-		src/arbodat/input/ArchBotDaten.mdb postgres > src/arbodat/input/ArchBotDaten_schema.sql 
-		
+	@mdb-schema $(SCHEMA_OPTS) src/arbodat/input/ArchBotDaten.mdb $(BACKEND) > src/arbodat/input/ArchBotDaten_$(BACKEND)_schema.sql 
+
 arbodat-lookup-schema:
-	@mdb-schema --no-drop-table --not-null --default-values --no-not_empty --comments --indexes --relations \
-		src/arbodat/input/ArchBotStrukDat.mdb postgres > src/arbodat/input/ArchBotStrukDat_schema.sql 
+	@mdb-schema $(SCHEMA_OPTS) src/arbodat/input/ArchBotStrukDat.mdb $(BACKEND) > src/arbodat/input/ArchBotStrukDat_$(BACKEND)_schema.sql 
 
 arbodat-schema: arbodat-data-schema arbodat-lookup-schema
 	@echo "✅ Schema extraction complete!"
