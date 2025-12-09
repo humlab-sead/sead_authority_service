@@ -50,5 +50,6 @@
     "python.analysis.displayEnglishDiagnostics": true,
     "python.analysis.generateWithTypeAnnotation": true,
     "python.analysis.inlayHints.pytestParameters": true,
-    "python.analysis.typeEvaluation.deprecateTypingAliases": true
+    "python.analysis.typeEvaluation.deprecateTypingAliases": true,
+    "yaml.format.printWidth": 120
 }
