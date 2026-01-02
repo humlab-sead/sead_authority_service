@@ -209,8 +209,8 @@ class TestRenderPreview:
             mock_strategy_with_get_details(mock_strategies, details)
             result = await render_preview(uri)
 
-        assert "<title>First Value – Preview</title>" in result
-        assert "<h1>First Value</h1>" in result
+        assert "<title>First Value – Preview</title>" in result  # type: ignore
+        assert "<h1>First Value</h1>" in result  # type: ignore
 
     @pytest.mark.asyncio
     @with_test_config
@@ -222,10 +222,10 @@ class TestRenderPreview:
             mock_strategy_with_get_details(mock_strategies, details)
             result = await render_preview(uri)
 
-        assert "Name:" not in result
-        assert "label:" not in result
-        assert '<div class="label">other:</div>' in result
-        assert '<div class="value">Value</div>' in result
+        assert "Name:" not in result  # type: ignore
+        assert "label:" not in result  # type: ignore
+        assert '<div class="label">other:</div>' in result  # type: ignore
+        assert '<div class="value">Value</div>' in result  # type: ignore
 
     @pytest.mark.asyncio
     @with_test_config

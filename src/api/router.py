@@ -21,9 +21,8 @@ from src.metadata import get_reconcile_properties, get_reconciliation_metadata
 from src.preview import render_preview
 from src.reconcile import reconcile_queries
 from src.strategies.strategy import Strategies
-from src.suggest import render_flyout_preview, suggest_entities
+from src.suggest import render_flyout_preview, suggest_entities, suggest_types
 from src.suggest import suggest_properties as suggest_properties_api
-from src.suggest import suggest_types
 
 # pylint: disable=unused-argument, redefined-builtin, too-many-locals, too-many-return-statements, too-many-branches
 

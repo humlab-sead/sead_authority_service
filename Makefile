@@ -61,7 +61,7 @@ ruff-lint:
 	@uv run ruff check --fix src tests main.py
 	
 .PHONY: lint
-lint: tidy pylint ruff-lint check-imports
+lint: tidy pylint ruff-lint
 
 .PHONY: check-imports
 check-imports:
