@@ -48,7 +48,7 @@ async def test_suggest_entity_with_prefix(test_app: FastAPI, mock_results: list[
     ]
 
     # Mock the suggest function or database query - return dict format
-    with patch("src.api.router.suggest_entities", new=AsyncMock(return_value={"result": mock_results})):
+    with patch("src.suggest.suggest_entities", new=AsyncMock(return_value={"result": mock_results})):
 
         async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
             response: Response = await client.get("/suggest/entity?prefix=upp")
@@ -74,7 +74,7 @@ async def test_suggest_entity_with_prefix(test_app: FastAPI, mock_results: list[
 @with_test_config
 async def test_suggest_entity_with_type_filter(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: MockConfigProvider):
     """Test entity autocomplete with type filter"""
-    with patch("src.api.router.suggest_entities", new=AsyncMock(return_value={"result": mock_results})):
+    with patch("src.suggest.suggest_entities", new=AsyncMock(return_value={"result": mock_results})):
         async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
             response: Response = await client.get("/suggest/entity?prefix=upp&type=site")
 
@@ -91,7 +91,7 @@ async def test_suggest_entity_with_type_filter(test_app: FastAPI, mock_results: 
 @with_test_config
 async def test_suggest_entity_short_prefix(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: MockConfigProvider):
     """Test entity autocomplete with short prefix (should return empty)"""
-    with patch("src.api.router.suggest_entities", new=AsyncMock(return_value={"result": []})):
+    with patch("src.suggest.suggest_entities", new=AsyncMock(return_value={"result": []})):
         async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
             response: Response = await client.get("/suggest/entity?prefix=u")
 
@@ -109,7 +109,7 @@ async def test_suggest_type_all(test_app: FastAPI, mock_results: list[dict[str, 
     # Create proper type suggestion mock data
     mock_type_results = [{"id": "site", "name": "Site"}, {"id": "location", "name": "Location"}, {"id": "taxon", "name": "Taxon"}]
     # Mock suggest_types to return dict format that the real function returns
-    with patch("src.api.router.suggest_types", new=AsyncMock(return_value={"result": mock_type_results})):
+    with patch("src.suggest.suggest_types", new=AsyncMock(return_value={"result": mock_type_results})):
         async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
             response: Response = await client.get("/suggest/type")
 
@@ -132,7 +132,7 @@ async def test_suggest_type_with_prefix(test_app: FastAPI, mock_results: list[di
     # Create proper type suggestion mock data for prefix "loc"
     mock_type_results = [{"id": "location", "name": "Location"}]
     # Mock suggest_types to return dict format that the real function returns
-    with patch("src.api.router.suggest_types", new=AsyncMock(return_value={"result": mock_type_results})):
+    with patch("src.suggest.suggest_types", new=AsyncMock(return_value={"result": mock_type_results})):
         async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
             response: Response = await client.get("/suggest/type?prefix=loc")
 
@@ -279,7 +279,7 @@ async def test_suggest_entity_result_limit(test_app: FastAPI, mock_results: list
     """Test that entity suggest respects limit"""
     # Create a mock with exactly 5 results to test the limit
     limited_results = mock_results[:2]  # Use first 2 results
-    with patch("src.api.router.suggest_entities", new=AsyncMock(return_value={"result": limited_results})):
+    with patch("src.suggest.suggest_entities", new=AsyncMock(return_value={"result": limited_results})):
         async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
             response: Response = await client.get("/suggest/entity?prefix=sw")
 
