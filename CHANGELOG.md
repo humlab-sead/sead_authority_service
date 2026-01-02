@@ -1,3 +1,16 @@
+# [1.4.0](https://github.com/humlab-sead/sead_authority_service/compare/v1.3.0...v1.4.0) (2026-01-02)
+
+
+### Bug Fixes
+
+* correct HTML formatting in render_flyout_preview function ([245e9af](https://github.com/humlab-sead/sead_authority_service/commit/245e9af27926616ed2527401c8377192a8407b55))
+
+
+### Features
+
+* add local CI test script and update Makefile ([95186b1](https://github.com/humlab-sead/sead_authority_service/commit/95186b10e3a89be31a0467946d1ae0d594630a2d))
+* enhance CI workflow with uv integration and update linting rules ([f461e1a](https://github.com/humlab-sead/sead_authority_service/commit/f461e1ac822f2429e1f32bc1eacfe694a7303e0b))
+
 # [1.3.0](https://github.com/humlab-sead/sead_authority_service/compare/v1.2.0...v1.3.0) (2026-01-02)
 
 
