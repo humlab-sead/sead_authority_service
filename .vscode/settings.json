@@ -41,6 +41,18 @@
     "python.analysis.ignore": [
         ".venv"
     ],
+    "files.exclude": {
+        "**/.git": true,
+        "**/.DS_Store": true
+    },
+    "search.exclude": {
+        "**/.venv": true,
+        "**/__pycache__": true
+    },
+    "markdownlint.ignore": [
+        ".github/copilot-instructions.md",
+        "AGENTS.md"
+    ],
     "python.analysis.inlayHints.functionReturnTypes": true,
     "python.analysis.inlayHints.variableTypes": true,
     "python.analysis.typeCheckingMode": "standard",

@@ -121,11 +121,12 @@ class TestReconQuery:
             lang="en",
         )
 
+        assert query is not None
         assert query.query == "Uppsala Site"
         assert query.type == "site"
         assert query.type_strict == "should"
         assert query.limit == 10
-        assert len(query.properties) == 1
+        assert len(query.properties) == 1  # type: ignore
         assert query.lang == "en"
 
     def test_query_trimming(self):
@@ -260,7 +261,7 @@ class TestReconCandidate:
         desc = "A" * 500
         candidate = ReconCandidate(id="1", name="Test", description=desc)
 
-        assert len(candidate.description) == 500
+        assert len(candidate.description) == 500 # type: ignore
 
 
 class TestReconQueryResult:
@@ -722,8 +723,8 @@ class TestExtendResponse:
             ],
             rows={
                 "1": {
-                    "latitude": [ExtCell(str_value="59.8586")],
-                    "longitude": [ExtCell(str_value="17.6389")],
+                    "latitude": [ExtCell.model_validate({"str_value": "59.8586"})],
+                    "longitude": [ExtCell.model_validate({"str_value": "17.6389"})],
                 }
             },
         )
@@ -753,9 +754,10 @@ class TestAPIResponse:
 
     def test_api_response_with_complex_type(self):
         """Test API response with complex data type."""
-        candidate = ReconCandidate(id="1", name="Test")
+        candidate = ReconCandidate.model_validate({"id": "1", "name": "Test"})
         response = APIResponse[ReconCandidate](success=True, data=candidate)
 
+        assert response.data is not None
         assert response.data.id == "1"
         assert response.data.name == "Test"
 
@@ -811,7 +813,7 @@ class TestModelSerialization:
 
     def test_recon_candidate_round_trip(self):
         """Test ReconCandidate serialization round trip."""
-        original = ReconCandidate(id="123", name="Uppsala", type=[TypeRef(id="site", name="Site")], score=95.0, match=True)
+        original = ReconCandidate.model_validate({"id": "123", "name": "Uppsala", "type": [TypeRef.model_validate({"id": "site", "name": "Site"})], "score": 95.0, "match": True})
         data = original.model_dump()
         restored = ReconCandidate.model_validate(data)
 
@@ -822,7 +824,7 @@ class TestModelSerialization:
 
     def test_ext_cell_serialization_with_aliases(self):
         """Test ExtCell serialization preserves aliases."""
-        cell = ExtCell(str_value="test", type_ref="location")
+        cell = ExtCell.model_validate({"str_value": "test", "type_ref": "location"})
         data = cell.model_dump(by_alias=True)
 
         # When using by_alias=True, should use 'str' and 'type' keys

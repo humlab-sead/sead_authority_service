@@ -166,15 +166,17 @@ class _FakeRepository(strategy_module.BaseRepository):  # type: ignore[misc]
         self.fetch_by_alternate_identity_calls: list[str] = []
         self.find_calls: list[tuple[str, int]] = []
 
-    async def fetch_by_alternate_identity(self, alternate_identity: str):
+    async def fetch_by_alternate_identity(
+        self, alternate_identity: str, **kwargs
+    ) -> list[dict[str, Any]]:
         self.fetch_by_alternate_identity_calls.append(alternate_identity)
         return [{"name_sim": 0.2, "label": "alt", "id": 10}]
 
-    async def find(self, name: str, limit: int = 10):
+    async def find(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:
         self.find_calls.append((name, limit))
         return [{"name_sim": 0.9, "label": "name", "id": 11}]
 
-    async def get_details(self, entity_id: str):
+    async def get_details(self, entity_id: str, **kwargs) -> dict[str, Any] | None:
         return {"ID": entity_id}
 
 
