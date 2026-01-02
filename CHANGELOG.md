@@ -1,3 +1,15 @@
+# [1.5.0](https://github.com/humlab-sead/sead_authority_service/compare/v1.4.2...v1.5.0) (2026-01-02)
+
+
+### Bug Fixes
+
+* update authority-service version to 1.4.1 ([5efcc62](https://github.com/humlab-sead/sead_authority_service/commit/5efcc6281f75cf41778d9bb1aed2e352949ad01d))
+
+
+### Features
+
+* enhance create_db_uri to support password and update driver ([712541e](https://github.com/humlab-sead/sead_authority_service/commit/712541e14bf92a6b53a4292d99901a67f8a15a30))
+
 ## [1.4.2](https://github.com/humlab-sead/sead_authority_service/compare/v1.4.1...v1.4.2) (2026-01-02)
 
 ## [1.4.1](https://github.com/humlab-sead/sead_authority_service/compare/v1.4.0...v1.4.1) (2026-01-02)
