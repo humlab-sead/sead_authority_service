@@ -1,6 +1,6 @@
 import os
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -14,7 +14,6 @@ from src.utility import (
     dotget,
     dotset,
     env2dict,
-    get_connection_uri,
     import_sub_modules,
     load_resource_yaml,
     normalize_text,
@@ -621,13 +620,13 @@ class TestDatabaseUtilities:
     def test_create_db_uri(self):
         """Test create_db_uri function."""
         uri = create_db_uri(host="localhost", port=5432, user="testuser", dbname="testdb")
-        expected = "postgresql://testuser@localhost:5432/testdb"
+        expected = "postgresql+psycopg://testuser@localhost:5432/testdb"
         assert uri == expected
 
     def test_create_db_uri_string_port(self):
         """Test create_db_uri with string port."""
         uri = create_db_uri(host="localhost", port="5432", user="testuser", dbname="testdb")
-        expected = "postgresql://testuser@localhost:5432/testdb"
+        expected = "postgresql+psycopg://testuser@localhost:5432/testdb"
         assert uri == expected
 
     def test_create_db_uri_custom_driver(self):
@@ -635,23 +634,10 @@ class TestDatabaseUtilities:
         uri = create_db_uri(host="localhost", port=5432, user="testuser", dbname="testdb", driver="postgresql+psycopg")
         assert uri == "postgresql+psycopg://testuser@localhost:5432/testdb"
 
-    def test_get_connection_uri(self):
-        """Test get_connection_uri function."""
-        mock_connection = MagicMock()
-        mock_connection.get_dsn_parameters.return_value = {"user": "testuser", "host": "localhost", "port": "5432", "dbname": "testdb"}
-
-        uri = get_connection_uri(mock_connection)
-        expected = "postgresql://testuser@localhost:5432/testdb"
-        assert uri == expected
-
-    def test_get_connection_uri_missing_params(self):
-        """Test get_connection_uri with missing parameters."""
-        mock_connection = MagicMock()
-        mock_connection.get_dsn_parameters.return_value = {"user": None, "host": "localhost", "port": "5432", "dbname": "testdb"}
-
-        uri = get_connection_uri(mock_connection)
-        expected = "postgresql://None@localhost:5432/testdb"
-        assert uri == expected
+    def test_create_db_uri_with_password(self):
+        """Test create_db_uri with password."""
+        uri = create_db_uri(host="localhost", port=5432, user="testuser", password="secret", dbname="testdb")
+        assert uri == "postgresql+psycopg://testuser:secret@localhost:5432/testdb"
 
 
 class TestIntegration:
