@@ -1,3 +1,5 @@
+## [1.4.1](https://github.com/humlab-sead/sead_authority_service/compare/v1.4.0...v1.4.1) (2026-01-02)
+
 # [1.4.0](https://github.com/humlab-sead/sead_authority_service/compare/v1.3.0...v1.4.0) (2026-01-02)
 
 
