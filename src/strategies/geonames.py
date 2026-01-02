@@ -54,7 +54,10 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
     ) -> None:
         specification = resolve_specification(specification=specification or self.key)
         strategy_options: dict[str, Any] = ConfigValue(f"policy.{self.key}.geonames.options").resolve() or {}
-        proxy: BaseRepository = (repository_or_cls or self.repository_cls)(specification, **strategy_options)  # type: ignore[arg-type]
+        if isinstance(repository_or_cls, BaseRepository):
+            proxy: BaseRepository = repository_or_cls
+        else:
+            proxy = (repository_or_cls or self.repository_cls)(specification, **strategy_options)  # type: ignore[arg-type]
         super().__init__(specification, proxy)
 
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:

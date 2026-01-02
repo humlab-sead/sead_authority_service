@@ -185,6 +185,13 @@ class TestGeoNamesReconciliationStrategy:
         assert strategy.specification.get("key") == "geonames"
 
     @with_test_config
+    def test_init_with_repository_instance(self, test_provider: MockConfigProvider):
+        """Test initialization with a provided repository instance"""
+        proxy = MagicMock(spec=GeoNamesRepository)
+        strategy = GeoNamesReconciliationStrategy(repository_or_cls=proxy)
+        assert strategy.get_repository() is proxy
+
+    @with_test_config
     def test_init_with_custom_specification(self, test_provider: MockConfigProvider):
         """Test initialization with custom specification"""
         custom_spec = {"key": "custom_geonames", "display_name": "Custom GeoNames"}
@@ -284,6 +291,16 @@ class TestGeoNamesReconciliationStrategy:
         result = strategy.as_candidate(geonames_data, "vasterbotten")
 
         assert result["type"] == [{"id": "/location/administrative_area", "name": "Administrative Area"}]
+
+    @with_test_config
+    def test_as_candidate_name_sim_when_score_is_none(self, test_provider: MockConfigProvider):
+        """Test name_sim fallback when score is None (defensive branch)."""
+        strategy = GeoNamesReconciliationStrategy()
+        strategy._calculate_score = MagicMock(return_value=None)  # type: ignore[method-assign]
+
+        geonames_data = {"geonameId": 123, "name": "Test Place"}
+        result = strategy.as_candidate(geonames_data, "test")
+        assert result["name_sim"] == 0.0
 
     @with_test_config
     def test_calculate_score_basic(self, test_provider: MockConfigProvider):
