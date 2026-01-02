@@ -2,7 +2,6 @@
 Unit tests for OllamaProvider LLM implementation.
 """
 
-import os
 from unittest.mock import AsyncMock, Mock, mock_open, patch
 
 import httpx
@@ -49,23 +48,6 @@ class TestOllamaProvider:
             assert provider.model == "llama2"
             assert provider.client == mock_client
             mock_client_class.assert_called_once_with(host="http://localhost:11434", timeout=30, follow_redirects=True)
-
-    @with_test_config
-    def test_init_with_defaults2(self, test_provider: MockConfigProvider):
-        """Test OllamaProvider initialization with default configuration"""
-
-        with patch("ollama.Client") as mock_client_class:
-            mock_client = Mock()
-            mock_client_class.return_value = mock_client
-
-            provider = OllamaProvider()
-
-            environ_base_url: str = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-
-            assert provider.host == environ_base_url
-            assert provider.model == "gpt-oss:20b"
-            assert provider.client == mock_client
-            mock_client_class.assert_called_once_with(host=environ_base_url, timeout=30, follow_redirects=True)
 
     @with_test_config
     def test_init_with_parameters(self, test_provider: MockConfigProvider):

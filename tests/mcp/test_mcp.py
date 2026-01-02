@@ -39,7 +39,6 @@ from tests.decorators import with_test_config
 # pylint: disable=redefined-outer-name, unused-argument
 
 
-@pytest.mark.asyncio
 class TestMCPServer:
     """Tests for SEADMCPServer"""
 
@@ -172,7 +171,6 @@ class TestMCPServer:
         assert any(t["table"] == "method" for t in tables)
 
 
-@pytest.mark.asyncio
 class TestMCPModels:
     """Tests for MCP data models"""
 
@@ -603,6 +601,7 @@ class TestMCPTools:
 
 
 # Integration test (requires actual database connection)
+@pytest.mark.skip("Integration test - enable when database is available")
 @pytest.mark.integration
 @pytest.mark.asyncio
 @with_test_config
