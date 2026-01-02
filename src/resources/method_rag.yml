@@ -1,0 +1,10 @@
+
+key: "method (rag hybrid)"
+display_name: "Methods (RAG Hybrid)"
+id_field: "method_id"
+label_field: "label"
+alternate_identity_field: "method_abbreviation"
+properties: [
+]
+property_settings: {}
+sql_queries: { }

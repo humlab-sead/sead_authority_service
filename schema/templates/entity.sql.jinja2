@@ -1,0 +1,117 @@
+/**********************************************************************************************
+**  {{ entity.name }} - Tri-gram Search Objects
+**  Generated from template by generate_entity_schema.py
+**  
+**  Note: This file creates the base view WITHOUT embeddings.
+**        If the entity has embeddings, also install semantic-{entity}.sql to create
+**        the embeddings table and semantic search functions.
+**********************************************************************************************/
+
+{%- if entity.materialized | default(false) %}
+
+drop materialized view if exists authority.{{ entity_key }} cascade;
+
+create materialized view authority.{{ entity_key }} as
+{%- else %}
+
+drop view if exists authority.{{ entity_key }} cascade;
+
+create or replace view authority.{{ entity_key }} as
+{%- endif %}
+  select
+    t.{{ entity.id_column }},
+    t.{{ entity.label_column }} as label,
+    authority.immutable_unaccent(lower(t.{{ entity.label_column }})) as norm_label
+{%- if entity.description_column %},
+    t.{{ entity.description_column }}
+{%- endif %}
+{%- if entity.alternate_identity_column %},
+    t.{{ entity.alternate_identity_column }}
+{%- endif %}
+{%- for col in entity.extra_columns | default([]) %},
+    {{ col }}
+{%- endfor %}
+  from public.{{ entity.table_name }} as t
+{%- for join in entity.joins | default([]) %}
+  {{ join }}
+{%- endfor %}
+{%- if entity.where_clause %}
+  where {{ entity.where_clause }}
+{%- endif %};
+
+{%- if entity.materialized | default(false) %}
+
+-- Required to allow REFRESH MATERIALIZED VIEW CONCURRENTLY
+create unique index if not exists {{ entity_key }}_uidx
+  on authority.{{ entity_key }} ({{ entity.id_column }});
+
+-- Trigram index must be on the MV column we filter with (%), not on base table.
+create index if not exists {{ entity_key }}_norm_trgm
+  on authority.{{ entity_key }}
+    using gin (norm_label gin_trgm_ops);
+
+-- (First-time populate)
+-- refresh materialized view concurrently authority.{{ entity_key }};
+-- analyze authority.{{ entity_key }};
+{%- else %}
+
+create index if not exists {{ entity.table_name }}_norm_trgm
+  on public.{{ entity.table_name }}
+    using gin ( (authority.immutable_unaccent(lower({{ entity.label_column }}))) gin_trgm_ops );
+{%- endif %}
+
+/***************************************************************************************************
+ ** Procedure  authority.fuzzy_{{ entity_key }}
+ ** What       Trigram fuzzy search function using pg_trgm similarity
+ ** Usage      SELECT * FROM authority.fuzzy_{{ entity_key }}('query text', 10);
+{%- if trigram_config.filter_params %}
+ ** Params     {% for param in trigram_config.filter_params %}{{ param.name }}: {{ param.description | default('filter parameter') }}{% if not loop.last %}, {% endif %}{% endfor %}
+{%- endif %}
+ ****************************************************************************************************/
+
+drop function if exists authority.fuzzy_{{ entity_key }}(text, integer{% for param in trigram_config.filter_params | default([]) %}, {{ param.type }}{% endfor %}) cascade;
+
+create or replace function authority.fuzzy_{{ entity_key }}(
+  p_text text,
+  p_limit integer default 10{% for param in trigram_config.filter_params | default([]) %},
+  {{ param.name }} {{ param.type }} default {{ param.default }}{% endfor %}
+) returns table (
+  {{ entity.id_column }} integer,
+  label text,
+  name_sim double precision
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q
+  )
+{%- if entity.filter_params %}
+  , filter_params as (
+{%- for param in entity.filter_params %}
+    {{ param.cte_definition | indent(4) }}{% if not loop.last %},{% endif %}
+{%- endfor %}
+  )
+{%- endif %}
+  select
+    s.{{ entity.id_column }},
+    s.label,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+          else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as name_sim
+  from authority.{{ entity_key }} as s
+  cross join params pq
+{%- if entity.filter_params %}
+{%- for param in entity.filter_params %}
+  {{ param.join_clause | indent(2) }}
+{%- endfor %}
+{%- endif %}
+  where s.norm_label % pq.q
+{%- if entity.filter_params %}
+{%- for param in entity.filter_params %}
+    {{ param.where_clause | indent(4) }}
+{%- endfor %}
+{%- endif %}
+  order by name_sim desc, s.label
+  limit p_limit;
+$$;

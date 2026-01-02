@@ -10,7 +10,7 @@ async def render_preview(uri: str) -> ValueError | str:
     """Provides a generic HTML preview for a given entity ID."""
 
     logger.info(f"Rendering preview for URI: {uri}")
-    id_base: str = ConfigValue("options:id_base").resolve()
+    id_base: str = ConfigValue("options:id_base").resolve() or ""
 
     if not uri.startswith(id_base):
         raise ValueError("Invalid ID format")
@@ -25,7 +25,10 @@ async def render_preview(uri: str) -> ValueError | str:
     if not Strategies.items.get(entity_path):
         raise ValueError(f"Unknown entity type: {entity_path}")
 
-    strategy: ReconciliationStrategy = Strategies.items.get(entity_path)()
+    strategy_cls = Strategies.items.get(entity_path)
+    if not strategy_cls:
+        raise ValueError(f"Unknown entity type: {entity_path}")
+    strategy: ReconciliationStrategy = strategy_cls()
 
     if not strategy:
         raise ValueError(f"Unknown entity type: {entity_path}")

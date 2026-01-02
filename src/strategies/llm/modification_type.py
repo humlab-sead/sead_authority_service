@@ -6,7 +6,7 @@ from loguru import logger
 
 from src.configuration import ConfigValue
 
-from ..query import DatabaseQueryProxy
+from ..query import BaseRepository
 from ..strategy import Strategies, StrategySpecification
 from .llm_strategy import LLMReconciliationStrategy
 
@@ -26,7 +26,7 @@ SPECIFICATION: StrategySpecification = {
     ],
     "property_settings": {},
     "sql_queries": {
-        "fuzzy_label_sql": """
+        "fuzzy_find_sql": """
             SELECT 
                 modification_type_id,
                 modification_type_name as label,
@@ -64,7 +64,7 @@ SPECIFICATION: StrategySpecification = {
 }
 
 
-class ModificationTypeQueryProxy(DatabaseQueryProxy):
+class ModificationTypeRepository(BaseRepository):
     """Modification type-specific query proxy"""
 
     async def get_lookup_data(self) -> list[dict[str, Any]]:
@@ -72,30 +72,30 @@ class ModificationTypeQueryProxy(DatabaseQueryProxy):
         return await self.fetch_all(self.specification["sql_queries"]["get_lookup_data"])
 
 
-@Strategies.register(key="modification_type")
+@Strategies.register(key="modification_type", repository_cls=ModificationTypeRepository)
 class LLMModificationTypeReconciliationStrategy(LLMReconciliationStrategy):
     """LLM-powered modification type reconciliation strategy"""
 
     def __init__(self) -> None:
-        super().__init__(SPECIFICATION, ModificationTypeQueryProxy)
+        super().__init__(SPECIFICATION)
         logger.info("Initialized ModificationTypeReconciliationStrategy with LLM support")
 
     def get_context_description(self) -> str:
         """Return context description for modification types"""
-        return ConfigValue("policy.modification_type.context", default="").resolve()
+        return ConfigValue("policy.modification_type.context", default="").resolve() or ""
 
     def get_lookup_fields(self) -> list[str]:
         return super().get_lookup_fields() + ["modification_type_description"]
 
     async def get_lookup_data(self) -> list[dict[str, Any]]:
         """Fetch modification type lookup data"""
-        proxy = ModificationTypeQueryProxy(self.specification)
+        proxy = ModificationTypeRepository(self.specification)
         return await proxy.get_lookup_data()
 
     async def find_candidates(
         self,
         query: str,
-        properties: dict[str, Any] = None,
+        properties: dict[str, Any] | None = None,
         limit: int = 10,
     ) -> list[dict[str, Any]]:
         """Find modification type candidates using LLM"""

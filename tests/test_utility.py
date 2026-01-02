@@ -15,9 +15,13 @@ from src.utility import (
     dotset,
     env2dict,
     get_connection_uri,
+    import_sub_modules,
+    load_resource_yaml,
+    normalize_text,
     recursive_filter_dict,
     recursive_update,
     replace_env_vars,
+    resolve_specification,
 )
 
 
@@ -111,7 +115,7 @@ class TestRecursiveFilterDict:
         """Test that non-dict input is returned as-is."""
         data = "not a dict"
         filter_keys = {"a"}
-        result = recursive_filter_dict(data, filter_keys, "exclude")
+        result = recursive_filter_dict(data, filter_keys, "exclude")  # type: ignore
         assert result == "not a dict"
 
     def test_default_mode_is_exclude(self):
@@ -226,8 +230,8 @@ class TestDotNotationUtilities:
     def test_dotexists_multiple_paths(self):
         """Test dotexists with multiple paths."""
         data = {"a": {"b": {"c": 42}}}
-        assert dotexists(data, ["x.y.z"], ["a.b.c"]) is True
-        assert dotexists(data, ["x.y.z"], ["p.q.r"]) is False
+        assert dotexists(data, "x.y.z", "a.b.c") is True
+        assert dotexists(data, "x.y.z", "p.q.r") is False
 
     def test_dget_simple(self):
         """Test dget with simple usage."""
@@ -250,13 +254,18 @@ class TestDotNotationUtilities:
     def test_dget_none_path(self):
         """Test dget with None path."""
         data = {"a": 1}
-        result = dget(data, None, default="default")
+        result = dget(data, None, default="default")  # type: ignore
         assert result == "default"
 
     def test_dget_empty_data(self):
         """Test dget with empty data."""
         result = dget({}, "a.b.c", default="default")
         assert result == "default"
+
+    def test_dget_no_paths_returns_default(self):
+        """Test dget with no paths returns default."""
+        data = {"a": 1}
+        assert dget(data, default="default") == "default"
 
 
 class TestEnv2Dict:
@@ -349,13 +358,19 @@ class TestConfigureLogging:
         # Should not call configure since handler has no sink
         mock_logger.configure.assert_called_once_with(handlers=opts["handlers"])
 
+    @patch("src.utility.logger")
+    def test_configure_logging_opts_without_handlers(self, mock_logger):
+        """Test configure_logging with options but no handlers."""
+        configure_logging({"folder": "logs"})
+        mock_logger.configure.assert_not_called()
+
 
 class TestRegistry:
     """Tests for Registry class."""
 
     def setup_method(self):
         """Clear registry before each test."""
-        Registry.items = {}
+        Registry[object].items = {}  # type: ignore
 
     def test_register_function(self):
         """Test registering a function."""
@@ -365,7 +380,9 @@ class TestRegistry:
             return "test_result"
 
         assert Registry.is_registered("test_func")
-        assert Registry.get("test_func")() == "test_result"
+        fx = Registry.get("test_func")
+        assert fx is not None
+        assert fx() == "test_result"
 
     def test_register_with_function_type(self):
         """Test registering with function type (calls function)."""
@@ -385,7 +402,10 @@ class TestRegistry:
             return "result"
 
         assert Registry.is_registered("my_function")
-        assert Registry.get("my_function")() == "result"
+        fx = Registry.get("my_function")
+
+        assert fx is not None
+        assert fx() == "result"
 
     def test_get_nonexistent_key(self):
         """Test getting nonexistent key raises ValueError."""
@@ -405,8 +425,11 @@ class TestRegistry:
                 return "class_result"
 
         assert Registry.is_registered("test_class")
-        instance = Registry.get("test_class")()
+        cls = Registry.get("test_class")
+        assert cls is not None
+        instance = cls()
         assert instance.method() == "class_result"
+        assert instance.key == "test_class"
 
 
 class TestReplaceEnvVars:
@@ -565,7 +588,9 @@ class TestReplaceEnvVars:
     def test_replace_env_vars_multiple_vars_in_structure(self):
         """Test replace_env_vars with multiple environment variables."""
         with patch.dict(
-            os.environ, {"VAR1": "value1", "VAR2": "value2", "VAR3": "value3", "MISSING_VAR": ""}, clear=True  # This will be missing from environment
+            os.environ,
+            {"VAR1": "value1", "VAR2": "value2", "VAR3": "value3", "MISSING_VAR": ""},
+            clear=True,  # This will be missing from environment
         ):
             # Remove MISSING_VAR to test missing behavior
             if "MISSING_VAR" in os.environ:
@@ -605,6 +630,11 @@ class TestDatabaseUtilities:
         expected = "postgresql://testuser@localhost:5432/testdb"
         assert uri == expected
 
+    def test_create_db_uri_custom_driver(self):
+        """Test create_db_uri with custom driver."""
+        uri = create_db_uri(host="localhost", port=5432, user="testuser", dbname="testdb", driver="postgresql+psycopg")
+        assert uri == "postgresql+psycopg://testuser@localhost:5432/testdb"
+
     def test_get_connection_uri(self):
         """Test get_connection_uri function."""
         mock_connection = MagicMock()
@@ -624,7 +654,6 @@ class TestDatabaseUtilities:
         assert uri == expected
 
 
-# Integration tests
 class TestIntegration:
     """Integration tests combining multiple utility functions."""
 
@@ -660,3 +689,74 @@ class TestIntegration:
             assert dotget(config, "db.host") == "localhost"
             assert dotget(config, "db.port") == "5432"
             assert dget(config, "db:host", "db.host") == "localhost"
+
+
+class TestNormalizeText:
+    """Tests for normalize_text function."""
+
+    def test_normalize_text_lowercase_and_unaccent(self):
+        assert normalize_text("Café") == "cafe"
+        assert normalize_text("Ångström") == "angstrom"
+        assert normalize_text("Résumé") == "resume"
+
+    def test_normalize_text_empty(self):
+        assert normalize_text("") == ""
+
+
+class TestDotNotationEdgeCases:
+    """Additional tests for dot notation utility functions."""
+
+    def test_dotexpand_invalid_type(self):
+        with pytest.raises(ValueError, match="dot path must be a string or list of strings"):
+            dotexpand(123)  # type: ignore[arg-type]
+
+    def test_dotget_non_dict_intermediate_returns_default(self):
+        data = {"a": 5}
+        assert dotget(data, "a.b", default="missing") == "missing"
+
+
+class TestImportSubModules:
+    """Tests for import_sub_modules function."""
+
+    @patch("src.utility.importlib.import_module")
+    def test_import_sub_modules(self, mock_import, tmp_path):
+        (tmp_path / "module1.py").write_text("# module1", encoding="utf-8")
+        (tmp_path / "module2.py").write_text("# module2", encoding="utf-8")
+        (tmp_path / "__init__.py").write_text("# init", encoding="utf-8")
+        (tmp_path / "not_python.txt").write_text("nope", encoding="utf-8")
+
+        import_sub_modules(str(tmp_path))
+        assert mock_import.call_count == 2
+        mock_import.assert_any_call(".module1", package="src.utility")
+        mock_import.assert_any_call(".module2", package="src.utility")
+
+    @patch("src.utility.importlib.import_module")
+    def test_import_sub_modules_empty_dir(self, mock_import, tmp_path):
+        import_sub_modules(str(tmp_path))
+        mock_import.assert_not_called()
+
+
+class TestResourceYaml:
+    """Tests for resource YAML helpers."""
+
+    def test_load_resource_yaml_existing(self):
+        data = load_resource_yaml("site")
+        assert isinstance(data, dict)
+        assert data.get("key") == "site"
+
+    def test_load_resource_yaml_missing(self):
+        assert load_resource_yaml("__does_not_exist__") is None
+
+    def test_resolve_specification_dict_passthrough(self):
+        spec = {"key": "inline", "properties": []}
+        assert resolve_specification(spec) is spec
+
+    def test_resolve_specification_string_loads(self):
+        spec = resolve_specification("site")
+        assert isinstance(spec, dict)
+        assert spec.get("key") == "site"
+
+    def test_resolve_specification_none_default(self):
+        spec = resolve_specification(None)
+        assert spec["key"] == "unknown"
+        assert spec["id_field"] == "id"

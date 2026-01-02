@@ -30,24 +30,43 @@ Use [Conventional Commits](https://www.conventionalcommits.org/) format:
 
 ### Common Types
 
-- `feat:` - A new feature (minor version bump)
-- `fix:` - A bug fix (patch version bump)
-- `docs:` - Documentation changes (patch version bump)
-- `style:` - Code style changes (formatting, missing semicolons, etc.) (patch version bump)
-- `refactor:` - Code refactoring (patch version bump)
-- `perf:` - Performance improvements (patch version bump)
-- `test:` - Adding or updating tests (no version bump)
-- `chore:` - Maintenance tasks (no version bump)
-- `ci:` - CI/CD changes (no version bump)
-- `build:` - Build system changes (no version bump)
+#### Types That Trigger Releases
+
+| Type | Version Bump | Description |
+|------|--------------|-------------|
+| `feat:` | **Minor** (0.x.0) | A new feature |
+| `fix:` | **Patch** (0.0.x) | A bug fix |
+| `perf:` | **Patch** (0.0.x) | Performance improvements |
+| `refactor:` | **Patch** (0.0.x) | Code refactoring |
+| `style:` | **Patch** (0.0.x) | Code style changes (formatting, etc.) |
+| `docs:` | **Patch** (0.0.x) | Documentation changes (only with `scope: README`) |
+
+#### Types That Don't Trigger Releases
+
+| Type | Description |
+|------|-------------|
+| `test:` | Adding or updating tests |
+| `chore:` | Maintenance tasks |
+| `ci:` | CI/CD changes |
+| `build:` | Build system changes |
+| `docs:` | Documentation changes (without README scope) |
+
+#### Breaking Changes (Major Version Bump)
+
+| Format | Version Bump | Description |
+|--------|--------------|-------------|
+| `feat!:` or `fix!:` | **Major** (x.0.0) | Breaking change (with `!` suffix) |
+| `BREAKING CHANGE:` in footer | **Major** (x.0.0) | Breaking change note in commit body |
 
 ### Examples
 
 **Patch Release (0.1.0 → 0.1.1):**
 ```bash
 git commit -m "fix: correct database connection timeout"
-git commit -m "docs: update README with deployment instructions"
+git commit -m "perf: optimize query performance"
 git commit -m "refactor: simplify reconciliation strategy"
+git commit -m "style: format code with black"
+git commit -m "docs(README): update installation instructions"
 ```
 
 **Minor Release (0.1.0 → 0.2.0):**
@@ -71,6 +90,15 @@ git commit -m "feat: redesign API
 BREAKING CHANGE: The reconciliation endpoint now requires authentication."
 ```
 
+**No Release (no version bump):**
+```bash
+git commit -m "test: add unit tests for reconciliation"
+git commit -m "chore: update dependencies"
+git commit -m "ci: fix docker build workflow"
+git commit -m "build: update Dockerfile optimization"
+git commit -m "docs: update code comments"  # Without README scope
+```
+
 ## Configuration
 
 The semantic-release configuration is in `.releaserc.json`:
@@ -88,6 +116,26 @@ The semantic-release configuration is in `.releaserc.json`:
   ]
 }
 ```
+
+### Custom Release Rules
+
+This project extends the default Angular preset with custom rules:
+
+```json
+{
+  "releaseRules": [
+    {"type": "docs", "scope": "README", "release": "patch"},
+    {"type": "refactor", "release": "patch"},
+    {"type": "style", "release": "patch"}
+  ]
+}
+```
+
+These rules mean:
+- **`docs(README):`** triggers a patch release (README updates are versioned)
+- **`refactor:`** triggers a patch release (not just internal changes)
+- **`style:`** triggers a patch release (formatting is versioned)
+- Other `docs:` commits (without README scope) don't trigger releases
 
 ### Key Plugin: @semantic-release/exec
 

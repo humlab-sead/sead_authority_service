@@ -1,0 +1,114 @@
+key: bibliographic_reference
+display_name: "Bibliographic References"
+id_field: biblio_id
+label_field: full_reference
+
+properties:
+  - id: doi
+    name: "DOI"
+    type: string
+    description: "Digital Object Identifier"
+
+  - id: isbn
+    name: "ISBN"
+    type: string
+    description: "International Standard Book Number"
+
+  - id: title
+    name: "Title"
+    type: string
+    description: "Title of the work"
+
+  - id: year
+    name: "Year"
+    type: string
+    description: "Publication year"
+
+  - id: authors
+    name: "Authors"
+    type: string
+    description: "Authors of the work"
+
+  - id: full_reference
+    name: "Full reference"
+    type: string
+    description: "Full bibliographic reference"
+
+  - id: bugs_reference
+    name: "BUGS reference"
+    type: string
+    description: "BugsCEP reference"
+
+property_settings: {}
+
+sql_queries:
+  fuzzy_find_sql: |
+    select * from authority.fuzzy_bibliographic_reference(%(q)s, %(n)s);
+
+  details_sql: |
+    select  biblio_id as "ID",
+            bugs_reference as "BUGS Reference",
+            doi as "DOI",
+            isbn as "ISBN",
+            notes as "Notes",
+            title as "Title",
+            year as "Year",
+            authors as "Authors",
+            full_reference as "Full reference",
+            url as "URL"
+    from public.tbl_biblio
+    where biblio_id = %(id)s::int
+
+  isbn_sql: |
+    select biblio_id, full_reference as label
+    from public.tbl_biblio
+    where replace(upper(isbn), '-', '') = %s
+
+  doi_sql: |
+    select biblio_id, full_reference as label
+    from public.tbl_biblio
+    where replace(lower(doi), 'https://doi.org/', '') = lower(%s)
+       or lower(doi) = lower(%s)
+
+  full_reference_sql: |
+    select biblio_id, full_reference as label
+    from public.tbl_biblio
+    where full_reference = %s
+
+  title_year_sql: |
+    select biblio_id, full_reference as label
+    from public.tbl_biblio
+    where title = %s and year = %s
+
+  bugs_reference_sql: |
+    select biblio_id, full_reference as label
+    from public.tbl_biblio
+    where bugs_reference = %s
+
+  full_reference_fuzzy_word_similarity_sql: |
+    select entity_id, biblio_id, label, name_sim
+    from authority.fuzzy_bibliographic_reference(
+      p_text => %s, p_limit => %s, p_target_field => 'full_reference',
+      p_mode => 'word', p_threshold => %s
+    )
+
+  authors_fuzzy_sql: |
+    select entity_id, biblio_id, label, name_sim
+    from authority.fuzzy_bibliographic_reference(
+      p_text => %s, p_limit => %s, p_target_field => 'authors',
+      p_mode => 'word', p_threshold => %s
+    )
+
+  biblio_ids_sql: |
+    select biblio_id, full_reference AS label
+    from public.tbl_biblio
+    where biblio_id = any(%s)
+      and year = %s
+
+  full_reference_fuzzy_similarity_sql: |
+    select entity_id, biblio_id, label, name_sim
+    from authority.fuzzy_bibliographic_reference(
+      p_text => %s, p_limit => %s, p_target_field => 'full_reference',
+      p_mode => 'similarity', p_threshold => %s
+    )
+

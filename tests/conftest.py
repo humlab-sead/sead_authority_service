@@ -1,31 +1,38 @@
-import asyncio
-import os
-from typing import Any, Generator
+import sys
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import psycopg
 import pytest
+from loguru import logger
 
-from src.configuration import Config, ConfigFactory, ConfigStore, MockConfigProvider, reset_config_provider, setup_config_store
+from src.configuration import Config, ConfigFactory, MockConfigProvider
 
 # pylint: disable=unused-argument
 
 
-def pytest_sessionstart(session) -> None:
-    """Hook to run before any tests are executed."""
-    os.environ["CONFIG_FILE"] = "./tests/config.yml"
-    os.environ["ENV_FILE"] = "./tests/.env"
-    asyncio.run(setup_config_store("./tests/config.yml"))
+@pytest.fixture(autouse=True, scope="session")
+def setup_test_logging():
+    """Configure logging for all tests with DEBUG level."""
+    logger.remove()
+    logger.add(sys.stderr, level="DEBUG", format="{time} | {level} | {name}:{function}:{line} - {message}")
 
 
-@pytest.fixture(autouse=True)
-def setup_reset_config() -> Generator[None, Any, None]:
-    """Reset Config Store and provider before each test"""
-    ConfigStore.reset_instance()
-    reset_config_provider()
-    yield
-    ConfigStore.reset_instance()
-    reset_config_provider()
+# def pytest_sessionstart(session) -> None:
+#     """Hook to run before any tests are executed."""
+#     os.environ["CONFIG_FILE"] = "./tests/config/config.yml"
+#     os.environ["ENV_FILE"] = "./tests/.env"
+#     asyncio.run(setup_config_store("./tests/config/config.yml"))
+
+
+# @pytest.fixture(autouse=True)
+# def setup_reset_config() -> Generator[None, Any, None]:
+#     """Reset Config Store and provider before each test"""
+#     ConfigStore.reset_instance()
+#     reset_config_provider()
+#     yield
+#     ConfigStore.reset_instance()
+#     reset_config_provider()
 
 
 class MockRow:
@@ -98,7 +105,7 @@ def test_config() -> Config:
         return mock_conn
 
     factory: ConfigFactory = ConfigFactory()
-    config: Config = factory.load(source="./tests/config.yml", context="default", env_filename="./tests/.env")
+    config: Config = factory.load(source="./tests/config/config.yml", context="default", env_filename="./tests/.env")  # type: ignore
     config.update(
         {
             "runtime": {
@@ -112,6 +119,9 @@ def test_config() -> Config:
 
 class ExtendedMockConfigProvider(MockConfigProvider):
     """Extended MockConfigProvider that allows setting config after initialization"""
+
+    def __init__(self, initial_config: Config) -> None:
+        super().__init__(initial_config)
 
     def create_connection_mock(self, **kwargs) -> None:
         connection = create_connection_mock(**({"execute": None} | kwargs))
@@ -165,4 +175,5 @@ def create_connection_mock(**method_returns: Any) -> AsyncMock:
     cursor_context_manager.__aenter__.return_value = mock_cursor
     cursor_context_manager.__aexit__.return_value = None
     mock_conn.cursor.return_value = cursor_context_manager
+    mock_conn.cursor_instance = mock_cursor
     return mock_conn

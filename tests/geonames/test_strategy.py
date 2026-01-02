@@ -7,14 +7,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.configuration import MockConfigProvider
-from src.strategies.geonames import SPECIFICATION, GeoNamesQueryProxy, GeoNamesReconciliationStrategy
+from src.strategies.geonames import GeoNamesReconciliationStrategy, GeoNamesRepository
 from tests.decorators import with_test_config
 
 # pylint: disable=unused-argument, protected-access
 
 
-class TestGeoNamesQueryProxy:
-    """Test GeoNamesQueryProxy functionality"""
+class TestGeoNamesRepository:
+    """Test GeoNamesRepository functionality"""
 
     @with_test_config
     def test_init_default_config(self, test_provider: MockConfigProvider):
@@ -31,7 +31,7 @@ class TestGeoNamesQueryProxy:
             }
         )
 
-        proxy = GeoNamesQueryProxy(SPECIFICATION)
+        proxy = GeoNamesRepository("geonames")
 
         assert proxy.username == "test_user"
         assert proxy.lang == "sv"
@@ -51,8 +51,15 @@ class TestGeoNamesQueryProxy:
             }
         )
 
-        proxy = GeoNamesQueryProxy(
-            SPECIFICATION, username="override_user", lang="fr", country_bias="FR", fuzzy=0.7, feature_classes=["P"], orderby="relevance", style="MEDIUM"
+        proxy = GeoNamesRepository(
+            "geonames",
+            username="override_user",
+            lang="fr",
+            country_bias="FR",
+            fuzzy=0.7,
+            feature_classes=["P"],
+            orderby="relevance",
+            style="MEDIUM",
         )
 
         assert proxy.username == "override_user"
@@ -67,7 +74,7 @@ class TestGeoNamesQueryProxy:
     def test_init_fallback_defaults(self, test_provider: MockConfigProvider):
         """Test initialization with fallback default values when config is empty"""
         # No config values set
-        proxy = GeoNamesQueryProxy(SPECIFICATION)
+        proxy = GeoNamesRepository("geonames")
 
         assert proxy.username == "demo"
         assert proxy.lang == "en"
@@ -89,7 +96,7 @@ class TestGeoNamesQueryProxy:
         mock_proxy.search.return_value = mock_results
         mock_proxy_class.return_value = mock_proxy
 
-        proxy = GeoNamesQueryProxy(SPECIFICATION, username="test_user")
+        proxy = GeoNamesRepository("geonames", username="test_user")
 
         result = await proxy.find("Umeå", limit=5)
 
@@ -116,8 +123,8 @@ class TestGeoNamesQueryProxy:
         mock_proxy.search.return_value = mock_results
         mock_proxy_class.return_value = mock_proxy
 
-        proxy = GeoNamesQueryProxy(
-            SPECIFICATION, username="test_user", fuzzy=0.9, feature_classes=["P", "H"], country_bias="SE", orderby="population", style="SHORT"
+        proxy = GeoNamesRepository(
+            "geonames", username="test_user", fuzzy=0.9, feature_classes=["P", "H"], country_bias="SE", orderby="population", style="SHORT"
         )
 
         await proxy.find("Stockholm", limit=10)
@@ -131,13 +138,20 @@ class TestGeoNamesQueryProxy:
     @patch("src.strategies.geonames.GeoNamesProxy")
     async def test_get_details(self, mock_proxy_class, test_provider: MockConfigProvider):
         """Test get_details functionality"""
-        mock_details = {"geonameId": 2666199, "name": "Umeå", "lat": "63.82842", "lng": "20.25972", "countryName": "Sweden", "population": 83249}
+        mock_details = {
+            "geonameId": 2666199,
+            "name": "Umeå",
+            "lat": "63.82842",
+            "lng": "20.25972",
+            "countryName": "Sweden",
+            "population": 83249,
+        }
 
         mock_proxy = AsyncMock()
         mock_proxy.get_details.return_value = mock_details
         mock_proxy_class.return_value = mock_proxy
 
-        proxy = GeoNamesQueryProxy(SPECIFICATION, username="test_user")
+        proxy = GeoNamesRepository("geonames", username="test_user")
 
         result = await proxy.get_details("2666199", lang="sv", style="MEDIUM")
 
@@ -148,7 +162,7 @@ class TestGeoNamesQueryProxy:
     @pytest.mark.asyncio
     async def test_fetch_by_alternate_identity_not_implemented(self, test_provider: MockConfigProvider):
         """Test that fetch_by_alternate_identity raises NotImplementedError"""
-        proxy = GeoNamesQueryProxy(SPECIFICATION, username="test_user")
+        proxy = GeoNamesRepository("geonames", username="test_user")
 
         with pytest.raises(NotImplementedError, match="Alternate identity lookup not implemented for GeoNames"):
             await proxy.fetch_by_alternate_identity("some_id")
@@ -158,43 +172,53 @@ class TestGeoNamesReconciliationStrategy:
     """Test GeoNamesReconciliationStrategy functionality"""
 
     @with_test_config
-    @patch("src.strategies.geonames.GeoNamesQueryProxy")
-    def test_init_default(self, mock_query_proxy_class, test_provider: MockConfigProvider):
+    def test_init_default(self, test_provider: MockConfigProvider):
         """Test initialization with default specification"""
         mock_proxy = MagicMock()
+        mock_query_proxy_class = MagicMock()
         mock_query_proxy_class.return_value = mock_proxy
 
-        strategy = GeoNamesReconciliationStrategy()
+        strategy = GeoNamesReconciliationStrategy(repository_or_cls=mock_query_proxy_class)
 
-        mock_query_proxy_class.assert_called_once_with(SPECIFICATION)
-        assert strategy.specification == SPECIFICATION
+        mock_query_proxy_class.assert_called()
+        assert isinstance(strategy.specification, dict)
+        assert strategy.specification.get("key") == "geonames"
 
     @with_test_config
-    @patch("src.strategies.geonames.GeoNamesQueryProxy")
-    def test_init_with_custom_specification(self, mock_query_proxy_class, test_provider: MockConfigProvider):
+    def test_init_with_repository_instance(self, test_provider: MockConfigProvider):
+        """Test initialization with a provided repository instance"""
+        proxy = MagicMock(spec=GeoNamesRepository)
+        strategy = GeoNamesReconciliationStrategy(repository_or_cls=proxy)
+        assert strategy.get_repository() is proxy
+
+    @with_test_config
+    def test_init_with_custom_specification(self, test_provider: MockConfigProvider):
         """Test initialization with custom specification"""
         custom_spec = {"key": "custom_geonames", "display_name": "Custom GeoNames"}
         mock_proxy = MagicMock()
+        mock_query_proxy_class = MagicMock()
         mock_query_proxy_class.return_value = mock_proxy
 
-        strategy = GeoNamesReconciliationStrategy(custom_spec)
+        strategy = GeoNamesReconciliationStrategy(specification=custom_spec, repository_or_cls=mock_query_proxy_class)
 
-        mock_query_proxy_class.assert_called_once_with(SPECIFICATION)  # Still uses SPECIFICATION for proxy
+        mock_query_proxy_class.assert_called()
         assert strategy.specification == custom_spec
 
     @with_test_config
-    @patch("src.strategies.geonames.GeoNamesQueryProxy")
-    def test_init_with_strategy_options(self, mock_query_proxy_class, test_provider: MockConfigProvider):
+    def test_init_with_strategy_options(self, test_provider: MockConfigProvider):
         """Test initialization with strategy options from config"""
-        test_provider.get_config().update({"policy.geonames.geonames.options": {"username": "strategy_user", "lang": "sv", "country_bias": "SE"}})
+        test_provider.get_config().update(
+            {"policy.geonames.geonames.options": {"username": "strategy_user", "lang": "sv", "country_bias": "SE"}}
+        )
 
         mock_proxy = MagicMock()
+        mock_query_proxy_class = MagicMock()
         mock_query_proxy_class.return_value = mock_proxy
 
-        _ = GeoNamesReconciliationStrategy()
+        strategy = GeoNamesReconciliationStrategy(repository_or_cls=mock_query_proxy_class)
 
         # Verify proxy was created with strategy options
-        mock_query_proxy_class.assert_called_once_with(SPECIFICATION, username="strategy_user", lang="sv", country_bias="SE")
+        mock_query_proxy_class.assert_called_once_with(strategy.specification, username="strategy_user", lang="sv", country_bias="SE")
 
     @with_test_config
     def test_as_candidate_basic(self, test_provider: MockConfigProvider):
@@ -256,11 +280,27 @@ class TestGeoNamesReconciliationStrategy:
         """Test candidate conversion for administrative area"""
         strategy = GeoNamesReconciliationStrategy()
 
-        geonames_data = {"geonameId": 456, "name": "Västerbotten", "fcl": "A", "fcode": "ADM1", "fcodeName": "first-order administrative division"}
+        geonames_data = {
+            "geonameId": 456,
+            "name": "Västerbotten",
+            "fcl": "A",
+            "fcode": "ADM1",
+            "fcodeName": "first-order administrative division",
+        }
 
         result = strategy.as_candidate(geonames_data, "vasterbotten")
 
         assert result["type"] == [{"id": "/location/administrative_area", "name": "Administrative Area"}]
+
+    @with_test_config
+    def test_as_candidate_name_sim_when_score_is_none(self, test_provider: MockConfigProvider):
+        """Test name_sim fallback when score is None (defensive branch)."""
+        strategy = GeoNamesReconciliationStrategy()
+        strategy._calculate_score = MagicMock(return_value=None)  # type: ignore[method-assign]
+
+        geonames_data = {"geonameId": 123, "name": "Test Place"}
+        result = strategy.as_candidate(geonames_data, "test")
+        assert result["name_sim"] == 0.0
 
     @with_test_config
     def test_calculate_score_basic(self, test_provider: MockConfigProvider):
@@ -369,7 +409,7 @@ class TestGeoNamesReconciliationStrategy:
         mock_proxy.find.return_value = mock_geonames_results
 
         strategy = GeoNamesReconciliationStrategy()
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy.find_candidates("Swedish cities", limit=5)
 
         mock_proxy.find.assert_called_once_with("Swedish cities", 5, properties={})
@@ -388,7 +428,7 @@ class TestGeoNamesReconciliationStrategy:
         strategy = GeoNamesReconciliationStrategy()
         properties = {"country": "SE", "feature_class": "P"}
 
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             await strategy.find_candidates("test", properties=properties, limit=3)
 
         mock_proxy.find.assert_called_once_with("test", 3, properties=properties)
@@ -404,7 +444,7 @@ class TestGeoNamesReconciliationStrategy:
 
         strategy = GeoNamesReconciliationStrategy()
 
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy.find_candidates("test", limit=3)
 
         # Should only return top 3 results
@@ -423,7 +463,7 @@ class TestGeoNamesReconciliationStrategy:
 
         strategy = GeoNamesReconciliationStrategy()
 
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy.get_details("2666199", lang="sv", style="FULL")
 
         mock_proxy.get_details.assert_called_once_with(entity_id="2666199", lang="sv", style="FULL")
@@ -439,7 +479,7 @@ class TestGeoNamesReconciliationStrategy:
         strategy = GeoNamesReconciliationStrategy()
 
         # Pass various kwargs, only lang and style should be passed through
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             await strategy.get_details("123", lang="fr", style="MEDIUM", invalid_param="should_be_filtered", another_param=123)
 
         mock_proxy.get_details.assert_called_once_with(entity_id="123", lang="fr", style="MEDIUM")
@@ -509,20 +549,6 @@ class TestGeoNamesReconciliationStrategy:
         result = strategy._geonames_type_for_refine(data)
 
         assert result == {"id": "/location/place", "name": "Place"}
-
-
-class TestGeoNamesSpecification:
-    """Test SPECIFICATION constant"""
-
-    def test_specification_structure(self):
-        """Test that SPECIFICATION has required fields"""
-        assert SPECIFICATION["key"] == "geonames"
-        assert SPECIFICATION["display_name"] == "GeoNames Places"
-        assert SPECIFICATION["id_field"] == "geoname_id"
-        assert SPECIFICATION["label_field"] == "label"
-        assert isinstance(SPECIFICATION["properties"], list)
-        assert isinstance(SPECIFICATION["property_settings"], dict)
-        assert isinstance(SPECIFICATION["sql_queries"], dict)
 
 
 class TestGeoNamesIntegration:
@@ -598,7 +624,7 @@ class TestGeoNamesEdgeCases:
 
         strategy = GeoNamesReconciliationStrategy()
 
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy.find_candidates("nonexistent place")
 
         assert result == []
@@ -611,7 +637,7 @@ class TestGeoNamesEdgeCases:
         mock_proxy.get_details.return_value = None
         strategy = GeoNamesReconciliationStrategy()
 
-        with patch.object(strategy, "get_proxy", return_value=mock_proxy):
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
             result = await strategy.get_details("999999999")
 
         assert result is None

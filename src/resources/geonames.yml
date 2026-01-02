@@ -1,0 +1,10 @@
+key: geonames
+display_name: "GeoNames Places"
+id_field: geoname_id
+label_field: label
+
+properties: []
+
+property_settings: {}
+
+sql_queries: {}

@@ -56,7 +56,12 @@ class TranslationCache:
         # Update file cache
         cache_file = self.cache_dir / f"{key}.json"
         try:
-            data = {"text": text, "target_lang": target_lang, "translation": translation, "timestamp": str(datetime.datetime.now(datetime.timezone.utc))}
+            data = {
+                "text": text,
+                "target_lang": target_lang,
+                "translation": translation,
+                "timestamp": str(datetime.datetime.now(datetime.timezone.utc)),
+            }
             with open(cache_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:  # pylint: disable=broad-exception-caught

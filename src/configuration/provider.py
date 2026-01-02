@@ -1,33 +1,45 @@
 import threading
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any, Self
+
+from loguru import logger
 
 from src.utility import recursive_filter_dict, recursive_update
 
-from .config import ConfigFactory
+from .config import Config, ConfigFactory
 from .interface import ConfigLike
 
 # pylint: disable=global-statement
 
 
 class ConfigStore:
-    """A class to manage configuration files and contexts"""
+    """A class to manage configuration files and contexts."""
 
-    _instance: "ConfigStore" = None
+    _instance: "ConfigStore | None" = None
     _lock = threading.Lock()
 
-    def __init__(self):
-        if ConfigStore._instance is not None:
+    def __init__(self, config_directory: Any | None = None):
+        """
+        Initialize ConfigStore.
+
+        Args:
+            config_directory: Path to configuration directory (for non-singleton usage)
+        """
+        if ConfigStore._instance is not None and config_directory is None:
             raise RuntimeError("ConfigStore is a singleton. Use get_instance()")
-        self.store: dict[str, ConfigLike | None] = {"default": None}
+
+        self.config_directory = config_directory
+        self.store: dict[str, ConfigLike | None] = {}
         self.context: str = "default"
 
     @classmethod
-    def get_instance(cls) -> Self:
+    def get_instance(cls) -> "ConfigStore":
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
                     cls._instance = cls()
+        assert cls._instance is not None
         return cls._instance
 
     @classmethod
@@ -38,23 +50,87 @@ class ConfigStore:
             # Also reset the provider to singleton when resetting Config Store
             reset_config_provider()
 
-    def is_configured(self, context: str = None) -> bool:
+    def is_configured(self, context: str | None = None) -> bool:
+        """Check if a config context is loaded."""
         return self.store.get(context or self.context) is not None
 
-    def config(self, context: str = None) -> ConfigLike:
-        ctx = context or self.context
+    def config(self, context: str | None = None) -> ConfigLike | None:
+        """Get config for a context (raises if not loaded)."""
+        ctx: str = context or self.context
         if not self.is_configured(ctx):
             raise ValueError(f"Config context '{ctx}' not properly initialized")
-        return self.store.get(ctx)
+
+        return self.store[ctx]
+
+    def load_config(self, config_name: str) -> ConfigLike:
+        """
+        Load a config file by name (cached per name).
+
+        Args:
+            config_name: Name of config file (without .yml extension)
+
+        Returns:
+            Loaded configuration
+
+        Raises:
+            FileNotFoundError: If config file doesn't exist
+            ValueError: If config_directory not set
+        """
+        if self.config_directory is None:
+            raise ValueError("config_directory not set. Cannot load config.")
+
+        if config_name not in self.store:
+
+            filename: Path = Path(self.config_directory) / f"{config_name.strip(".yml")}.yml"
+            if not filename.exists():
+                raise FileNotFoundError(f"Config file not found: {filename}")
+
+            cfg: ConfigLike = ConfigFactory().load(source=str(filename), context=config_name)
+            self.store[config_name] = cfg
+            logger.info(f"Loaded config '{config_name}' from {filename}")
+
+        return self.store[config_name]  # type: ignore
+
+    def get_config(self, config_name: str) -> ConfigLike:
+        """
+        Get a loaded config (raises if not loaded).
+
+        Args:
+            config_name: Name of config context
+
+        Returns:
+            Configuration
+
+        Raises:
+            ValueError: If config not loaded
+        """
+        if config_name not in self.store:
+            raise ValueError(f"Config '{config_name}' not loaded. Call load_config() first.")
+        return self.store[config_name]  # type: ignore
+
+    def is_loaded(self, config_name: str) -> bool:
+        """Check if a config is currently loaded."""
+        return config_name in self.store and self.store[config_name] is not None
+
+    def unload_config(self, config_name: str) -> None:
+        """Unload a config from memory."""
+        if config_name in self.store:
+            del self.store[config_name]
+            logger.info(f"Unloaded config '{config_name}'")
+
+    def reload_config(self, config_name: str) -> ConfigLike:
+        """Force reload a config from disk."""
+        self.unload_config(config_name)
+        return self.load_config(config_name)
 
     # Convenience class methods for backward compatibility
     @classmethod
-    def is_configured_global(cls, context: str = None) -> bool:
+    def is_configured_global(cls, context: str | None = None) -> bool:
         """Check if configuration is available (uses provider layer)"""
         return get_config_provider().is_configured(context)
 
     @classmethod
-    def config_global(cls, context: str = None) -> ConfigLike:
+    def config_global(cls, context: str | None = None) -> ConfigLike:
         """Get configuration (uses provider layer)"""
         return get_config_provider().get_config(context)
 
@@ -62,16 +138,16 @@ class ConfigStore:
         self,
         *,
         context: str = "default",
-        source: ConfigLike | str | dict = "config.yml",
+        source: ConfigLike | str | dict[str, Any] = "config.yml",
         env_filename: str | None = None,
-        env_prefix: str = None,
+        env_prefix: str | None = None,
         switch_to_context: bool = True,
     ) -> Self:
         if not self.store.get(context) and not source:
             raise ValueError(f"Config context {context} undefined, cannot initialize")
 
-        if isinstance(source, ConfigLike):
-            self.set_config(context=context, cfg=source)
+        if isinstance(source, (Config, ConfigLike)):
+            self.set_config(context="context", cfg=source)
         else:
             cfg: ConfigLike = ConfigFactory().load(
                 source=source or self.store.get(context),
@@ -97,32 +173,35 @@ class ConfigStore:
         if not section:
             raise ValueError("Config section cannot be undefined, cannot consolidate")
 
-        ignore_keys: set[str] = ignore_keys or set(opts.keys())
+        ignore_keys = ignore_keys or set(opts.keys())
+
+        cfg: ConfigLike | None = self.store[context]
+        assert cfg is not None
 
         opts = recursive_update(
             opts,
             recursive_filter_dict(
-                self.store[context].get(section, {}),
+                cfg.get(section, default={}),
                 filter_keys=ignore_keys,
                 filter_mode="exclude",
             ),
         )
 
-        self.store[context].data[section] = opts
+        self.store[context].data[section] = opts  # type: ignore
 
         return self
 
     def set_config(
         self,
+        cfg: ConfigLike,
         *,
         context: str = "default",
-        cfg: ConfigLike | None = None,
         switch_to_context: bool = True,
     ) -> ConfigLike | None:
         """Set configuration for the given context. Returns old config if it existed."""
         if not isinstance(cfg, ConfigLike):
             raise ValueError(f"Expected Config, found {type(cfg)}")
-        old_config = self.store.get(context)
+        old_config: ConfigLike | None = self.store.get(context)
         self.store[context] = cfg
         if switch_to_context:
             self.context = context
@@ -133,48 +212,51 @@ class ConfigProvider(ABC):
     """Abstract configuration provider for dependency injection"""
 
     @abstractmethod
-    def get_config(self, context: str = None) -> ConfigLike:
+    def get_config(self, context: str | None = None) -> ConfigLike:
         """Get configuration for the given context"""
 
     @abstractmethod
-    def is_configured(self, context: str = None) -> bool:
+    def is_configured(self, context: str | None = None) -> bool:
         """Check if configuration exists for the given context"""
 
     @abstractmethod
-    def set_config(self, config: ConfigLike | None, context: str = None) -> ConfigLike | None:
+    def set_config(self, config: ConfigLike, context: str | None = None) -> ConfigLike | None:
         """Set configuration for the given context"""
 
 
 class SingletonConfigProvider(ConfigProvider):
     """Production config provider using Config Store singleton"""
 
-    def get_config(self, context: str = None) -> ConfigLike:
-        return ConfigStore.get_instance().config(context)
+    def get_config(self, context: str | None = None) -> ConfigLike:
+        cfg: ConfigLike | None = ConfigStore.get_instance().config(context)
+        if cfg is None:
+            raise ValueError(f"Config context '{context or 'default'}' not properly initialized")
+        return cfg
 
-    def is_configured(self, context: str = None) -> bool:
+    def is_configured(self, context: str | None = None) -> bool:
         return ConfigStore.get_instance().is_configured(context)
 
-    def set_config(self, config: ConfigLike | None, context: str = None) -> ConfigLike | None:
-        return ConfigStore.get_instance().set_config(context=context or "default", cfg=config)
+    def set_config(self, config: ConfigLike, context: str | None = None) -> ConfigLike | None:
+        return ConfigStore.get_instance().set_config(cfg=config, context=context or "default")
 
 
 class MockConfigProvider(ConfigProvider):
     """Test config provider with controllable configuration.
     Note that the context parameter is ignored in this implementation."""
 
-    def __init__(self, config: ConfigLike, context: str = "default"):
+    def __init__(self, config: ConfigLike, context: str | None = "default"):
         self._config: ConfigLike = config
-        self._context: str = context
+        self._context: str | None = context
 
-    def get_config(self, context: str = None) -> ConfigLike:
+    def get_config(self, context: str | None = None) -> ConfigLike:  # pylint: disable=unused-argument
         return self._config
 
-    def set_config(self, config: ConfigLike | None, context: str = None) -> ConfigLike | None:
-        old_config = self._config
+    def set_config(self, config: ConfigLike, context: str | None = None) -> ConfigLike | None:  # pylint: disable=unused-argument
+        old_config: ConfigLike | None = self._config
         self._config = config
         return old_config
 
-    def is_configured(self, context: str = None) -> bool:
+    def is_configured(self, context: str | None = None) -> bool:  # pylint: disable=unused-argument
         return self._config is not None
 
 

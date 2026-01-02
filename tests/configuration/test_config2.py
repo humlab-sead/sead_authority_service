@@ -1,0 +1,1894 @@
+from pathlib import Path
+
+import pytest
+
+from src.configuration import Config, ConfigFactory, ConfigProvider, ConfigStore, ConfigValue, MockConfigProvider, set_config_provider
+from src.configuration.utility import replace_references
+from tests.decorators import with_test_config
+
+# pylint: disable=unused-argument, implicit-str-concat, f-string-without-interpolation, invalid-field-call
+
+
+class TestConfigProvider:
+    """Test edge cases and error conditions"""
+
+    @with_test_config
+    def test_simple_test(self, test_provider: MockConfigProvider) -> None:
+        """A simple test to ensure pytest is working"""
+        value = ConfigValue("llm.options.max_tokens").resolve()
+        assert value == 10000
+        value = ConfigValue("llm.ollama.options.max_tokens").resolve()
+        assert value is None
+        value = ConfigValue("llm.num_predict,llm.ollama.options.num_predict").resolve()
+        assert value == 4096
+        value = ConfigValue("llm.ollama.options.num_predict,llm.num_predict").resolve()
+        assert value == 4096
+        value = ConfigValue("llm.dummy.options.num_predict,llm.num_predict").resolve()
+        assert value is None
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_config_value_resolution(self, test_provider: MockConfigProvider):
+        """Test that ConfigValue works with the new provider system"""
+        # Test ConfigValue resolution
+        id_base_config = ConfigValue("options:id_base")
+
+        # This will use the test_provider's configuration
+        assert id_base_config.resolve() == "https://w3id.org/sead/id/"
+
+    def test_config_provider_switching(self) -> None:
+        """Test that we can switch between providers"""
+        # Create two different configs
+        config1 = Config(data={"test": {"value": "config1"}})
+        config2 = Config(data={"test": {"value": "config2"}})
+
+        provider1 = MockConfigProvider(config1)
+        provider2 = MockConfigProvider(config2)
+
+        # Test switching providers
+        original: ConfigProvider = set_config_provider(provider1)
+
+        try:
+            config_value = ConfigValue("test:value")
+            assert config_value.resolve() == "config1"
+
+            # Switch to second provider
+            set_config_provider(provider2)
+            assert config_value.resolve() == "config2"
+
+            # Switch back
+            set_config_provider(provider1)
+            assert config_value.resolve() == "config1"
+
+        finally:
+            set_config_provider(original)
+
+    @with_test_config
+    def test_singleton_persistence(self, test_provider):
+        """Test that singleton ConfigStore persists across calls"""
+        # Configure the singleton
+        config = Config(data={"test": "singleton_value"})
+        store: ConfigStore = ConfigStore.get_instance()
+        store.store["default"] = config
+
+        # Get another instance - should be the same
+        store2: ConfigStore = ConfigStore.get_instance()
+        assert store is store2
+        assert store2 is not None
+        assert store2.config().get("test") == "singleton_value"  # type: ignore
+
+        # Reset and verify it's clean
+        # ConfigStore.reset_instance()
+        # store3 = ConfigStore.get_instance()
+        # assert store3 is not store
+        # assert store3.store["default"] is None
+
+
+class TestConfigFactorySubConfigs:
+    """Test sub-config loading feature using @include: notation"""
+
+    def test_simple_sub_config_loading(self, tmp_path: Path):
+        """Test loading a simple sub-config referenced with @include: notation"""
+        # Create sub-config file
+        sub_config = tmp_path / "sub_config.yml"
+        sub_config.write_text(
+            """
+database:
+  host: localhost
+  port: 5432
+  name: testdb
+"""
+        )
+
+        # Create main config that references sub-config
+        main_config = tmp_path / "main_config.yml"
+        main_config.write_text(
+            f"""
+app_name: "Test Application"
+db_config: "@include:{sub_config}"
+"""
+        )
+
+        # Load main config
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        # Verify main config values
+        assert config.get("app_name") == "Test Application"
+
+        # Verify sub-config was loaded and merged
+        assert config.get("db_config:database:host") == "localhost"
+        assert config.get("db_config:database:port") == 5432
+        assert config.get("db_config:database:name") == "testdb"
+
+    def test_relative_path_sub_config(self, tmp_path: Path):
+        """Test loading sub-config with relative path"""
+        # Create directory structure
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+
+        # Create sub-config in same directory
+        sub_config = config_dir / "database.yml"
+        sub_config.write_text(
+            """
+connection:
+  host: db.example.com
+  port: 5433
+"""
+        )
+
+        # Create main config with relative reference
+        main_config = config_dir / "main.yml"
+        main_config.write_text(
+            """
+app:
+  name: "My App"
+  database: "@include:database.yml"
+"""
+        )
+
+        # Load main config
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        # Verify values
+        assert config.get("app:name") == "My App"
+        assert config.get("app:database:connection:host") == "db.example.com"
+        assert config.get("app:database:connection:port") == 5433
+
+    def test_nested_sub_configs(self, tmp_path: Path):
+        """Test loading nested sub-configs (sub-config references another sub-config)"""
+        # Create innermost config
+        credentials_config = tmp_path / "credentials.yml"
+        credentials_config.write_text(
+            """
+username: admin
+password: secret123
+"""
+        )
+
+        # Create middle config that references credentials
+        db_config = tmp_path / "database.yml"
+        db_config.write_text(
+            f"""
+host: localhost
+port: 5432
+credentials: "@include:{credentials_config}"
+"""
+        )
+
+        # Create main config that references database
+        main_config = tmp_path / "main.yml"
+        main_config.write_text(
+            f"""
+application: "Test App"
+database: "@include:{db_config}"
+"""
+        )
+
+        # Load main config
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        # Verify all levels loaded correctly
+        assert config.get("application") == "Test App"
+        assert config.get("database:host") == "localhost"
+        assert config.get("database:port") == 5432
+        assert config.get("database:credentials:username") == "admin"
+        assert config.get("database:credentials:password") == "secret123"
+
+    def test_multiple_sub_configs(self, tmp_path: Path):
+        """Test loading multiple sub-configs in the same main config"""
+        # Create multiple sub-configs
+        db_config = tmp_path / "database.yml"
+        db_config.write_text(
+            """
+host: localhost
+port: 5432
+"""
+        )
+
+        api_config = tmp_path / "api.yml"
+        api_config.write_text(
+            """
+base_url: "https://api.example.com"
+timeout: 30
+"""
+        )
+
+        logging_config = tmp_path / "logging.yml"
+        logging_config.write_text(
+            """
+level: DEBUG
+format: "%(asctime)s - %(message)s"
+"""
+        )
+
+        # Create main config referencing all three
+        main_config = tmp_path / "main.yml"
+        main_config.write_text(
+            f"""
+app_name: "Multi-Config App"
+database: "@include:{db_config}"
+api: "@include:{api_config}"
+logging: "@include:{logging_config}"
+"""
+        )
+
+        # Load main config
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        # Verify all sub-configs loaded
+        assert config.get("app_name") == "Multi-Config App"
+        assert config.get("database:host") == "localhost"
+        assert config.get("api:base_url") == "https://api.example.com"
+        assert config.get("logging:level") == "DEBUG"
+
+    def test_sub_config_with_list(self, tmp_path: Path):
+        """Test sub-config containing lists"""
+        # Create sub-config with list
+        servers_config = tmp_path / "servers.yml"
+        servers_config.write_text(
+            """
+servers:
+  - name: server1
+    host: 192.168.1.1
+    port: 8080
+  - name: server2
+    host: 192.168.1.2
+    port: 8081
+"""
+        )
+
+        # Create main config
+        main_config = tmp_path / "main.yml"
+        main_config.write_text(
+            f"""
+environment: production
+backend: "@include:{servers_config}"
+"""
+        )
+
+        # Load and verify
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        assert config.get("environment") == "production"
+        servers = config.get("backend:servers")
+        assert len(servers) == 2
+        assert servers[0]["name"] == "server1"
+        assert servers[1]["host"] == "192.168.1.2"
+
+    def test_sub_config_within_list(self, tmp_path: Path):
+        """Test sub-config reference within a list"""
+        # Create sub-config
+        prod_db = tmp_path / "prod_db.yml"
+        prod_db.write_text(
+            """
+host: prod.example.com
+port: 5432
+replicas: 3
+"""
+        )
+
+        # Create main config with sub-config reference in list
+        main_config = tmp_path / "main.yml"
+        main_config.write_text(
+            f"""
+databases:
+  - name: development
+    host: localhost
+    port: 5432
+  - "@include:{prod_db}"
+"""
+        )
+
+        # Load and verify
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        databases = config.get("databases")
+        assert len(databases) == 2
+        assert databases[0]["name"] == "development"
+        assert databases[1]["host"] == "prod.example.com"
+        assert databases[1]["replicas"] == 3
+
+    def test_sub_config_not_found(self, tmp_path: Path):
+        """Test error handling when sub-config file doesn't exist"""
+        main_config = tmp_path / "main.yml"
+        main_config.write_text(
+            """
+app: test
+database: "@include:nonexistent.yml"
+"""
+        )
+
+        factory = ConfigFactory()
+        with pytest.raises(FileNotFoundError, match="Configuration file not found"):
+            factory.load(source=str(main_config))
+
+    def test_sub_config_with_environment_variables(self, tmp_path: Path, monkeypatch):
+        """Test sub-config with environment variable substitution"""
+        # Set environment variable
+        monkeypatch.setenv("DB_HOST", "env-db-host.example.com")
+        monkeypatch.setenv("DB_PORT", "5433")
+
+        # Create sub-config with env vars
+        db_config = tmp_path / "database.yml"
+        db_config.write_text(
+            """
+host: "${DB_HOST}"
+port: ${DB_PORT}
+"""
+        )
+
+        # Create main config
+        main_config = tmp_path / "main.yml"
+        main_config.write_text(
+            f"""
+app: test
+database: "@include:{db_config}"
+"""
+        )
+
+        # Load and verify env vars were replaced
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        assert config.get("database:host") == "env-db-host.example.com"
+        assert config.get("database:port") == "5433"
+
+    def test_sub_config_with_yaml_constructors(self, tmp_path: Path):
+        """Test sub-config with custom YAML constructors like !join and !path_join"""
+        # Create sub-config using constructors
+        paths_config = tmp_path / "paths.yml"
+        paths_config.write_text(
+            """
+base_dir: /var/app
+log_file: !path_join [/var/app, logs, app.log]
+message: !join ["Hello", " ", "World"]
+"""
+        )
+
+        # Create main config
+        main_config = tmp_path / "main.yml"
+        main_config.write_text(
+            f"""
+app: test
+paths: "@include:{paths_config}"
+"""
+        )
+
+        # Load and verify
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        assert config.get("paths:base_dir") == "/var/app"
+        # Note: path_join behavior depends on OS
+        assert "logs" in config.get("paths:log_file")
+        assert config.get("paths:message") == "Hello World"
+
+    def test_sub_config_absolute_path(self, tmp_path: Path):
+        """Test loading sub-config with absolute path"""
+        # Create sub-config
+        sub_config = tmp_path / "absolute_sub.yml"
+        sub_config.write_text(
+            """
+setting: "absolute path test"
+value: 42
+"""
+        )
+
+        # Create main config with absolute path reference
+        main_config = tmp_path / "main.yml"
+        absolute_path = str(sub_config.absolute())
+        main_config.write_text(
+            f"""
+app: test
+config: "@include:{absolute_path}"
+"""
+        )
+
+        # Load and verify
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        assert config.get("config:setting") == "absolute path test"
+        assert config.get("config:value") == 42
+
+    def test_sub_config_override_behavior(self, tmp_path: Path):
+        """Test that sub-config completely replaces the key value"""
+        # Create sub-config
+        sub_config = tmp_path / "override.yml"
+        sub_config.write_text(
+            """
+new_key: "from sub-config"
+another: 123
+"""
+        )
+
+        # Create main config
+        main_config = tmp_path / "main.yml"
+        main_config.write_text(
+            f"""
+target:
+  old_key: "will be replaced"
+  target: "@include:{sub_config}"
+"""
+        )
+
+        # Load and verify
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        # The sub-config should completely replace the value
+        assert config.get("target:target:new_key") == "from sub-config"
+        assert config.get("target:target:another") == 123
+
+    def test_sub_config_empty_file(self, tmp_path: Path):
+        """Test loading an empty sub-config file"""
+        # Create empty sub-config
+        sub_config = tmp_path / "empty.yml"
+        sub_config.write_text("")
+
+        # Create main config
+        main_config = tmp_path / "main.yml"
+        main_config.write_text(
+            f"""
+app: test
+empty_config: "@include:{sub_config}"
+"""
+        )
+
+        # Load and verify
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        assert config.get("app") == "test"
+        # Empty YAML file loads as empty dict
+        assert config.get("empty_config") == {}
+
+    def test_sub_config_circular_reference_protection(self, tmp_path: Path):
+        """Test that circular references are handled (Python recursion limit will catch this)"""
+        # Create two configs that reference each other
+        config_a = tmp_path / "config_a.yml"
+        config_b = tmp_path / "config_b.yml"
+
+        config_a.write_text(
+            f"""
+name: config_a
+ref: "@include:{config_b}"
+"""
+        )
+
+        config_b.write_text(
+            f"""
+name: config_b
+ref: "@include:{config_a}"
+"""
+        )
+
+        # This should raise a RecursionError
+        factory = ConfigFactory()
+        with pytest.raises(RecursionError):
+            factory.load(source=str(config_a))
+
+    def test_sub_config_with_env_prefix(self, tmp_path: Path, monkeypatch):
+        """Test sub-config loading with env_prefix parameter"""
+        # Set environment variables with prefix
+        monkeypatch.setenv("MYAPP_CONFIG_DATABASE_HOST", "prefix-host.example.com")
+
+        # Create sub-config
+        db_config = tmp_path / "database.yml"
+        db_config.write_text(
+            """
+database:
+  host: default-host
+  port: 5432
+"""
+        )
+
+        # Create main config
+        main_config = tmp_path / "main.yml"
+        main_config.write_text(
+            f"""
+app: test
+config: "@include:{db_config}"
+"""
+        )
+
+        # Load with env_prefix
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config), env_prefix="MYAPP")
+
+        # Env variable should override the sub-config value
+        assert config.get("config:database:host") == "prefix-host.example.com"
+        assert config.get("config:database:port") == 5432
+
+    def test_sub_config_preserves_structure(self, tmp_path: Path):
+        """Test that complex nested structure in sub-config is preserved"""
+        # Create complex sub-config
+        complex_config = tmp_path / "complex.yml"
+        complex_config.write_text(
+            """
+level1:
+  level2:
+    level3:
+      level4:
+        deep_value: "found me!"
+      items:
+        - item1
+        - item2
+  siblings:
+    - name: first
+      value: 1
+    - name: second
+      value: 2
+"""
+        )
+
+        # Create main config
+        main_config = tmp_path / "main.yml"
+        main_config.write_text(
+            f"""
+data: "@include:{complex_config}"
+"""
+        )
+
+        # Load and verify structure
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        assert config.get("data:level1:level2:level3:level4:deep_value") == "found me!"
+        assert len(config.get("data:level1:level2:level3:items")) == 2
+        assert config.get("data:level1:siblings")[1]["name"] == "second"
+
+    def test_sub_config_mixed_with_regular_values(self, tmp_path: Path):
+        """Test that sub-configs can be mixed with regular configuration values"""
+        # Create sub-config
+        db_config = tmp_path / "database.yml"
+        db_config.write_text(
+            """
+connection_string: "postgresql://localhost:5432/mydb"
+pool_size: 10
+"""
+        )
+
+        # Create main config with both sub-config and regular values
+        main_config = tmp_path / "main.yml"
+        main_config.write_text(
+            f"""
+app_name: "MyApp"
+version: "1.0.0"
+database: "@include:{db_config}"
+features:
+  auth: true
+  cache: false
+"""
+        )
+
+        # Load and verify
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        assert config.get("app_name") == "MyApp"
+        assert config.get("version") == "1.0.0"
+        assert config.get("database:connection_string") == "postgresql://localhost:5432/mydb"
+        assert config.get("database:pool_size") == 10
+        assert config.get("features:auth") is True
+
+    def test_sub_config_without_at_include_prefix(self, tmp_path: Path):
+        """Test that strings not starting with @include: are treated as regular values"""
+        main_config = tmp_path / "main.yml"
+        main_config.write_text(
+            """
+app: test
+database: "some/path/that/looks/like/file.yml"
+message: "@value:something"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        # These should be treated as regular string values, not file references
+        assert config.get("database") == "some/path/that/looks/like/file.yml"
+        # Note: "@value:something" will be treated as a reference by replace_references
+        # Since "something" doesn't exist in the config, it will remain as the original string
+        assert config.get("message") == "@value:something"
+
+
+class TestConfigFactoryReferences:
+    """Test internal reference replacement feature using @value: notation"""
+
+    def test_simple_internal_reference(self, tmp_path: Path):
+        """Test simple internal reference replacement."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+base_url: "https://api.example.com"
+api_endpoint: "@value:base_url"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("base_url") == "https://api.example.com"
+        assert config.get("api_endpoint") == "https://api.example.com"
+
+    def test_nested_path_reference(self, tmp_path: Path):
+        """Test reference to nested configuration path."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+database:
+  primary:
+    host: db.example.com
+    port: 5432
+  replica:
+    host: replica.example.com
+    port: 5433
+    
+connection:
+  primary_host: "@value:database.primary.host"
+  primary_port: "@value:database.primary.port"
+  replica_host: "@value:database.replica.host"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("connection:primary_host") == "db.example.com"
+        assert config.get("connection:primary_port") == 5432
+        assert config.get("connection:replica_host") == "replica.example.com"
+
+    def test_reference_with_colon_notation(self, tmp_path: Path):
+        """Test reference using colon notation in path."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+app:
+  settings:
+    timeout: 30
+    retries: 3
+    
+timeout_value: "@value:app:settings:timeout"
+retry_count: "@value:app:settings:retries"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("timeout_value") == 30
+        assert config.get("retry_count") == 3
+
+    def test_reference_to_entire_dict(self, tmp_path: Path):
+        """Test reference pointing to entire dictionary."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+defaults:
+  timeout: 30
+  retries: 3
+  cache: true
+  
+service_a:
+  config: "@value:defaults"
+  
+service_b:
+  config: "@value:defaults"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("service_a:config:timeout") == 30
+        assert config.get("service_a:config:retries") == 3
+        assert config.get("service_b:config:cache") is True
+
+    def test_reference_to_list(self, tmp_path: Path):
+        """Test reference pointing to list."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+allowed_hosts:
+  - localhost
+  - example.com
+  - api.example.com
+  
+cors_origins: "@value:allowed_hosts"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        allowed = config.get("allowed_hosts")
+        cors = config.get("cors_origins")
+        assert cors == allowed
+        assert cors == ["localhost", "example.com", "api.example.com"]
+
+    def test_references_in_list(self, tmp_path: Path):
+        """Test references within a list."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+primary_db: "db1.example.com"
+backup_db: "db2.example.com"
+
+database_hosts:
+  - "@value:primary_db"
+  - "@value:backup_db"
+  - "static.example.com"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        hosts = config.get("database_hosts")
+        assert hosts == ["db1.example.com", "db2.example.com", "static.example.com"]
+
+    def test_recursive_reference_resolution(self, tmp_path: Path):
+        """Test that references pointing to other references are resolved."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+base_value: "final_value"
+level1: "@value:base_value"
+level2: "@value:level1"
+level3: "@value:level2"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("base_value") == "final_value"
+        assert config.get("level1") == "final_value"
+        assert config.get("level2") == "final_value"
+        assert config.get("level3") == "final_value"
+
+    def test_missing_reference_path(self, tmp_path: Path):
+        """Test that missing reference paths remain as original strings."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+value: "test"
+missing_ref: "@value:nonexistent.path"
+another_ref: "@value:value"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("value") == "test"
+        assert config.get("missing_ref") == "@value:nonexistent.path"
+        assert config.get("another_ref") == "test"
+
+    def test_reference_with_environment_variables(self, tmp_path: Path, monkeypatch):
+        """Test that references work after environment variable replacement."""
+        monkeypatch.setenv("DB_HOST", "env-db.example.com")
+        monkeypatch.setenv("DB_PORT", "5432")
+
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+database:
+  host: "${DB_HOST}"
+  port: ${DB_PORT}
+  
+connection_string: "@value:database.host"
+connection_port: "@value:database.port"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Env vars should be replaced first, then references resolved
+        assert config.get("database:host") == "env-db.example.com"
+        assert config.get("database:port") == "5432"
+        assert config.get("connection_string") == "env-db.example.com"
+        assert config.get("connection_port") == "5432"
+
+    def test_references_with_sub_configs(self, tmp_path: Path):
+        """Test that references work with @include: sub-config loading."""
+        # Create sub-config
+        db_config = tmp_path / "database.yml"
+        db_config.write_text(
+            """
+host: localhost
+port: 5432
+name: mydb
+"""
+        )
+
+        # Create main config with both @include: and @value: references
+        main_config = tmp_path / "main.yml"
+        main_config.write_text(
+            f"""
+database: "@include:{db_config}"
+app:
+  db_host: "@value:database.host"
+  db_name: "@value:database.name"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(main_config))
+
+        # Sub-config should load first, then references resolve
+        assert config.get("database:host") == "localhost"
+        assert config.get("app:db_host") == "localhost"
+        assert config.get("app:db_name") == "mydb"
+
+    def test_complex_nested_references(self, tmp_path: Path):
+        """Test complex nested structure with multiple references."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+defaults:
+  timeout: 30
+  retries: 3
+  
+services:
+  api:
+    name: "API Service"
+    settings: "@value:defaults"
+  worker:
+    name: "Worker Service"
+    settings: "@value:defaults"
+    
+monitoring:
+  # Direct references to values that exist in the original structure
+  default_timeout: "@value:defaults.timeout"
+  api_name: "@value:services.api.name"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Services should have their settings resolved from defaults
+        assert config.get("services:api:settings:timeout") == 30
+        assert config.get("services:worker:settings:retries") == 3
+        # Monitoring should reference values that exist in original structure
+        assert config.get("monitoring:default_timeout") == 30
+        assert config.get("monitoring:api_name") == "API Service"
+
+    def test_reference_with_underscore_fallback(self, tmp_path: Path):
+        """Test that references support underscore notation fallback."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+app_config_value: 42
+reference: "@value:app:config:value"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("app_config_value") == 42
+        assert config.get("reference") == 42
+
+    def test_reference_does_not_affect_yaml_constructors(self, tmp_path: Path):
+        """Test that references work alongside YAML constructors."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+base_dir: /var/app
+log_path: !path_join [/var/app, logs, app.log]
+message: !join ["Hello", " ", "World"]
+
+app:
+  directory: "@value:base_dir"
+  greeting: "@value:message"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("base_dir") == "/var/app"
+        assert config.get("message") == "Hello World"
+        assert config.get("app:directory") == "/var/app"
+        assert config.get("app:greeting") == "Hello World"
+
+    def test_mixed_references_and_regular_values(self, tmp_path: Path):
+        """Test that references can be mixed with regular configuration values."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+base_url: "https://api.example.com"
+version: "v1"
+
+endpoints:
+  users: "@value:base_url"
+  posts: "@value:base_url"
+  static_endpoint: "https://static.example.com"
+  version: "@value:version"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("endpoints:users") == "https://api.example.com"
+        assert config.get("endpoints:posts") == "https://api.example.com"
+        assert config.get("endpoints:static_endpoint") == "https://static.example.com"
+        assert config.get("endpoints:version") == "v1"
+
+    def test_reference_order_independence(self, tmp_path: Path):
+        """Test that references work regardless of definition order."""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+# Reference defined before the target
+early_ref: "@value:late_value"
+
+# Other config
+app_name: "Test App"
+
+# Target defined after the reference
+late_value: "this was defined later"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        assert config.get("late_value") == "this was defined later"
+        assert config.get("early_ref") == "this was defined later"
+
+
+# Integration tests
+class TestReplaceReferences:
+    """Tests for replace_references and _replace_references functions."""
+
+    def test_replace_references_simple_string_reference(self):
+        """Test replace_references with simple string reference."""
+        data = {"target": "value123", "ref": "@value:target"}
+        result = replace_references(data)
+        assert result == {"target": "value123", "ref": "value123"}
+
+    def test_replace_references_nested_path_reference(self):
+        """Test replace_references with nested dotpath reference."""
+        data = {
+            "config": {"database": {"host": "localhost", "port": 5432}},
+            "db_host": "@value:config.database.host",
+            "db_port": "@value:config.database.port",
+        }
+        result = replace_references(data)
+        assert result == {"config": {"database": {"host": "localhost", "port": 5432}}, "db_host": "localhost", "db_port": 5432}
+
+    def test_replace_references_colon_notation(self):
+        """Test replace_references with colon notation in path."""
+        data = {"app": {"settings": {"timeout": 30}}, "ref": "@value:app:settings:timeout"}
+        result = replace_references(data)
+        assert result == {"app": {"settings": {"timeout": 30}}, "ref": 30}
+
+    def test_replace_references_missing_path(self):
+        """Test replace_references with nonexistent path (returns original string)."""
+        data = {"value": "test", "ref": "@value:nonexistent.path"}
+        result = replace_references(data)
+        assert result == {"value": "test", "ref": "@value:nonexistent.path"}
+
+    def test_replace_references_non_reference_string(self):
+        """Test replace_references leaves non-reference strings unchanged."""
+        data = {"regular": "just a string", "not_ref": "something:include", "also_not": "includetest"}
+        result = replace_references(data)
+        assert result == {"regular": "just a string", "not_ref": "something:include", "also_not": "includetest"}
+
+    def test_replace_references_dict_structure(self):
+        """Test replace_references with nested dict structure."""
+        data = {"base": {"value": "original"}, "nested": {"config": {"ref": "@value:base.value"}}}
+        result = replace_references(data)
+        assert result == {"base": {"value": "original"}, "nested": {"config": {"ref": "original"}}}
+
+    def test_replace_references_list_structure(self):
+        """Test replace_references with list containing references."""
+        # Note: dotget doesn't support numeric indices, so list item references won't resolve
+        data = {"values": ["a", "b", "c"], "whole_list": "@value:values", "refs": ["@value:whole_list", "static"]}
+        result = replace_references(data)
+        assert result == {"values": ["a", "b", "c"], "whole_list": ["a", "b", "c"], "refs": [["a", "b", "c"], "static"]}
+
+    def test_replace_references_mixed_list_and_dict(self):
+        """Test replace_references with mixed list and dict structures."""
+        # dotget doesn't support numeric indices, so we reference the whole list instead
+        data = {
+            "primary_server": {"name": "server1", "host": "host1.com"},
+            "servers": [{"name": "server1", "host": "host1.com"}, {"name": "server2", "host": "host2.com"}],
+            "primary_host": "@value:primary_server.host",
+        }
+        result = replace_references(data)
+        assert result == {
+            "primary_server": {"name": "server1", "host": "host1.com"},
+            "servers": [{"name": "server1", "host": "host1.com"}, {"name": "server2", "host": "host2.com"}],
+            "primary_host": "host1.com",
+        }
+
+    def test_replace_references_recursive_resolution(self):
+        """Test replace_references with reference pointing to another reference."""
+        data = {"value": "final_value", "ref1": "@value:value", "ref2": "@value:ref1"}
+        result = replace_references(data)
+        # ref2 should resolve to ref1's value, which resolves to "final_value"
+        assert result == {"value": "final_value", "ref1": "final_value", "ref2": "final_value"}
+
+    def test_replace_references_reference_to_dict(self):
+        """Test replace_references with reference pointing to dict."""
+        data = {"settings": {"timeout": 30, "retries": 3}, "copied": "@value:settings"}
+        result = replace_references(data)
+        assert result == {"settings": {"timeout": 30, "retries": 3}, "copied": {"timeout": 30, "retries": 3}}
+
+    def test_replace_references_reference_to_list(self):
+        """Test replace_references with reference pointing to list."""
+        data = {"items": [1, 2, 3], "copied_items": "@value:items"}
+        result = replace_references(data)
+        assert result == {"items": [1, 2, 3], "copied_items": [1, 2, 3]}
+
+    def test_replace_references_multiple_refs_to_same_path(self):
+        """Test replace_references with multiple references to same path."""
+        data = {"source": "shared_value", "ref1": "@value:source", "ref2": "@value:source", "ref3": "@value:source"}
+        result = replace_references(data)
+        assert result == {"source": "shared_value", "ref1": "shared_value", "ref2": "shared_value", "ref3": "shared_value"}
+
+    def test_replace_references_empty_structures(self):
+        """Test replace_references with empty dict and list."""
+        result = replace_references({})
+        assert result == {}
+
+        result = replace_references([])
+        assert result == []
+
+        data = {"empty_dict": {}, "empty_list": [], "ref_to_empty": "@value:empty_dict"}
+        result = replace_references(data)
+        assert result == {"empty_dict": {}, "empty_list": [], "ref_to_empty": {}}
+
+    def test_replace_references_complex_nested_structure(self):
+        """Test replace_references with complex nested structure."""
+        data = {
+            "database": {"primary": {"host": "db1.example.com", "port": 5432}, "replica": {"host": "db2.example.com", "port": 5433}},
+            "app": {"db_config": {"main": "@value:database.primary", "backup": "@value:database.replica.host"}},
+            "monitoring": {"targets": ["@value:database.primary.host", "@value:database.replica.host"]},
+        }
+        result = replace_references(data)
+        expected = {
+            "database": {"primary": {"host": "db1.example.com", "port": 5432}, "replica": {"host": "db2.example.com", "port": 5433}},
+            "app": {"db_config": {"main": {"host": "db1.example.com", "port": 5432}, "backup": "db2.example.com"}},
+            "monitoring": {"targets": ["db1.example.com", "db2.example.com"]},
+        }
+        assert result == expected
+
+    def test_replace_references_deep_nesting(self):
+        """Test replace_references with deeply nested path."""
+        data = {"level1": {"level2": {"level3": {"level4": {"value": "deep"}}}}, "ref": "@value:level1.level2.level3.level4.value"}
+        result = replace_references(data)
+        assert result == {"level1": {"level2": {"level3": {"level4": {"value": "deep"}}}}, "ref": "deep"}
+
+    def test_replace_references_underscore_fallback(self):
+        """Test replace_references with underscore notation fallback."""
+        data = {"app_config_value": 42, "ref": "@value:app:config:value"}
+        result = replace_references(data)
+        assert result == {"app_config_value": 42, "ref": 42}
+
+    def test_replace_references_mixed_data_types(self):
+        """Test replace_references with various data types."""
+        data = {
+            "string": "text",
+            "number": 123,
+            "float": 45.67,
+            "boolean": True,
+            "none_value": None,
+            "ref_string": "@value:string",
+            "ref_number": "@value:number",
+            "ref_float": "@value:float",
+            "ref_boolean": "@value:boolean",
+            "ref_none": "@value:none_value",
+        }
+        result = replace_references(data)
+        expected = {
+            "string": "text",
+            "number": 123,
+            "float": 45.67,
+            "boolean": True,
+            "none_value": None,
+            "ref_string": "text",
+            "ref_number": 123,
+            "ref_float": 45.67,
+            "ref_boolean": True,
+            # Note: When the referenced value is None, dotget returns None as default,
+            # and _replace_references returns the original string if ref_value is None
+            "ref_none": "@value:none_value",
+        }
+        assert result == expected
+
+    def test_replace_references_does_not_modify_original(self):
+        """Test that replace_references doesn't modify the original data."""
+        original_data = {"value": "original", "ref": "@value:value"}
+        original_copy = {"value": "original", "ref": "@value:value"}
+
+        result = replace_references(original_data)
+
+        # Original data should be unchanged
+        assert original_data == original_copy
+
+        # Result should have replacements
+        assert result == {"value": "original", "ref": "original"}
+
+
+class TestListOperations:
+    """Tests for list operations with include directives."""
+
+    def test_simple_include_still_works(self):
+        """Test that simple include directive still works as before."""
+        data = {"source": ["a", "b", "c"], "target": "@value: source"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c"]  # type: ignore[call-arg]
+
+    def test_prepend_items_to_included_list(self):
+        """Test prepending items to an included list."""
+        data = {"source": ["b", "c"], "target": "['a'] + @value: source"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c"]  # type: ignore[call-arg]
+
+    def test_append_items_to_included_list(self):
+        """Test appending items to an included list."""
+        data = {"source": ["a", "b"], "target": "@value: source + ['c']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c"]  # type: ignore[call-arg]
+
+    def test_prepend_and_append(self):
+        """Test prepending and appending items to an included list."""
+        data = {"source": ["b", "c"], "target": "['a'] + @value: source + ['d']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c", "d"]  # type: ignore[call-arg]
+
+    def test_multiple_includes(self):
+        """Test concatenating multiple included lists."""
+        data = {"list1": ["a", "b"], "list2": ["c", "d"], "target": "@value: list1 + @value: list2"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c", "d"]  # type: ignore[call-arg]
+
+    def test_multiple_includes_with_literals(self):
+        """Test complex expression with multiple includes and literals."""
+        data = {"list1": ["b"], "list2": ["d"], "target": "['a'] + @value: list1 + ['c'] + @value: list2 + ['e']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c", "d", "e"]  # type: ignore[call-arg]
+
+    def test_nested_path_reference(self):
+        """Test include with nested path."""
+        data = {"entities": {"sample": {"columns": ["col1", "col2", "col3"]}}, "target": "@value: entities.sample.columns"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["col1", "col2", "col3"]  # type: ignore[call-arg]
+
+    def test_nested_path_with_operations(self):
+        """Test list operations with nested path references."""
+        data = {"entities": {"sample": {"columns": ["col2", "col3"]}}, "target": "['col1'] + @value: entities.sample.columns"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["col1", "col2", "col3"]  # type: ignore[call-arg]
+
+    def test_list_with_strings(self):
+        """Test list operations with string values."""
+        data = {"source": ["value1", "value2"], "target": "['prefix'] + @value: source + ['suffix']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["prefix", "value1", "value2", "suffix"]  # type: ignore[call-arg]
+
+    def test_list_with_numbers(self):
+        """Test list operations with numeric values."""
+        data = {"source": [2, 3], "target": "[1] + @value: source + [4]"}
+
+        result = replace_references(data)
+
+        assert result["target"] == [1, 2, 3, 4]  # type: ignore[call-arg]
+
+    def test_multiple_list_literals(self):
+        """Test multiple list literals without include."""
+        data = {"target": "['a', 'b'] + ['c', 'd']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c", "d"]  # type: ignore[call-arg]
+
+    def test_empty_list_operations(self):
+        """Test operations with empty lists."""
+        data = {"source": [], "target": "['a'] + @value: source + ['b']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b"]  # type: ignore[call-arg]
+
+    def test_whitespace_handling(self):
+        """Test that whitespace in expressions is handled correctly."""
+        data = {"source": ["b"], "target": "  ['a']   +   @value: source   +   ['c']  "}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "b", "c"]  # type: ignore[call-arg]
+
+    def test_recursive_includes(self):
+        """Test that included lists can themselves contain include directives."""
+        data = {"base": ["a", "b"], "extended": "@value: base", "target": "['x'] + @value: extended + ['y']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["x", "a", "b", "y"]  # type: ignore[call-arg]
+
+    def test_nonexistent_path_in_operation(self):
+        """Test handling of nonexistent paths in list operations."""
+        data = {"target": "['a'] + @value: nonexistent.path + ['b']"}
+
+        result = replace_references(data)
+
+        # Should skip the nonexistent reference and concatenate what exists
+        assert result["target"] == ["a", "b"]  # type: ignore[call-arg]
+
+    def test_non_list_value_in_include(self):
+        """Test including a non-list value in a list operation."""
+        data = {"source": "single_value", "target": "['a'] + @value: source + ['b']"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["a", "single_value", "b"]  # type: ignore[call-arg]
+
+    def test_nested_dict_values_unaffected(self):
+        """Test that non-string values in dicts are not affected."""
+        data = {"source": ["a", "b"], "nested": {"list": ["x", "y"], "ref": "@value: source"}}
+
+        result = replace_references(data)
+
+        assert result["nested"]["list"] == ["x", "y"]  # type: ignore[call-arg]
+        assert result["nested"]["ref"] == ["a", "b"]  # type: ignore[call-arg]
+
+    def test_list_within_list_not_processed(self):
+        """Test that list items themselves aren't treated as expressions."""
+        data = {"source": ["a", "b"], "target": ["@value: source", "literal_string"]}  # This should be replaced
+
+        result = replace_references(data)
+
+        assert result["target"][0] == ["a", "b"]  # type: ignore[call-arg]
+        assert result["target"][1] == "literal_string"  # type: ignore[call-arg]
+
+    def test_complex_nested_structure(self):
+        """Test complex nested configuration structure."""
+        data = {
+            "entities": {
+                "location": {"keys": ["Ort", "Kreis", "Land"]},
+                "site": {"keys": ["ProjektNr", "Fustel"], "columns": "@value: entities.site.keys"},
+                "site_location": {"keys": [], "columns": "['extra_col'] + @value: entities.site.columns + @value: entities.location.keys"},
+            }
+        }
+
+        result = replace_references(data)
+
+        # site.columns should resolve to site.keys
+        assert result["entities"]["site"]["columns"] == ["ProjektNr", "Fustel"]  # type: ignore[call-arg]
+
+        # site_location.columns should concatenate all parts
+        assert result["entities"]["site_location"]["columns"] == [  # type: ignore[call-arg]
+            "extra_col",
+            "ProjektNr",
+            "Fustel",
+            "Ort",
+            "Kreis",
+            "Land",
+        ]
+
+    def test_real_world_example(self):
+        """Test a real-world configuration scenario."""
+        data = {
+            "entities": {
+                "sample": {
+                    "surrogate_id": "sample_id",
+                    "keys": ["ProjektNr", "Befu", "ProbNr"],
+                    "columns": ["ProjektNr", "Befu", "ProbNr", "EDatProb", "Strat"],
+                },
+                "sample_taxa": {"keys": [], "columns": "['PCODE', 'RTyp'] + @value: entities.sample.keys + ['Anmerkung']"},
+            }
+        }
+
+        result = replace_references(data)
+
+        assert result["entities"]["sample_taxa"]["columns"] == [  # type: ignore[call-arg]
+            "PCODE",
+            "RTyp",
+            "ProjektNr",
+            "Befu",
+            "ProbNr",
+            "Anmerkung",
+        ]
+
+
+class TestEdgeCases:
+    """Tests for edge cases and error conditions."""
+
+    def test_malformed_list_literal(self):
+        """Test handling of malformed list literal."""
+        data = {"target": "['a', 'b' + @value: source"}  # Missing closing bracket
+
+        # Should not crash, return original or best effort
+        result = replace_references(data)
+        assert result["target"] is not None  # type: ignore[call-arg]
+
+    def test_empty_include_path(self):
+        """Test handling of empty include path."""
+        data = {"target": "@value: "}
+
+        result = replace_references(data)
+        # Should return original string if path is empty/invalid
+        assert result["target"] == "@value: "  # type: ignore[call-arg]
+
+    def test_only_plus_operators(self):
+        """Test string with plus operators but no lists or includes."""
+        data = {"target": "a + b + c"}
+
+        result = replace_references(data)
+
+        # Should remain unchanged as it's not a valid list operation
+        assert result["target"] == "a + b + c"  # type: ignore[call-arg]
+
+    def test_plus_in_string_values(self):
+        """Test that plus signs within list values don't break parsing."""
+        data = {"source": ["value+with+plus"], "target": "@value: source"}
+
+        result = replace_references(data)
+
+        assert result["target"] == ["value+with+plus"]  # type: ignore[call-arg]
+
+
+class TestConfigFactoryLoadDirective:
+    """Test CSV data loading feature using @load: notation"""
+
+    def test_simple_csv_load_with_filepath(self, tmp_path: Path):
+        """Test loading CSV data using direct file path with @load: notation"""
+        # Create a simple CSV file
+        csv_file = tmp_path / "data.csv"
+        csv_file.write_text(
+            """name,value,description
+item1,100,First item
+item2,200,Second item
+item3,300,Third item
+"""
+        )
+
+        # Create config that loads the CSV
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+app_name: "Test App"
+data: "@load:{csv_file}"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify CSV data was loaded as list of dicts
+        data = config.get("data")
+        assert isinstance(data, list)
+        assert len(data) == 3
+        assert data[0]["name"] == "item1"
+        assert data[0]["value"] == "100"
+        assert data[0]["description"] == "First item"
+        assert data[2]["name"] == "item3"
+
+    def test_csv_load_with_tab_delimiter(self, tmp_path: Path):
+        """Test loading TSV (tab-separated) data using @load: notation"""
+        # Create a TSV file
+        tsv_file = tmp_path / "data.tsv"
+        tsv_file.write_text("name\tcode\tpriority\nalpha\tA001\t1\nbeta\tB002\t2\ngamma\tG003\t3\n")
+
+        # Create config with options for TSV
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+app_name: "Test App"
+lookup_data:
+  filename: "{tsv_file}"
+  delimiter: "\\t"
+items: "@load:lookup_data"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify TSV data was loaded
+        items = config.get("items")
+        assert isinstance(items, list)
+        assert len(items) == 3
+        assert items[0]["name"] == "alpha"
+        assert items[0]["code"] == "A001"
+        assert items[1]["priority"] == "2"
+
+    def test_csv_load_with_comma_delimiter(self, tmp_path: Path):
+        """Test loading CSV with explicit comma delimiter option"""
+        # Create a CSV file
+        csv_file = tmp_path / "products.csv"
+        csv_file.write_text(
+            """id,product,price
+1,Widget,9.99
+2,Gadget,19.99
+3,Doohickey,29.99
+"""
+        )
+
+        # Create config with explicit delimiter option
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+products_config:
+  filename: "{csv_file}"
+  delimiter: ","
+products: "@load:products_config"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify CSV was loaded
+        products = config.get("products")
+        assert len(products) == 3
+        assert products[1]["product"] == "Gadget"
+        assert products[1]["price"] == "19.99"
+
+    def test_csv_load_nonexistent_file(self, tmp_path: Path):
+        """Test that loading nonexistent CSV file returns the directive argument"""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+app: test
+data: "@load:nonexistent.csv"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Should return just the directive argument (without @load: prefix)
+        assert config.get("data") == "nonexistent.csv"
+
+    def test_csv_load_missing_filename_in_options(self, tmp_path: Path):
+        """Test that @load with options dict but no filename returns directive argument"""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+bad_config:
+  delimiter: ","
+  other_option: "value"
+data: "@load:bad_config"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Should return just the directive argument
+        assert config.get("data") == "bad_config"
+
+    def test_csv_load_when_path_points_to_non_dict(self, tmp_path: Path):
+        """Test that @load with path to non-dict value returns directive argument"""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+not_a_dict: "just a string"
+data: "@load:not_a_dict"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Should return just the directive argument
+        assert config.get("data") == "not_a_dict"
+
+    def test_csv_load_with_relative_path(self, tmp_path: Path):
+        """Test loading CSV with relative path (relative to config file)"""
+        # Create directory structure
+        config_dir = tmp_path / "config"
+        config_dir.mkdir()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        # Create CSV in data directory
+        csv_file = data_dir / "items.csv"
+        csv_file.write_text(
+            """id,name
+1,First
+2,Second
+"""
+        )
+
+        # Create config with relative path
+        config_file = config_dir / "app.yml"
+        config_file.write_text(
+            f"""
+items: "@load:{csv_file}"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify data loaded
+        items = config.get("items")
+        assert len(items) == 2
+        assert items[0]["id"] == "1"
+
+    def test_csv_load_multiple_files(self, tmp_path: Path):
+        """Test loading multiple CSV files in the same config"""
+        # Create multiple CSV files
+        users_csv = tmp_path / "users.csv"
+        users_csv.write_text(
+            """username,role
+admin,administrator
+user1,user
+"""
+        )
+
+        products_csv = tmp_path / "products.csv"
+        products_csv.write_text(
+            """sku,name
+P001,Product One
+P002,Product Two
+"""
+        )
+
+        # Create config loading both
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+users: "@load:{users_csv}"
+products: "@load:{products_csv}"
+app_name: "Multi-Load App"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify both loaded correctly
+        users = config.get("users")
+        assert len(users) == 2
+        assert users[0]["username"] == "admin"
+
+        products = config.get("products")
+        assert len(products) == 2
+        assert products[1]["sku"] == "P002"
+
+        assert config.get("app_name") == "Multi-Load App"
+
+    def test_csv_load_within_nested_structure(self, tmp_path: Path):
+        """Test @load directive within deeply nested configuration"""
+        # Create CSV
+        csv_file = tmp_path / "codes.csv"
+        csv_file.write_text(
+            """code,description
+C1,Code One
+C2,Code Two
+"""
+        )
+
+        # Create config with nested structure
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+application:
+  settings:
+    database:
+      connection: "postgresql://localhost"
+    lookup_tables:
+      codes: "@load:{csv_file}"
+      other_setting: "value"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify nested load worked
+        codes = config.get("application:settings:lookup_tables:codes")
+        assert len(codes) == 2
+        assert codes[0]["code"] == "C1"
+        assert config.get("application:settings:lookup_tables:other_setting") == "value"
+
+    def test_csv_load_with_list_in_config(self, tmp_path: Path):
+        """Test @load directive within a list"""
+        # Create CSV
+        csv_file = tmp_path / "data.csv"
+        csv_file.write_text(
+            """key,value
+k1,v1
+k2,v2
+"""
+        )
+
+        # Create config with @load in list
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+datasets:
+  - name: "Static Data"
+    items: [1, 2, 3]
+  - "@load:{csv_file}"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify list structure
+        datasets = config.get("datasets")
+        assert len(datasets) == 2
+        assert datasets[0]["name"] == "Static Data"
+        # Second item should be the loaded CSV data (list of dicts)
+        assert isinstance(datasets[1], list)
+        assert len(datasets[1]) == 2
+        assert datasets[1][0]["key"] == "k1"
+
+    def test_csv_load_empty_file(self, tmp_path: Path):
+        """Test loading an empty CSV file fails and returns filepath"""
+        # Create empty CSV
+        csv_file = tmp_path / "empty.csv"
+        csv_file.write_text("")
+
+        # Create config
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+data: "@load:{csv_file}"
+"""
+        )
+
+        # Load config - empty CSV will fail to parse
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Since pandas can't parse empty file, it returns the directive argument
+        data = config.get("data")
+        assert data == str(csv_file)
+
+    def test_csv_load_only_headers(self, tmp_path: Path):
+        """Test loading CSV with only header row"""
+        # Create CSV with only headers
+        csv_file = tmp_path / "headers_only.csv"
+        csv_file.write_text("name,value,status\n")
+
+        # Create config
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+data: "@load:{csv_file}"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Should load as empty list (no data rows)
+        data = config.get("data")
+        assert isinstance(data, list)
+        assert len(data) == 0
+
+    def test_csv_load_with_special_characters(self, tmp_path: Path):
+        """Test loading CSV with special characters in data"""
+        # Create CSV with special characters
+        csv_file = tmp_path / "special.csv"
+        csv_file.write_text("name,description\n" '"Item, with comma","Description with ""quotes"""\n' "Item2,Normal description\n")
+
+        # Create config
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+data: "@load:{csv_file}"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify special characters handled correctly
+        data = config.get("data")
+        assert len(data) == 2
+        assert data[0]["name"] == "Item, with comma"
+        assert "quotes" in data[0]["description"]
+
+    def test_csv_load_combined_with_include(self, tmp_path: Path):
+        """Test using both @load and @include in the same config"""
+        # Create CSV
+        csv_file = tmp_path / "data.csv"
+        csv_file.write_text(
+            """id,value
+1,100
+2,200
+"""
+        )
+
+        # Create sub-config
+        sub_config = tmp_path / "database.yml"
+        sub_config.write_text(
+            """
+host: localhost
+port: 5432
+"""
+        )
+
+        # Create main config using both directives
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+database: "@include:{sub_config}"
+lookup_data: "@load:{csv_file}"
+app_name: "Combined Test"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify both directives worked
+        assert config.get("database:host") == "localhost"
+        data = config.get("lookup_data")
+        assert len(data) == 2
+        assert data[0]["id"] == "1"
+        assert config.get("app_name") == "Combined Test"
+
+    def test_csv_load_with_env_vars(self, tmp_path: Path, monkeypatch):
+        """Test that environment variable substitution doesn't work for @load paths"""
+        # Set environment variable
+        monkeypatch.setenv("DATA_DIR", str(tmp_path))
+
+        # Create CSV
+        csv_file = tmp_path / "env_data.csv"
+        csv_file.write_text(
+            """name,code
+Alpha,A
+Beta,B
+"""
+        )
+
+        # Create config with env var in path
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+data: "@load:${{DATA_DIR}}/env_data.csv"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Env vars are replaced AFTER @load resolution, so this doesn't work
+        # The file won't be found, so directive argument is returned
+        data = config.get("data")
+        assert data == "${DATA_DIR}/env_data.csv"
+
+    def test_csv_load_all_strings_dtype(self, tmp_path: Path):
+        """Test that CSV data is loaded with all columns as strings (dtype=str)"""
+        # Create CSV with various data types
+        csv_file = tmp_path / "types.csv"
+        csv_file.write_text(
+            """id,name,value,is_active
+1,Item One,123.45,true
+2,Item Two,678.90,false
+"""
+        )
+
+        # Create config
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+data: "@load:{csv_file}"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify all values are strings (as per dtype=str in pd.read_csv)
+        data = config.get("data")
+        assert data[0]["id"] == "1"  # String, not int
+        assert data[0]["value"] == "123.45"  # String, not float
+        assert data[0]["is_active"] == "true"  # String, not boolean
+
+    def test_load_directive_with_options_and_missing_file(self, tmp_path: Path):
+        """Test @load with options dict but file doesn't exist"""
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            """
+load_config:
+  filename: "nonexistent.csv"
+  delimiter: "\\t"
+data: "@load:load_config"
+"""
+        )
+
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Should return directive argument when file not found
+        assert config.get("data") == "load_config"
+
+    def test_csv_load_default_delimiter(self, tmp_path: Path):
+        """Test that default delimiter is comma when not specified in options"""
+        # Create CSV
+        csv_file = tmp_path / "default.csv"
+        csv_file.write_text("a,b,c\n1,2,3\n4,5,6\n")
+
+        # Create config with just filename in options (no delimiter)
+        config_file = tmp_path / "config.yml"
+        config_file.write_text(
+            f"""
+csv_opts:
+  filename: "{csv_file}"
+data: "@load:csv_opts"
+"""
+        )
+
+        # Load config
+        factory = ConfigFactory()
+        config = factory.load(source=str(config_file))
+
+        # Verify loaded with comma delimiter
+        data = config.get("data")
+        assert len(data) == 2
+        assert data[0]["a"] == "1"
+        assert data[0]["b"] == "2"

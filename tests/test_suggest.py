@@ -12,8 +12,10 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient, Response
 
+import src.suggest as suggest_module
 from src.api.router import router
 from src.configuration import MockConfigProvider
+from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 
 # pylint: disable=redefined-outer-name, unused-argument, too-many-locals
@@ -181,7 +183,7 @@ async def test_suggest_property_with_prefix(test_app: FastAPI, mock_results: lis
 
 @pytest.mark.asyncio
 @with_test_config
-async def test_flyout_entity_valid(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: MockConfigProvider):
+async def test_flyout_entity_valid(test_app: FastAPI, mock_results: list[dict[str, Any]], test_provider: ExtendedMockConfigProvider):
     """Test flyout preview with valid entity ID"""
     location_row_data = {
         "location_id": 806,
@@ -287,3 +289,242 @@ async def test_suggest_entity_result_limit(test_app: FastAPI, mock_results: list
 
         # Should not return more than 10 results (default limit)
         assert len(data["result"]) <= 10
+
+
+class _TestConfigValue:
+    def __init__(self, path: str, default: Any = None):
+        self.path = path
+        self.default = default
+
+    def resolve(self) -> Any:
+        if self.path == "options:id_base":
+            return "https://w3id.org/sead/id/"
+        return self.default
+
+
+class _SuggestStrategyBase:
+    id_field = "id"
+    label_field = "label"
+    display_name = "Unknown"
+    candidates: list[dict[str, Any]] = []
+    properties: list[dict[str, str]] = []
+    details: dict[str, Any] | None = None
+    raise_on_find: bool = False
+
+    def get_entity_id_field(self) -> str:
+        return self.id_field
+
+    def get_label_field(self) -> str:
+        return self.label_field
+
+    def get_display_name(self) -> str:
+        return self.display_name
+
+    def get_properties_meta(self) -> list[dict[str, str]]:
+        return self.properties
+
+    async def find_candidates(self, query: str, properties: dict[str, Any] | None = None, limit: int = 10) -> list[dict[str, Any]]:
+        if self.raise_on_find:
+            raise RuntimeError("boom")
+        return list(self.candidates)
+
+    async def get_details(self, entity_id: str) -> dict[str, Any] | None:
+        return self.details
+
+
+@pytest.mark.asyncio
+async def test_render_flyout_preview_invalid_id_format(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(suggest_module, "ConfigValue", _TestConfigValue)
+    monkeypatch.setattr(suggest_module.Strategies, "items", {"site": _SuggestStrategyBase}, raising=False)
+
+    with pytest.raises(ValueError, match="Invalid ID format"):
+        await suggest_module.render_flyout_preview("https://example.org/site/123")
+
+
+@pytest.mark.asyncio
+async def test_render_flyout_preview_invalid_id_path(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(suggest_module, "ConfigValue", _TestConfigValue)
+    monkeypatch.setattr(suggest_module.Strategies, "items", {"site": _SuggestStrategyBase}, raising=False)
+
+    with pytest.raises(ValueError, match="Invalid ID path"):
+        await suggest_module.render_flyout_preview("https://w3id.org/sead/id/site/123/extra")
+
+
+@pytest.mark.asyncio
+async def test_render_flyout_preview_unknown_entity_type(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(suggest_module, "ConfigValue", _TestConfigValue)
+    monkeypatch.setattr(suggest_module.Strategies, "items", {}, raising=False)
+
+    with pytest.raises(ValueError, match="Unknown entity type: site"):
+        await suggest_module.render_flyout_preview("https://w3id.org/sead/id/site/123")
+
+
+@pytest.mark.asyncio
+async def test_render_flyout_preview_missing_entity(monkeypatch: pytest.MonkeyPatch):
+    class SiteStrategy(_SuggestStrategyBase):
+        details = None
+
+    monkeypatch.setattr(suggest_module, "ConfigValue", _TestConfigValue)
+    monkeypatch.setattr(suggest_module.Strategies, "items", {"site": SiteStrategy}, raising=False)
+
+    with pytest.raises(ValueError, match="not found"):
+        await suggest_module.render_flyout_preview("https://w3id.org/sead/id/site/123")
+
+
+@pytest.mark.asyncio
+async def test_render_flyout_preview_success_compact_html(monkeypatch: pytest.MonkeyPatch):
+    long_value = "x" * 200
+
+    class SiteStrategy(_SuggestStrategyBase):
+        details = {
+            "Name": "My Site",
+            "IgnoredEmpty": "",
+            "IgnoredNone": None,
+            "Field1": "A",
+            "Field2": "B",
+            "Field3": "C",
+            "Field4": "D",
+            "Field5": long_value,
+            "Field6": "ShouldBeExcludedByMaxDetails",
+            "label": "AlsoIgnored",
+        }
+
+    monkeypatch.setattr(suggest_module, "ConfigValue", _TestConfigValue)
+    monkeypatch.setattr(suggest_module.Strategies, "items", {"site": SiteStrategy}, raising=False)
+
+    data = await suggest_module.render_flyout_preview("https://w3id.org/sead/id/site/123")
+    assert data["id"] == "https://w3id.org/sead/id/site/123"
+    assert "My Site" in data["html"]
+    assert "site" in data["html"]
+    assert "Field6" not in data["html"]
+    assert "x" * 57 + "..." in data["html"]
+
+
+@pytest.mark.asyncio
+async def test_suggest_entities_short_prefix_returns_empty(monkeypatch: pytest.MonkeyPatch):
+    class SiteStrategy(_SuggestStrategyBase):
+        raise_on_find = True
+
+    monkeypatch.setattr(suggest_module, "ConfigValue", _TestConfigValue)
+    monkeypatch.setattr(suggest_module.Strategies, "items", {"site": SiteStrategy}, raising=False)
+
+    data = await suggest_module.suggest_entities(prefix="a")
+    assert data == {"result": []}
+
+
+@pytest.mark.asyncio
+async def test_suggest_entities_filters_and_sorts(monkeypatch: pytest.MonkeyPatch):
+    class SiteStrategy(_SuggestStrategyBase):
+        candidates = [
+            {"id": 1, "label": "Low Score", "name_sim": 0.1},
+            {"id": 2, "label": None, "name_sim": 0.99},
+        ]
+
+    class LocationStrategy(_SuggestStrategyBase):
+        candidates = [{"id": 9, "label": "High Score", "name_sim": 0.9, "description": "desc"}]
+
+    monkeypatch.setattr(suggest_module, "ConfigValue", _TestConfigValue)
+    monkeypatch.setattr(
+        suggest_module.Strategies,
+        "items",
+        {"site": SiteStrategy, "location": LocationStrategy},
+        raising=False,
+    )
+
+    data = await suggest_module.suggest_entities(prefix="up", limit=10)
+    assert len(data["result"]) == 2
+    assert data["result"][0]["name"] == "High Score"
+    assert data["result"][0]["id"] == "https://w3id.org/sead/id/location/9"
+    assert data["result"][0]["description"] == "desc"
+    assert data["result"][1]["id"] == "https://w3id.org/sead/id/site/1"
+
+
+@pytest.mark.asyncio
+async def test_suggest_entities_type_filter_and_error_isolated(monkeypatch: pytest.MonkeyPatch):
+    class SiteStrategy(_SuggestStrategyBase):
+        candidates = [{"id": 1, "label": "Site A", "name_sim": 0.5}]
+
+    class BrokenStrategy(_SuggestStrategyBase):
+        raise_on_find = True
+
+    monkeypatch.setattr(suggest_module, "ConfigValue", _TestConfigValue)
+    monkeypatch.setattr(
+        suggest_module.Strategies,
+        "items",
+        {"site": SiteStrategy, "broken": BrokenStrategy},
+        raising=False,
+    )
+
+    data = await suggest_module.suggest_entities(prefix="si", entity_type="site", limit=10)
+    assert [r["id"] for r in data["result"]] == ["https://w3id.org/sead/id/site/1"]
+
+    data = await suggest_module.suggest_entities(prefix="si", entity_type="missing_type", limit=10)
+    assert [r["id"] for r in data["result"]] == ["https://w3id.org/sead/id/site/1"]
+
+
+@pytest.mark.asyncio
+async def test_suggest_entities_respects_limit_across_strategies(monkeypatch: pytest.MonkeyPatch):
+    class ManyCandidatesStrategy(_SuggestStrategyBase):
+        candidates = [{"id": i, "label": f"Site {i}", "name_sim": 0.9 - (i / 1000)} for i in range(50)]
+
+    class OtherStrategy(_SuggestStrategyBase):
+        candidates = [{"id": 1, "label": "Other", "name_sim": 1.0}]
+
+    monkeypatch.setattr(suggest_module, "ConfigValue", _TestConfigValue)
+    monkeypatch.setattr(
+        suggest_module.Strategies,
+        "items",
+        {"site": ManyCandidatesStrategy, "other": OtherStrategy},
+        raising=False,
+    )
+
+    data = await suggest_module.suggest_entities(prefix="si", limit=5)
+    assert len(data["result"]) == 5
+
+
+@pytest.mark.asyncio
+async def test_suggest_types_filters_by_prefix(monkeypatch: pytest.MonkeyPatch):
+    class SiteStrategy(_SuggestStrategyBase):
+        display_name = "Sites"
+
+    class LocationStrategy(_SuggestStrategyBase):
+        display_name = "Locations"
+
+    monkeypatch.setattr(suggest_module.Strategies, "items", {"site": SiteStrategy, "location": LocationStrategy}, raising=False)
+
+    data = await suggest_module.suggest_types(prefix="")
+    assert {t["id"] for t in data["result"]} == {"site", "location"}
+
+    data = await suggest_module.suggest_types(prefix="loc")
+    assert [t["id"] for t in data["result"]] == ["location"]
+
+    data = await suggest_module.suggest_types(prefix="SITE")
+    assert [t["id"] for t in data["result"]] == ["site"]
+
+
+@pytest.mark.asyncio
+async def test_suggest_properties_dedup_and_prefix_filter(monkeypatch: pytest.MonkeyPatch):
+    class SiteStrategy(_SuggestStrategyBase):
+        properties = [
+            {"id": "latitude", "name": "Latitude", "description": "lat desc"},
+            {"id": "country", "name": "Country", "description": "nation"},
+        ]
+
+    class LocationStrategy(_SuggestStrategyBase):
+        properties = [
+            {"id": "latitude", "name": "Latitude", "description": "duplicate"},
+            {"id": "place_name", "name": "Place Name", "description": "locality"},
+        ]
+
+    monkeypatch.setattr(suggest_module.Strategies, "items", {"site": SiteStrategy, "location": LocationStrategy}, raising=False)
+
+    data = await suggest_module.suggest_properties(prefix="")
+    prop_ids = [p["id"] for p in data["result"]]
+    assert prop_ids.count("latitude") == 1
+    assert set(prop_ids) == {"latitude", "country", "place_name"}
+
+    data = await suggest_module.suggest_properties(prefix="loca")
+    assert [p["id"] for p in data["result"]] == ["place_name"]
+
+    data = await suggest_module.suggest_properties(prefix="", entity_type="site")
+    assert {p["id"] for p in data["result"]} == {"latitude", "country"}

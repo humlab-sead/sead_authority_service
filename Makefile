@@ -75,4 +75,33 @@ requirements.txt: pyproject.toml
 
 .PHONY: test-coverage
 test-coverage:
-	@uv run pytest test_main.py --cov=main --cov-report=html --cov-report=term
+	@uv run pytest tests --cov-report=html --cov=src
+
+.PHONY: dead-code
+dead-code:
+	@uv run vulture src tests main.py
+
+.PHONY: generate-schema
+generate-schema:
+	@echo "Generating entity schema files from templates..."
+	@uv run python src/scripts/generate_entity_schema.py --all
+	@echo "✅ Schema generation complete!"
+
+.PHONY: generate-schema-force
+generate-schema-force:
+	@echo "Regenerating all entity schema files..."
+	@uv run python src/scripts/generate_entity_schema.py --all --force
+	@echo "✅ Schema regeneration complete!"
+	
+
+SCHEMA_OPTS = --no-drop-table --not-null --default-values --no-not_empty --comments --indexes --relations
+BACKEND = postgres
+
+arbodat-data-schema:
+	@mdb-schema $(SCHEMA_OPTS) src/arbodat/input/ArchBotDaten.mdb $(BACKEND) > src/arbodat/input/ArchBotDaten_$(BACKEND)_schema.sql 
+
+arbodat-lookup-schema:
+	@mdb-schema $(SCHEMA_OPTS) src/arbodat/input/ArchBotStrukDat.mdb $(BACKEND) > src/arbodat/input/ArchBotStrukDat_$(BACKEND)_schema.sql 
+
+arbodat-schema: arbodat-data-schema arbodat-lookup-schema
+	@echo "✅ Schema extraction complete!"

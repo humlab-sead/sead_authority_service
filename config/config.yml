@@ -36,6 +36,25 @@ policy:
       feature_classes: ["P", "A"]  # Populated places and Administrative divisions
       orderby: "relevance"
       style: "FULL"
+
+features:
+  use_mcp_server: false  # Start disabled, flip to true when ready
+
+mcp:
+  version: "0.1.0"
+  retrieval:
+    k_fuzzy: 30        # Top-K from trigram search
+    k_sem: 30          # Top-K from semantic search (Phase 3)
+    k_final: 20        # Final candidate count
+    min_score_threshold: 0.6  # Minimum score to return
+  enable_caching: true
+  cache_ttl_seconds: 86400
+  embedding:
+    model: "sentence-transformers/all-mpnet-base-v2"
+    dimensions: 768
+
+table_specs: "@include: entities.yml"
+
 llm:
   provider: "openai"  # "openai" or "anthropic", "ollama"
   options:
@@ -46,7 +65,7 @@ llm:
   translation_target_lang: "en"
   semantic_batch_size: 50
   openai:
-    model: "gpt-4o-mini" # "gpt-4o-mini"
+    model: "gpt-4o-mini"  # "gpt-4o-mini"
     provider_id: "openapi"
     api_key: "${OPENAI_API_KEY}"
     options:
@@ -86,89 +105,7 @@ llm:
     options:
       temperature: 0.1
       max_tokens: 1000
-  prompts:
-    language_detection: |
-      Detect the language of the following text. Respond with the ISO 639-1 language code (e.g., "en" for English, "fr" for French, "de" for German, "sv" for Swedish).
-
-      Text:
-      "{text}"
-
-    translation: |
-      Translate the following text line by line from {source_lang} to {target_lang}.
-
-      Context:
-      {context}
-
-      Guidelines:
-      - Keep the translation natural and fluent.
-      - Preserve proper nouns, names, and technical terms when appropriate.
-      - Use the most common or widely recognized form in the target language if one exists.
-      - Maintain the same number of lines as the input.
-
-      Text to translate:
-      {text}
-
-    abbreviation: |
-      Expand the following abbreviations line by line.
-
-      Each line in the input follows the format:
-      "id, abbreviation"
-
-      The text may include multiple languages.
-      
-      {context}
-
-      Your task:
-      - Expand each abbreviation into its full form based on the given context.
-      - Preserve proper nouns, names, and original capitalization when appropriate.
-      - Output one line per input line, using the format:
-        "id, expanded-abbreviation"
-
-      Input abbreviations:
-      {data}
-
-    reconciliation: |
-      You are reconciling input values against a controlled list of {{ entity_type }}.
-      Return ONLY strict JSON. No prose.
-
-      Context:
-      {{ context }}
-
-      Lookup data ({{ lookup_format }} objects with fields: id, label, description):
-      {{ lookup_data | safe }}
-
-      Input values ({{ lookup_format }}, preserve order):
-      {{ data | safe }}
-
-      Task:
-      For each input, return up to 5 candidate matches from the lookup, ordered best→worst.
-
-      Output JSON must be an array where each element is:
-      {
-        "input_id": "<string>",
-        "input_value": "<string>",
-        "candidates": [
-          { "id": "<lookup id as string>", "value": "<lookup label verbatim>", "score": 0.00, "reasons": ["...","..."] }
-        ]
-      }
-
-      {{ examples | safe }}
-
-      Rules:
-      - Use ONLY ids/labels from the lookup (do not invent).
-      - Copy the lookup's **label** into the candidate **value** verbatim.
-      - If no reasonable match, return "candidates": [].
-      - Scores are in [0,1], **rounded to two decimals**.
-      - Provide **2–4 short** reason bullets per candidate.
-      - Treat text comparison as **case- and diacritic-insensitive**.
-      - Return **ONLY** valid JSON (no comments, no trailing commas, no extra text).
-
-      Scoring considerations:
-      - String similarity (normalization, diacritics, casing)
-      - Abbreviation/alias/lemmatization expansion
-      - Domain/context alignment (terminology fit)
-      - Language variants and most common target-language form
-      - Penalize partial/ambiguous overlaps and mismatched domain terms
+  prompts: "@include prompts.yml"
 
 geonames:
   options:

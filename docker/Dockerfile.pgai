@@ -1,0 +1,32 @@
+FROM postgis/postgis:16-3.4
+
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends \
+		git \
+		curl \
+		sqitch \
+		software-properties-common \
+		libpq-dev \
+	&& add-apt-repository ppa:deadsnakes/ppa \
+	&& apt-get update \
+	&& apt-get install -y --no-install-recommends \
+		python3.11 \
+		python3.11-dev \
+		python3.11-distutils \
+	&& curl -sS https://bootstrap.pypa.io/get-pip.py | python3.11 \
+	&& rm -rf /var/lib/apt/lists/*
+
+# Install pgai Python package which includes the PostgreSQL extension
+RUN python3.11 -m pip install --no-cache-dir "pgai[vectorizer-worker]"
+
+WORKDIR /
+
+RUN git clone https://github.com/humlab-sead/sead_change_control
+
+# this might be needed by the sead_change_control deploy script, not sure
+RUN ln -s /sead_change_control /repo
+
+WORKDIR /sead_change_control
+
+# Add sead_change_control/bin to PATH
+ENV PATH="/sead_change_control/bin:$PATH"

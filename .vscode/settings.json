@@ -23,5 +23,52 @@
         "tests"
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "pgFormatter.configFile": "${workspaceFolder}/.pg_format",
+    "[sql]": {
+        "editor.defaultFormatter": "bradymholt.pgformatter"
+    },
+    "python.analysis.exclude": [
+        "bin",
+        "data",
+        "dist",
+        "**/__pycache__",
+        ".git",
+        "logs",
+        "tmp",
+        ".venv"
+    ],
+    "python.analysis.ignore": [
+        ".venv"
+    ],
+    "files.exclude": {
+        "**/.git": true,
+        "**/.DS_Store": true
+    },
+    "search.exclude": {
+        "**/.venv": true,
+        "**/__pycache__": true
+    },
+    "markdownlint.ignore": [
+        ".github/copilot-instructions.md",
+        "AGENTS.md"
+    ],
+    "github.copilot.chat.diagnostics.ignoreFiles": [
+        ".github/copilot-instructions.md",
+        "AGENTS.md"
+    ],
+    "python.analysis.inlayHints.functionReturnTypes": true,
+    "python.analysis.inlayHints.variableTypes": true,
+    "python.analysis.typeCheckingMode": "standard",
+    "python.analysis.autoFormatStrings": true,
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.diagnosticMode": "workspace",
+    "python.analysis.displayEnglishDiagnostics": true,
+    "python.analysis.generateWithTypeAnnotation": true,
+    "python.analysis.inlayHints.pytestParameters": true,
+    "python.analysis.typeEvaluation.deprecateTypingAliases": true,
+    "yaml.format.printWidth": 120,
+    "yaml.schemas": {
+        "https://www.schemastore.org/yamllint.json": "file:///home/roger/source/sead_authority_service/src/resources/site.yml"
+    }
 }
