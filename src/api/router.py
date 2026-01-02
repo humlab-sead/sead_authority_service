@@ -21,9 +21,7 @@ from src.metadata import get_reconcile_properties, get_reconciliation_metadata
 from src.preview import render_preview
 from src.reconcile import reconcile_queries
 from src.strategies.strategy import Strategies
-from src.suggest import render_flyout_preview, suggest_entities
-from src.suggest import suggest_properties as suggest_properties_api
-from src.suggest import suggest_types
+from src import suggest
 
 # pylint: disable=unused-argument, redefined-builtin, too-many-locals, too-many-return-statements, too-many-branches
 
@@ -310,7 +308,7 @@ async def suggest_entity(
         }
     """
     try:
-        items: dict[str, Any] = await suggest_entities(prefix=prefix, entity_type=type, limit=10)
+        items: dict[str, Any] = await suggest.suggest_entities(prefix=prefix, entity_type=type, limit=10)
         return SuggestEntityResponse(result=items.get("result", []))
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception(f"Error in suggest_entity: {e}")
@@ -337,7 +335,7 @@ async def suggest_type(prefix: str = "", config: Config = Depends(get_config_dep
         }
     """
     try:
-        result: dict[str, Any] = await suggest_types(prefix=prefix)
+        result: dict[str, Any] = await suggest.suggest_types(prefix=prefix)
         return SuggestTypeResponse(result=result.get("result", []))
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception(f"Error in suggest_type: {e}")
@@ -370,7 +368,7 @@ async def suggest_property(
         }
     """
     try:
-        result: dict[str, Any] = await suggest_properties_api(prefix=prefix, entity_type=type)
+        result: dict[str, Any] = await suggest.suggest_properties(prefix=prefix, entity_type=type)
         return SuggestPropertyResponse(result=result.get("result", []))
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception(f"Error in suggest_property: {e}")
@@ -401,7 +399,7 @@ async def flyout_entity(id: str = "", config: Config = Depends(get_config_depend
         if not id:
             return JSONResponse({"error": "Missing 'id' parameter"}, status_code=400)
 
-        result: dict[str, Any] = await render_flyout_preview(id)
+        result: dict[str, Any] = await suggest.render_flyout_preview(id)
         return JSONResponse(result)
     except ValueError as e:  # pylint: disable=broad-exception-caught
         logger.warning(f"Invalid flyout request: {e}")
