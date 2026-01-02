@@ -337,7 +337,6 @@ class TestMCPModels:
         assert error.details["entity_id"] == "123"  # pylint: disable=unsubscriptable-object
 
 
-@pytest.mark.asyncio
 class TestMCPConfig:
     """Tests for MCP configuration"""
 
@@ -389,7 +388,6 @@ class TestMCPConfig:
         assert config.enable_caching is False
 
 
-@pytest.mark.asyncio
 class TestMCPResources:
     """Tests for MCPResources"""
 
@@ -461,7 +459,6 @@ class TestMCPResources:
             await resources.get_lookup_rows("method", language="sv")
 
 
-@pytest.mark.asyncio
 class TestMCPTools:
     """Tests for MCPTools"""
 
