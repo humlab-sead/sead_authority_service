@@ -2,25 +2,6 @@ SHELL := /bin/bash
 
 UVICORN_PORT := 8000
 
-.PHONY: csv excel
-excel:
-	@export PYTHONPATH=. && python src/arbodat/survey2excel.py \ 
-		--env-file src/arbodat/input/.env \
-		--sep ";" \
-		--mode excel \
-		--config-file src/arbodat/input/arbodat.yml \
-		src/arbodat/input/arbodat_mal_elena_input.csv \
-		tmp/arbodat.xlsx
-
-csv:
-	@export PYTHONPATH=. && python src/arbodat/survey2excel.py \ 
-		--env-file src/arbodat/input/.env \
-		--sep ';' \
-		--mode csv \
-		--config-file src/arbodat/input/arbodat.yml \
-		src/arbodat/input/arbodat_mal_elena_input.csv \
-		tmp/arbodat
-
 .PHONY: dev-serve
 dev-serve: dev-kill
 	@echo "Starting uvicorn on port $(UVICORN_PORT)..."
