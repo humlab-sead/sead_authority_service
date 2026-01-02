@@ -1,16 +1,16 @@
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 import psycopg
+import pytest
 from psycopg.rows import dict_row, tuple_row
 
+import src.strategies.query as query_module
 from src.strategies.data_type import DataTypeRepository
 from src.strategies.dimension import DimensionRepository
 from src.strategies.feature_type import FeatureTypeRepository
 from src.strategies.location import LocationRepository
 from src.strategies.method import MethodRepository
-import src.strategies.query as query_module
 from src.strategies.query import BaseRepository
 from src.strategies.site import SiteRepository
 from tests.conftest import ExtendedMockConfigProvider

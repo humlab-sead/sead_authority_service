@@ -1385,7 +1385,6 @@ class TestEdgeCases:
         assert result["target"] == ["value+with+plus"]  # type: ignore[call-arg]
 
 
-
 class TestConfigFactoryLoadDirective:
     """Test CSV data loading feature using @load: notation"""
 

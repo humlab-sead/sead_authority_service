@@ -82,9 +82,7 @@ class BaseRepository(AbstractRepository):
         return self.connection
 
     @overload
-    async def fetch_all(
-        self, sql: str, params: Params | None = None, *, row_factory: Literal["dict"] = "dict"
-    ) -> list[DictRow]: ...
+    async def fetch_all(self, sql: str, params: Params | None = None, *, row_factory: Literal["dict"] = "dict") -> list[DictRow]: ...
 
     @overload
     async def fetch_all(self, sql: str, params: Params | None = None, *, row_factory: Literal["tuple"]) -> list[TupleRow]: ...
@@ -101,9 +99,7 @@ class BaseRepository(AbstractRepository):
             return [d if isinstance(d, dict) else dict(d) for d in rows]
 
     @overload
-    async def fetch_one(
-        self, sql: str, params: Params | None = None, *, row_factory: Literal["dict"] = "dict"
-    ) -> DictRow | None: ...
+    async def fetch_one(self, sql: str, params: Params | None = None, *, row_factory: Literal["dict"] = "dict") -> DictRow | None: ...
 
     @overload
     async def fetch_one(self, sql: str, params: Params | None = None, *, row_factory: Literal["tuple"]) -> TupleRow | None: ...

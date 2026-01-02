@@ -11,8 +11,8 @@ from src.api.model import (
     ExtendRequestProperty,
     ExtendResponse,
     PreviewTemplate,
-    ProposePropertiesDescriptor,
     PropertySetting,
+    ProposePropertiesDescriptor,
     ReconBatchRequest,
     ReconBatchRequestHandler,
     ReconBatchResponse,
@@ -181,8 +181,9 @@ class TestReconBatchRequest:
 
     def test_valid_batch_request(self):
         """Test valid batch request with multiple queries."""
-        batch = ReconBatchRequest(root={"q0": ReconQuery(query="Uppsala", **{}), "q1": 
-                                        ReconQuery(query="Stockholm", type="site", limit=5, **{})})
+        batch = ReconBatchRequest(
+            root={"q0": ReconQuery(query="Uppsala", **{}), "q1": ReconQuery(query="Stockholm", type="site", limit=5, **{})}
+        )
 
         assert "q0" in batch.root
         assert "q1" in batch.root
@@ -261,7 +262,7 @@ class TestReconCandidate:
         desc = "A" * 500
         candidate = ReconCandidate(id="1", name="Test", description=desc)
 
-        assert len(candidate.description) == 500 # type: ignore
+        assert len(candidate.description) == 500  # type: ignore
 
 
 class TestReconQueryResult:
@@ -333,7 +334,7 @@ class TestPreviewTemplate:
 
     def test_preview_template_custom_dimensions(self):
         """Test preview template with custom dimensions."""
-        preview = PreviewTemplate(url="https://example.org/preview", width=600, height=400)   # type: ignore
+        preview = PreviewTemplate(url="https://example.org/preview", width=600, height=400)  # type: ignore
 
         assert preview.width == 600
         assert preview.height == 400
@@ -813,7 +814,9 @@ class TestModelSerialization:
 
     def test_recon_candidate_round_trip(self):
         """Test ReconCandidate serialization round trip."""
-        original = ReconCandidate.model_validate({"id": "123", "name": "Uppsala", "type": [TypeRef.model_validate({"id": "site", "name": "Site"})], "score": 95.0, "match": True})
+        original = ReconCandidate.model_validate(
+            {"id": "123", "name": "Uppsala", "type": [TypeRef.model_validate({"id": "site", "name": "Site"})], "score": 95.0, "match": True}
+        )
         data = original.model_dump()
         restored = ReconCandidate.model_validate(data)
 

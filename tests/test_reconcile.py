@@ -140,4 +140,3 @@ async def test_reconcile_queries_covers_strategy_cls_none_branch(monkeypatch: py
 
     with pytest.raises(ValueError, match="Unknown entity type: site"):
         await reconcile_module.reconcile_queries({"q0": {"query": "ab", "type": "site"}})
-

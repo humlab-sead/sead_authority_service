@@ -2,9 +2,9 @@ from typing import Any, Type
 
 import pytest
 
+import src.strategies.strategy as strategy_module
 from src.configuration.provider import MockConfigProvider
 from src.strategies.strategy import ReconciliationStrategy, Strategies
-import src.strategies.strategy as strategy_module
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 
@@ -166,9 +166,7 @@ class _FakeRepository(strategy_module.BaseRepository):  # type: ignore[misc]
         self.fetch_by_alternate_identity_calls: list[str] = []
         self.find_calls: list[tuple[str, int]] = []
 
-    async def fetch_by_alternate_identity(
-        self, alternate_identity: str, **kwargs
-    ) -> list[dict[str, Any]]:
+    async def fetch_by_alternate_identity(self, alternate_identity: str, **kwargs) -> list[dict[str, Any]]:
         self.fetch_by_alternate_identity_calls.append(alternate_identity)
         return [{"name_sim": 0.2, "label": "alt", "id": 10}]
 

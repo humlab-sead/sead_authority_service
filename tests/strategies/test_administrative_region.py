@@ -136,15 +136,15 @@ class TestAdministrativeRegionMethods:
     def test_as_candidate_basic(self, test_provider: ExtendedMockConfigProvider):
         """Test converting entity data to candidate format."""
         strategy = AdministrativeRegionReconciliationStrategy()
-        
+
         entity_data = {
             strategy.get_entity_id_field(): "123",
             strategy.get_label_field(): "Test Region",
             "name_sim": 0.95,
         }
-        
+
         candidate = strategy.as_candidate(entity_data, "test query")
-        
+
         assert "id" in candidate
         assert "name" in candidate
         assert "score" in candidate
@@ -156,16 +156,16 @@ class TestAdministrativeRegionMethods:
     def test_as_candidate_with_distance(self, test_provider: ExtendedMockConfigProvider):
         """Test candidate includes distance when available."""
         strategy = AdministrativeRegionReconciliationStrategy()
-        
+
         entity_data = {
             strategy.get_entity_id_field(): "123",
             strategy.get_label_field(): "Test Region",
             "name_sim": 0.75,
             "distance_km": 25.6789,
         }
-        
+
         candidate = strategy.as_candidate(entity_data, "test")
-        
+
         assert "distance_km" in candidate
         assert candidate["distance_km"] == 25.68  # Rounded to 2 decimals
 
@@ -205,7 +205,7 @@ class TestAdministrativeRegionIntegration:
         assert hasattr(strategy, "get_id_path")
         assert hasattr(strategy, "get_display_name")
         assert hasattr(strategy, "as_candidate")
-        
+
         # Verify they're callable
         assert callable(strategy.get_entity_id_field)
         assert callable(strategy.get_label_field)
@@ -219,9 +219,10 @@ class TestAdministrativeRegionDistinctionFromCountry:
     def test_different_registry_keys(self, test_provider: ExtendedMockConfigProvider):
         """Administrative region has different key than country."""
         admin_strategy = AdministrativeRegionReconciliationStrategy()
-        
+
         # Import country strategy
         from src.strategies.country import CountryReconciliationStrategy
+
         country_strategy = CountryReconciliationStrategy()
 
         assert admin_strategy.key == "administrative_region"
@@ -244,7 +245,7 @@ class TestAdministrativeRegionDistinctionFromCountry:
     def test_both_inherit_from_location(self, test_provider: ExtendedMockConfigProvider):
         """Both strategies inherit from LocationReconciliationStrategy."""
         from src.strategies.country import CountryReconciliationStrategy
-        
+
         admin_strategy = AdministrativeRegionReconciliationStrategy()
         country_strategy = CountryReconciliationStrategy()
 
@@ -270,10 +271,10 @@ class TestAdministrativeRegionEdgeCases:
     def test_repository_reused_on_subsequent_calls(self, test_provider: ExtendedMockConfigProvider):
         """Test repository instance is reused."""
         strategy = AdministrativeRegionReconciliationStrategy()
-        
+
         repo1 = strategy.get_repository()
         repo2 = strategy.get_repository()
-        
+
         # Should be the same instance
         assert repo1 is repo2
 
@@ -281,13 +282,13 @@ class TestAdministrativeRegionEdgeCases:
     def test_as_candidate_high_score_match(self, test_provider: ExtendedMockConfigProvider):
         """Test high similarity score results in match=True."""
         strategy = AdministrativeRegionReconciliationStrategy()
-        
+
         entity_data = {
             strategy.get_entity_id_field(): "1",
             strategy.get_label_field(): "Test",
             "name_sim": 0.95,  # High score
         }
-        
+
         candidate = strategy.as_candidate(entity_data, "test")
         assert candidate["match"] is True
 
@@ -295,13 +296,13 @@ class TestAdministrativeRegionEdgeCases:
     def test_as_candidate_low_score_no_match(self, test_provider: ExtendedMockConfigProvider):
         """Test low similarity score results in match=False."""
         strategy = AdministrativeRegionReconciliationStrategy()
-        
+
         entity_data = {
             strategy.get_entity_id_field(): "1",
             strategy.get_label_field(): "Different",
             "name_sim": 0.3,  # Low score
         }
-        
+
         candidate = strategy.as_candidate(entity_data, "test")
         assert candidate["match"] is False
 
@@ -309,13 +310,13 @@ class TestAdministrativeRegionEdgeCases:
     def test_as_candidate_exact_match_case_insensitive(self, test_provider: ExtendedMockConfigProvider):
         """Test exact label match (case insensitive) results in match=True."""
         strategy = AdministrativeRegionReconciliationStrategy()
-        
+
         entity_data = {
             strategy.get_entity_id_field(): "1",
             strategy.get_label_field(): "Test Region",
             "name_sim": 0.5,  # Even with low similarity
         }
-        
+
         candidate = strategy.as_candidate(entity_data, "TEST REGION")
         assert candidate["match"] is True
 
@@ -334,7 +335,7 @@ class TestAdministrativeRegionRepositorySetup:
         """Test repository is created with strategy specification."""
         strategy = AdministrativeRegionReconciliationStrategy()
         repo = strategy.get_repository()
-        
+
         # Repository should have specification
         assert hasattr(repo, "specification")
         assert repo.specification == strategy.specification
@@ -344,7 +345,6 @@ class TestAdministrativeRegionRepositorySetup:
         """Test repository is correct type."""
         strategy = AdministrativeRegionReconciliationStrategy()
         repo = strategy.get_repository()
-        
+
         # Should be BaseRepository or subclass
         assert isinstance(repo, BaseRepository)
-

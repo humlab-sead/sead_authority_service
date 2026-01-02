@@ -79,7 +79,9 @@ class TestBibliographicReferenceRepository:
     async def test_fuzzy_full_reference_partial_applies_floor(self, monkeypatch: pytest.MonkeyPatch):
         repo = BibliographicReferenceRepository.__new__(BibliographicReferenceRepository)
         monkeypatch.setattr(repo, "get_sql_query", lambda key: "SQL")  # noqa: ARG005
-        fetch_all = AsyncMock(return_value=[{"biblio_id": 1, "label": "A", "name_sim": 0.1}, {"biblio_id": 2, "label": "B", "name_sim": 0.95}])
+        fetch_all = AsyncMock(
+            return_value=[{"biblio_id": 1, "label": "A", "name_sim": 0.1}, {"biblio_id": 2, "label": "B", "name_sim": 0.95}]
+        )
         monkeypatch.setattr(repo, "fetch_all", fetch_all)
 
         rows = await repo.fuzzy_full_reference_partial("foo", limit=10, threshold=0.45)
@@ -90,7 +92,9 @@ class TestBibliographicReferenceRepository:
     async def test_fuzzy_full_reference_fallback_caps(self, monkeypatch: pytest.MonkeyPatch):
         repo = BibliographicReferenceRepository.__new__(BibliographicReferenceRepository)
         monkeypatch.setattr(repo, "get_sql_query", lambda key: "SQL")  # noqa: ARG005
-        fetch_all = AsyncMock(return_value=[{"biblio_id": 1, "label": "A", "name_sim": 0.9}, {"biblio_id": 2, "label": "B", "name_sim": 0.2}])
+        fetch_all = AsyncMock(
+            return_value=[{"biblio_id": 1, "label": "A", "name_sim": 0.9}, {"biblio_id": 2, "label": "B", "name_sim": 0.2}]
+        )
         monkeypatch.setattr(repo, "fetch_all", fetch_all)
 
         rows = await repo.fuzzy_full_reference_fallback("foo", limit=10, threshold=0.30)
@@ -206,9 +210,7 @@ class TestBibliographicReferenceReconciliationStrategy:
         proxy.fetch_by_exact_title_year.return_value = []
         proxy.fetch_by_exact_bugs_reference.return_value = []
         proxy.fuzzy_authors_partial_and_year.return_value = []
-        proxy.fuzzy_full_reference_partial.return_value = [
-            {"biblio_id": i, "label": f"R{i}", "name_sim": 0.9} for i in range(10)
-        ]
+        proxy.fuzzy_full_reference_partial.return_value = [{"biblio_id": i, "label": f"R{i}", "name_sim": 0.9} for i in range(10)]
         proxy.fuzzy_full_reference_fallback.return_value = [{"biblio_id": 99, "label": "FB", "name_sim": 0.5}]
 
         strategy = BibliographicReferenceReconciliationStrategy(repository_or_cls=proxy)  # type: ignore[arg-type]
