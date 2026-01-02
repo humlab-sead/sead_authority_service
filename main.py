@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 # Force import of strategies to register them
-import src.strategies  # pylint: disable=unused-import
 from src.api.router import router
 from src.configuration import ConfigProvider, get_config_provider, setup_config_store
 

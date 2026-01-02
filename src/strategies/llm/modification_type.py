@@ -5,9 +5,9 @@ from typing import Any
 from loguru import logger
 
 from src.configuration import ConfigValue
+from src.strategies.query import BaseRepository
+from src.strategies.strategy import Strategies, StrategySpecification
 
-from ..query import BaseRepository
-from ..strategy import Strategies, StrategySpecification
 from .llm_strategy import LLMReconciliationStrategy
 
 # Specification for modification types
@@ -27,7 +27,7 @@ SPECIFICATION: StrategySpecification = {
     "property_settings": {},
     "sql_queries": {
         "fuzzy_find_sql": """
-            SELECT 
+            SELECT
                 modification_type_id,
                 modification_type_name as label,
                 similarity(modification_type_name, %(q)s) as name_sim
@@ -37,15 +37,15 @@ SPECIFICATION: StrategySpecification = {
             LIMIT %(n)s
         """,
         "details_sql": """
-            SELECT 
+            SELECT
                 modification_type_id as "ID",
-                modification_type_name as "Name", 
+                modification_type_name as "Name",
                 modification_type_description as "Description"
             FROM tbl_modification_types
             WHERE modification_type_id = %(id)s
         """,
         "get_lookup_data": """
-            SELECT 
+            SELECT
                 modification_type_id,
                 modification_type_name,
                 modification_type_description

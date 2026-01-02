@@ -50,7 +50,7 @@ class TestSuggestEntityEndpoint:
     """Test entity suggestion endpoint."""
 
     @with_test_config
-    @patch("src.api.router.suggest_entities")
+    @patch("src.suggest.suggest_entities")
     async def test_suggest_entity_success(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test entity suggestion returns results."""
         mock_suggest.return_value = {
@@ -73,7 +73,7 @@ class TestSuggestEntityEndpoint:
         assert data["result"][0]["name"] == "Uppsala Site"
 
     @with_test_config
-    @patch("src.api.router.suggest_entities")
+    @patch("src.suggest.suggest_entities")
     async def test_suggest_entity_with_type_filter(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test entity suggestion with type filter."""
         mock_suggest.return_value = {"result": []}
@@ -84,7 +84,7 @@ class TestSuggestEntityEndpoint:
         mock_suggest.assert_called_once_with(prefix="Test", entity_type="site", limit=10)
 
     @with_test_config
-    @patch("src.api.router.suggest_entities")
+    @patch("src.suggest.suggest_entities")
     async def test_suggest_entity_empty_prefix(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test entity suggestion with empty prefix."""
         mock_suggest.return_value = {"result": []}
@@ -96,7 +96,7 @@ class TestSuggestEntityEndpoint:
         assert "result" in data
 
     @with_test_config
-    @patch("src.api.router.suggest_entities", side_effect=Exception("Database error"))
+    @patch("src.suggest.suggest_entities", side_effect=Exception("Database error"))
     async def test_suggest_entity_error(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test entity suggestion handles errors."""
         response = client.get("/suggest/entity?prefix=Test")
@@ -106,7 +106,7 @@ class TestSuggestEntityEndpoint:
         assert "error" in data
 
     @with_test_config
-    @patch("src.api.router.suggest_entities")
+    @patch("src.suggest.suggest_entities")
     async def test_suggest_entity_multiple_results(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test entity suggestion returns multiple results."""
         mock_suggest.return_value = {
@@ -128,7 +128,7 @@ class TestSuggestTypeEndpoint:
     """Test type suggestion endpoint."""
 
     @with_test_config
-    @patch("src.api.router.suggest_types")
+    @patch("src.suggest.suggest_types")
     async def test_suggest_type_success(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test type suggestion returns results."""
         mock_suggest.return_value = {
@@ -146,7 +146,7 @@ class TestSuggestTypeEndpoint:
         assert len(data["result"]) == 2
 
     @with_test_config
-    @patch("src.api.router.suggest_types")
+    @patch("src.suggest.suggest_types")
     async def test_suggest_type_with_prefix(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test type suggestion with prefix filter."""
         mock_suggest.return_value = {"result": [{"id": "site", "name": "Site"}]}
@@ -157,7 +157,7 @@ class TestSuggestTypeEndpoint:
         mock_suggest.assert_called_once_with(prefix="si")
 
     @with_test_config
-    @patch("src.api.router.suggest_types", side_effect=Exception("Type error"))
+    @patch("src.suggest.suggest_types", side_effect=Exception("Type error"))
     async def test_suggest_type_error(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test type suggestion handles errors."""
         response = client.get("/suggest/type")
@@ -167,7 +167,7 @@ class TestSuggestTypeEndpoint:
         assert "error" in data
 
     @with_test_config
-    @patch("src.api.router.suggest_types")
+    @patch("src.suggest.suggest_types")
     async def test_suggest_type_empty_result(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test type suggestion with empty result."""
         mock_suggest.return_value = {"result": []}
@@ -183,7 +183,7 @@ class TestSuggestPropertyEndpoint:
     """Test property suggestion endpoint."""
 
     @with_test_config
-    @patch("src.api.router.suggest_properties_api")
+    @patch("src.suggest.suggest_properties")
     async def test_suggest_property_success(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test property suggestion returns results."""
         mock_suggest.return_value = {
@@ -201,7 +201,7 @@ class TestSuggestPropertyEndpoint:
         assert len(data["result"]) == 2
 
     @with_test_config
-    @patch("src.api.router.suggest_properties_api")
+    @patch("src.suggest.suggest_properties")
     async def test_suggest_property_with_prefix(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test property suggestion with prefix filter."""
         mock_suggest.return_value = {"result": [{"id": "latitude", "name": "Latitude"}]}
@@ -212,7 +212,7 @@ class TestSuggestPropertyEndpoint:
         mock_suggest.assert_called_once_with(prefix="lat", entity_type="")
 
     @with_test_config
-    @patch("src.api.router.suggest_properties_api")
+    @patch("src.suggest.suggest_properties")
     async def test_suggest_property_with_type(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test property suggestion with type filter."""
         mock_suggest.return_value = {"result": []}
@@ -223,7 +223,7 @@ class TestSuggestPropertyEndpoint:
         mock_suggest.assert_called_once_with(prefix="", entity_type="site")
 
     @with_test_config
-    @patch("src.api.router.suggest_properties_api")
+    @patch("src.suggest.suggest_properties")
     async def test_suggest_property_with_both_filters(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test property suggestion with prefix and type filters."""
         mock_suggest.return_value = {"result": []}
@@ -234,7 +234,7 @@ class TestSuggestPropertyEndpoint:
         mock_suggest.assert_called_once_with(prefix="coord", entity_type="site")
 
     @with_test_config
-    @patch("src.api.router.suggest_properties_api", side_effect=Exception("Property error"))
+    @patch("src.suggest.suggest_properties", side_effect=Exception("Property error"))
     async def test_suggest_property_error(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test property suggestion handles errors."""
         response = client.get("/suggest/property")
@@ -248,7 +248,7 @@ class TestFlyoutEntityEndpoint:
     """Test flyout entity preview endpoint."""
 
     @with_test_config
-    @patch("src.api.router.render_flyout_preview")
+    @patch("src.suggest.render_flyout_preview")
     async def test_flyout_entity_get_success(self, mock_render: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test flyout entity with GET request."""
         mock_render.return_value = {
@@ -264,7 +264,7 @@ class TestFlyoutEntityEndpoint:
         assert "html" in data
 
     @with_test_config
-    @patch("src.api.router.render_flyout_preview")
+    @patch("src.suggest.render_flyout_preview")
     async def test_flyout_entity_post_success(self, mock_render: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test flyout entity with POST request."""
         mock_render.return_value = {
@@ -276,7 +276,7 @@ class TestFlyoutEntityEndpoint:
         assert response.status_code == 200
 
     @with_test_config
-    @patch("src.api.router.render_flyout_preview")
+    @patch("src.suggest.render_flyout_preview")
     async def test_flyout_entity_missing_id(self, mock_render: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test flyout entity with missing ID parameter."""
         response = client.get("/flyout/entity")
@@ -287,14 +287,14 @@ class TestFlyoutEntityEndpoint:
         assert "Missing" in data["error"]
 
     @with_test_config
-    @patch("src.api.router.render_flyout_preview")
+    @patch("src.suggest.render_flyout_preview")
     async def test_flyout_entity_empty_id(self, mock_render: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test flyout entity with empty ID parameter."""
         response = client.get("/flyout/entity?id=")
         assert response.status_code == 400
 
     @with_test_config
-    @patch("src.api.router.render_flyout_preview", side_effect=ValueError("Invalid ID"))
+    @patch("src.suggest.render_flyout_preview", side_effect=ValueError("Invalid ID"))
     async def test_flyout_entity_invalid_id(self, mock_render: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test flyout entity with invalid ID."""
         response = client.get("/flyout/entity?id=invalid")
@@ -304,7 +304,7 @@ class TestFlyoutEntityEndpoint:
         assert "error" in data
 
     @with_test_config
-    @patch("src.api.router.render_flyout_preview", side_effect=Exception("Render error"))
+    @patch("src.suggest.render_flyout_preview", side_effect=Exception("Render error"))
     async def test_flyout_entity_render_error(self, mock_render: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test flyout entity handles render errors."""
         response = client.get("/flyout/entity?id=https://w3id.org/sead/id/site/123")
@@ -515,7 +515,7 @@ class TestResponseModels:
     """Test response model validation."""
 
     @with_test_config
-    @patch("src.api.router.suggest_entities")
+    @patch("src.suggest.suggest_entities")
     async def test_suggest_entity_response_model(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test entity suggestion response matches model."""
         mock_suggest.return_value = {
@@ -539,7 +539,7 @@ class TestResponseModels:
         assert isinstance(data["result"], list)
 
     @with_test_config
-    @patch("src.api.router.suggest_types")
+    @patch("src.suggest.suggest_types")
     async def test_suggest_type_response_model(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test type suggestion response matches model."""
         mock_suggest.return_value = {"result": [{"id": "site", "name": "Site"}]}
@@ -552,7 +552,7 @@ class TestResponseModels:
         assert isinstance(data["result"], list)
 
     @with_test_config
-    @patch("src.api.router.suggest_properties_api")
+    @patch("src.suggest.suggest_properties")
     async def test_suggest_property_response_model(self, mock_suggest: AsyncMock, client: TestClient, test_provider: MockConfigProvider):
         """Test property suggestion response matches model."""
         mock_suggest.return_value = {"result": [{"id": "lat", "name": "Latitude", "description": "Lat coord"}]}

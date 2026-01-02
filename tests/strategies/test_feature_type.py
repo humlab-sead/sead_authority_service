@@ -286,7 +286,7 @@ class TestFeatureTypeReconciliationStrategy:
 
         strategy = FeatureTypeReconciliationStrategy()
 
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception) as _:
             await strategy.get_details("1")
 
         # assert "Database connection failed" in str(exc_info.value)

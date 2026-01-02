@@ -1,9 +1,5 @@
 """Comprehensive tests for AdministrativeRegionReconciliationStrategy."""
 
-from unittest.mock import AsyncMock, patch
-
-import pytest
-
 from src.strategies.administrative_region import AdministrativeRegionReconciliationStrategy
 from src.strategies.location import LocationReconciliationStrategy
 from src.strategies.query import BaseRepository
