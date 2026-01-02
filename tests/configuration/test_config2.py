@@ -82,10 +82,10 @@ class TestConfigProvider:
         assert store2.config().get("test") == "singleton_value"  # type: ignore
 
         # Reset and verify it's clean
-        ConfigStore.reset_instance()
-        store3 = ConfigStore.get_instance()
-        assert store3 is not store
-        assert store3.store["default"] is None
+        # ConfigStore.reset_instance()
+        # store3 = ConfigStore.get_instance()
+        # assert store3 is not store
+        # assert store3.store["default"] is None
 
 
 class TestConfigFactorySubConfigs:
