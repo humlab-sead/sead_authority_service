@@ -138,6 +138,11 @@ markers = [
 [tool.coverage.run]
 branch = true
 source = ["src", "app.py"]
+omit = [
+    "tests/*",
+    "**/__init__.py",
+    "src/configuration/*",
+]
 
 [tool.coverage.report]
 show_missing = true

@@ -75,7 +75,7 @@ requirements.txt: pyproject.toml
 
 .PHONY: test-coverage
 test-coverage:
-	@uv run pytest test_main.py --cov=main --cov-report=html --cov-report=term
+	@uv run pytest tests --cov-report=html --cov=src
 
 .PHONY: dead-code
 dead-code:
