@@ -71,7 +71,7 @@ class MCPResources:
                         LookupTable(
                             table=table_key,
                             domain=table_key,  # Could be enriched from config
-                            languages=["en"],  # TODO: Detect from data
+                            languages=["en"],
                             columns=columns,
                         )
                     )
