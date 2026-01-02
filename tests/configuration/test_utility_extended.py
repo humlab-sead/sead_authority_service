@@ -148,6 +148,7 @@ class TestReplaceReferences:
 
         result = _replace_references(data, full_data=data)
 
+        assert isinstance(result, dict)
         assert result["level1"]["level2"]["ref"] == "value"
 
     def test_replaces_list_items_recursively(self) -> None:
@@ -156,6 +157,7 @@ class TestReplaceReferences:
 
         result = _replace_references(data, full_data=data)
 
+        assert isinstance(result, dict)
         assert result["items"] == ["value", "value"]
 
     def test_handles_list_expression_with_operations(self) -> None:
@@ -164,6 +166,7 @@ class TestReplaceReferences:
 
         result = _replace_references(data, full_data=data)
 
+        assert isinstance(result, dict)
         assert result["extended"] == ["a", "b", "c"]
 
     def test_recurses_after_parsing_list_expression(self) -> None:
@@ -176,7 +179,7 @@ class TestReplaceReferences:
 
         result = _replace_references(data, full_data=data)
 
-        # First resolves list_with_ref, then uses it in combined
+        assert isinstance(result, dict)
         assert result["combined"] == ["val", "extra"]
 
     def test_returns_original_for_missing_reference(self) -> None:
@@ -185,6 +188,7 @@ class TestReplaceReferences:
 
         result = _replace_references(data, full_data=data)
 
+        assert isinstance(result, dict)
         assert result["ref"] == "@value: nonexistent"
 
     def test_handles_non_string_primitives(self) -> None:
@@ -193,6 +197,7 @@ class TestReplaceReferences:
 
         result = _replace_references(data, full_data=data)
 
+        assert isinstance(result, dict)
         assert result["number"] == 42
         assert result["boolean"] is True
         assert result["null"] is None
@@ -208,6 +213,7 @@ class TestReplaceReferences:
 
         result = _replace_references(data, full_data=data)
 
+        assert isinstance(result, dict)
         assert result["level1"] == ["a", "b"]
         assert result["level2"] == ["a", "b", "c"]
         assert result["nested"]["deep"]["ref"] == ["a", "b", "c"]
@@ -222,6 +228,7 @@ class TestReplaceReferencesPublicAPI:
 
         result = replace_references(data)
 
+        assert isinstance(result, dict)
         assert result["target"] == "value"
 
     def test_handles_top_level_list(self) -> None:
@@ -253,6 +260,7 @@ class TestReplaceReferencesPublicAPI:
 
         result = replace_references(data)
 
+        assert isinstance(result, dict)
         assert result["combined"] == ["red", "blue", 1, 2, 3]
         assert result["extended"] == [["red", "blue"], [1, 2, 3]]
         assert result["nested"]["refs"]["combo"] == ["red", "blue", 1, 2, 3]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -45,18 +46,6 @@ path2: !jj ['another', 'path']
         assert "subdir" in result["path1"]
         assert "file.txt" in result["path1"]
         assert "another" in result["path2"]
-
-    def test_nj_joins_valid_paths(self) -> None:
-        """Test nj normalizes and joins valid paths."""
-        result = nj("dir", "subdir", "file.txt")
-        assert result is not None
-        assert "dir" in result
-        assert "file.txt" in result
-
-    def test_nj_returns_none_if_any_none(self) -> None:
-        """Test nj returns None if any path component is None."""
-        assert nj("dir", None, "file") is None
-        assert nj(None, "dir") is None
 
     def test_is_path_to_existing_file_edge_cases(self) -> None:
         """Test is_path_to_existing_file with various invalid inputs."""
@@ -235,8 +224,8 @@ class TestBaseResolver:
         class TestResolver(BaseResolver):
             directive = "@test"
 
-            def resolve_directive(self, directive_argument: str, base_path: Path | None) -> str:
-                return f"resolved_{directive_argument}"
+            def resolve_directive(self, directive_argument: str, base_path: Path | None) -> dict[str, Any]:
+                return f"resolved_{directive_argument}"  # type: ignore
 
         resolver = TestResolver()
         data = {

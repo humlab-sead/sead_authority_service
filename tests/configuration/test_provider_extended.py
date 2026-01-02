@@ -163,7 +163,7 @@ class TestConfigStoreConfigureContext:
         store = ConfigStore.get_instance()
 
         with pytest.raises(ValueError, match="undefined"):
-            store.configure_context(context="new", source=None)
+            store.configure_context(context="new", source=None) # type: ignore
 
     def test_configure_context_with_config_like(self) -> None:
         """configure_context should accept ConfigLike directly."""
