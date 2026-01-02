@@ -160,6 +160,93 @@ class TestRenderPreview:
         assert isinstance(result, str)
         assert "<title>Test Site – Preview</title>" in result  # Uses same mock data
 
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_unknown_entity_type(self, test_provider: MockConfigProvider):
+        """Test error when entity type is not registered."""
+        uri = f"{ID_BASE}unknown/123"
+        with patch("src.preview.Strategies") as mock_strategies:
+            mock_strategies.items.get.return_value = None
+            with pytest.raises(ValueError, match="Unknown entity type: unknown"):
+                await render_preview(uri)
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_strategy_registry_inconsistent_between_calls(self, test_provider: MockConfigProvider):
+        """Test defensive handling if registry returns different values per call."""
+        uri = f"{ID_BASE}site/123"
+        with patch("src.preview.Strategies") as mock_strategies:
+            mock_strategies.items.get.side_effect = [object(), None]
+            with pytest.raises(ValueError, match="Unknown entity type: site"):
+                await render_preview(uri)
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_strategy_instantiation_returns_falsy(self, test_provider: MockConfigProvider):
+        """Test defensive handling if a registry entry instantiates to a falsy strategy."""
+
+        class FalsyStrategy:
+            def __bool__(self):
+                return False
+
+        class StrategyFactory:
+            def __call__(self):
+                return FalsyStrategy()
+
+        uri = f"{ID_BASE}site/123"
+        with patch("src.preview.Strategies") as mock_strategies:
+            mock_strategies.items.get.return_value = StrategyFactory()
+            with pytest.raises(ValueError, match="Unknown entity type: site"):
+                await render_preview(uri)
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_title_fallback_to_first_value(self, test_provider: MockConfigProvider):
+        """Test title fallback when no Name/label exists."""
+        uri = f"{ID_BASE}site/999"
+        details = {"field1": "First Value", "field2": "Second Value"}
+        with patch("src.preview.Strategies") as mock_strategies:
+            mock_strategy_with_get_details(mock_strategies, details)
+            result = await render_preview(uri)
+
+        assert "<title>First Value – Preview</title>" in result
+        assert "<h1>First Value</h1>" in result
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_name_and_label_not_rendered_as_rows(self, test_provider: MockConfigProvider):
+        """Test that Name and label fields are not rendered as detail rows."""
+        uri = f"{ID_BASE}site/123"
+        details = {"Name": "Title", "label": "Label", "other": "Value"}
+        with patch("src.preview.Strategies") as mock_strategies:
+            mock_strategy_with_get_details(mock_strategies, details)
+            result = await render_preview(uri)
+
+        assert "Name:" not in result
+        assert "label:" not in result
+        assert '<div class="label">other:</div>' in result
+        assert '<div class="value">Value</div>' in result
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_empty_details_treated_as_not_found(self, test_provider: MockConfigProvider):
+        """Test that empty details dict triggers the not-found/unsupported error."""
+        uri = f"{ID_BASE}site/empty"
+        with patch("src.preview.Strategies") as mock_strategies:
+            mock_strategy_with_get_details(mock_strategies, GET_DETAILS_DATA["empty"])
+            with pytest.raises(ValueError, match="Entity with ID empty not found or preview not implemented"):
+                await render_preview(uri)
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_missing_id_base_config_causes_invalid_path(self, test_provider: MockConfigProvider):
+        """Test behavior when id_base config is missing (defaults to empty string)."""
+        uri = f"{ID_BASE}site/123"
+        with patch("src.preview.ConfigValue") as mock_config_value:
+            mock_config_value.return_value.resolve.return_value = None
+            with pytest.raises(ValueError, match="Invalid ID path"):
+                await render_preview(uri)
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
