@@ -259,21 +259,15 @@ class Registry(Generic[T]):
         return fn_or_class
 
 
-def create_db_uri(*, host: str, port: int | str, user: str, dbname: str, driver: str = "postgresql") -> str:
+def create_db_uri(
+    *, host: str, port: int | str, user: str, dbname: str, password: str | None = None, driver: str = "postgresql+psycopg"
+) -> str:
     """
     Builds database URI from the individual config elements.
     """
+    if password:
+        return f"{driver}://{user}:{password}@{host}:{port}/{dbname}"
     return f"{driver}://{user}@{host}:{port}/{dbname}"
-
-
-def get_connection_uri(connection: Any) -> str:
-    conn_info = connection.get_dsn_parameters()
-    user: str = conn_info.get("user")
-    host: str = conn_info.get("host")
-    port: str = conn_info.get("port")
-    dbname: str = conn_info.get("dbname")
-    uri: str = f"postgresql://{user}@{host}:{port}/{dbname}"
-    return uri
 
 
 def load_resource_yaml(key: str) -> dict[str, Any] | None:
