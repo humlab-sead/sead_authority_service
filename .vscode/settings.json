@@ -51,5 +51,8 @@
     "python.analysis.generateWithTypeAnnotation": true,
     "python.analysis.inlayHints.pytestParameters": true,
     "python.analysis.typeEvaluation.deprecateTypingAliases": true,
-    "yaml.format.printWidth": 120
+    "yaml.format.printWidth": 120,
+    "yaml.schemas": {
+        "https://www.schemastore.org/yamllint.json": "file:///home/roger/source/sead_authority_service/src/resources/site.yml"
+    }
 }
