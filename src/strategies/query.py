@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Literal, Mapping, Sequence, Tuple, TypeAlias, Union
+from typing import Any, Literal, Mapping, Sequence, Tuple, TypeAlias, Union, overload
 
 import psycopg
 from loguru import logger
@@ -12,8 +12,8 @@ from src.utility import resolve_specification
 from . import StrategySpecification
 
 Params: TypeAlias = Union[Sequence[Any], Mapping[str, Any]]
-Row: TypeAlias = dict[str, Any] | tuple[Any, ...]
-Rows: TypeAlias = list[Row]
+DictRow: TypeAlias = dict[str, Any]
+TupleRow: TypeAlias = tuple[Any, ...]
 
 
 class AbstractRepository(ABC):
@@ -81,9 +81,17 @@ class BaseRepository(AbstractRepository):
             self.connection = await get_connection()
         return self.connection
 
+    @overload
+    async def fetch_all(
+        self, sql: str, params: Params | None = None, *, row_factory: Literal["dict"] = "dict"
+    ) -> list[DictRow]: ...
+
+    @overload
+    async def fetch_all(self, sql: str, params: Params | None = None, *, row_factory: Literal["tuple"]) -> list[TupleRow]: ...
+
     async def fetch_all(
         self, sql: str, params: Params | None = None, *, row_factory: Literal["dict", "tuple"] = "dict"
-    ) -> Rows:
+    ) -> list[DictRow] | list[TupleRow]:
         connection: psycopg.AsyncConnection[Tuple[Any, ...]] = await self.get_connection()
         async with connection.cursor(row_factory=self.row_factories[row_factory]) as cursor:
             await cursor.execute(sql.strip(), params)  # type: ignore
@@ -92,9 +100,17 @@ class BaseRepository(AbstractRepository):
                 return list(rows)
             return [d if isinstance(d, dict) else dict(d) for d in rows]
 
+    @overload
+    async def fetch_one(
+        self, sql: str, params: Params | None = None, *, row_factory: Literal["dict"] = "dict"
+    ) -> DictRow | None: ...
+
+    @overload
+    async def fetch_one(self, sql: str, params: Params | None = None, *, row_factory: Literal["tuple"]) -> TupleRow | None: ...
+
     async def fetch_one(
         self, sql: str, params: Params | None = None, *, row_factory: Literal["dict", "tuple"] = "dict"
-    ) -> Row | None:
+    ) -> DictRow | TupleRow | None:
         connection: psycopg.AsyncConnection[Tuple[Any, ...]] = await self.get_connection()
         async with connection.cursor(row_factory=self.row_factories[row_factory]) as cursor:
             await cursor.execute(sql.strip(), params)  # type: ignore
