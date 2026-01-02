@@ -655,7 +655,7 @@ connection:
   primary_port: "@value:database.primary.port"
   replica_host: "@value:database.replica.host"
 """
-)
+        )
 
         factory = ConfigFactory()
         config = factory.load(source=str(config_file))

@@ -18,23 +18,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-          cache: 'pip'
 
       - name: Install dependencies
         run: |
-          pip install -e ".[dev]"
+          uv sync --dev
 
       - name: Run tests
         run: |
-          pytest --verbose
+          uv run pytest --verbose
 
       - name: Run linter
         run: |
-          ruff check src/ tests/
+          uv run ruff check src/ tests/
 
   # Job 2: Build and push Docker image
   build-and-push:
