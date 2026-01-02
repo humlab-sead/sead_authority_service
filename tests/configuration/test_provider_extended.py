@@ -204,7 +204,7 @@ class TestConfigStoreConfigureContext:
 class TestConfigStoreClassMethods:
     """Test ConfigStore class methods for backward compatibility."""
 
-    def test_is_configured_global_delegates_to_provider(self, _) -> None:
+    def test_is_configured_global_delegates_to_provider(self, test_provider) -> None:
         """is_configured_global should use provider layer."""
         mock_provider = MagicMock()
         mock_provider.is_configured.return_value = True
