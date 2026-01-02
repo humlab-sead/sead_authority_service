@@ -12,6 +12,8 @@ from src.utility import resolve_specification
 from . import StrategySpecification
 
 Params: TypeAlias = Union[Sequence[Any], Mapping[str, Any]]
+Row: TypeAlias = dict[str, Any] | tuple[Any, ...]
+Rows: TypeAlias = list[Row]
 
 
 class AbstractRepository(ABC):
@@ -81,21 +83,27 @@ class BaseRepository(AbstractRepository):
 
     async def fetch_all(
         self, sql: str, params: Params | None = None, *, row_factory: Literal["dict", "tuple"] = "dict"
-    ) -> list[dict[str, Any]]:
+    ) -> Rows:
         connection: psycopg.AsyncConnection[Tuple[Any, ...]] = await self.get_connection()
         async with connection.cursor(row_factory=self.row_factories[row_factory]) as cursor:
             await cursor.execute(sql.strip(), params)  # type: ignore
-            rows: list[dict[str, Any]] = await cursor.fetchall()
+            rows: list[Any] = await cursor.fetchall()
+            if row_factory == "tuple":
+                return list(rows)
             return [d if isinstance(d, dict) else dict(d) for d in rows]
 
     async def fetch_one(
         self, sql: str, params: Params | None = None, *, row_factory: Literal["dict", "tuple"] = "dict"
-    ) -> dict[str, Any] | None:
+    ) -> Row | None:
         connection: psycopg.AsyncConnection[Tuple[Any, ...]] = await self.get_connection()
         async with connection.cursor(row_factory=self.row_factories[row_factory]) as cursor:
             await cursor.execute(sql.strip(), params)  # type: ignore
-            row: dict[str, Any] | None = await cursor.fetchone()
-            return dict(row) if row else None
+            row: Any = await cursor.fetchone()
+            if not row:
+                return None
+            if row_factory == "tuple":
+                return row
+            return row if isinstance(row, dict) else dict(row)
 
     def get_details_sql(self) -> str:
         """Return the SQL query for fetching detailed information for a given entity ID."""
