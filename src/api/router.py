@@ -6,6 +6,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
 from starlette.datastructures import UploadFile
 
+from src import suggest
+
 # Not used: ReconBatchRequest, ReconBatchRequestHandler, ReconQueryRequest
 from src.api.model import (
     ReconBatchResponse,
@@ -21,7 +23,6 @@ from src.metadata import get_reconcile_properties, get_reconciliation_metadata
 from src.preview import render_preview
 from src.reconcile import reconcile_queries
 from src.strategies.strategy import Strategies
-from src import suggest
 
 # pylint: disable=unused-argument, redefined-builtin, too-many-locals, too-many-return-statements, too-many-branches
 
