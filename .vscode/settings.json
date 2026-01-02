@@ -53,6 +53,10 @@
         ".github/copilot-instructions.md",
         "AGENTS.md"
     ],
+    "github.copilot.chat.diagnostics.ignoreFiles": [
+        ".github/copilot-instructions.md",
+        "AGENTS.md"
+    ],
     "python.analysis.inlayHints.functionReturnTypes": true,
     "python.analysis.inlayHints.variableTypes": true,
     "python.analysis.typeCheckingMode": "standard",
