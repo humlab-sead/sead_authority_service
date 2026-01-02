@@ -56,7 +56,7 @@ async def render_flyout_preview(uri: str) -> dict[str, Any]:
     <div style="font-weight:600; font-size:12px; margin-bottom:3px; color:#1a1a1a; border-bottom:1px solid #e0e0e0; padding-bottom:2px;">
         {title}
     </div>
-    <div style="background:#f5f5f5; padding:2px 6px; border-radius:2px; display:inline-block; 
+    <div style="background:#f5f5f5; padding:2px 6px; border-radius:2px; display:inline-block;
         font-size:9px; margin-bottom:4px; color:#666; text-transform:uppercase;">
         {entity_path}
     </div>
