@@ -2,6 +2,9 @@ SHELL := /bin/bash
 
 UVICORN_PORT := 8000
 
+test-workflow:
+	@./scripts/test-ci.sh
+
 .PHONY: dev-serve
 dev-serve: dev-kill
 	@echo "Starting uvicorn on port $(UVICORN_PORT)..."
@@ -53,6 +56,10 @@ black:
 pylint:
 	@uv run pylint src tests main.py
 
+.PHONY: ruff-lint
+ruff-lint:
+	@uv run ruff check --fix src tests main.py
+	
 .PHONY: lint
 lint: tidy pylint check-imports
 
