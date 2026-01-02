@@ -58,14 +58,14 @@ class BibliographicReferenceRepository(BaseRepository):
         return [r | {"name_sim": max(0.8, float(r["name_sim"]))} for r in rows]
 
     async def fuzzy_authors_partial_and_year(self, authors: str, year: str | int, limit: int, threshold: float = 0.45) -> list[dict]:
-        rows: list[dict[str, Any]] = await self.fetch_all(
+        rows: list[dict[str, Any]] = await self.fetch_all(  # type: ignore
             self.get_sql_query("authors_fuzzy_sql"), params=(authors, limit, threshold), row_factory="tuple"
         )
         # filter to exact year; promote to 0.8 if matches
         ids: list[int] = [r[1] for r in rows]  # type: ignore
         if not ids:
             return []
-        year_ok: dict[str, Any] | None = await self.fetch_one(
+        year_ok: dict[str, Any] | None = await self.fetch_one(  # type: ignore
             self.get_sql_query("biblio_ids_sql"), params=(ids, str(year)), row_factory="tuple"
         )
         out = []

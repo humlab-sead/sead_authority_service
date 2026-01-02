@@ -54,7 +54,7 @@ class TestTypeRef:
     def test_type_ref_missing_field(self):
         """Test TypeRef requires both id and name."""
         with pytest.raises(ValidationError) as exc_info:
-            TypeRef(id="test")
+            TypeRef(id="test")  # type: ignore[call-arg]
 
         assert "name" in str(exc_info.value)
 
@@ -103,7 +103,7 @@ class TestReconQuery:
 
     def test_minimal_valid_query(self):
         """Test minimal valid ReconQuery with just query string."""
-        query = ReconQuery(query="Uppsala")
+        query = ReconQuery(query="Uppsala", **{})
 
         assert query.query == "Uppsala"
         assert query.type is None
@@ -130,49 +130,48 @@ class TestReconQuery:
 
     def test_query_trimming(self):
         """Test query string is trimmed."""
-        query = ReconQuery(query="  Uppsala  ")
+        query = ReconQuery(query="  Uppsala  ", **{})
 
         assert query.query == "Uppsala"
 
     def test_empty_query_raises_error(self):
         """Test empty query string raises ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
-            ReconQuery(query="")
+            ReconQuery(query="", **{})
 
         assert "Query cannot be empty" in str(exc_info.value)
 
     def test_whitespace_only_query_raises_error(self):
         """Test whitespace-only query raises ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
-            ReconQuery(query="   ")
+            ReconQuery(query="   ", **{})
 
         assert "Query cannot be empty" in str(exc_info.value)
 
     def test_limit_validation_min(self):
         """Test limit must be >= 1."""
         with pytest.raises(ValidationError):
-            ReconQuery(query="Test", limit=0)
+            ReconQuery(query="Test", limit=0, **{})
 
     def test_limit_validation_max(self):
         """Test limit must be <= 500."""
         with pytest.raises(ValidationError):
-            ReconQuery(query="Test", limit=501)
+            ReconQuery(query="Test", limit=501, **{})
 
     def test_type_strict_valid_values(self):
         """Test type_strict accepts valid literal values."""
         for value in ["should", "all", "any"]:
-            query = ReconQuery(query="Test", type_strict=value)
+            query = ReconQuery(query="Test", type_strict=value, **{})  # type: ignore
             assert query.type_strict == value
 
     def test_type_strict_invalid_value(self):
         """Test type_strict rejects invalid values."""
         with pytest.raises(ValidationError):
-            ReconQuery(query="Test", type_strict="invalid")
+            ReconQuery(query="Test", type_strict="invalid", **{})  # type: ignore
 
     def test_type_none_is_allowed(self):
         """Test type can be None."""
-        query = ReconQuery(query="Test", type=None)
-
+        query = ReconQuery(query="Test", type=None, **{})
         assert query.type is None
 
 
@@ -181,9 +180,8 @@ class TestReconBatchRequest:
 
     def test_valid_batch_request(self):
         """Test valid batch request with multiple queries."""
-        batch = ReconBatchRequest(
-            root={"q0": ReconQuery(query="Uppsala"), "q1": ReconQuery(query="Stockholm", type="site", limit=5)}
-        )
+        batch = ReconBatchRequest(root={"q0": ReconQuery(query="Uppsala", **{}), "q1": 
+                                        ReconQuery(query="Stockholm", type="site", limit=5, **{})})
 
         assert "q0" in batch.root
         assert "q1" in batch.root
@@ -198,7 +196,7 @@ class TestReconBatchRequest:
 
     def test_batch_request_serialization(self):
         """Test batch request can be serialized."""
-        batch = ReconBatchRequest(root={"q0": ReconQuery(query="Test")})
+        batch = ReconBatchRequest(root={"q0": ReconQuery(query="Test", **{})})
         data = batch.model_dump()
 
         assert "q0" in data
@@ -210,7 +208,7 @@ class TestReconCandidate:
 
     def test_minimal_candidate(self):
         """Test minimal candidate with required fields only."""
-        candidate = ReconCandidate(id="123", name="Uppsala Site")
+        candidate = ReconCandidate(id="123", name="Uppsala Site", **{})
 
         assert candidate.id == "123"
         assert candidate.name == "Uppsala Site"
@@ -239,17 +237,17 @@ class TestReconCandidate:
     def test_candidate_score_validation_min(self):
         """Test score must be >= 0."""
         with pytest.raises(ValidationError):
-            ReconCandidate(id="1", name="Test", score=-1.0)
+            ReconCandidate(id="1", name="Test", score=-1.0, **{})
 
     def test_candidate_score_validation_max(self):
         """Test score must be <= 100."""
         with pytest.raises(ValidationError):
-            ReconCandidate(id="1", name="Test", score=101.0)
+            ReconCandidate(id="1", name="Test", score=101.0, **{})
 
     def test_candidate_name_min_length(self):
         """Test name must have min_length=1."""
         with pytest.raises(ValidationError):
-            ReconCandidate(id="1", name="")
+            ReconCandidate(id="1", name="", **{})
 
     def test_candidate_description_max_length(self):
         """Test description has max_length=500."""
@@ -272,8 +270,8 @@ class TestReconQueryResult:
         """Test query result with multiple candidates."""
         result = ReconQueryResult(
             result=[
-                ReconCandidate(id="1", name="First", score=95.0),
-                ReconCandidate(id="2", name="Second", score=85.0),
+                ReconCandidate(id="1", name="First", score=95.0, **{}),
+                ReconCandidate(id="2", name="Second", score=85.0, **{}),
             ]
         )
 
@@ -294,8 +292,8 @@ class TestReconBatchResponse:
         """Test batch response with results."""
         response = ReconBatchResponse(
             root={
-                "q0": ReconQueryResult(result=[ReconCandidate(id="1", name="Uppsala")]),
-                "q1": ReconQueryResult(result=[ReconCandidate(id="2", name="Stockholm")]),
+                "q0": ReconQueryResult(result=[ReconCandidate(id="1", name="Uppsala", **{})]),
+                "q1": ReconQueryResult(result=[ReconCandidate(id="2", name="Stockholm", **{})]),
             }
         )
 
@@ -326,7 +324,7 @@ class TestPreviewTemplate:
 
     def test_valid_preview_template(self):
         """Test creating a valid preview template."""
-        preview = PreviewTemplate(url="https://example.org/preview?id={{id}}")
+        preview = PreviewTemplate(url="https://example.org/preview?id={{id}}")  # type: ignore
 
         assert str(preview.url) == "https://example.org/preview?id={{id}}"
         assert preview.width == 430
@@ -334,7 +332,7 @@ class TestPreviewTemplate:
 
     def test_preview_template_custom_dimensions(self):
         """Test preview template with custom dimensions."""
-        preview = PreviewTemplate(url="https://example.org/preview", width=600, height=400)
+        preview = PreviewTemplate(url="https://example.org/preview", width=600, height=400)   # type: ignore
 
         assert preview.width == 600
         assert preview.height == 400
@@ -342,22 +340,22 @@ class TestPreviewTemplate:
     def test_preview_width_validation_min(self):
         """Test width must be > 0."""
         with pytest.raises(ValidationError):
-            PreviewTemplate(url="https://example.org/preview", width=0)
+            PreviewTemplate(url="https://example.org/preview", width=0)  # type: ignore
 
     def test_preview_width_validation_max(self):
         """Test width must be <= 1920."""
         with pytest.raises(ValidationError):
-            PreviewTemplate(url="https://example.org/preview", width=1921)
+            PreviewTemplate(url="https://example.org/preview", width=1921)  # type: ignore
 
     def test_preview_height_validation_min(self):
         """Test height must be > 0."""
         with pytest.raises(ValidationError):
-            PreviewTemplate(url="https://example.org/preview", height=0)
+            PreviewTemplate(url="https://example.org/preview", height=0)  # type: ignore
 
     def test_preview_height_validation_max(self):
         """Test height must be <= 1080."""
         with pytest.raises(ValidationError):
-            PreviewTemplate(url="https://example.org/preview", height=1081)
+            PreviewTemplate(url="https://example.org/preview", height=1081)  # type: ignore
 
 
 class TestSuggestSubservice:
@@ -389,9 +387,7 @@ class TestSuggestDescriptor:
 
     def test_suggest_descriptor_with_entity(self):
         """Test suggest descriptor with entity service."""
-        descriptor = SuggestDescriptor(
-            entity=SuggestSubservice(service_url="https://api.example.org", service_path="/suggest/entity")
-        )
+        descriptor = SuggestDescriptor(entity=SuggestSubservice(service_url="https://api.example.org", service_path="/suggest/entity"))
 
         assert descriptor.entity is not None
         assert descriptor.entity.service_path == "/suggest/entity"
@@ -459,13 +455,9 @@ class TestExtendDescriptor:
     def test_extend_descriptor(self):
         """Test creating an extend descriptor."""
         descriptor = ExtendDescriptor(
-            propose_properties=ProposePropertiesDescriptor(
-                service_url="https://api.example.org", service_path="/propose"
-            ),
+            propose_properties=ProposePropertiesDescriptor(service_url="https://api.example.org", service_path="/propose"),
             property_settings=[
-                PropertySetting(
-                    name="latitude", label="Latitude", type="number", help_text="Latitude", entity_types=["site"]
-                )
+                PropertySetting(name="latitude", label="Latitude", type="number", help_text="Latitude", entity_types=["site"])
             ],
         )
 
@@ -494,10 +486,8 @@ class TestReconServiceManifest:
             schemaSpace="https://w3id.org/sead/schema/",
             defaultTypes=[TypeRef(id="site", name="Site")],
             view=ViewTemplate(url="https://example.org/{{id}}"),
-            preview=PreviewTemplate(url="https://example.org/preview?id={{id}}"),
-            suggest=SuggestDescriptor(
-                entity=SuggestSubservice(service_url="https://api.example.org", service_path="/suggest/entity")
-            ),
+            preview=PreviewTemplate(url="https://example.org/preview?id={{id}}"),  # type: ignore
+            suggest=SuggestDescriptor(entity=SuggestSubservice(service_url="https://api.example.org", service_path="/suggest/entity")),
             versions=["0.2", "0.3"],
             homepage="https://example.org",
             logo="https://example.org/logo.png",
@@ -507,7 +497,7 @@ class TestReconServiceManifest:
         assert manifest.view is not None
         assert manifest.preview is not None
         assert manifest.suggest is not None
-        assert "0.2" in manifest.versions
+        assert "0.2" in manifest.versions  # type: ignore
 
 
 class TestSuggestEntityItem:
@@ -656,25 +646,27 @@ class TestExtCell:
 
     def test_ext_cell_with_str_value(self):
         """Test ExtCell with str value."""
-        cell = ExtCell(str_value="59.8586")
+        cell = ExtCell.model_validate({"str_value": "59.8586"})
 
         assert cell.str_value == "59.8586"
 
     def test_ext_cell_with_alias_str(self):
         """Test ExtCell accepts 'str' alias."""
-        cell = ExtCell(**{"str": "test value"})
+        cell = ExtCell.model_validate({"str": "test value"})
 
         assert cell.str_value == "test value"
 
     def test_ext_cell_full(self):
         """Test ExtCell with all fields."""
-        cell = ExtCell(
-            str_value="Uppsala",
-            lang="en",
-            id="123",
-            name="Uppsala Site",
-            type_ref="site",
-            url="https://example.org/123",
+        cell = ExtCell.model_validate(
+            {
+                "str_value": "Uppsala",
+                "lang": "en",
+                "id": "123",
+                "name": "Uppsala Site",
+                "type_ref": "site",
+                "url": "https://example.org/123",
+            }
         )
 
         assert cell.str_value == "Uppsala"
@@ -685,20 +677,20 @@ class TestExtCell:
 
     def test_ext_cell_string_trimming(self):
         """Test ExtCell trims string values."""
-        cell = ExtCell(str_value="  test  ", name="  name  ")
+        cell = ExtCell.model_validate({"str_value": "  test  ", "name": "  name  "})
 
         assert cell.str_value == "test"
         assert cell.name == "name"
 
     def test_ext_cell_empty_string_becomes_none(self):
         """Test ExtCell converts empty strings to None."""
-        cell = ExtCell(str_value="   ")
+        cell = ExtCell.model_validate({"str_value": "   "})
 
         assert cell.str_value is None
 
     def test_ext_cell_with_type_alias(self):
         """Test ExtCell accepts 'type' alias."""
-        cell = ExtCell(**{"type": "location"})
+        cell = ExtCell.model_validate({"type": "location"})
 
         assert cell.type_ref == "location"
 
@@ -711,8 +703,8 @@ class TestExtendResponse:
         response = ExtendResponse(
             meta=[ExtendRequestProperty(id="latitude", name="Latitude")],
             rows={
-                "1": {"latitude": [ExtCell(str_value="59.8586")]},
-                "2": {"latitude": [ExtCell(str_value="59.3293")]},
+                "1": {"latitude": [ExtCell.model_validate({"str_value": "59.8586"})]},
+                "2": {"latitude": [ExtCell.model_validate({"str_value": "59.3293"})]},
             },
         )
 
@@ -790,7 +782,7 @@ class TestReconBatchRequestHandler:
 
     def test_parse_batch_from_root_model(self):
         """Test parsing batch request from RootModel."""
-        batch = ReconBatchRequest(root={"q0": ReconQuery(query="Test")})
+        batch = ReconBatchRequest(root={"q0": ReconQuery(query="Test", type=None, type_strict=None, limit=None, lang=None)})
 
         result = ReconBatchRequestHandler.parse_batch(batch)
 
@@ -809,7 +801,7 @@ class TestModelSerialization:
 
     def test_recon_query_round_trip(self):
         """Test ReconQuery serialization round trip."""
-        original = ReconQuery(query="Test", type="site", limit=10)
+        original = ReconQuery(query="Test", type="site", limit=10, **{})
         data = original.model_dump()
         restored = ReconQuery.model_validate(data)
 
@@ -819,9 +811,7 @@ class TestModelSerialization:
 
     def test_recon_candidate_round_trip(self):
         """Test ReconCandidate serialization round trip."""
-        original = ReconCandidate(
-            id="123", name="Uppsala", type=[TypeRef(id="site", name="Site")], score=95.0, match=True
-        )
+        original = ReconCandidate(id="123", name="Uppsala", type=[TypeRef(id="site", name="Site")], score=95.0, match=True)
         data = original.model_dump()
         restored = ReconCandidate.model_validate(data)
 
@@ -846,9 +836,7 @@ class TestModelSerialization:
 
     def test_recon_service_manifest_config(self):
         """Test ReconServiceManifest has proper config."""
-        manifest = ReconServiceManifest(
-            name="Test", identifierSpace="https://example.org/id/", schemaSpace="https://example.org/schema/"
-        )
+        manifest = ReconServiceManifest(name="Test", identifierSpace="https://example.org/id/", schemaSpace="https://example.org/schema/")
 
         # Check model_config is set
         assert manifest.model_config is not None
