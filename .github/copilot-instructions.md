@@ -19,7 +19,7 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
     # Implementation
 ```
 
-**Why**: Strategies auto-register on import. [main.py](main.py#L7) imports `src.strategies` which triggers recursive module loading in [src/strategies/\_\_init\_\_.py](src/strategies/__init__.py) that instantiates all decorated classes.
+**Why**: Strategies auto-register on import. [main.py](../main.py#L7) imports `src.strategies` which triggers recursive module loading in [src/strategies/\_\_init\_\_.py](../src/strategies/__init__.py) that instantiates all decorated classes.
 
 ### 2. Configuration Resolution with ConfigValue
 Use `ConfigValue` for lazy config resolution instead of direct lookups:
@@ -34,7 +34,7 @@ threshold = ConfigValue("options:auto_accept_threshold", default=0.90).resolve()
 model = ConfigValue("llm.ollama.model,llm.model", default="llama3").resolve()
 ```
 
-**Location**: [src/configuration/resolve.py](src/configuration/resolve.py). Supports colon-separated paths (`options:database:dbname`) and comma-separated fallbacks.
+**Location**: [src/configuration/resolve.py](../src/configuration/resolve.py). Supports colon-separated paths (`options:database:dbname`) and comma-separated fallbacks.
 
 ### 3. Database Connection Singleton
 **Never** create database connections directly. Use the config provider pattern:
@@ -47,16 +47,16 @@ async with await get_connection() as conn:
         await cur.execute(query, params)
 ```
 
-Connection is created once at startup via [src/configuration/setup.py](src/configuration/setup.py#L50) and stored in runtime config.
+Connection is created once at startup via [src/configuration/setup.py](../src/configuration/setup.py#L50) and stored in runtime config.
 
 ### 4. Schema Generation from Templates
 Entity schemas are **generated**, not hand-written. To add a new entity:
 
-1. Add entity config to [config/entities.yml](config/entities.yml)
-2. Run `make generate-schema` (calls [src/scripts/generate_entity_schema.py](src/scripts/generate_entity_schema.py))
-3. Generated SQL appears in [schema/generated/](schema/generated/)
+1. Add entity config to [config/entities.yml](../config/entities.yml)
+2. Run `make generate-schema` (calls [src/scripts/generate_entity_schema.py](../src/scripts/generate_entity_schema.py))
+3. Generated SQL appears in [schema/generated/](../schema/generated/)
 
-**Do not** edit generated files directly. Edit [schema/templates/](schema/templates/) or [config/entities.yml](config/entities.yml) instead.
+**Do not** edit generated files directly. Edit [schema/templates/](../schema/templates/) or [config/entities.yml](../config/entities.yml) instead.
 
 ## Development Workflows
 
@@ -76,7 +76,7 @@ uv run pytest -m integration  # Integration tests only (require DB/Ollama)
 uv run pytest -k test_name     # Run specific test
 ```
 
-**Test markers**: `@pytest.mark.integration`, `@pytest.mark.manual`, `@pytest.mark.debug` (see [pyproject.toml](pyproject.toml#L119)).
+**Test markers**: `@pytest.mark.integration`, `@pytest.mark.manual`, `@pytest.mark.debug` (see [pyproject.toml](../pyproject.toml#L119)).
 
 ### Code Quality
 ```bash
@@ -85,7 +85,7 @@ make tidy            # Run black + isort
 make check-imports   # Verify no relative imports beyond current package
 ```
 
-**Import rules**: Ruff enforces `ban-relative-imports = "parents"` (see [pyproject.toml](pyproject.toml#L46)). Use absolute imports from `src.*`.
+**Import rules**: Ruff enforces `ban-relative-imports = "parents"` (see [pyproject.toml](../pyproject.toml#L46)). Use absolute imports from `src.*`.
 
 ## Architecture Deep Dive
 
@@ -107,13 +107,13 @@ class MethodReconciliationStrategy(RAGHybridReconciliationStrategy):
     # Uses MCP search_lookup → 5-10 candidates → LLM validation
 ```
 
-**Feature flag**: `features.use_mcp_server` in [config/config.yml](config/config.yml#L48). When disabled, falls back to standard fuzzy search.
+**Feature flag**: `features.use_mcp_server` in [config/config.yml](../config/config.yml#L48). When disabled, falls back to standard fuzzy search.
 
 ### Multi-Environment Config
-- **Base config**: [config/config.yml](config/config.yml)
-- **Entity schemas**: [config/entities.yml](config/entities.yml)
-- **LLM prompts**: [config/prompts.yml](config/prompts.yml)
-- **Environment vars**: `.env` (loaded via [src/configuration/setup.py](src/configuration/setup.py#L12))
+- **Base config**: [config/config.yml](../config/config.yml)
+- **Entity schemas**: [config/entities.yml](../config/entities.yml)
+- **LLM prompts**: [config/prompts.yml](../config/prompts.yml)
+- **Environment vars**: `.env` (loaded via [src/configuration/setup.py](../src/configuration/setup.py#L12))
 
 Override config file: `export CONFIG_FILE=./tests/config/config.yml`
 
@@ -121,13 +121,13 @@ Override config file: `export CONFIG_FILE=./tests/config/config.yml`
 
 1. **Strategy not found**: Ensure strategy file is in `src/strategies/` and decorated with `@Strategies.register()`. Import errors are printed to console during startup but don't fail startup.
 
-2. **Config not available**: Call `await setup_config_store()` before accessing config. FastAPI does this in [main.py](main.py#L20) startup event.
+2. **Config not available**: Call `await setup_config_store()` before accessing config. FastAPI does this in [main.py](../main.py#L20) startup event.
 
 3. **Schema changes ignored**: Run `make generate-schema` after editing [config/entities.yml](config/entities.yml). The `--force` flag overwrites existing files.
 
-4. **Test isolation**: Use fixtures from [tests/conftest.py](tests/conftest.py). `MockConfigProvider` prevents tests from hitting real database.
+4. **Test isolation**: Use fixtures from [tests/conftest.py](../tests/conftest.py). `MockConfigProvider` prevents tests from hitting real database.
 
-5. **LLM provider setup**: Ollama/OpenAI providers lazy-load config. See [src/llm/providers/](src/llm/providers/) for provider-specific settings.
+5. **LLM provider setup**: Ollama/OpenAI providers lazy-load config. See [src/llm/providers/](../src/llm/providers/) for provider-specific settings.
 
 ## Git Commit Conventions
 
@@ -166,18 +166,18 @@ test(loaders): add comprehensive UCanAccessSqlLoader tests
 
 ## Key Files Reference
 
-- [main.py](main.py) - FastAPI app entry point, imports strategies
-- [src/api/router.py](src/api/router.py) - All HTTP endpoints
-- [src/reconcile.py](src/reconcile.py) - Core reconciliation logic
-- [src/strategies/strategy.py](src/strategies/strategy.py) - Base strategy class and registry
-- [src/configuration/](src/configuration/) - Config provider pattern
-- [config/entities.yml](config/entities.yml) - Entity definitions (source of truth)
-- [Makefile](Makefile) - All developer commands
+- [main.py](../main.py) - FastAPI app entry point, imports strategies
+- [src/api/router.py](../src/api/router.py) - All HTTP endpoints
+- [src/reconcile.py](../src/reconcile.py) - Core reconciliation logic
+- [src/strategies/strategy.py](../src/strategies/strategy.py) - Base strategy class and registry
+- [src/configuration/](../src/configuration/) - Config provider pattern
+- [config/entities.yml](../config/entities.yml) - Entity definitions (source of truth)
+- [Makefile](../Makefile) - All developer commands
 
 ## Docker Deployment
 
 Multi-environment support:
 - **Development**: `cd docker && docker-compose up --build`
-- **Production**: Uses GHCR images from CI/CD (see [docker/README.md](docker/README.md))
+- **Production**: Uses GHCR images from CI/CD (see [docker/README.md](../docker/README.md))
 
 GitHub Actions builds on every push to `main`/`dev` and pushes to `ghcr.io/humlab-sead/sead_authority_service`.
