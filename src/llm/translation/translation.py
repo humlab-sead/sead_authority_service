@@ -65,7 +65,7 @@ For place names, use the most common English form if it exists.
 
 Examples:
 - "Gamla Uppsala" (sv->en) -> "Old Uppsala"
-- "Sankt Petersburg" (de->en) -> "Saint Petersburg"  
+- "Sankt Petersburg" (de->en) -> "Saint Petersburg"
 - "Château de Versailles" (fr->en) -> "Palace of Versailles"
 
 Text to translate: "{text}"

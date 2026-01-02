@@ -650,13 +650,12 @@ database:
   replica:
     host: replica.example.com
     port: 5433
-    
 connection:
   primary_host: "@value:database.primary.host"
   primary_port: "@value:database.primary.port"
   replica_host: "@value:database.replica.host"
 """
-        )
+)
 
         factory = ConfigFactory()
         config = factory.load(source=str(config_file))
@@ -674,7 +673,6 @@ app:
   settings:
     timeout: 30
     retries: 3
-    
 timeout_value: "@value:app:settings:timeout"
 retry_count: "@value:app:settings:retries"
 """
@@ -695,10 +693,10 @@ defaults:
   timeout: 30
   retries: 3
   cache: true
-  
+
 service_a:
   config: "@value:defaults"
-  
+
 service_b:
   config: "@value:defaults"
 """
@@ -720,7 +718,7 @@ allowed_hosts:
   - localhost
   - example.com
   - api.example.com
-  
+
 cors_origins: "@value:allowed_hosts"
 """
         )
@@ -803,7 +801,7 @@ another_ref: "@value:value"
 database:
   host: "${DB_HOST}"
   port: ${DB_PORT}
-  
+
 connection_string: "@value:database.host"
 connection_port: "@value:database.port"
 """
@@ -857,7 +855,7 @@ app:
 defaults:
   timeout: 30
   retries: 3
-  
+
 services:
   api:
     name: "API Service"
@@ -865,7 +863,7 @@ services:
   worker:
     name: "Worker Service"
     settings: "@value:defaults"
-    
+
 monitoring:
   # Direct references to values that exist in the original structure
   default_timeout: "@value:defaults.timeout"
@@ -1806,8 +1804,8 @@ Beta,B
         # Create config with env var in path
         config_file = tmp_path / "config.yml"
         config_file.write_text(
-            f"""
-data: "@load:${{DATA_DIR}}/env_data.csv"
+            """
+data: "@load:${DATA_DIR}/env_data.csv"
 """
         )
 

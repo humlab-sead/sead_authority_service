@@ -34,14 +34,12 @@ from typing import Any
 import click
 import ollama
 import psycopg
-import yaml
 from dotenv import load_dotenv
 from loguru import logger
 
 from configuration.interface import ConfigLike
 from configuration.provider import ConfigStore, get_config_provider
 from configuration.resolve import ConfigValue
-from src.configuration import setup_config_store
 from utility import configure_logging, create_db_uri
 
 # Add src to path for imports
