@@ -499,7 +499,7 @@ class TestReconServiceManifest:
         assert manifest.view is not None
         assert manifest.preview is not None
         assert manifest.suggest is not None
-        assert "0.2" in manifest.versions  # type: ignore
+        assert "0.2" in manifest.versions  # type: ignore ; pylint: ignore=unsupported-membership-test
 
 
 class TestSuggestEntityItem:

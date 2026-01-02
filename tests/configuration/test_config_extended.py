@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -18,9 +18,6 @@ from src.configuration.config import (
     SafeLoaderIgnoreUnknown,
     SubConfigResolver,
     is_path_to_existing_file,
-    nj,
-    yaml_path_join,
-    yaml_str_join,
 )
 
 

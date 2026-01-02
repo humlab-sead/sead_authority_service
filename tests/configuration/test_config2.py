@@ -1,13 +1,9 @@
-import os
 from pathlib import Path
-from typing import Any
-from unittest.mock import patch
 
 import pytest
 
 from src.configuration import Config, ConfigFactory, ConfigProvider, ConfigStore, ConfigValue, MockConfigProvider, set_config_provider
 from src.configuration.utility import replace_references
-from src.utility import replace_env_vars
 from tests.decorators import with_test_config
 
 # pylint: disable=unused-argument, implicit-str-concat, f-string-without-interpolation, invalid-field-call

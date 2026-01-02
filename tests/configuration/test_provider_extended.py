@@ -8,12 +8,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.configuration.config import Config
-from src.configuration.interface import ConfigLike
 from src.configuration.provider import (
-    ConfigProvider,
     ConfigStore,
     MockConfigProvider,
     SingletonConfigProvider,
+    _provider_lock,
     get_config_provider,
     reset_config_provider,
 )
@@ -205,7 +204,7 @@ class TestConfigStoreConfigureContext:
 class TestConfigStoreClassMethods:
     """Test ConfigStore class methods for backward compatibility."""
 
-    def test_is_configured_global_delegates_to_provider(self, monkeypatch) -> None:
+    def test_is_configured_global_delegates_to_provider(self, _) -> None:
         """is_configured_global should use provider layer."""
         mock_provider = MagicMock()
         mock_provider.is_configured.return_value = True
@@ -320,7 +319,6 @@ class TestProviderThreadSafety:
     def test_reset_config_provider_is_thread_safe(self) -> None:
         """reset_config_provider should use locking."""
         # This test verifies the mechanism exists, not actual thread behavior
-        from src.configuration.provider import _provider_lock
 
         assert _provider_lock is not None
 

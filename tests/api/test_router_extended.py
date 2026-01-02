@@ -3,7 +3,6 @@ Extended comprehensive tests for API router endpoints - adds missing coverage.
 """
 
 import json
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -501,7 +500,7 @@ class TestContentTypeHandling:
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
 
-        assert response.status_code == 400 or response.status_code == 500
+        assert response.status_code in [400, 500]
 
     @with_test_config
     def test_reconcile_missing_queries_field(self, client: TestClient, test_provider: MockConfigProvider):

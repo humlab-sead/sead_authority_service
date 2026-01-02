@@ -3,11 +3,13 @@
 import hashlib
 import json
 from pathlib import Path
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 
 import pytest
 
 from src.llm.translation.cache import TranslationCache
+
+# pylint: disable=protected-access
 
 
 class TestTranslationCacheInitialization:
@@ -47,7 +49,7 @@ class TestTranslationCacheInitialization:
         """Test memory cache is initialized as empty dict."""
         cache = TranslationCache(cache_dir=str(tmp_path / "cache"))
 
-        assert cache._memory_cache == {}
+        assert not cache._memory_cache
         assert isinstance(cache._memory_cache, dict)
 
 

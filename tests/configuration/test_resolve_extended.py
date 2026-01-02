@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 import pytest
 
 from src.configuration.config import Config
 from src.configuration.provider import ConfigProvider, MockConfigProvider, set_config_provider
 from src.configuration.resolve import Configurable, ConfigValue, inject_config, resolve_arguments
+
+# pylint: disable=redefined-outer-name,unused-argument
 
 
 @pytest.fixture()
@@ -114,7 +115,7 @@ class TestResolveArguments:
         args = (ConfigValue("section:value"), ConfigValue("other:count"))
         kwargs = {}
 
-        resolved_args, resolved_kwargs = resolve_arguments(fn, args, kwargs)
+        resolved_args, _ = resolve_arguments(fn, args, kwargs)
 
         assert resolved_args == (10, 5)
 
@@ -130,7 +131,6 @@ class TestResolveArguments:
         resolved_args, resolved_kwargs = resolve_arguments(fn, args, kwargs)
 
         # bind_partial puts resolved kwargs in arguments, not kwargs
-        bound_args = resolved_kwargs if not resolved_args else resolved_args
         # Actually the implementation uses bind_partial which returns BoundArguments
         # Let's check the actual behavior
         assert len(resolved_args) == 2 or "a" in resolved_kwargs
@@ -165,7 +165,7 @@ class TestResolveArguments:
         args = (99,)
         kwargs = {}
 
-        resolved_args, resolved_kwargs = resolve_arguments(fn, args, kwargs)
+        resolved_args, _ = resolve_arguments(fn, args, kwargs)
 
         assert resolved_args == (99,)
 
@@ -178,7 +178,7 @@ class TestResolveArguments:
         args = ("text", 42, [1, 2, 3])
         kwargs = {}
 
-        resolved_args, resolved_kwargs = resolve_arguments(fn, args, kwargs)
+        resolved_args, _ = resolve_arguments(fn, args, kwargs)
 
         assert resolved_args == ("text", 42, [1, 2, 3])
 

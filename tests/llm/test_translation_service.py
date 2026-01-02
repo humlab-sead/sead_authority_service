@@ -110,6 +110,6 @@ class TestTranslationServiceHeuristics:
         llm = AsyncMock()
         service = TranslationService(llm_client=llm)  # type: ignore[arg-type]
 
-        assert service._contains_non_english_patterns("Ångström") is True
-        assert service._contains_non_english_patterns("Château") is True
-        assert service._contains_non_english_patterns("Hello") is False
+        assert service._contains_non_english_patterns("Ångström") is True  # pylint: disable=protected-access
+        assert service._contains_non_english_patterns("Château") is True  # pylint: disable=protected-access
+        assert service._contains_non_english_patterns("Hello") is False  # pylint: disable=protected-access

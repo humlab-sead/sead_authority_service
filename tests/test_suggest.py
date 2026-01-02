@@ -397,7 +397,7 @@ async def test_render_flyout_preview_success_compact_html(monkeypatch: pytest.Mo
     assert "My Site" in data["html"]
     assert "site" in data["html"]
     assert "Field6" not in data["html"]
-    assert ("x" * 57 + "...") in data["html"]
+    assert "x" * 57 + "..." in data["html"]
 
 
 @pytest.mark.asyncio

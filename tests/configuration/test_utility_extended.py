@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from src.configuration.utility import _parse_list_expression, _replace_references, replace_references
 
 

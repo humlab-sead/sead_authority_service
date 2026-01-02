@@ -39,7 +39,7 @@ async def test_reconcile_queries_empty_query_short_circuits(monkeypatch: pytest.
     _RecordingStrategy.calls = []
     results = await reconcile_module.reconcile_queries({"q0": {"query": "   ", "type": "site"}})
     assert results == {"q0": {"result": []}}
-    assert _RecordingStrategy.calls == []
+    assert not _RecordingStrategy.calls
 
 
 @pytest.mark.asyncio
@@ -122,7 +122,7 @@ async def test_reconcile_queries_covers_strategy_cls_none_branch(monkeypatch: py
         def __init__(self):
             self._calls = 0
 
-        def get(self, key: str, default: Any = None) -> Any:
+        def get(self, key: str, default: Any = None) -> Any:  # pylint: disable=unused-argument
             self._calls += 1
             if self._calls == 1:
                 return _RecordingStrategy
