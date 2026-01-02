@@ -2,7 +2,6 @@
 Unit tests for OllamaProvider LLM implementation.
 """
 
-import os
 from unittest.mock import AsyncMock, Mock, mock_open, patch
 
 import httpx
