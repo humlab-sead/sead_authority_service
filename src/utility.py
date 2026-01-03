@@ -162,17 +162,17 @@ def env2dict(prefix: str, data: dict[str, str] | None = None, lower_key: bool = 
 
 def configure_logging(opts: dict[str, Any] | None = None, default_level: str = "INFO") -> None:
     """Configure logging with file and console handlers.
-    
+
     Args:
         opts: Logging options from config (folder, handlers)
         default_level: Default log level if not specified in handlers
     """
     logger.remove()
-    
+
     # Get log folder path, ensure it exists
     log_folder = opts.get("folder", "./logs") if opts else "./logs"
     os.makedirs(log_folder, exist_ok=True)
-    
+
     # Add default console handler if no handlers specified
     if not opts or not opts.get("handlers"):
         logger.add(
@@ -208,13 +208,13 @@ def configure_logging(opts: dict[str, Any] | None = None, default_level: str = "
                 # Create log file path
                 log_filename = handler["sink"]
                 handler["sink"] = os.path.join(log_folder, log_filename)
-                
+
                 # Add rotation and retention if not specified
                 if "rotation" not in handler:
                     handler["rotation"] = "10 MB"
                 if "retention" not in handler:
                     handler["retention"] = "30 days"
-            
+
             # Add backtrace and diagnose for better exception tracking
             if "backtrace" not in handler:
                 handler["backtrace"] = True

@@ -322,17 +322,17 @@ class TestConfigureLogging:
         configure_logging(None)
         mock_logger.remove.assert_called_once()
         mock_makedirs.assert_called_once_with("./logs", exist_ok=True)
-        
+
         # Should be called twice: console + file
         assert mock_logger.add.call_count == 2
-        
+
         # Check console handler (first call)
         console_call = mock_logger.add.call_args_list[0]
         assert console_call[0][0] == sys.stdout
         assert console_call[1]["level"] == "INFO"
         assert console_call[1]["backtrace"] is True
         assert console_call[1]["diagnose"] is True
-        
+
         # Check file handler (second call)
         file_call = mock_logger.add.call_args_list[1]
         assert "sead_authority.log" in file_call[0][0]
@@ -359,7 +359,7 @@ class TestConfigureLogging:
         """Test configure_logging with file handler."""
         opts = {"folder": "test_logs", "handlers": [{"sink": "test.log", "level": "ERROR"}]}
         configure_logging(opts)
-        
+
         mock_makedirs.assert_called_once_with("test_logs", exist_ok=True)
         handlers = mock_logger.configure.call_args[1]["handlers"]
         expected_path = os.path.join("test_logs", "test.log")
