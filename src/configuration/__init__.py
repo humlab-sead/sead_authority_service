@@ -12,7 +12,7 @@ from .provider import (
     set_config_provider,
 )
 from .resolve import ConfigValue, inject_config
-from .setup import get_connection, setup_config_store
+from .setup import get_connection, setup_config_store, shutdown_connection_pool
 
 __all__ = [
     # config

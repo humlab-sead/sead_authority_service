@@ -4,7 +4,7 @@ from loguru import logger
 
 # Force import of strategies to register them
 from src.api.router import router
-from src.configuration import ConfigProvider, get_config_provider, setup_config_store
+from src.configuration import ConfigProvider, get_config_provider, setup_config_store, shutdown_connection_pool
 
 app = FastAPI(title="SEAD Entity Reconciliation Service")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -34,8 +34,7 @@ async def startup():
 async def shutdown():
     try:
         if get_config_provider().is_configured():
-            connection = get_config_provider().get_config().get("runtime:connection")
-            if connection:
-                await connection.close()
+
+            await shutdown_connection_pool()
     except Exception as e:  # pylint: disable=broad-except
-        logger.error(f"Error closing database connection: {e}")
+        logger.error(f"Error closing database connection pool: {e}")

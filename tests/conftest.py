@@ -1,4 +1,5 @@
 import sys
+from contextlib import asynccontextmanager
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -80,41 +81,10 @@ def mock_strategy_with_get_details(mock_strategies, value: dict[str, str]) -> As
 @pytest.fixture
 def test_config() -> Config:
     """Provide test configuration"""
-
-    async def async_mock_connection():
-        mock_conn = AsyncMock(spec=psycopg.AsyncConnection)
-        mock_cursor = AsyncMock(spec=psycopg.AsyncCursor)
-
-        async def async_fetchone():
-            mock_row_data = {
-                "ID": 123,
-                "Name": "Test Site",
-                "Description": "A test archaeological site",
-                "National ID": "TEST123",
-                "Latitude": 59.8586,
-                "Longitude": 17.6389,
-            }
-            return MockRow(mock_row_data)
-
-        async def async_execute(query, params=None):
-            pass
-
-        mock_cursor.fetchone.side_effect = async_fetchone
-        mock_cursor.execute.side_effect = async_execute
-        mock_conn.cursor.return_value = mock_cursor
-        return mock_conn
-
     factory: ConfigFactory = ConfigFactory()
     config: Config = factory.load(source="./tests/config/config.yml", context="default", env_filename="./tests/.env")  # type: ignore
-    config.update(
-        {
-            "runtime": {
-                "connection_factory": async_mock_connection,
-            }
-        }
-    )
+    # Note: Tests use mocked connections, not the real pool
     return config
-    # return Config(data={"options": {"id_base": "https://w3id.org/sead/id/"}, "runtime": {"connection_factory": async_mock_connection}})
 
 
 class ExtendedMockConfigProvider(MockConfigProvider):
@@ -122,17 +92,41 @@ class ExtendedMockConfigProvider(MockConfigProvider):
 
     def __init__(self, initial_config: Config) -> None:
         super().__init__(initial_config)
+        self._mock_connection: AsyncMock | None = None
 
     def create_connection_mock(self, **kwargs) -> None:
+        """Create a mock connection pool that returns mock connections"""
         connection = create_connection_mock(**({"execute": None} | kwargs))
-        self.get_config().update({"runtime:connection": connection})
+
+        # Create mock pool
+        mock_pool = MagicMock()
+
+        # Set up connection() to return a proper async context manager
+        # This function will be called by pool.connection()
+        def create_connection_cm():
+            @asynccontextmanager
+            async def connection_context_manager():
+                """Async context manager for pool.connection()"""
+                yield connection
+
+            return connection_context_manager()
+
+        # Store reference to connection for test assertions
+        self._mock_connection = connection
+
+        # Make pool.connection a callable that returns a new context manager each time
+        mock_pool.connection = MagicMock(side_effect=create_connection_cm)
+
+        self.get_config().update({"runtime:connection_pool": mock_pool})
 
     @property
-    def connection_mock(self) -> MagicMock:
-        return self.get_config().get("runtime:connection")
+    def connection_mock(self) -> AsyncMock | None:
+        """Get the mock connection object for assertions"""
+        return getattr(self, "_mock_connection", None)
 
     @property
     def cursor_mock(self) -> MagicMock:
+        """Get the mock cursor object for assertions"""
         if not self.connection_mock:
             raise ValueError("Connection mock not set up. Call create_connection_mock first.")
 
@@ -176,4 +170,9 @@ def create_connection_mock(**method_returns: Any) -> AsyncMock:
     cursor_context_manager.__aexit__.return_value = None
     mock_conn.cursor.return_value = cursor_context_manager
     mock_conn.cursor_instance = mock_cursor
+
+    # Add commit and rollback methods for transaction management
+    mock_conn.commit = AsyncMock()
+    mock_conn.rollback = AsyncMock()
+
     return mock_conn

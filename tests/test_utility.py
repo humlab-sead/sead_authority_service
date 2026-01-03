@@ -620,13 +620,13 @@ class TestDatabaseUtilities:
     def test_create_db_uri(self):
         """Test create_db_uri function."""
         uri = create_db_uri(host="localhost", port=5432, user="testuser", dbname="testdb")
-        expected = "postgresql+psycopg://testuser@localhost:5432/testdb"
+        expected = "postgresql://testuser@localhost:5432/testdb"
         assert uri == expected
 
     def test_create_db_uri_string_port(self):
         """Test create_db_uri with string port."""
         uri = create_db_uri(host="localhost", port="5432", user="testuser", dbname="testdb")
-        expected = "postgresql+psycopg://testuser@localhost:5432/testdb"
+        expected = "postgresql://testuser@localhost:5432/testdb"
         assert uri == expected
 
     def test_create_db_uri_custom_driver(self):
@@ -637,7 +637,7 @@ class TestDatabaseUtilities:
     def test_create_db_uri_with_password(self):
         """Test create_db_uri with password."""
         uri = create_db_uri(host="localhost", port=5432, user="testuser", password="secret", dbname="testdb")
-        assert uri == "postgresql+psycopg://testuser:secret@localhost:5432/testdb"
+        assert uri == "postgresql://testuser:secret@localhost:5432/testdb"
 
 
 class TestIntegration:

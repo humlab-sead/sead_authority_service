@@ -4,6 +4,9 @@ options:
   default_query_limit: 10
   database:
     dbname: sead_staging
+    pool_min_size: 2
+    pool_max_size: 10
+    pool_timeout: 30.0
 
 policy:
   site:

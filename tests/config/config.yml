@@ -7,6 +7,9 @@ options:
     dbname: smurfs
     user: holamundo
     port: 9999
+    pool_min_size: 1
+    pool_max_size: 5
+    pool_timeout: 10.0
 policy:
   site:
     proximity_boost:

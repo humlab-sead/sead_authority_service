@@ -17,6 +17,7 @@ dependencies = [
     "openpyxl>=3.1.5",
     "pandas>=2.3.3",
     "psycopg>=3.2.13",
+    "psycopg-pool>=3.2.0",
     "pyaml>=25.7.0",
     "python-multipart>=0.0.20",
     "sqlalchemy>=2.0.44",

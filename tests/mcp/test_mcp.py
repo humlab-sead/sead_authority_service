@@ -20,7 +20,6 @@ from src.configuration.config import ConfigFactory
 from src.configuration.interface import ConfigLike
 from src.configuration.provider import MockConfigProvider
 from src.configuration.resolve import ConfigValue
-from src.configuration.setup import _setup_connection_factory
 from src.mcp import (
     Candidate,
     GetByIdParams,
@@ -619,9 +618,10 @@ async def test_search_lookup_integration(test_provider):
 
     config: ConfigLike = ConfigFactory().load(source="./config/config.yml", env_prefix="SEAD_AUTHORITY", env_filename=".env")
     test_provider.set_config(config)
-    await _setup_connection_factory(config, "options:database")
 
-    async with await get_connection() as conn:
+    # Note: In real usage, connection pool would be set up via setup_config_store()
+    # For this manual test, we're using direct connection
+    async with get_connection() as conn:
         server = SEADMCPServer(conn)
 
         params = SearchLookupParams(

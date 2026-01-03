@@ -2,7 +2,7 @@ from typing import Any, Type
 
 from loguru import logger
 
-from src.configuration import get_config_provider, get_connection
+from src.configuration import get_config_provider
 from src.strategies.strategy import ReconciliationStrategy, Strategies
 
 
@@ -11,7 +11,6 @@ async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
     default_query_limit: int = get_config_provider().get_config().get("options:default_query_limit") or 10
 
     results: dict[str, Any] = {}
-    _ = await get_connection()
 
     logger.info(f"Processing {len(queries)} reconciliation queries")
 
