@@ -121,7 +121,7 @@ class BaseRepository(AbstractRepository):
         try:
             return await self.fetch_one(self.get_details_sql(), {"id": int(entity_id)})
         except (ValueError, psycopg.Error) as e:
-            logger.error(f"Error fetching details for entity_id {entity_id}: {e}")
+            logger.exception(f"Error fetching details for entity_id {entity_id}: {e}")
             return None
 
     async def find(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:  # pylint: disable=unused-argument

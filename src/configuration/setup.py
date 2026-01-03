@@ -119,7 +119,7 @@ async def get_connection() -> AsyncIterator[psycopg.AsyncConnection]:
         except Exception as e:
             # Auto-rollback on error
             await conn.rollback()
-            logger.error(f"Database transaction error, rolled back: {e}")
+            logger.exception(f"Database transaction error, rolled back: {e}")
             raise
 
 

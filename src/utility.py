@@ -179,6 +179,8 @@ def configure_logging(opts: dict[str, Any] | None = None, default_level: str = "
             sys.stdout,
             level=default_level,
             format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>",
+            backtrace=True,
+            diagnose=True,
         )
         # Add default file handler
         logger.add(
@@ -187,6 +189,8 @@ def configure_logging(opts: dict[str, Any] | None = None, default_level: str = "
             retention="30 days",
             level=default_level,
             format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+            backtrace=True,
+            diagnose=True,
         )
         return
 
@@ -210,6 +214,12 @@ def configure_logging(opts: dict[str, Any] | None = None, default_level: str = "
                     handler["rotation"] = "10 MB"
                 if "retention" not in handler:
                     handler["retention"] = "30 days"
+            
+            # Add backtrace and diagnose for better exception tracking
+            if "backtrace" not in handler:
+                handler["backtrace"] = True
+            if "diagnose" not in handler:
+                handler["diagnose"] = True
 
         logger.configure(handlers=opts["handlers"])
 
