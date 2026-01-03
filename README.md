@@ -123,7 +123,7 @@ make test
 
 ```bash
 make lint
-make format
+make tidy
 ```
 
 ### Release Management
@@ -184,27 +184,6 @@ Once running, visit `http://localhost:8000/docs` for interactive API documentati
 
 ### Docker Deployment
 
-The service includes comprehensive Docker support with multiple deployment strategies. All Docker-related files are in the `docker/` directory.
-
-#### Quick Start with Docker
-
-**Development:**
-```bash
-cd docker
-cp .env.example .env
-# Edit .env with your credentials
-docker-compose up --build
-```
-
-**Production:**
-```bash
-cd docker
-cp .env.production.example .env.production
-# Edit .env.production with your credentials
-docker-compose -f docker-compose.prod.yml pull
-docker-compose -f docker-compose.prod.yml up -d
-```
-
 See [docker/QUICKSTART.md](docker/QUICKSTART.md) for detailed quick start instructions.
 
 ### CI/CD Pipeline
@@ -213,16 +192,15 @@ The project uses GitHub Actions for automated Docker image builds and deployment
 
 #### How It Works
 
-1. **Automated Builds**: On every push to `main` or `dev` branches, or when creating version tags
-2. **Multi-Architecture**: Builds for both `linux/amd64` and `linux/arm64`
-3. **Container Registry**: Images published to GitHub Container Registry (GHCR)
+1. **Automated Builds**: On every push to `main` branch, or when creating version tags
+3. **Container Registry**: Image is published to GitHub Container Registry (GHCR)
 4. **Version Tags**: Automatic tagging based on git tags and branches
 
 #### Workflow Triggers
 
 The GitHub Actions workflow (`.github/workflows/docker-build.yml`) is triggered by:
 
-- **Push to main/dev**: Builds and pushes with `latest` or `dev` tag
+- **Push to main**: Builds and pushes with `latest` tag
 - **Version tags**: Push tags like `v1.0.0` to build versioned images
 - **Pull requests**: Builds image for testing (doesn't push)
 - **Manual dispatch**: Trigger builds manually from GitHub UI
@@ -232,10 +210,8 @@ The GitHub Actions workflow (`.github/workflows/docker-build.yml`) is triggered 
 Images are available at `ghcr.io/humlab-sead/sead_authority_service` with these tags:
 
 - `latest` - Latest stable release from main branch
-- `dev` - Latest development version from dev branch
 - `v*` - Specific version tags (e.g., `v0.1.0`, `v1.2.3`)
 - `main-sha-<commit>` - Specific commit from main branch
-- `dev-sha-<commit>` - Specific commit from dev branch
 
 #### Using Pre-built Images
 
@@ -262,41 +238,22 @@ docker run -d \
 
 To create a new release and trigger automated builds:
 
+Create a PR to `main` with your changes, then merge it. After merging, create a version tag:
+
 ```bash
 # Create and push a version tag
 git tag -a v0.1.0 -m "Release version 0.1.0"
 git push origin v0.1.0
 
-# GitHub Actions will:
-# 1. Build the Docker image
-# 2. Tag it as v0.1.0, v0.1, v0, and latest
-# 3. Push to ghcr.io/humlab-sead/sead_authority_service
-# 4. Generate build attestation for security
 ```
 
 #### Deployment Workflow
-
-**For development:**
-```bash
-# Automatic on every push to dev branch
-git checkout dev
-git push origin dev
-# Image built and tagged as 'dev'
-```
 
 **For production:**
 ```bash
 # 1. Create release tag
 git tag v1.0.0
 git push origin v1.0.0
-
-# 2. GitHub Actions builds and pushes automatically
-
-# 3. Deploy on server
-cd docker
-docker-compose -f docker-compose.prod.yml pull
-docker-compose -f docker-compose.prod.yml up -d
-```
 
 #### Build Process
 
@@ -317,7 +274,7 @@ The CI/CD pipeline uses a multi-stage Docker build:
 The service supports multiple deployment strategies:
 
 1. **Local Build** - Build Docker image from local source code
-   - Best for: Development and testing
+   - Best for: Development and testing, `use docker/build.sh` script
    - See: `docker/Dockerfile`
 
 2. **GitHub Build** - Build from specific GitHub tag/branch
@@ -342,6 +299,7 @@ SEAD_AUTHORITY_OPTIONS_DATABASE_HOST=your-db-host
 SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME=sead_staging
 SEAD_AUTHORITY_OPTIONS_DATABASE_USER=your-db-user
 SEAD_AUTHORITY_OPTIONS_DATABASE_PORT=5432
+SEAD_AUTHORITY_OPTIONS_DATABASE_PASSWORD=your-db-password
 
 OPENAI_API_KEY=your-openai-key
 GEONAMES_USERNAME=your-geonames-username
@@ -353,14 +311,7 @@ Configuration file (`config.yml`) is mounted from the host as a read-only volume
 
 - [ ] Configure production environment variables in `docker/.env.production`
 - [ ] Review and customize `docker/config.yml` for production settings
-- [ ] Set up reverse proxy (nginx/traefik) for HTTPS
-- [ ] Configure log rotation and monitoring
-- [ ] Set up automated backups for logs and data
-- [ ] Configure resource limits in docker-compose
-- [ ] Set up monitoring and alerting (Prometheus, Grafana)
-- [ ] Review security settings (firewall, access controls)
-- [ ] Test health checks and auto-restart behavior
-- [ ] Configure SSL/TLS certificates
+- [ ] tbc
 
 ### Documentation
 
