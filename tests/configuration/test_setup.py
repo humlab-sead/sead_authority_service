@@ -97,7 +97,7 @@ async def test_get_connection_from_pool(provider_with_config: Config) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_connection_missing_pool_raises(provider_with_config: Config) -> None:
+async def test_get_connection_missing_pool_raises(provider_with_config: Config) -> None:  # pylint: disable=unused-argument
     """get_connection should raise when connection pool is not initialized."""
     # Don't set runtime:connection_pool - this should cause an error
 
