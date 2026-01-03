@@ -4,7 +4,7 @@ import sys
 import unicodedata
 from datetime import datetime
 from typing import Any, Callable, Generic, Literal, TypeVar
-
+from urllib.parse import quote
 import yaml
 from loguru import logger
 
@@ -260,13 +260,14 @@ class Registry(Generic[T]):
 
 
 def create_db_uri(
-    *, host: str, port: int | str, user: str, dbname: str, password: str | None = None, driver: str = "postgresql+psycopg"
+    *, host: str, port: int | str, user: str, dbname: str, password: str | None = None, driver: str = "postgresql"
 ) -> str:
     """
     Builds database URI from the individual config elements.
     """
     if password:
-        return f"{driver}://{user}:{password}@{host}:{port}/{dbname}"
+        quoted_password: str = quote(password, safe="")
+        return f"{driver}://{user}:{quoted_password}@{host}:{port}/{dbname}"
     return f"{driver}://{user}@{host}:{port}/{dbname}"
 
 
