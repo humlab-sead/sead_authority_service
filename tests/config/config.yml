@@ -336,9 +336,13 @@ geonames:
 logging:
   folder: ./logs
   handlers:
-    - sink: "import_excel.log"
-      level: "DEBUG"
-      format: "{time} - {level} - {message}"
+    # Console output for tests (simplified)
     - sink: "sys.stdout"
+      level: "WARNING"
+      format: "<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>"
+    # Test log file
+    - sink: "test_run.log"
       level: "DEBUG"
-      format: "{time} - {level} - {message}"
+      format: "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
+      rotation: "5 MB"
+      retention: "7 days"
