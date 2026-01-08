@@ -64,7 +64,7 @@ class RAGHybridReconciliationStrategy(ReconciliationStrategy):
 
         try:
             # Get MCP server instance
-            async with await get_connection() as conn:
+            async with get_connection() as conn:
                 mcp_server = SEADMCPServer(conn)
 
                 k_fuzzy: int = ConfigValue("mcp.retrieval.k_fuzzy").resolve() or 30
