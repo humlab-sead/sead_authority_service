@@ -68,23 +68,35 @@ class ReconciliationStrategy(ABC):
 
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:
         """Convert entity data to OpenRefine candidate format"""
+        from loguru import logger
+        
         auto_accept_threshold: float = ConfigValue("options:auto_accept_threshold").resolve() or 0.85
         id_base: str = ConfigValue("options:id_base").resolve() or ""
 
         entity_id: str = entity_data[self.get_entity_id_field()]
         label: str = entity_data[self.get_label_field()]
         score = float(entity_data.get("name_sim", 0))
+        score_percent = min(100.0, round(score * 100, 2))
+        is_match = bool(label.lower() == query.lower() or score >= auto_accept_threshold)
+        
         candidate: dict[str, Any] = {
             "id": f"{id_base}{self.get_id_path()}/{entity_id}",
             "name": label,
-            "score": min(100.0, round(score * 100, 2)),
-            "match": bool(label.lower() == query.lower() or score >= auto_accept_threshold),
+            "score": score_percent,
+            "match": is_match,
             "type": [{"id": self.get_id_path(), "name": label}],
         }
 
         # Add additional metadata if available
         if "distance_km" in entity_data:
             candidate["distance_km"] = round(entity_data["distance_km"], 2)
+        
+        # Log candidate details for debugging
+        logger.debug(
+            f"Candidate: query='{query}' → name='{label}' | "
+            f"score={score_percent}% (threshold={auto_accept_threshold*100}%) | "
+            f"match={is_match} | id={entity_id}"
+        )
 
         return candidate
 
