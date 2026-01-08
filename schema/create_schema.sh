@@ -17,6 +17,7 @@ readonly YELLOW='\033[1;33m'
 readonly NC='\033[0m'
 
 if [[ -f .env ]]; then
+    echo "Loading environment variables from .env file"
     set -a
     source .env
     set +a
@@ -28,8 +29,10 @@ g_port="${SEAD_AUTHORITY_OPTIONS_DATABASE_PORT:-5432}"
 g_db="${SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME:-}"
 
 g_generate_deploy_sql="YES"
+g_single_sql="YES"
 g_deploy="NO"
 g_schema_folder="schema/generated"
+g_deploy_semantic="NO"
 
 if [[ -z "$g_host" ]] && [[ -f ~/vault/.default.sead.server ]]; then
     g_host=$(cat ~/vault/.default.sead.server)
@@ -72,8 +75,11 @@ Options:
   --user, -U USERNAME      Database user (overrides SEAD_AUTHORITY_OPTIONS_DATABASE_USER)
   --host, -h HOSTNAME      Database host (overrides SEAD_AUTHORITY_OPTIONS_DATABASE_HOST)
   --schema-folder FOLDER   Directory to store generated SQL files (default: ${g_schema_folder})
+  --single-sql             Output single combined SQL file instead of multiple files with \i commands
+  --no-single-sql          Output multiple SQL files with \i commands (default)
   --deploy, -D             Deploy the generated schema to the target database
   --no-generate            Skip schema generation, only deploy existing files
+  --deploy-semantic        Deploy semantic search schemas (requires --deploy)
   --help                   Show this help message and exit
 
 Environment Variables:
@@ -126,6 +132,18 @@ while [[ $# -gt 0 ]]; do
             g_generate_deploy_sql="NO"
             shift
             ;;
+        --single-sql)
+            g_single_sql="YES"
+            shift
+            ;;
+        --no-single-sql)
+            g_single_sql="NO"
+            shift
+            ;;
+        --deploy-semantic)
+            g_deploy_semantic="YES"
+            shift
+            ;;
         --deploy|-D)
             g_deploy="YES"
             shift
@@ -144,67 +162,100 @@ if [[ "$g_deploy" == "YES" ]]; then
         print_usage "Database connection parameters (--database, --user, --host) are required for deployment"
     fi
 fi
-
+log_info "g_host=$g_host"
+log_info "g_user=$g_user"
+log_info "g_port=$g_port"
+log_info "g_db=$g_db"
 cleanup() {
     log_info "Cleaning up generated schema files"
     rm -rf schema/generated
     rm -f "${g_deploy_sql_filename}"
 }
 
-generate_deploy_sql() {
+generate_entity_schema() {
     log_info "Generating entity schema files from templates"
     mkdir -p "${g_schema_folder}"
-    
+    if [[ "$g_deploy_semantic" == "YES" ]]; then
+        embeddings_flag="--no-skip-embeddings"
+        log_info "Including semantic search schemas in generation"
+    else
+        embeddings_flag="--skip-embeddings"
+        log_info "Skipping semantic search schemas in generation"
+    fi
     # Generate entity-specific SQL files using Python script
-    if ! PYTHONPATH=. uv run python src/scripts/generate_entity_schema.py --all --force \
+    if ! PYTHONPATH=. uv run python src/scripts/generate_entity_schema.py --all-entities --force \
         --config config/entities.yml \
         --template-dir schema/templates \
+        ${embeddings_flag} \
         --output-dir "${g_schema_folder}"; then
         log_error "Schema generation failed"
         return 1
     fi
 
     log_info "Schema generation completed (stored in ${g_schema_folder}/)"
+}
 
+function generate_deploy_sql() {
     # Create combined deployment SQL file
     log_info "Creating deployment SQL file: ${g_deploy_sql_filename}"
 
-    cat > "${g_deploy_sql_filename}" <<SQLEOF
--- SEAD Authority Service Schema Deployment
--- Generated automatically by create_schema.sh
+    echo "-- SEAD Authority Service Database Schema"          >> "${g_deploy_sql_filename}"
+    echo ""                                                   >> "${g_deploy_sql_filename}"
+    echo "-- Generated automatically by create_schema.sh"     >> "${g_deploy_sql_filename}"
+    echo ""                                                   >> "${g_deploy_sql_filename}"
+    echo "\set quiet on"                                      >> "${g_deploy_sql_filename}"
+    echo "\set echo none"                                     >> "${g_deploy_sql_filename}"
+    echo "\set verbosity terse"                               >> "${g_deploy_sql_filename}"
+    echo ""                                                   >> "${g_deploy_sql_filename}"
+    echo "set client_min_messages = warning;"                 >> "${g_deploy_sql_filename}"
+    echo ""                                                   >> "${g_deploy_sql_filename}"
+    echo "begin;"                                             >> "${g_deploy_sql_filename}"
+    echo ""                                                   >> "${g_deploy_sql_filename}"
+    echo "-- Core authority schema objects"                   >> "${g_deploy_sql_filename}"
+    echo ""                                                   >> "${g_deploy_sql_filename}"
 
-\set quiet on
-\set echo none
-\set verbosity terse
-SET client_min_messages = warning;
-
-BEGIN;
-
--- Core authority schema
-\i schema/sql/authority.sql
-\i schema/sql/utility.sql
-
-SQLEOF
+    if [[ "$g_single_sql" == "NO" ]]; then
+        echo "\i schema/sql/authority.sql"                    >> "${g_deploy_sql_filename}"
+        echo "\i schema/sql/utility.sql"                      >> "${g_deploy_sql_filename}"
+    else
+        cat schema/sql/authority.sql                          >> "${g_deploy_sql_filename}"
+        cat schema/sql/utility.sql                            >> "${g_deploy_sql_filename}"
+    fi
 
     local file_count=0
     for sql_file in schema/generated/*.sql; do
         [[ -f "$sql_file" ]] || continue
         [[ "$sql_file" =~ semantic- ]] && continue
-        echo "\\i $sql_file" >> "${g_deploy_sql_filename}"
+
+        if [[ "$g_single_sql" == "YES" ]]; then
+            cat "$sql_file"                                   >> "${g_deploy_sql_filename}"
+            echo ""                                           >> "${g_deploy_sql_filename}"
+            echo ""                                           >> "${g_deploy_sql_filename}"
+        else
+            echo "\\i $sql_file"                              >> "${g_deploy_sql_filename}"
+        fi
         ((file_count++))
-        # log_info "...added $sql_file"
     done
 
-    # Add semantic entity schemas last
-    log_info "Including semantic search schemas"
-    for sql_file in schema/generated/semantic-*.sql; do
-        [[ -f "$sql_file" ]] || continue
-        echo "\\i $sql_file" >> "${g_deploy_sql_filename}"
-        ((file_count++))
-        # log_info "...added $sql_file"
-    done
+    if [[ "$g_deploy_semantic" == "YES" ]]; then
+        # Add semantic entity schemas last
+        log_info "Including semantic search schemas"
+        for sql_file in schema/generated/semantic-*.sql; do
+            [[ -f "$sql_file" ]] || continue
+            if [[ "$g_single_sql" == "YES" ]]; then
+                cat "$sql_file"                               >> "${g_deploy_sql_filename}"
+                echo ""                                       >> "${g_deploy_sql_filename}"
+            else
+                echo "\\i $sql_file"                          >> "${g_deploy_sql_filename}"
+            fi
+            ((file_count++))
+        done
+    else
+        log_info "Skipping semantic search schemas (use --deploy-semantic to include)"
+    fi
 
-    echo "COMMIT;" >> "${g_deploy_sql_filename}"
+    echo "commit;"                                            >> "${g_deploy_sql_filename}"
+
     log_info "Deployment SQL file created with $file_count schema files"
     
     return 0
@@ -218,9 +269,13 @@ deploy_schema() {
         return 1
     fi
 
-    log_info "Deploying schema to database: ${g_db}@${g_host}:${g_port}"
+    log_info "Deploying schema to database: ${g_user}@${g_host}:${g_port}/${g_db}"
     log_warn "This will modify the database schema. Press Ctrl+C to cancel..."
     sleep 2
+
+    # log_info "psql cmd: psql -h '${g_host}' -p '${g_port}' -U '${g_user}' -d '${g_db}' -f '${g_deploy_sql_filename}'"
+    # command -v psql
+    # psql --version
 
     if psql -h "$g_host" -p "$g_port" -U "$g_user" -d "$g_db" \
             -v ON_ERROR_STOP=1 -q -t -A -f "${g_deploy_sql_filename}"; then
@@ -237,10 +292,17 @@ main() {
 
     if [[ "$g_generate_deploy_sql" == "YES" ]]; then
         cleanup
-        if ! generate_deploy_sql; then
+        if ! generate_entity_schema; then
             log_error "Schema generation failed"
             exit_code=1
         fi
+        if [[ $exit_code -eq 0 ]]; then
+            if ! generate_deploy_sql; then
+                log_error "Failed to create deployment SQL file"
+                exit_code=1
+            fi
+        fi
+
     fi
 
     if [[ "$g_deploy" == "YES" ]] && [[ $exit_code -eq 0 ]]; then
