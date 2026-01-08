@@ -6,20 +6,25 @@
 **        If the entity has embeddings, also install semantic-{entity}.sql to create
 **        the embeddings table and semantic search functions.
 **********************************************************************************************/
+
 drop view if exists authority.sampling_context cascade;
 
-create or replace view authority.sampling_context as  select
+create or replace view authority.sampling_context as
+  select
     t.sampling_context_id,
     t.sampling_context as label,
     authority.immutable_unaccent(lower(t.sampling_context)) as norm_label,
     t.description  from public.tbl_sample_group_sampling_contexts as t;
+
 create index if not exists tbl_sample_group_sampling_contexts_norm_trgm
   on public.tbl_sample_group_sampling_contexts
     using gin ( (authority.immutable_unaccent(lower(sampling_context))) gin_trgm_ops );
+
 /***************************************************************************************************
  ** Procedure  authority.fuzzy_sampling_context
  ** What       Trigram fuzzy search function using pg_trgm similarity
- ** Usage      SELECT * FROM authority.fuzzy_sampling_context('query text', 10); ****************************************************************************************************/
+ ** Usage      SELECT * FROM authority.fuzzy_sampling_context('query text', 10);
+ ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_sampling_context(text, integer) cascade;
 
