@@ -1,10 +1,17 @@
+-- SEAD Authority Service Schema Deployment
+-- Generated automatically by create_schema.sh
+
 \set quiet on
 \set echo none
 \set verbosity terse
-set client_min_messages = warning;
-begin;
+SET client_min_messages = warning;
+
+BEGIN;
+
+-- Core authority schema
 \i schema/sql/authority.sql
 \i schema/sql/utility.sql
+
 \i schema/generated/bibliographic_reference.sql
 \i schema/generated/data_type_group.sql
 \i schema/generated/data_type.sql
@@ -49,4 +56,4 @@ begin;
 \i schema/generated/semantic-taxa_tree_order.sql
 \i schema/generated/semantic-taxonomic_order_system.sql
 \i schema/generated/semantic-taxonomy_note.sql
-commit;
+COMMIT;
