@@ -6,6 +6,12 @@ test-workflow:
 	@./scripts/test-ci.sh
 
 
+fetch-openrefine-manifest:
+	@curl -s http://localhost:8000/reconcile
+
+fetch-openrefine-manifest-types:
+	@curl -s http://localhost:8000/reconcile | jq -r '.defaultTypes[].id'
+
 .PHONY: generate-schema
 generate-schema:
 	@echo "Generating entity schema files from templates..."
