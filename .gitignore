@@ -117,4 +117,4 @@ bin
 deprecated
 output*.xlsx
 **/*.mdb
-SEAD
+sead-tools
