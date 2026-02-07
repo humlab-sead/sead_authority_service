@@ -56,7 +56,7 @@ cp docker/.env.example .env
 make serve
 ```
 
-The service will be available at `http://localhost:8000`
+The service will be available at `http://localhost:8000/reconcile`
 
 ### Docker Deployment
 
