@@ -1,6 +1,7 @@
 SHELL := /bin/bash
 
 UVICORN_PORT := 8000
+SEAD_TOOLS_DIR := /home/sead/sead-tools/sead_authority_service
 
 test-workflow:
 	@./scripts/test-ci.sh
@@ -25,11 +26,11 @@ generate-schema-force:
 	@echo "✅ Schema regeneration complete!"
 	
 
-.PHONY: dev-deploy-supersead
-dev-deploy-supersead:
+.PHONY: dev-deploy-to-sead-tools
+dev-deploy-to-sead-tools:
 	@echo "Deploying docker image using local build..." \
 	 && ./docker/build.sh \
-	 && pushd /home/sead/supersead.humlab.umu.se \
+	 && pushd $(SEAD_TOOLS_DIR) \
 	 && sudo docker compose up -d \
 	 && popd \
 	 && docker logs `docker ps -q --filter "publish=$(UVICORN_PORT)"` --follow
