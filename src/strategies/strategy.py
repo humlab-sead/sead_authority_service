@@ -69,7 +69,7 @@ class ReconciliationStrategy(ABC):
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:
         """Convert entity data to OpenRefine candidate format"""
         from loguru import logger
-        
+
         auto_accept_threshold: float = ConfigValue("options:auto_accept_threshold").resolve() or 0.85
         id_base: str = ConfigValue("options:id_base").resolve() or ""
 
@@ -78,7 +78,7 @@ class ReconciliationStrategy(ABC):
         score = float(entity_data.get("name_sim", 0))
         score_percent = min(100.0, round(score * 100, 2))
         is_match = bool(label.lower() == query.lower() or score >= auto_accept_threshold)
-        
+
         candidate: dict[str, Any] = {
             "id": f"{id_base}{self.get_id_path()}/{entity_id}",
             "name": label,
@@ -90,7 +90,7 @@ class ReconciliationStrategy(ABC):
         # Add additional metadata if available
         if "distance_km" in entity_data:
             candidate["distance_km"] = round(entity_data["distance_km"], 2)
-        
+
         # Log candidate details for debugging
         logger.debug(
             f"Candidate: query='{query}' → name='{label}' | "

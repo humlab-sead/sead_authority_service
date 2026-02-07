@@ -151,7 +151,16 @@ def generate_semantic_sql(entity_key: str, entity: dict[str, Any], env: Environm
     "--template-dir", type=click.Path(exists=True, path_type=Path), default=Path("schema/templates"), help="Path to templates directory"
 )
 @click.option("--output-dir", type=click.Path(path_type=Path), default=Path("schema/generated"), help="Path to output directory")
-def main(entities: str | None, all_entities: bool, force: bool, verbose: bool, skip_embeddings: bool, config: Path, template_dir: Path, output_dir: Path) -> None:
+def main(
+    entities: str | None,
+    all_entities: bool,
+    force: bool,
+    verbose: bool,
+    skip_embeddings: bool,
+    config: Path,
+    template_dir: Path,
+    output_dir: Path,
+) -> None:
     """
     Generate entity-specific SQL schema files from Jinja2 templates.
 
@@ -267,7 +276,7 @@ def main(entities: str | None, all_entities: bool, force: bool, verbose: bool, s
 
     if error_count > 0:
         logger.error(f"Failed to generate {error_count} files")
-        
+
     logger.info(f"Output directory: {output_dir.absolute()}")
     logger.info("=" * 60)
 

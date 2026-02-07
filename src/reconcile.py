@@ -46,7 +46,7 @@ async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
         )
 
         candidates = [strategy.as_candidate(data, query.get("query", "")) for data in candidate_data]
-        
+
         # Log summary with match counts and score ranges
         if candidates:
             match_count = sum(1 for c in candidates if c.get("match"))
@@ -57,7 +57,7 @@ async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
             )
         else:
             logger.info(f"Found 0 candidates for query {query_id}")
-        
+
         results[query_id] = {"result": candidates}
 
     logger.info(f"Reconciliation completed with {len(results)} results")
