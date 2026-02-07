@@ -52,7 +52,7 @@ class AbstractRepository(ABC):
         """Return the SQL query for fuzzy finding entities"""
         sql: str = self.get_sql_queries().get("fuzzy_find_sql", "")
         if not sql:
-            sql = "select * from authority.fuzzy_site(%(q)s, %(n)s);"
+            sql = f"select * from authority.fuzzy_{self.key}(%(q)s::text, %(n)s::int);"
         return sql
 
 
