@@ -6,20 +6,25 @@
 **        If the entity has embeddings, also install semantic-{entity}.sql to create
 **        the embeddings table and semantic search functions.
 **********************************************************************************************/
+
 drop view if exists authority.taxa_tree_master cascade;
 
-create or replace view authority.taxa_tree_master as  select
+create or replace view authority.taxa_tree_master as
+  select
     t.taxon_id,
     t.species as label,
     authority.immutable_unaccent(lower(t.species)) as norm_label,
     t.genus_id  from public.tbl_taxa_tree_master as t  join public.tbl_taxa_tree_genera gen using (genus_id);
+
 create index if not exists tbl_taxa_tree_master_norm_trgm
   on public.tbl_taxa_tree_master
     using gin ( (authority.immutable_unaccent(lower(species))) gin_trgm_ops );
+
 /***************************************************************************************************
  ** Procedure  authority.fuzzy_taxa_tree_master
  ** What       Trigram fuzzy search function using pg_trgm similarity
- ** Usage      SELECT * FROM authority.fuzzy_taxa_tree_master('query text', 10); ****************************************************************************************************/
+ ** Usage      SELECT * FROM authority.fuzzy_taxa_tree_master('query text', 10);
+ ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_taxa_tree_master(text, integer) cascade;
 

@@ -92,9 +92,14 @@ if [ -n "$g_no_cache" ]; then
     g_optional_args="$g_optional_args $g_no_cache"
 fi
 
-g_cmd="docker build -f $g_dockerfile -t $g_image_name:$g_image_tag -t $g_registry/$g_image_name:$g_image_tag --build-arg USE_UV=$g_use_uv $g_optional_args .."
+# Get UID of 'sead' user and GID of 'www-data' group
+g_user_uid=$(id -u sead 2>/dev/null || echo "1002")
+g_user_gid=$(getent group www-data | cut -d: -f3 || echo "33")
+
+g_cmd="docker build -f $g_dockerfile -t $g_image_name:$g_image_tag -t $g_registry/$g_image_name:$g_image_tag --build-arg USE_UV=$g_use_uv --build-arg USER_UID=$g_user_uid --build-arg USER_GID=$g_user_gid $g_optional_args .."
 
 echo "info: building image $g_image_name:$g_image_tag using $g_dockerfile"
+echo "info: using USER_UID=$g_user_uid (sead) and USER_GID=$g_user_gid (www-data)"
 
 pushd "$g_script_dir" > /dev/null
 

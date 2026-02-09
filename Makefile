@@ -1,9 +1,45 @@
 SHELL := /bin/bash
 
 UVICORN_PORT := 8000
+SEAD_TOOLS_DIR := /home/sead/sead-tools/sead_authority_service
 
 test-workflow:
 	@./scripts/test-ci.sh
+
+
+fetch-openrefine-manifest:
+	@curl -s http://localhost:8000/reconcile
+
+fetch-openrefine-manifest-types:
+	@curl -s http://localhost:8000/reconcile | jq -r '.defaultTypes[].id'
+
+.PHONY: generate-schema
+generate-schema:
+	@echo "Generating entity schema files from templates..."
+	@uv run python src/scripts/generate_entity_schema.py --all
+	@echo "✅ Schema generation complete!"
+
+.PHONY: generate-schema-force
+generate-schema-force:
+	@echo "Regenerating all entity schema files..."
+	@uv run python src/scripts/generate_entity_schema.py --all --force
+	@echo "✅ Schema regeneration complete!"
+	
+
+.PHONY: dev-deploy-to-sead-tools
+dev-deploy-to-sead-tools:
+	@echo "Deploying docker image using local build..." \
+	 && ./docker/build.sh \
+	 && pushd $(SEAD_TOOLS_DIR) \
+	 && sudo docker compose up -d \
+	 && popd \
+	 && docker logs `docker ps -q --filter "publish=$(UVICORN_PORT)"` --follow
+	@echo "✅ Development environment deployed!"
+
+.PHONY: logs-supersead
+logs-supersead:
+	@docker logs `docker ps -q --filter "publish=$(UVICORN_PORT)"` --follow
+
 
 .PHONY: dev-serve
 dev-serve: dev-kill
@@ -88,27 +124,15 @@ test-coverage:
 dead-code:
 	@uv run vulture src tests main.py
 
-.PHONY: generate-schema
-generate-schema:
-	@echo "Generating entity schema files from templates..."
-	@uv run python src/scripts/generate_entity_schema.py --all
-	@echo "✅ Schema generation complete!"
+# SCHEMA_OPTS = --no-drop-table --not-null --default-values --no-not_empty --comments --indexes --relations
+# BACKEND = postgres
 
-.PHONY: generate-schema-force
-generate-schema-force:
-	@echo "Regenerating all entity schema files..."
-	@uv run python src/scripts/generate_entity_schema.py --all --force
-	@echo "✅ Schema regeneration complete!"
-	
+# arbodat-data-schema:
+# 	@mdb-schema $(SCHEMA_OPTS) src/arbodat/input/ArchBotDaten.mdb $(BACKEND) > src/arbodat/input/ArchBotDaten_$(BACKEND)_schema.sql 
 
-SCHEMA_OPTS = --no-drop-table --not-null --default-values --no-not_empty --comments --indexes --relations
-BACKEND = postgres
+# arbodat-lookup-schema:
+# 	@mdb-schema $(SCHEMA_OPTS) src/arbodat/input/ArchBotStrukDat.mdb $(BACKEND) > src/arbodat/input/ArchBotStrukDat_$(BACKEND)_schema.sql 
 
-arbodat-data-schema:
-	@mdb-schema $(SCHEMA_OPTS) src/arbodat/input/ArchBotDaten.mdb $(BACKEND) > src/arbodat/input/ArchBotDaten_$(BACKEND)_schema.sql 
+# arbodat-schema: arbodat-data-schema arbodat-lookup-schema
+# 	@echo "✅ Schema extraction complete!"
 
-arbodat-lookup-schema:
-	@mdb-schema $(SCHEMA_OPTS) src/arbodat/input/ArchBotStrukDat.mdb $(BACKEND) > src/arbodat/input/ArchBotStrukDat_$(BACKEND)_schema.sql 
-
-arbodat-schema: arbodat-data-schema arbodat-lookup-schema
-	@echo "✅ Schema extraction complete!"

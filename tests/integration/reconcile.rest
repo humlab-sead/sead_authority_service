@@ -1,0 +1,14 @@
+
+### Single reconciliation query
+POST http://localhost:8000/reconcile HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+
+queries={"q0": {"query": "Göteborg", "type": "site", "limit": 3}}
+
+###
+
+### Alternative: Multiple queries
+POST http://localhost:8000/reconcile HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+
+queries={"q0": {"query": "Sandarna Gbg 15:1", "type": "site", "limit": 3}, "q1": {"query": "Uppsala", "type": "site", "limit": 5}}

@@ -6,9 +6,11 @@
 **        If the entity has embeddings, also install semantic-{entity}.sql to create
 **        the embeddings table and semantic search functions.
 **********************************************************************************************/
+
 drop materialized view if exists authority.site cascade;
 
-create materialized view authority.site as  select
+create materialized view authority.site as
+  select
     t.site_id,
     t.site_name as label,
     authority.immutable_unaccent(lower(t.site_name)) as norm_label,
@@ -17,6 +19,7 @@ create materialized view authority.site as  select
     t.latitude_dd,
     t.longitude_dd,
     ST_SetSRID(ST_MakePoint(t.longitude_dd, t.latitude_dd), 4326) AS geom  from public.tbl_sites as t;
+
 -- Required to allow REFRESH MATERIALIZED VIEW CONCURRENTLY
 create unique index if not exists site_uidx
   on authority.site (site_id);
@@ -29,10 +32,12 @@ create index if not exists site_norm_trgm
 -- (First-time populate)
 -- refresh materialized view concurrently authority.site;
 -- analyze authority.site;
+
 /***************************************************************************************************
  ** Procedure  authority.fuzzy_site
  ** What       Trigram fuzzy search function using pg_trgm similarity
- ** Usage      SELECT * FROM authority.fuzzy_site('query text', 10); ****************************************************************************************************/
+ ** Usage      SELECT * FROM authority.fuzzy_site('query text', 10);
+ ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_site(text, integer) cascade;
 

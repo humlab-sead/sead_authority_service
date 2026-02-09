@@ -7,7 +7,7 @@ property_settings: {}
 
 sql_queries:
   fuzzy_find_sql: |
-    select * from authority.fuzzy_location(%(q)s, %(n)s, 7)
+    select * from authority.fuzzy_location(%(q)s::text, %(n)s::int, 7)
 
   details_sql: |
     select  location_id as "ID",

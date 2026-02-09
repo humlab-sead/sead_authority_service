@@ -1,41 +1,212 @@
 # SEAD Authority Service
 
-[![semantic-release: angular](https://img.shields.io/badge/semantic--release-angular-e10079?logo=semantic-release)](https://github.com/semantic-release/semantic-release)
+[![Docker Build](https://github.com/humlab-sead/sead_authority_service/actions/workflows/docker-build.yml/badge.svg)](https://github.com/humlab-sead/sead_authority_service/actions/workflows/docker-build.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A FastAPI-based reconciliation service for SEAD (Strategic Environmental Archaeology Database) entities, providing OpenRefine-compatible reconciliation endpoints for archaeological and environmental data.
+FastAPI-based reconciliation service for SEAD (Strategic Environmental Archaeology Database) implementing the **OpenRefine Reconciliation API**. This service enables fuzzy text matching of archaeological and environmental entities against canonical database identifiers.
 
-## Features
+## 🎯 Key Features
 
-- **Entity Reconciliation**: Support for sites and taxonomic entities
-- **OpenRefine Integration**: Full compatibility with OpenRefine reconciliation protocol
-- **Fuzzy Matching**: Advanced text matching with similarity scoring
-- **Geographic Queries**: Location-based search capabilities
-- **Property-based Filtering**: Enhanced reconciliation using entity properties
+- **OpenRefine Integration**: Full implementation of the Reconciliation API specification
+- **Entity Reconciliation**: Support for sites, taxa, methods, bibliographic references, and more
+- **Hybrid Search**: Combines fuzzy text matching with optional semantic search
+- **LLM-Enhanced Matching**: Optional LLM validation using OpenAI, Anthropic, or Ollama
+- **Geographic Proximity**: Location-aware matching with distance-based scoring
+- **MCP Server Support**: Embedded Model Context Protocol server for advanced retrieval
+- **Auto-Registration**: Plugin-based strategy system with decorator-based registration
+- **Schema Generation**: Template-based SQL schema generation for rapid entity onboarding
 
-## Quick Start
+## 📋 Table of Contents
+
+- [Quick Start](#quick-start)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [Development](#development)
+- [Docker Deployment](#docker-deployment)
+- [API Reference](#api-reference)
+- [Testing](#testing)
+- [Contributing](#contributing)
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.13+
-- UV package manager
-- PostgreSQL database with SEAD data
+- Python 3.11+
+- PostgreSQL database with SEAD schema
+- (Optional) OpenAI API key or Ollama installation
 
-### Installation
+### Local Development
 
 ```bash
-git clone <repository-url>
+# Clone the repository
+git clone https://github.com/humlab-sead/sead_authority_service.git
 cd sead_authority_service
-uv install
+
+# Install dependencies using uv
+uv venv
+uv pip install -e .
+
+# Configure environment
+cp docker/.env.example .env
+# Edit .env with your database credentials and API keys
+
+# Start the service
+make serve
 ```
 
-### Configuration
+The service will be available at `http://localhost:8000/reconcile`
 
-Copy the configuration template and adjust database settings:
+### Docker Deployment
 
 ```bash
-cp config/config.yml.template config/config.yml
-# Edit config/config.yml with your database credentials
+cd docker
+cp .env.example .env
+# Edit .env with your configuration
+docker-compose up --build
 ```
+
+See [docker/README.md](docker/README.md) for detailed deployment options.
+
+## 🏗️ Architecture
+
+### Registry-Based Plugin System
+
+The core architecture uses a **strategy registry pattern** where reconciliation strategies auto-register via decorators:
+
+```python
+from src.strategies.strategy import ReconciliationStrategy, Strategies
+
+@Strategies.register(key="site", repository_cls=SiteRepository)
+class SiteReconciliationStrategy(ReconciliationStrategy):
+    async def find_candidates(self, query, properties, limit):
+        # Implementation
+```
+
+**Request Flow:**
+```
+OpenRefine → POST /reconcile → router.py
+  → reconcile.py:reconcile_queries()
+    → Strategies.get("site")
+      → SiteReconciliationStrategy
+        → SiteRepository.search()
+          → PostgreSQL
+```
+
+### Key Components
+
+- **Strategies**: Entity-specific reconciliation logic (`src/strategies/`)
+- **Repositories**: Database query layer (`src/strategies/query.py`)
+- **Configuration**: Lazy-loading config resolution (`src/configuration/`)
+- **LLM Providers**: OpenAI, Anthropic, Ollama support (`src/llm/providers/`)
+- **MCP Server**: Embedded retrieval server (`src/mcp_server/`)
+
+## 📦 Installation
+
+### Using UV (Recommended)
+
+```bash
+# Install UV if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create virtual environment and install
+uv venv
+uv pip install -e .
+```
+
+### Using pip
+
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -e .
+```
+
+## ⚙️ Configuration
+
+Configuration is managed through YAML files and environment variables.
+
+### Main Configuration Files
+
+- **config/config.yml**: Base configuration (database, LLM, policies)
+- **config/entities.yml**: Entity definitions (source of truth for schema generation)
+- **config/prompts.yml**: LLM prompt templates
+- **.env**: Environment variables (database credentials, API keys)
+
+### Environment Variables
+
+Required variables in `.env`:
+
+```bash
+# Database Connection
+SEAD_AUTHORITY_OPTIONS_DATABASE_HOST=localhost
+SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME=sead_staging
+SEAD_AUTHORITY_OPTIONS_DATABASE_USER=postgres
+SEAD_AUTHORITY_OPTIONS_DATABASE_PORT=5432
+
+# LLM Provider (Optional)
+OPENAI_API_KEY=your_api_key_here
+OPENAI_MODEL=gpt-4o-mini
+
+# GeoNames (Optional)
+GEONAMES_USERNAME=your_username
+```
+
+### Configuration Resolution
+
+Use `ConfigValue` for lazy configuration resolution:
+
+```python
+from src.configuration import ConfigValue
+
+# Single path with fallback
+threshold = ConfigValue("options:auto_accept_threshold", default=0.90).resolve()
+
+# Multiple path fallback
+model = ConfigValue("llm.ollama.model,llm.model", default="llama3").resolve()
+```
+
+## 🎮 Usage
+
+### With OpenRefine
+
+1. Start the service: `make serve`
+2. Open OpenRefine
+3. Create a project and select a column
+4. Click **Reconcile** → **Start reconciling...**
+5. Add Standard Service: `http://localhost:8000/reconcile`
+6. Select entity type (Site, Taxon, Method, etc.)
+7. Configure matching options
+8. Start reconciliation
+
+### API Endpoints
+
+#### Health Check
+```bash
+curl http://localhost:8000/is_alive
+```
+
+#### Service Metadata
+```bash
+curl http://localhost:8000/reconcile
+```
+
+#### Reconciliation Request
+```bash
+curl -X POST http://localhost:8000/reconcile \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d 'queries={"q0":{"query":"Uppsala","type":"site","limit":10}}'
+```
+
+#### Entity Suggestions (Autocomplete)
+```bash
+curl "http://localhost:8000/suggest/entity?prefix=Uppsala&type=site"
+```
+
+See [API Reference](#api-reference) for complete endpoint documentation.
+
+## 👨‍💻 Development
 
 ### Running the Service
 
@@ -43,284 +214,287 @@ cp config/config.yml.template config/config.yml
 # Development mode with auto-reload
 make serve
 
-# Or manually
-uv run uvicorn main:app --reload
+# Start uvicorn + OpenRefine together
+make dev-serve
+
+# Stop services
+make dev-stop
 ```
 
-The service will be available at `http://localhost:8000`
-
-## OpenRefine Integration
-
-### Adding the Service to OpenRefine
-
-1. **Open OpenRefine** and go to your project
-2. **Click on the dropdown arrow** next to a column you want to reconcile
-3. **Select "Reconcile" → "Start reconciling..."**
-4. **Click "Add Standard Service"**
-5. **Enter the service URL:** `http://localhost:8000/reconcile`
-6. **Click "Add Service"**
-
-### Service URL
-
-```
-http://localhost:8000/reconcile
-```
-
-### Available Entity Types
-
-The service supports reconciliation for these entity types:
-
-- **site** - Archaeological/geographic sites and locations
-- **taxon** - Taxonomic entities (species, genera, etc.)
-
-### Enhanced Properties
-
-When reconciling, you can use additional properties to improve matching accuracy:
-
-#### Site Properties
-- `latitude` - Decimal latitude coordinate
-- `longitude` - Decimal longitude coordinate  
-- `country` - Country name
-- `region` - Administrative region
-- `elevation` - Elevation in meters
-
-#### Taxon Properties
-- `kingdom` - Taxonomic kingdom
-- `phylum` - Taxonomic phylum
-- `class` - Taxonomic class
-- `order` - Taxonomic order
-- `family` - Taxonomic family
-
-### API Endpoints
-
-- **Service Metadata**: `GET /reconcile` - Returns service information and available entity types
-- **Reconciliation**: `POST /reconcile` - Performs entity reconciliation queries
-- **Properties**: `GET /reconcile/properties` - Returns available properties for entity types
-- **Preview**: `GET /reconcile/preview` - Returns entity preview information
-
-### Example Usage
-
-1. **Start the service**:
-   ```bash
-   make serve
-   ```
-
-2. **In OpenRefine**, add the service URL: `http://localhost:8000/reconcile`
-
-3. **Select your entity type** (site or taxon) when configuring reconciliation
-
-4. **Add property constraints** if available to improve matching accuracy
-
-## Development
-
-### Running Tests
+### Testing
 
 ```bash
+# Run all tests
 make test
+
+# Run integration tests only
+uv run pytest -m integration
+
+# Run specific test
+uv run pytest -k test_name
+
+# Test coverage
+make test-coverage
 ```
+
+**Test Markers:**
+- `@pytest.mark.integration`: Requires database/Ollama
+- `@pytest.mark.manual`: Manual testing only
+- `@pytest.mark.debug`: Debug tests
 
 ### Code Quality
 
 ```bash
+# Run all linting
 make lint
+
+# Format code
 make tidy
+
+# Check imports
+make check-imports
 ```
 
-### Release Management
+**Import Rules:** Use absolute imports from `src.*`. Ruff enforces `ban-relative-imports = "parents"`.
 
-This project uses [semantic-release](https://semantic-release.gitbook.io/) for automated versioning and releases. See [SEMANTIC_RELEASE.md](SEMANTIC_RELEASE.md) for detailed information on:
+### Adding New Entities
 
-- Commit message conventions
-- Release workflow
-- Version management
-- Troubleshooting
+1. Add entity configuration to [config/entities.yml](config/entities.yml)
+2. Generate schema: `make generate-schema`
+3. Create strategy class in `src/strategies/`
+4. Register with `@Strategies.register()` decorator
 
-**Quick guide:**
-```bash
-# Features (minor version bump)
-git commit -m "feat: add new reconciliation strategy"
-
-# Bug fixes (patch version bump)
-git commit -m "fix: correct database connection timeout"
-
-# Breaking changes (major version bump)
-git commit -m "feat!: redesign API
-
-BREAKING CHANGE: The reconciliation endpoint now uses a different format."
-```
-
-### Project Structure
-
-```
-src/
-├── api/           # FastAPI routes and endpoints
-├── configuration/ # Configuration management
-├── strategies/    # Entity-specific reconciliation strategies
-└── utility/       # Helper functions and utilities
-```
-
-## Configuration
-
-The service uses YAML configuration files. Key settings:
+Example:
 
 ```yaml
-options:
-  database:
-    host: localhost
-    port: 5432
-    database: sead_db
-    username: your_user
-    password: your_password
-  
-  default_query_limit: 10
-  id_base: "https://w3id.org/sead/id/"
+# config/entities.yml
+new_entity:
+  name: "New Entity"
+  table_name: "tbl_new_entities"
+  id_column: "entity_id"
+  label_column: "entity_name"
+  description_column: "description"
 ```
 
-## API Documentation
-
-Once running, visit `http://localhost:8000/docs` for interactive API documentation.
-
-## Deployment
-
-### Docker Deployment
-
-See [docker/QUICKSTART.md](docker/QUICKSTART.md) for detailed quick start instructions.
-
-### CI/CD Pipeline
-
-The project uses GitHub Actions for automated Docker image builds and deployment.
-
-#### How It Works
-
-1. **Automated Builds**: On every push to `main` branch, or when creating version tags
-3. **Container Registry**: Image is published to GitHub Container Registry (GHCR)
-4. **Version Tags**: Automatic tagging based on git tags and branches
-
-#### Workflow Triggers
-
-The GitHub Actions workflow (`.github/workflows/docker-build.yml`) is triggered by:
-
-- **Push to main**: Builds and pushes with `latest` tag
-- **Version tags**: Push tags like `v1.0.0` to build versioned images
-- **Pull requests**: Builds image for testing (doesn't push)
-- **Manual dispatch**: Trigger builds manually from GitHub UI
-
-#### Image Tags
-
-Images are available at `ghcr.io/humlab-sead/sead_authority_service` with these tags:
-
-- `latest` - Latest stable release from main branch
-- `v*` - Specific version tags (e.g., `v0.1.0`, `v1.2.3`)
-- `main-sha-<commit>` - Specific commit from main branch
-
-#### Using Pre-built Images
-
 ```bash
-# Pull latest stable version
-docker pull ghcr.io/humlab-sead/sead_authority_service:latest
-
-# Pull specific version
-docker pull ghcr.io/humlab-sead/sead_authority_service:v0.1.0
-
-# Pull development version
-docker pull ghcr.io/humlab-sead/sead_authority_service:dev
-
-# Run the image
-docker run -d \
-  -p 8000:8000 \
-  -v $(pwd)/docker/config.yml:/app/config/config.yml:ro \
-  -v $(pwd)/docker/logs:/app/logs \
-  --env-file docker/.env \
-  ghcr.io/humlab-sead/sead_authority_service:latest
+make generate-schema
 ```
 
-#### Creating a Release
+```python
+# src/strategies/new_entity.py
+from src.strategies.strategy import ReconciliationStrategy, Strategies
+from src.strategies.query import BaseRepository
 
-To create a new release and trigger automated builds:
-
-Create a PR to `main` with your changes, then merge it. After merging, create a version tag:
-
-```bash
-# Create and push a version tag
-git tag -a v0.1.0 -m "Release version 0.1.0"
-git push origin v0.1.0
-
+@Strategies.register(key="new_entity", repository_cls=BaseRepository)
+class NewEntityReconciliationStrategy(ReconciliationStrategy):
+    pass  # Uses default implementation
 ```
 
-#### Deployment Workflow
+## 🐳 Docker Deployment
 
-**For production:**
+Multiple deployment options supported:
+
+### Option 1: Local Build
 ```bash
-# 1. Create release tag
-git tag v1.0.0
-git push origin v1.0.0
-
-#### Build Process
-
-The CI/CD pipeline uses a multi-stage Docker build:
-
-1. **Builder Stage**: Installs dependencies and builds application
-2. **Runtime Stage**: Minimal runtime image with only necessary components
-3. **Security**: Runs as non-root user, includes health checks
-4. **Optimization**: Layer caching for faster builds, minimal image size
-
-#### Monitoring Builds
-
-- **GitHub Actions**: View build status at `https://github.com/humlab-sead/sead_authority_service/actions`
-- **Container Registry**: View published images at `https://github.com/humlab-sead/sead_authority_service/pkgs/container/sead_authority_service`
-
-### Deployment Options
-
-The service supports multiple deployment strategies:
-
-1. **Local Build** - Build Docker image from local source code
-   - Best for: Development and testing, `use docker/build.sh` script
-   - See: `docker/Dockerfile`
-
-2. **GitHub Build** - Build from specific GitHub tag/branch
-   - Best for: Reproducible builds from releases
-   - See: `docker/Dockerfile.github`
-
-3. **Pre-built Images** - Use images from GHCR
-   - Best for: Production deployments
-   - See: `docker/docker-compose.prod.yml`
-
-4. **CI/CD Pipeline** - Automated builds via GitHub Actions (Recommended)
-   - Best for: Continuous deployment
-   - See: `.github/workflows/docker-build.yml`
-
-### Configuration
-
-The Docker deployment uses environment variables for configuration:
-
-```bash
-# Required environment variables
-SEAD_AUTHORITY_OPTIONS_DATABASE_HOST=your-db-host
-SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME=sead_staging
-SEAD_AUTHORITY_OPTIONS_DATABASE_USER=your-db-user
-SEAD_AUTHORITY_OPTIONS_DATABASE_PORT=5432
-SEAD_AUTHORITY_OPTIONS_DATABASE_PASSWORD=your-db-password
-
-OPENAI_API_KEY=your-openai-key
-GEONAMES_USERNAME=your-geonames-username
+cd docker
+docker-compose up --build
 ```
 
-Configuration file (`config.yml`) is mounted from the host as a read-only volume for security and easy updates without rebuilding images.
+### Option 2: Production (GHCR)
+```bash
+cd docker
+docker-compose -f docker-compose.prod.yml pull
+docker-compose -f docker-compose.prod.yml up -d
+```
 
-### Production Deployment Checklist
+### Option 3: GitHub Tag Build
+```bash
+docker build -f docker/Dockerfile.github \
+  --build-arg GIT_TAG=v0.1.0 \
+  -t sead-authority-service:v0.1.0 .
+```
 
-- [ ] Configure production environment variables in `docker/.env.production`
-- [ ] Review and customize `docker/config.yml` for production settings
-- [ ] tbc
+**Available GHCR Tags:**
+- `latest` - Latest stable release from main
+- `dev` - Latest development version
+- `v*` - Specific version tags (e.g., `v0.1.0`)
 
-### Documentation
+See [docker/README.md](docker/README.md) for detailed deployment guide.
 
-For detailed deployment information, see:
+## 📚 API Reference
 
-- [docker/README.md](docker/README.md) - Comprehensive deployment guide
-- [docker/QUICKSTART.md](docker/QUICKSTART.md) - Quick start guide
-- [.github/workflows/docker-build.yml](.github/workflows/docker-build.yml) - CI/CD workflow definition
+### Reconciliation API Endpoints
 
-## License
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/reconcile` | GET | Service metadata |
+| `/reconcile` | POST | Batch reconciliation queries |
+| `/reconcile/properties` | GET | Available properties |
+| `/reconcile/preview` | GET | Entity preview HTML |
 
-[Add your license information here]
+### Suggest API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/suggest/entity` | GET | Entity autocomplete |
+| `/suggest/type` | GET | Type autocomplete |
+| `/suggest/property` | GET | Property autocomplete |
+| `/flyout/entity` | GET/POST | Inline tooltip preview |
+
+### Response Format
+
+Reconciliation response:
+
+```json
+{
+  "q0": {
+    "result": [
+      {
+        "id": "https://w3id.org/sead/id/site/123",
+        "name": "Uppsala Site",
+        "score": 95.5,
+        "match": true,
+        "type": [{"id": "site", "name": "Site"}],
+        "distance_km": 1.2
+      }
+    ]
+  }
+}
+```
+
+## 🧪 Testing
+
+### Test Structure
+
+- **tests/**: Unit and integration tests
+- **tests/config/**: Test configuration files
+- **tests/conftest.py**: Shared fixtures
+
+### Running Tests
+
+```bash
+# All tests
+make test
+
+# With coverage
+make test-coverage
+
+# Specific test file
+uv run pytest tests/test_reconcile.py
+
+# Specific test function
+uv run pytest -k test_reconcile_queries
+```
+
+### Test Fixtures
+
+Key fixtures from [tests/conftest.py](tests/conftest.py):
+
+- `test_config`: Test configuration object
+- `test_provider`: Mock config provider
+- `create_connection_mock()`: Mock database connections
+
+## 🤝 Contributing
+
+### Git Commit Conventions
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) with semantic-release.
+
+**Format:**
+```
+<type>[optional scope]: <description>
+```
+
+**Types:**
+- `feat`: New feature → MINOR release (1.2.0)
+- `fix`: Bug fix → PATCH release (1.2.1)
+- `refactor/perf/style`: Code improvements → PATCH
+- `docs`: Documentation → PATCH (if scope is README)
+- `test/build/ci/chore`: No release
+
+**Breaking Changes:**
+```bash
+feat(api)!: change response format for validation errors
+```
+
+**Examples:**
+```bash
+feat(cache): implement hash-based cache invalidation
+fix(validation): prevent null pointer in entity resolution
+refactor(core): simplify dependency resolution logic
+docs(README): update installation instructions
+```
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feat/my-feature`
+3. Make changes following code quality standards
+4. Run tests: `make test`
+5. Run linting: `make lint`
+6. Commit with conventional commits
+7. Push and create a pull request
+
+## 📁 Project Structure
+
+```
+sead_authority_service/
+├── config/                 # Configuration files
+│   ├── config.yml         # Base configuration
+│   ├── entities.yml       # Entity definitions
+│   └── prompts.yml        # LLM prompt templates
+├── docker/                # Docker deployment files
+├── schema/                # Database schema
+│   ├── templates/         # Jinja2 SQL templates
+│   └── generated/         # Generated SQL files
+├── src/
+│   ├── api/              # FastAPI routes
+│   ├── configuration/    # Config management
+│   ├── llm/              # LLM provider integrations
+│   ├── mcp_server/       # MCP server implementation
+│   └── strategies/       # Reconciliation strategies
+├── tests/                # Test suite
+├── main.py               # FastAPI application entry point
+├── Makefile              # Development commands
+└── pyproject.toml        # Python package configuration
+```
+
+## 🔧 Common Gotchas
+
+1. **Strategy not found**: Ensure strategy file is in `src/strategies/` and decorated with `@Strategies.register()`
+2. **Config not available**: Call `await setup_config_store()` before accessing config
+3. **Schema changes ignored**: Run `make generate-schema` after editing `config/entities.yml`
+4. **Test isolation**: Use fixtures from `tests/conftest.py`
+5. **Database connections**: Always use `get_connection()`, never create connections directly
+
+## 📖 Additional Documentation
+
+- [AGENTS.md](AGENTS.md): AI coding agent instructions
+- [docker/README.md](docker/README.md): Docker deployment guide
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md): Production deployment
+- [docs/OPTIMIZATION_QUICKSTART.md](docs/OPTIMIZATION_QUICKSTART.md): Performance optimization
+
+## 📄 License
+
+[MIT License](LICENSE)
+
+## 👥 Authors
+
+- **HUMLAB SEAD Team** - [GitHub](https://github.com/humlab-sead)
+
+## 🙏 Acknowledgments
+
+- OpenRefine reconciliation API specification
+- SEAD (Strategic Environmental Archaeology Database) project
+- FastAPI framework
+- PostgreSQL and pgvector extension
+
+## 📞 Support
+
+For issues or questions:
+- GitHub Issues: https://github.com/humlab-sead/sead_authority_service/issues
+- Documentation: See files in `docs/` directory
+
+---
+
+**Built with ❤️ for archaeological and environmental research**
