@@ -6,7 +6,6 @@ SEAD_TOOLS_DIR := /home/sead/sead-tools/sead_authority_service
 test-workflow:
 	@./scripts/test-ci.sh
 
-
 fetch-openrefine-manifest:
 	@curl -s http://localhost:8000/reconcile
 
@@ -123,16 +122,3 @@ test-coverage:
 .PHONY: dead-code
 dead-code:
 	@uv run vulture src tests main.py
-
-# SCHEMA_OPTS = --no-drop-table --not-null --default-values --no-not_empty --comments --indexes --relations
-# BACKEND = postgres
-
-# arbodat-data-schema:
-# 	@mdb-schema $(SCHEMA_OPTS) src/arbodat/input/ArchBotDaten.mdb $(BACKEND) > src/arbodat/input/ArchBotDaten_$(BACKEND)_schema.sql 
-
-# arbodat-lookup-schema:
-# 	@mdb-schema $(SCHEMA_OPTS) src/arbodat/input/ArchBotStrukDat.mdb $(BACKEND) > src/arbodat/input/ArchBotStrukDat_$(BACKEND)_schema.sql 
-
-# arbodat-schema: arbodat-data-schema arbodat-lookup-schema
-# 	@echo "✅ Schema extraction complete!"
-
