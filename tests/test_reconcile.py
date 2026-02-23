@@ -24,7 +24,14 @@ class _RecordingStrategy:
         return list(self.candidates)
 
     def as_candidate(self, data: dict[str, Any], query: str) -> dict[str, Any]:
-        return {"id": data.get("id"), "name": data.get("name"), "query": query}
+        return {
+            "id": data.get("id"),
+            "name": data.get("name"),
+            "score": data.get("score", 85.0),
+            "match": data.get("match", False),
+            "type": data.get("type", []),
+            "query": query,
+        }
 
 
 @pytest.mark.asyncio
@@ -90,8 +97,8 @@ async def test_reconcile_queries_builds_properties_and_candidates(monkeypatch: p
 
     results = await reconcile_module.reconcile_queries(queries)
     assert results["q0"]["result"] == [
-        {"id": "1", "name": "Site A", "query": "upp"},
-        {"id": "2", "name": "Site B", "query": "upp"},
+        {"id": "1", "name": "Site A", "score": 85.0, "match": False, "type": [], "query": "upp"},
+        {"id": "2", "name": "Site B", "score": 85.0, "match": False, "type": [], "query": "upp"},
     ]
     assert _RecordingStrategy.calls == [{"query": "upp", "properties": {"country": "Sweden"}, "limit": 7}]
 
