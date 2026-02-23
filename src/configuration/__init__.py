@@ -29,6 +29,7 @@ __all__ = [
     "get_config_provider",
     "reset_config_provider",
     "set_config_provider",
+    "shutdown_connection_pool",
     # resolve
     "ConfigValue",
     "inject_config",

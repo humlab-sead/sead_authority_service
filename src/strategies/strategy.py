@@ -1,6 +1,8 @@
 from abc import ABC
 from typing import Any
 
+from loguru import logger
+
 from src.configuration import ConfigValue
 from src.utility import Registry, resolve_specification
 
@@ -68,7 +70,6 @@ class ReconciliationStrategy(ABC):
 
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:
         """Convert entity data to OpenRefine candidate format"""
-        from loguru import logger
 
         auto_accept_threshold: float = ConfigValue("options:auto_accept_threshold").resolve() or 0.85
         id_base: str = ConfigValue("options:id_base").resolve() or ""

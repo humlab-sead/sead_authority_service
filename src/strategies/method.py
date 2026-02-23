@@ -1,6 +1,5 @@
 # from src.utility import load_resource_yaml
 from .query import BaseRepository
-from .rag_hybrid.rag_hybrid_strategy import RAGHybridReconciliationStrategy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 RAG_SPECIFICATION: StrategySpecification = {

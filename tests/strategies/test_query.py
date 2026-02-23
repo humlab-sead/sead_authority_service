@@ -1,9 +1,8 @@
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import psycopg
 import pytest
-from psycopg.rows import dict_row, tuple_row
 
 import src.strategies.query as query_module
 from src.strategies.data_type import DataTypeRepository
