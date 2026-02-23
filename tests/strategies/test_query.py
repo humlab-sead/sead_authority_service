@@ -144,7 +144,7 @@ class TestBaseRepositoryUnit:
 
     def test_get_find_fuzzy_sql_fallback(self, monkeypatch: pytest.MonkeyPatch):
         repo = self._make_repo(monkeypatch, {"key": "x", "sql_queries": {}})
-        assert repo.get_find_fuzzy_sql() == "select * from authority.fuzzy_site(%(q)s::text, %(n)s::int);"
+        assert repo.get_find_fuzzy_sql() == "select * from authority.fuzzy_x(%(q)s::text, %(n)s::int);"
 
     @pytest.mark.asyncio
     async def test_fetch_by_alternate_identity_no_sql_does_not_call_fetch_all(self, monkeypatch: pytest.MonkeyPatch):
