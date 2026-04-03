@@ -25,10 +25,12 @@ The identity system requires three categories of persistent structure: a central
 
 ### Identity Allocations
 
-The central registry maps external identifiers to SEAD integer primary keys within a submission context.
+> **Provisional DDL — see [ASSESSMENT.md](./ASSESSMENT.md) Gaps 9, 10, 11 and checklist H8.** The context/grouping model (submission FK, cascade delete) presupposes design decisions about allocation origins and atomicity that have not yet been made. Treat this as an illustrative sketch, not a structural commitment.
+
+The central registry maps external identifiers to SEAD integer primary keys within an allocation context.
 
 ```sql
-CREATE TABLE sead_utility.identity_allocations (
+CREATE TABLE authority.identity_allocations (
     allocation_uuid     UUID NOT NULL DEFAULT uuid_generate_v4() PRIMARY KEY,
 
     -- Target
@@ -42,13 +44,14 @@ CREATE TABLE sead_utility.identity_allocations (
     -- Allocated SEAD identity
     alloc_integer_id    INTEGER NOT NULL,
 
-    -- Submission context
-    submission_uuid     UUID NOT NULL
-        REFERENCES sead_utility.submissions(submission_uuid) ON DELETE CASCADE,
-    submission_name     TEXT NOT NULL,
+    -- Allocation context (PROVISIONAL: origin model not yet defined; see ASSESSMENT.md Gap 10)
+    -- These columns reflect assumed provider-submission origin only.
+    submission_uuid     UUID NULL                         -- NULL for non-submission origins
+        REFERENCES authority.submissions(submission_uuid) ON DELETE SET NULL,
+    submission_name     TEXT NULL,
 
     -- Change control
-    change_request_id   TEXT NULL,                        -- Sqitch change set ID
+    change_request_id   TEXT NULL,                        -- Sqitch change set ID (primary context for change-request origin)
 
     -- Optional audit context
     external_system_id  TEXT NULL,
@@ -78,7 +81,7 @@ Key indexes: `submission_uuid`, `(table_name, column_name)`, `status`, `external
 Groups related allocations into a named, auditable batch.
 
 ```sql
-CREATE TABLE sead_utility.submissions (
+CREATE TABLE authority.submissions (
     submission_uuid      UUID NOT NULL DEFAULT uuid_generate_v4() PRIMARY KEY,
     submission_name      TEXT NOT NULL UNIQUE,
     source_system        TEXT NOT NULL,                   -- e.g. 'shape_shifter'

@@ -20,10 +20,11 @@ The document chain is internally consistent and largely free of redundancy. Iden
 
 **However, the proposal is not yet implementation-ready.** Several structural design questions remain unresolved, and until they are answered, the implementation structures in the third document cannot be validated against the real SEAD schema.
 
-The remaining gaps cluster into two categories:
+The remaining gaps cluster into three categories:
 
-1. **Domain modeling gaps** — which SEAD objects are tracked entities, what their aggregate boundaries are, and how reconciliation works in practice.
-2. **Identity model gaps** — where the SEAD universal identity (UUID) actually lives, and how it relates to the external_id stored in the allocation registry.
+1. **Allocation process gaps** — core operational concepts (allocation, submission, atomic unit, inputs/outputs, origin) that are used throughout the documents but left undefined at the requirements level.
+2. **Domain modeling gaps** — which SEAD objects are tracked entities, what their aggregate boundaries are, and how reconciliation works in practice.
+3. **Identity model gaps** — where the SEAD universal identity (UUID) actually lives, and how it relates to the external_id stored in the allocation registry.
 
 ---
 
@@ -147,6 +148,39 @@ This decision affects Gaps 2 (tracked entity enumeration), 3 (aggregate boundari
 
 See [IMPLEMENTATION_VIEW.md](./IMPLEMENTATION_VIEW.md) § Entity Metadata for the candidate options.
 
+### Gap 9: Core allocation process concepts are undefined
+
+The term "identity allocation" is used throughout all three documents but is never defined as a domain concept in REQUIREMENTS.md. "Submission" is defined only by a grouping rule (FR-21), not as a domain object. Without these foundations the documents cannot be validated for internal consistency, and no implementation structure can be treated as authoritative.
+
+Specifically undefined:
+
+- **Identity allocation**: Is it the act of minting a new SEAD UUID, the act of recording a mapping between an external identifier and a SEAD internal identifier, or both? Can resolving an *existing* identity also be called an allocation? Is it always one entity at a time?
+- **Submission**: FR-21 says "group related identity actions under a submission concept" — that is a grouping rule, not a definition. What constitutes a submission? Who can originate one? What is its lifecycle at the conceptual level?
+- **Inputs and outputs of an allocation**: The five identity types are defined clearly. But REQUIREMENTS.md contains no statement of which types are *inputs* to an allocation request, which are *outputs*, and which are *retained as evidence* without becoming canonical identifiers.
+- **Atomic unit**: What is the smallest irreversible act the identity system performs? One identity mapping point (UUID↔integer)? One entity instance with all its identity types resolved simultaneously? One entity with all its owned child allocations as a single unit? This choice affects rollback semantics, concurrent access, and submission design.
+
+### Gap 10: Allocation origin model is incomplete
+
+The requirements and the implementation view both assume that all identity allocations originate from an external provider submission. At minimum, three distinct origins exist:
+
+1. **Provider submission** — an external data provider submits entities as part of a data ingestion workflow. The only origin currently modeled.
+2. **SEAD administrator action** — SEAD staff allocate identities to shared classifiers, reference data, or lookup tables as part of ongoing database administration. No external submission context exists.
+3. **Sqitch change request** — a change request corrects or restructures existing SEAD data and requires new or re-allocated identities for existing rows. The change request is the authoritative context unit; wrapping it in a submission would be artificial.
+
+Until the allocation origin model is defined at the requirements level, neither the grouping/context model for allocations nor the context fields in the allocation table can be designed. The current implementation DDL structurally forbids origins 2 and 3 (see Gap 11).
+
+### Gap 11: Implementation DDL presupposes unresolved design decisions
+
+The `identity_allocations` table in IMPLEMENTATION_VIEW.md specifies `submission_uuid UUID NOT NULL REFERENCES submissions ON DELETE CASCADE`. This encodes three structural decisions that have not been made at the requirements or design level:
+
+- every allocation has exactly one parent submission,
+- allocations are cascade-deleted when their submission is deleted,
+- the submission is the sole grouping and audit unit.
+
+These may be correct for provider submission workflows but structurally break for administrator and change-request origins (Gap 10). The DDL was written before the allocation origin model (Gap 10), the allocation atomicity definition (Gap 9), and the identity permanence rule (checklist B3) were resolved.
+
+**Immediate action**: the `submission_uuid NOT NULL FK` and cascade clause in IMPLEMENTATION_VIEW.md should be marked as provisional. The DDL is an illustrative sketch, not a structural commitment, until Gaps 9 and 10 are resolved.
+
 ---
 
 ## What Has Improved Since The Earlier Assessment
@@ -183,21 +217,22 @@ The proposal is now at a **late design** stage. The conceptual model is sound an
 
 **Ready for implementation:**
 
-- The allocation registry schema and operations (modulo Gap 1).
-- The submission lifecycle and API surface.
-- Phase 1 infrastructure deployment (schema, functions, API shell).
-- The rollout phasing strategy.
+- The rollout phasing strategy (as a planning framework; individual phases depend on resolving the gaps below).
+- Phase 1 infrastructure concept (schema namespace, API shell) — but not the DDL itself, which remains provisional (Gap 11).
 
 **Not ready for implementation:**
 
-- Entity table extensions (depends on tracked entity list and UUID column strategy).
-- Business-key resolution (depends on serialization rules per entity type).
-- Reconciliation for shared metadata (not yet specified).
-- Content-hash change detection (depends on aggregate boundary definitions).
-- Identity policy administration (no candidate structure).
+- Allocation registry DDL — presupposes unresolved allocation origin, atomicity, and submission definitions (Gaps 9, 10, 11).
+- Submission lifecycle and API surface — depends on submission domain concept and origin model (Gaps 9, 10).
+- Entity table extensions — depends on tracked entity list and UUID column strategy (Gaps 1, 2).
+- Business-key resolution — depends on serialization rules per entity type (Gap 5, checklist C2).
+- Reconciliation for shared metadata — not yet specified (Gap 4).
+- Content-hash change detection — depends on aggregate boundary definitions (Gap 3, 6).
+- Identity policy administration — no candidate structure (Gap 7).
 
 **Recommended path to implementation-readiness:**
 
+0. Define the core allocation process concepts: what an allocation is, what a submission is, what the atomic unit is, and which allocation origins exist. None of the implementation structures can be finalized until these are defined in REQUIREMENTS.md (checklist Group H).
 1. Enumerate tracked entities against the real SEAD DDL.
 2. Define aggregate boundaries (which tables are roots, which are owned children, which are associations).
 3. Resolve the UUID column question: reuse existing `{entity}_uuid`, rename `{entity}_external_id`, or add `sead_uuid` to the allocation table.
@@ -205,7 +240,7 @@ The proposal is now at a **late design** stage. The conceptual model is sound an
 5. Define business-key rules for at least the five pilot entity types.
 6. State the identity permanence rule (are issued identities ever reusable?).
 
-Steps 1–3 are prerequisites for any entity-table work. Steps 4–6 can proceed in parallel with Phase 1 infrastructure.
+Step 0 is a prerequisite for all DDL work. Steps 1–3 are prerequisites for any entity-table work. Steps 4–6 can proceed in parallel once step 0 is resolved.
 
 ---
 
@@ -256,6 +291,26 @@ Each item must be completed and recorded in the appropriate document before the 
 - [ ] **G2. Finalize entity table extensions.** For each pilot entity, produce the `ALTER TABLE` migration adding the required columns. Confirm column names and types against B1 and B2.
 - [ ] **G3. Write Sqitch migration plan.** Produce the ordered list of Sqitch change sets for Phase 1 (infrastructure) and Phase 2 (pilot entities). Each change set should reference the design decision it implements.
 - [ ] **G4. Validate against real SEAD DDL.** Run the proposed migrations against a copy of the production schema. Confirm no conflicts with existing columns, constraints, or triggers.
+
+### Group H: Allocation Process Concepts (prerequisite for Groups B–G)
+
+These items must be resolved before any implementation structure — DDL, lifecycle states, or API surface — is treated as authoritative. They belong in REQUIREMENTS.md (H1–H2, H4–H5) and DESIGN_VIEW.md (H3, H6–H7). H8 is a documentation correction dependent on resolving H5.
+
+- [ ] **H1. Define "identity allocation" as a domain concept.** State what an allocation is, what it produces, and when it is complete. Clarify whether resolving an existing identity is also called an allocation. Record in REQUIREMENTS.md §Domain Concepts.
+
+- [ ] **H2. Define "submission" as a domain concept.** State what a submission is, who can originate one, what its minimal contents are, and what its lifecycle means at the conceptual level. FR-21's grouping rule should follow from this definition, not substitute for it. Record in REQUIREMENTS.md §Domain Concepts.
+
+- [ ] **H3. Define the atomic unit of allocation.** State the smallest irreversible act the identity system performs, and whether owned-child allocations are part of the same atomic unit as the root entity's allocation. Record in DESIGN_VIEW.md.
+
+- [ ] **H4. Define allocation inputs and outputs per identity type.** For a given allocation invocation, state which identity types are required inputs, which are optional inputs, which are produced as outputs, and which are retained only as identity evidence without being returned to the caller. Record in REQUIREMENTS.md.
+
+- [ ] **H5. Define allocation origins.** Enumerate all contexts from which an allocation can be initiated: at minimum, provider submission, SEAD administrator action, and Sqitch change request. For each origin, state the grouping/context unit that carries the allocation and the audit trail it must provide. Record in REQUIREMENTS.md.
+
+- [ ] **H6. Define allocation ordering with FK dependencies.** State who is responsible for ensuring that FK-referenced entities are allocated before the entities that depend on them. State whether the identity system enforces topological order or relies on the caller to submit entities in the correct order. Record in DESIGN_VIEW.md.
+
+- [ ] **H7. Define concurrent allocation behavior.** State what happens when two concurrent callers attempt to allocate the same entity (same business key or same provider UUID). State whether the system guarantees exactly-once allocation and how that guarantee is maintained. Record in DESIGN_VIEW.md.
+
+- [ ] **H8. Mark provisional DDL in IMPLEMENTATION_VIEW.md.** Annotate the `submission_uuid NOT NULL REFERENCES... ON DELETE CASCADE` constraint as a provisional illustration pending resolution of H5 and H3. No commitment to this structure should be made until the origin model and atomicity definition are settled.
 
 ---
 
