@@ -97,6 +97,23 @@ OpenRefine → POST /reconcile → router.py:reconcile() →
       SiteRepository.search() → PostgreSQL
 ```
 
+### SIMS Identity Module (`src/identity/`)
+
+The SEAD Identity Management System (SIMS) is integrated into this service. It provides identity policy and allocation logic for incoming SEAD data submissions.
+
+**Design docs**: [docs/sims/](../docs/sims/) — REQUIREMENTS, DESIGN_VIEW, IMPLEMENTATION_VIEW, ASSESSMENT, TRACKED_ENTITIES.
+
+**Planned submodules** (implementation not yet started):
+- `src/identity/models.py` — Domain models: `IdentityEvidence`, `AllocationResult`, `ResolutionRequest`, `IdentityRecord`
+- `src/identity/policy.py` — Resolve → Allocate → Map decision logic driven by entity `identity_tracking` and `reconciliation` properties
+- `src/identity/registry.py` — UUID minting, identity evidence recording, idempotency against `identity_registry` table
+
+**Entity metadata source of truth**: `sead_standard_model.yml` in the Shape Shifter repo defines per-entity `identity_tracking` and `reconciliation` properties that drive SIMS policy decisions.
+
+**Key identity tracking values**: `tracked` (UUID + PK, aggregate roots), `reconciled` (matched by business key), `derived` (identity from FK references), `child` (inherits parent aggregate identity).
+
+**Do not** place identity SQL scripts in `schema/sql/` until the `identity_registry` and `identity_evidence` tables are designed — the old `entity_metadata_functions.sql` referenced retired aggregate model tables and was removed.
+
 ### RAG Hybrid Strategy (New Pattern)
 Phase 1 implementation uses embedded MCP server for small-prompt reconciliation:
 
@@ -171,7 +188,9 @@ test(loaders): add comprehensive UCanAccessSqlLoader tests
 - [src/reconcile.py](../src/reconcile.py) - Core reconciliation logic
 - [src/strategies/strategy.py](../src/strategies/strategy.py) - Base strategy class and registry
 - [src/configuration/](../src/configuration/) - Config provider pattern
+- [src/identity/](../src/identity/) - SIMS identity module (stub; implementation pending)
 - [config/entities.yml](../config/entities.yml) - Entity definitions (source of truth)
+- [docs/sims/](../docs/sims/) - SIMS design documentation
 - [Makefile](../Makefile) - All developer commands
 
 ## Docker Deployment

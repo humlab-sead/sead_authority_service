@@ -29,6 +29,7 @@ The SEAD Authority Service is a FastAPI-based reconciliation service implementin
 4. **Template-Based Schema Generation**: SQL schemas generated from YAML configs
 5. **Strategy Pattern**: Entity-specific reconciliation logic isolated in strategies
 6. **Repository Pattern**: Database queries abstracted from business logic
+7. **Integrated Identity Module**: SIMS identity policy and allocation logic lives in `src/identity/`
 
 ## High-Level Architecture
 
@@ -426,6 +427,42 @@ LLMProvider (abstract base)
 └── OllamaProvider
 ```
 
+### Identity Module (`src/identity/`)
+
+**Purpose**: SEAD Identity Management System (SIMS) — policy and allocation logic for incoming data submissions. Migrated from the retired `sead_identity_system` repository.
+
+**Design documentation**: [docs/sims/](sims/) — REQUIREMENTS, DESIGN_VIEW, IMPLEMENTATION_VIEW, ASSESSMENT, TRACKED_ENTITIES.
+
+**Status**: Package stub created; implementation pending.
+
+**Planned submodules**:
+
+| Module | Responsibility |
+|--------|----------------|
+| `models.py` | Domain models: `IdentityEvidence`, `AllocationResult`, `ResolutionRequest`, `IdentityRecord` |
+| `policy.py` | Resolve → Allocate → Map decision logic, driven by per-entity `identity_tracking` and `reconciliation` properties |
+| `registry.py` | UUID minting, evidence recording, idempotency against `identity_registry` table |
+
+**Identity tracking values** (from `sead_standard_model.yml` in Shape Shifter):
+
+| Value | Meaning |
+|-------|---------|
+| `tracked` | Aggregate root — full UUID + PK allocation per submission |
+| `reconciled` | Matched against existing records by business key |
+| `derived` | Identity composed from FK references (bridge entities) |
+| `child` | Inherits parent aggregate identity; no independent UUID |
+
+**Decision flow** (see [docs/sims/DESIGN_VIEW.md](sims/DESIGN_VIEW.md)):
+```
+Incoming entity
+  → Resolve: does a match exist in identity_registry?
+      → yes → return existing UUID
+      → no  → Allocate: mint new UUID (tracked) or reconcile via Authority Service
+                → Map: record evidence, link submission PK → UUID
+```
+
+**SQL schema**: `identity_registry` and `identity_evidence` tables are not yet defined. Do **not** place identity DDL in `schema/sql/` until the schema design is finalised.
+
 **Provider Selection**:
 
 ```python
@@ -464,6 +501,42 @@ class LLMReconciliationStrategy:
         # 4. Map back to input data
         return self._map_results(results, data)
 ```
+
+### Identity Module (`src/identity/`)
+
+**Purpose**: SEAD Identity Management System (SIMS) — policy and allocation logic for incoming data submissions. Migrated from the retired `sead_identity_system` repository.
+
+**Design documentation**: [docs/sims/](sims/) — REQUIREMENTS, DESIGN_VIEW, IMPLEMENTATION_VIEW, ASSESSMENT, TRACKED_ENTITIES.
+
+**Status**: Package stub created; implementation pending.
+
+**Planned submodules**:
+
+| Module | Responsibility |
+|--------|----------------|
+| `models.py` | Domain models: `IdentityEvidence`, `AllocationResult`, `ResolutionRequest`, `IdentityRecord` |
+| `policy.py` | Resolve → Allocate → Map decision logic, driven by per-entity `identity_tracking` and `reconciliation` properties |
+| `registry.py` | UUID minting, evidence recording, idempotency against `identity_registry` table |
+
+**Identity tracking values** (defined in `sead_standard_model.yml` in Shape Shifter):
+
+| Value | Meaning |
+|-------|---------|
+| `tracked` | Aggregate root — full UUID + PK allocation per submission |
+| `reconciled` | Matched against existing records by business key |
+| `derived` | Identity composed from FK references (bridge entities) |
+| `child` | Inherits parent aggregate identity; no independent UUID |
+
+**Decision flow** (see [docs/sims/DESIGN_VIEW.md](sims/DESIGN_VIEW.md)):
+```
+Incoming entity
+  → Resolve: does a match exist in identity_registry?
+      → yes → return existing UUID
+      → no  → Allocate: mint new UUID (tracked) or reconcile via Authority Service
+                → Map: record evidence, link submission PK → UUID
+```
+
+**SQL schema**: `identity_registry` and `identity_evidence` tables are not yet defined. Do **not** place identity DDL in `schema/sql/` until the schema design is finalised.
 
 ## Request Flow
 

@@ -15,6 +15,7 @@ FastAPI-based reconciliation service for SEAD (Strategic Environmental Archaeolo
 - **MCP Server Support**: Embedded Model Context Protocol server for advanced retrieval
 - **Auto-Registration**: Plugin-based strategy system with decorator-based registration
 - **Schema Generation**: Template-based SQL schema generation for rapid entity onboarding
+- **SIMS Identity Module**: Integrated SEAD Identity Management System for identity allocation and evidence tracking (`src/identity/`)
 
 ## 📋 Table of Contents
 
@@ -101,6 +102,7 @@ OpenRefine → POST /reconcile → router.py
 - **Configuration**: Lazy-loading config resolution (`src/configuration/`)
 - **LLM Providers**: OpenAI, Anthropic, Ollama support (`src/llm/providers/`)
 - **MCP Server**: Embedded retrieval server (`src/mcp_server/`)
+- **Identity Module**: SIMS identity policy and allocation (`src/identity/`); design docs in [`docs/sims/`](docs/sims/)
 
 ## 📦 Installation
 

@@ -18,6 +18,8 @@ This document provides comprehensive deployment instructions for the SEAD Author
 The SEAD Authority Service uses a modern CI/CD pipeline built on GitHub Actions, Docker, and GitHub Container Registry (GHCR). This setup provides:
 
 - **Automated builds** on code changes
+
+> **Note on the SIMS Identity Module**: The `src/identity/` module (SEAD Identity Management System) is built into this service — there is no separate `sead_identity_system` deployment. Identity allocation logic, design docs (`docs/sims/`), and tests (`tests/identity/`) are all part of this repository.
 - **Multi-architecture support** (amd64, arm64)
 - **Version management** through git tags
 - **Security attestation** for supply chain integrity
