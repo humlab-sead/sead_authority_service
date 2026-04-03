@@ -2,6 +2,8 @@
 
 ## Purpose
 
+> **Module location**: SIMS is implemented as the `src/identity/` module within the [`sead_authority_service`](https://github.com/humlab-sead/sead_authority_service) repository. There is no separate `sead_identity_system` deployment. See [docs/sims/README.md](./README.md) for full context.
+
 This document states the initial functional requirements for the SEAD Identity System.
 
 It is intentionally focused on:

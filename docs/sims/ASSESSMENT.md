@@ -141,7 +141,7 @@ Shape Shifter's target model (`sead_standard_model.yml`) already catalogues 47 S
 
 The design question is: **should SIMS maintain its own entity registry, or consume Shape Shifter's target model spec?**
 
-An earlier design produced a three-table aggregate model (entity_types, aggregate_definitions, entity_dependencies) with views and PL/pgSQL functions. That design was retired as premature and largely redundant with the target model. The useful SQL patterns are preserved in `src/sql/entity_metadata_functions.sql`; the retired documents are in `docs/ignore/`.
+An earlier design produced a three-table aggregate model (entity_types, aggregate_definitions, entity_dependencies) with views and PL/pgSQL functions. That design was retired as premature and largely redundant with the target model. The associated SQL was removed from this repository (it referenced retired aggregate model tables and was not applicable to the new design).
 
 This decision affects Gaps 2 (tracked entity enumeration), 3 (aggregate boundaries), and 5 (business-key rules). It should be resolved early.
 
@@ -160,7 +160,7 @@ See [IMPLEMENTATION_VIEW.md](./IMPLEMENTATION_VIEW.md) § Entity Metadata for th
 | Location/site forced into ownership hierarchy | Fixed. Association relationship type introduced, FR-18 supports many-to-many. |
 | Documents redundant and inconsistent | Fixed. Three-document chain is clean, DRY, and properly cross-referenced. |
 | Implementation detail mixed with design | Fixed. Clear separation across three documents. |
-| Aggregate model metadata tables premature | Fixed. Retired to `docs/ignore/`. Useful SQL preserved in `src/sql/entity_metadata_functions.sql`. Design question recorded as Gap 8. |
+| Aggregate model metadata tables premature | Fixed. Retired; associated SQL removed (referenced retired tables). Design question recorded as Gap 8. |
 | NFRs more mature than domain model | Fixed. NFR material stashed. Implementation view is proportionate to design maturity. |
 
 ---

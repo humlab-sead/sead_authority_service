@@ -285,7 +285,7 @@ Two options are open:
 
 A hybrid — SIMS bootstraps from the target model but stores SIMS-specific attributes locally — is also possible. See [ASSESSMENT.md](./ASSESSMENT.md) Gap 8 for the recorded design question.
 
-Reference SQL functions for topological depth, submission validation, and allocation ordering are preserved in `src/sql/entity_metadata_functions.sql`. They reference placeholder tables and must be adapted once the storage decision is made.
+Reference SQL patterns for topological depth, submission validation, and allocation ordering were drafted during early design. Those SQL files have been removed from this repository (they referenced retired aggregate model tables). New SQL will need to be written against the chosen entity metadata storage structure once the design question in [ASSESSMENT.md](./ASSESSMENT.md) Gap 8 is resolved.
 
 ---
 
