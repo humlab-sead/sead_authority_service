@@ -15,19 +15,7 @@ It is intentionally focused on:
 
 ### Out Of Scope For This Document
 
-AI agents, take notice! The following are **out of scope** for this document, and should **not** be included in this document:
-
-- implementation details,
-- implementation plans,
-- non-functional requirements (NFRs)
-- deployment phases,
-- infrastructure architecture,
-- performance targets,
-- authentication details,
-- endpoint-level contracts or payload definitions,
-- database migration steps,
-- rollout plans,
-- code-level hashing or serialization rules.
+This document covers requirements only. Implementation details, NFRs, infrastructure, deployment, authentication, endpoint contracts, and rollout plans belong in separate documents.
 
 ---
 
@@ -84,64 +72,15 @@ The system **must**:
 
 ### Core identity concepts
 
-The system must distinguish the following concepts clearly.
+The system must distinguish the following identifier types.
 
-#### SEAD internal identity
-
-The current SEAD primary key used inside the relational schema.
-
-Characteristics:
-
-- entity-scoped,
-- integer sequences, 
-- relational,
-- internal to SEAD,
-- should **not** be exposed as a public identity.
-- represented in SEAD as `{entity}_id` where applicable.
-
-#### SEAD universal identity
-
-The stable UUID used to identify **a tracked SEAD entity** across system boundaries.
-
-Characteristics:
-
-- globally scoped,
-- externally usable,
-- stable across submissions,
-- represented in SEAD as `{entity}_uuid` where applicable.
-
-#### Business key
-
-A natural key or key set that uniquely identifies an entity in practice.
-
-Characteristics:
-
-- defined per entity type,
-- used primarily for reconciliation,
-- may come from SEAD conventions or provider data,
-- may or may not be globally stable.
-
-#### Provider key
-
-An identifier used by a remote data provider.
-
-Characteristics:
-
-- may be a UUID,
-- may be a business key,
-- may be internal to the provider,
-- should generally be retained in the identity system even when not promoted into SEAD tables.
-
-#### Authority key
-
-An identifier from an external authority or reference system, such as Wikidata, GeoNames, or a domain ontology.
-
-Characteristics:
-
-- useful for reconciliation,
-- useful for de-duplication of shared metadata,
-- not always available from providers,
-- may become strategically important for shared SEAD entities.
+| Type | Definition | Scope | In SEAD |
+|---|---|---|---|
+| **SEAD internal identity** | Integer sequence primary key | Entity-scoped, relational | `{entity}_id` — not a public identity |
+| **SEAD universal identity** | Stable UUID for a tracked entity | Global, externally usable | `{entity}_uuid` |
+| **Business key** | Natural key or key set identifying an entity in practice | Per entity type | Used for reconciliation; may come from SEAD or provider |
+| **Provider key** | Identifier used by a remote data provider | Provider-internal | Retained in identity system even if not promoted to SEAD tables |
+| **Authority key** | Identifier from an external reference system (e.g. Wikidata, GeoNames) | External authority | Supports reconciliation and de-duplication of shared metadata |
 
 ### Entity and value object distinction
 
@@ -177,32 +116,15 @@ Value objects belong to an owning entity and are managed as part of that entity'
 
 ### Relationship types
 
-The domain model must support more than one relationship type.
+The domain model must support:
 
-#### Ownership
-
-The child is part of the aggregate state of a parent entity.
-
-#### Association
-
-Two entities are linked, but one does not own the identity of the other.
-
-This is important for relationships such as site-to-location where the schema expresses association rather than strict containment.
-
-#### Reconciliation linkage
-
-A provider object or classifier is matched to an existing SEAD object without implying ownership.
+- **Ownership**: the child is part of the aggregate state of a parent entity.
+- **Association**: two entities are linked without ownership (e.g. site-to-location).
+- **Reconciliation linkage**: a provider object or classifier is matched to an existing SEAD object without implying ownership.
 
 ### Conceptual model alignment
 
-The domain concepts above are elaborated in [CONCEPTUAL_MODEL.md](./CONCEPTUAL_MODEL.md), which defines the full conceptual model for SIMS. The following CM concepts are relevant to how these requirements are realized:
-
-- **Source Scope**: the external namespace (system, provider, dataset) within which source identifiers are unique and interpretable. This is the identity context implied by "identity scope" in FR-13 and "submission context" in the API concepts.
-- **Binding**: the explicit, governed correspondence between a source-side identity and a SEAD-side tracked identity. Bindings are the decision objects that record the outcome of identity resolution (FR-12, FR-14) and support traceability (FR-22, FR-23).
-- **Change Request**: the governed package of proposed domain changes created after identity resolution. This is the mechanism through which identity decisions are separated from business-data mutation (FR-25) and supports update workflows (FR-24).
-- **Identity Resolution**: the process that evaluates identity evidence and determines whether to reuse an existing tracked identity, allocate a new one, or leave the case unresolved. This process implements the resolution and allocation logic required by FR-6 through FR-11.
-
-See [CONCEPTUAL_MODEL.md § Core Concepts](./CONCEPTUAL_MODEL.md#core-concepts) for full definitions, relations, and lifecycle semantics.
+The domain concepts above are elaborated in [CONCEPTUAL_MODEL.md](./CONCEPTUAL_MODEL.md), which defines the full conceptual model including core concepts, relations, lifecycles, and canonical use cases.
 
 ---
 
@@ -238,7 +160,7 @@ FR-11. The system shall enforce an administrable identity policy that governs wh
 
 FR-12. The system shall return the same resolved SEAD identity for the same accepted identifier across repeated submissions.
 
-FR-13. The system shall prevent duplicate identity allocation for the same accepted identifier within the same identity scope.
+FR-13. The system shall prevent duplicate identity allocation for the same accepted identifier within the same source scope.
 
 FR-14. The system shall support stable lookup of existing mappings between provider identifiers, business keys, authority keys, UUID identity, and SEAD internal identity.
 
@@ -274,17 +196,7 @@ FR-25. The system shall keep identity allocation logic independent of business-d
 
 ## Usage Scenarios
 
-> **Cross-reference**: [CONCEPTUAL_MODEL.md § Canonical Use Cases](./CONCEPTUAL_MODEL.md#canonical-use-cases) provides identity-centered use cases that complement these requirements-level scenarios. The mapping is:
->
-> | REQ scenario | CM use case(s) |
-> |---|---|
-> | Scenario 1 (provider submits entity data) | UC 2 (new source identity matched to existing tracked identity), UC 3 (new source identity requiring new tracked identity) |
-> | Scenario 2 (classifier reconciliation) | UC 2 (matched to existing tracked identity), plus unresolved case handling ([CM deferred issue 2](./CONCEPTUAL_MODEL.md#deferred-issues)) |
-> | Scenario 3 (association, not ownership) | Not identity-specific; modeled through CM relations (independent tracked identities with separate bindings) |
-> | Scenario 4 (authority-backed reconciliation) | UC 2 (matched via authority key as identity signal) |
-> | — | UC 1 (existing source identity with existing binding) — covers repeat submissions, not explicitly a REQ scenario |
-> | — | UC 4 (confirmed binding later corrected) — covers error correction, not explicitly a REQ scenario |
-> | — | UC 5 (change request rejected) — covers governance outcomes, not explicitly a REQ scenario |
+The scenarios below describe requirements-level situations. [CONCEPTUAL_MODEL.md § Canonical Use Cases](./CONCEPTUAL_MODEL.md#canonical-use-cases) provides corresponding identity-centered use cases.
 
 ### Scenario 1: Provider submits entity data
 
@@ -332,14 +244,14 @@ Expected outcome:
 
 ## High Level API Behaviour
 
-The API exposes the identity system as a service. Clients present identity evidence, request resolution or allocation within a submission context, and receive stable identity results. Endpoint design belongs in a later API specification.
+The API exposes the identity system as a service. Clients present identity evidence, request resolution or allocation within a source scope, and receive stable identity results. Endpoint design belongs in a later API specification.
 
 ### API-visible concepts
 
 At a high level, the API should expose behavior around:
 
 - tracked entity types,
-- submission contexts,
+- source scopes and submissions,
 - identity evidence,
 - resolved identity,
 - minted identity,
