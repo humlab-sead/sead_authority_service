@@ -2,7 +2,7 @@
 
 ## Overview
 
-The SEAD Identity Management System (SIMS) separates externally expressed identity from SEAD-managed identity and makes the correspondence between them explicit, governed, and historically traceable. Source data is received through **Submissions**, interpreted within a **Source Scope**, and represented through **Source Identities**. These are resolved against SEAD-managed **Tracked Identities** through the **Identity Resolution** process. The result is recorded as historical **Bindings**. Once identities have been resolved, proposed domain changes may be bundled into a **Change Request** for review, quality assurance, and possible ingestion into SEAD.
+The SEAD Identity Management System (SIMS) separates externally expressed identity from SEAD-managed identity and makes the correspondence between them explicit, governed, and historically traceable. Source data is received through **Submissions**, interpreted within a **Source Scope**, and represented through **Source Identities**. These are resolved against SEAD-managed **Tracked Identities** through the **Identity Resolution** process. The results are grouped into **Binding Sets** — atomic batches of **Bindings** that are confirmed or rejected together. Once identities have been resolved, a Binding Set may be associated with a **Change Request** for review, quality assurance, and possible ingestion into SEAD.
 
 The model aligns with domain-driven design principles, as defined in the next section.
 
@@ -58,12 +58,20 @@ A **Tracked Identity** is a persistent, allocated SEAD-side identity for a domai
 
 ### Binding
 
-A **Binding** is an explicit, managed assertion that a given Source Identity corresponds to a given Tracked Identity. It records the outcome of identity resolution and is retained as a first-class historical object with provenance and lifecycle state. A Binding is not merely a technical pointer; it is the decision object that states two identities are considered the same entity for SEAD purposes.
+A **Binding** is an explicit assertion that a given Source Identity corresponds to a given Tracked Identity. It records the outcome of identity resolution for one Source Identity and is retained as a historical object with provenance. A Binding always belongs to exactly one Binding Set.
 
-- Provenance-bearing: records how, when, and by whom the binding was established
-- Lifecycle-sensitive: may be proposed, confirmed, rejected, superseded, or invalidated (see Binding Lifecycle)
+- Provenance-bearing: records how the binding was established (method, evidence)
 - May exist before the tracked entity is materialized in SEAD
+- Lifecycle is governed by the owning Binding Set (see Binding Set Lifecycle)
+
+### Binding Set
+
+A **Binding Set** is the atomic unit of identity resolution output. It groups one or more Bindings that are confirmed or rejected together as a single governed batch. The Binding Set owns the lifecycle state, audit trail, and Change Request reference for its constituent Bindings.
+
+- Lifecycle-sensitive: may be proposed, confirmed, rejected, or invalidated (see Binding Set Lifecycle)
+- Owns the association with a Change Request (if any)
 - Subject to governance: may require validation or review before becoming authoritative
+- A Binding Set may contain Bindings for multiple entity types within the same Submission
 
 ### Identity Resolution
 
@@ -74,7 +82,7 @@ A **Binding** is an explicit, managed assertion that a given Source Identity cor
 
 ### Change Request
 
-A **Change Request** is a governed package of proposed domain-level changes to SEAD. It is owned and managed by the SEAD Change Control System (powered by Sqitch) and referenced by a unique name (the Sqitch change name). SIMS does not own or manage Change Requests; it associates confirmed Bindings with a Change Request to record which identity correspondences support which domain changes. A Change Request does not define identity correspondence; it consumes correspondence already established through Identity Resolution and Binding.
+A **Change Request** is a governed package of proposed domain-level changes to SEAD. It is owned and managed by the SEAD Change Control System (powered by Sqitch) and referenced by a unique name (the Sqitch change name). SIMS does not own or manage Change Requests; it associates confirmed Binding Sets with a Change Request to record which identity correspondences support which domain changes. A Change Request does not define identity correspondence; it consumes correspondence already established through Identity Resolution and Binding.
 
 - Owned by the SEAD Change Control System, not by SIMS
 - Referenced by unique name
@@ -94,10 +102,10 @@ A **Change Request** is a governed package of proposed domain-level changes to S
 | 4 | Source Identity — Binding | 1:N (many historical Bindings; normally at most one current confirmed Binding) |
 | 5 | Tracked Identity — Binding | 1:N (many Source Identities from different scopes may bind to the same Tracked Identity) |
 | 6 | Tracked Identity — SEAD entity | 1:0..1 (a Tracked Identity may correspond to zero or one materialized SEAD entity) |
-| 7 | Identity Resolution — Binding | 1:N (resolution may create zero or more Proposed Bindings) |
-| 8 | Identity Resolution — Tracked Identity | Resolution may reuse an existing, allocate a new, or select no Tracked Identity |
-| 9 | Change Request — Tracked Identity | M:N (a Change Request may refer to multiple Tracked Identities and vice versa) |
-| 10 | Change Request — Binding | M:N (a Change Request consumes confirmed Bindings; a Binding may support multiple Change Requests) |
+| 7 | Binding Set — Binding | 1:N (a Binding Set contains one or more Bindings; a Binding belongs to exactly one Binding Set) |
+| 8 | Identity Resolution — Binding Set | 1:1 (resolution produces one Binding Set) |
+| 9 | Identity Resolution — Tracked Identity | Resolution may reuse an existing, allocate a new, or select no Tracked Identity |
+| 10 | Change Request — Binding Set | M:N (a Change Request consumes confirmed Binding Sets; a Binding Set may support multiple Change Requests) |
 | 11 | Submission — Change Request | M:N (a Submission may give rise to many Change Requests and vice versa) |
 
 ---
@@ -116,27 +124,37 @@ A **Change Request** is a governed package of proposed domain-level changes to S
 ### Binding constraints
 
 - A Binding links exactly one Source Identity to exactly one Tracked Identity.
-- A Source Identity may have many historical Bindings but normally at most one current confirmed Binding.
-- Superseded, Rejected, and Invalidated Bindings remain historically visible.
-- A historical Binding must not be reactivated; any renewed correspondence creates a new Binding.
+- A Binding belongs to exactly one Binding Set.
+- A Source Identity may have many historical Bindings but normally at most one within a current confirmed Binding Set.
+- Superseded, Rejected, and Invalidated Binding Sets (and their Bindings) remain historically visible.
+- A historical Binding must not be reactivated; any renewed correspondence creates a new Binding in a new Binding Set.
+
+### Binding Set constraints
+
+- A Binding Set contains one or more Bindings.
+- All Bindings in a Binding Set share the same lifecycle state (governed at the set level).
+- A Binding Set may be associated with zero or one Change Request.
+- Splitting a Binding out of a set (e.g. to reject one while confirming the rest) creates a new Binding Set.
 
 ### Process constraints
 
-- Identity Resolution precedes Change Request creation.
-- No source-derived domain change should enter a Change Request until its identity has been resolved to the degree required by policy.
+- Identity Resolution precedes Change Request association.
+- No source-derived domain change should enter a Change Request until its identity has been resolved to the degree required by policy and the corresponding Binding Set is confirmed.
 - Change Requests govern domain changes, not identity correspondence.
 
 ---
 
-## Binding Lifecycle
+## Binding Set Lifecycle
+
+The lifecycle is managed at the Binding Set level. All Bindings within a set share the set's lifecycle state.
 
 | State | Meaning |
 |---|---|
-| **Proposed** | A candidate correspondence exists but is not yet authoritative. |
-| **Confirmed** | The binding is the current authoritative correspondence. |
-| **Rejected** | The proposed correspondence was assessed and refused. |
-| **Superseded** | The binding was once authoritative but has been replaced by another. |
-| **Invalidated** | The binding is no longer valid for active use, but is retained for history and audit. |
+| **Proposed** | The set's correspondences exist as candidates but are not yet authoritative. |
+| **Confirmed** | The set's correspondences are the current authoritative identity mappings. |
+| **Rejected** | The proposed set was assessed and refused as a whole. |
+| **Superseded** | The set was once authoritative but has been replaced by another. |
+| **Invalidated** | The set is no longer valid for active use, but is retained for history and audit. |
 
 **Allowed transitions:**
 
@@ -147,7 +165,7 @@ Confirmed   → Superseded
 Confirmed   → Invalidated
 ```
 
-Rejected, Superseded, and Invalidated are terminal states. A Binding is current only when Confirmed and not subsequently superseded or invalidated.
+Rejected, Superseded, and Invalidated are terminal states. A Binding Set is current only when Confirmed and not subsequently superseded or invalidated.
 
 ---
 
@@ -166,7 +184,7 @@ If a related Change Request is never accepted and the tracked entity is never ma
 
 ## Canonical Use Cases
 
-Each use case follows the general flow: Submission → Source Scope → Source Identity → Identity Resolution → Binding → Change Request → (optional) Materialization. Identity Resolution and Change Request are distinct stages: the first establishes identity correspondence, the second governs whether domain changes are accepted into SEAD.
+Each use case follows the general flow: Submission → Source Scope → Source Identity → Identity Resolution → Binding Set → Change Request → (optional) Materialization. Identity Resolution and Change Request are distinct stages: the first establishes identity correspondence (grouped in a Binding Set), the second governs whether domain changes are accepted into SEAD.
 
 ### 1. Existing source identity bound to existing tracked identity
 
@@ -174,19 +192,19 @@ A Submission contains a Source Identity already known within its Source Scope. I
 
 ### 2. New source identity matched to existing tracked identity
 
-A Submission contains a previously unseen Source Identity. Identity Resolution determines that it corresponds to an existing Tracked Identity. A Proposed Binding is created and later Confirmed. The Submission results in a Change Request referring to that Tracked Identity.
+A Submission contains a previously unseen Source Identity. Identity Resolution determines that it corresponds to an existing Tracked Identity. A Proposed Binding is created within a Binding Set. The Binding Set is later Confirmed. The Submission results in a Change Request associated with that Binding Set.
 
 ### 3. New source identity requiring a new tracked identity
 
-A Submission contains a Source Identity for which no suitable Tracked Identity exists. Identity Resolution allocates a new Tracked Identity and creates a Proposed Binding. If accepted, the resulting Change Request may later materialize the entity in SEAD.
+A Submission contains a Source Identity for which no suitable Tracked Identity exists. Identity Resolution allocates a new Tracked Identity and creates a Proposed Binding within a Binding Set. If the Binding Set is confirmed, the resulting Change Request may later materialize the entity in SEAD.
 
 ### 4. Confirmed binding later corrected
 
-A Binding was previously Confirmed but is later found to be wrong. A new Proposed Binding is created to the correct Tracked Identity and Confirmed. The old Binding transitions to Superseded. Historical traceability is preserved.
+A Binding within a previously Confirmed Binding Set is later found to be wrong. A new Binding Set is created containing a Proposed Binding to the correct Tracked Identity. The new Binding Set is Confirmed; the old Binding Set transitions to Superseded. Historical traceability is preserved.
 
 ### 5. Change request rejected before materialization
 
-A Tracked Identity has been allocated and bound, but the Change Request arising from the Submission is rejected or indefinitely blocked. The Tracked Identity may later be invalidated. The identity and its historical relations remain recorded, but neither the identity nor any allocated identifiers may be reused.
+A Tracked Identity has been allocated and bound within a Confirmed Binding Set, but the Change Request associated with the Binding Set is rejected or indefinitely blocked. The Tracked Identity may later be invalidated. The Binding Set and its historical relations remain recorded, but neither the identity nor any allocated identifiers may be reused.
 
 ---
 
@@ -196,7 +214,7 @@ A Tracked Identity has been allocated and bound, but the Change Request arising 
 2. **Unresolved case handling**: formal treatment of unresolved outcomes and associated review or work items.
 3. **Merge and split semantics**: two Source Identities later found to be the same entity, or one later split into two.
 4. **Binding evidence model**: detailed structure for recording the basis of binding decisions.
-5. **Change Request integration**: detailed rules for how SIMS associates Bindings with externally managed Change Requests.
+5. **Change Request integration**: detailed rules for how SIMS associates Binding Sets with externally managed Change Requests.
 6. **Materialized SEAD entity modeling**: the relationship between a Tracked Identity and the actual SEAD domain entity.
 7. **Detailed policy for binding review**: governance rules for when and how Proposed Bindings are reviewed and Confirmed.
 
@@ -211,5 +229,6 @@ A Tracked Identity has been allocated and bound, but the Change Request arising 
 | **Source Identity** | Expresses how an external source identifies an entity. |
 | **Tracked Identity** | Expresses how SEAD identifies that entity. |
 | **Identity Resolution** | Determines whether and how the two correspond. |
-| **Binding** | Records that correspondence as a historical governed assertion. |
+| **Binding** | Records one source-to-tracked correspondence with provenance. |
+| **Binding Set** | Groups Bindings into an atomic batch with shared lifecycle, audit, and Change Request reference. |
 | **Change Request** | External governed object (Sqitch) that bundles domain changes; SIMS references it by name. |

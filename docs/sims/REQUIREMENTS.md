@@ -192,6 +192,10 @@ FR-24. The system shall maintain identity state sufficient for aggregate-level c
 
 FR-25. The system shall keep identity allocation logic independent of business-data mutation logic.
 
+### Binding set requirements
+
+FR-26. The system shall group the Bindings produced by an identity resolution batch into a Binding Set that is confirmed or rejected as an atomic unit.
+
 ---
 
 ## Usage Scenarios

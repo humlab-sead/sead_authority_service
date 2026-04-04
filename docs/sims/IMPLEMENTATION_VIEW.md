@@ -28,16 +28,18 @@ The table below maps each CM concept to its implementation anchor. This is the p
 | **Submission**          | `submissions` table        | Temporal provenance; belongs to one Source Scope                                                                          |
 | **Source Identity**     | `source_identities` table  | Persistent per scope; carries identity signals                                                                            |
 | **Tracked Identity**    | `tracked_identities` table | SEAD-side UUID anchor; lifecycle per [CM § Tracked Identity Lifecycle](./CONCEPTUAL_MODEL.md#tracked-identity-lifecycle)  |
-| **Binding**             | `bindings` table           | Links Source Identity → Tracked Identity; lifecycle per [CM § Binding Lifecycle](./CONCEPTUAL_MODEL.md#binding-lifecycle) |
-| **Identity Resolution** | Service operation          | Stateless process; outcomes expressed as Bindings and unresolved cases                                                    |
+| **Binding**             | `bindings` table           | Links Source Identity → Tracked Identity; belongs to one Binding Set                                                     |
+| **Binding Set**         | `binding_sets` table       | Atomic batch of Bindings; owns lifecycle, audit, and Change Request reference (FR-26)                                     |
+| **Identity Resolution** | Service operation          | Stateless process; outcomes expressed as a Binding Set containing Bindings and unresolved cases                           |
 | **Change Request**      | External reference (by name) | Owned by SEAD Change Control System (Sqitch); SIMS records association between Bindings and Change Request name          |
 
 ### Key structural principles
 
 - Each CM concept owned by SIMS maps to its own table. No composite "allocation" table conflating Source Identity, Tracked Identity, and Binding.
-- Change Requests are external objects (owned by the SEAD Change Control System); SIMS references them by name on the Binding record.
-- Binding and Tracked Identity lifecycles are expressed as state columns with allowed transitions enforced by application logic (or CHECK constraints).
-- Identity Resolution is a service-layer operation, not a stored object. Its outcomes are Bindings.
+- Binding Sets are the atomic governance unit. Lifecycle state, audit trail, and Change Request references live on the Binding Set, not on individual Bindings.
+- Change Requests are external objects (owned by the SEAD Change Control System); SIMS references them by name on the Binding Set record.
+- Binding Set lifecycle is expressed as a state column with allowed transitions enforced by application logic (or CHECK constraints).
+- Identity Resolution is a service-layer operation, not a stored object. Its outcomes are a Binding Set.
 
 ---
 
@@ -47,40 +49,40 @@ The table below maps each CM concept to its implementation anchor. This is the p
 
 Represents the external namespace within which Source Identities are unique.
 
-| Column | Purpose |
-|---|---|
-| `scope_uuid` (PK) | Unique identifier |
-| `scope_name` | Human-readable label |
+| Column                             | Purpose                                            |
+|------------------------------------|----------------------------------------------------|
+| `scope_uuid` (PK)                  | Unique identifier                                  |
+| `scope_name`                       | Human-readable label                               |
 | `parent_scope_uuid` (FK, nullable) | Hierarchical nesting (system → provider → dataset) |
-| `description` | Context for the scope |
-| Audit columns | `created_at`, `created_by` |
+| `description`                      | Context for the scope                              |
+| Audit columns                      | `created_at`, `created_by`                         |
 
 ### Submissions
 
 Represents a delivered batch or ingest event within a single Source Scope.
 
-| Column | Purpose |
-|---|---|
-| `submission_uuid` (PK) | Unique identifier |
-| `scope_uuid` (FK) | The Source Scope this submission belongs to |
-| `submission_name` | Human-readable label |
-| `status` | Lifecycle state: `pending`, `completed`, `failed` |
-| Audit columns | `created_at`, `created_by`, `completed_at` |
+| Column                 | Purpose                                           |
+|------------------------|---------------------------------------------------|
+| `submission_uuid` (PK) | Unique identifier                                 |
+| `scope_uuid` (FK)      | The Source Scope this submission belongs to       |
+| `submission_name`      | Human-readable label                              |
+| `status`               | Lifecycle state: `pending`, `completed`, `failed` |
+| Audit columns          | `created_at`, `created_by`, `completed_at`        |
 
 ### Source Identities
 
 Represents a persistent identity for a domain entity as expressed within a Source Scope.
 
-| Column | Purpose |
-|---|---|
-| `source_identity_uuid` (PK) | Unique identifier |
-| `scope_uuid` (FK) | The Source Scope this identity belongs to |
-| `entity_type` | Target SEAD entity type (e.g. `site`, `sample_group`) |
-| `identity_type` | `uuid`, `business_key`, `provider_key`, `authority_key` |
-| `identity_value` | The serialized identifier value |
+| Column                               | Purpose                                                                |
+|--------------------------------------|------------------------------------------------------------------------|
+| `source_identity_uuid` (PK)          | Unique identifier                                                      |
+| `scope_uuid` (FK)                    | The Source Scope this identity belongs to                              |
+| `entity_type`                        | Target SEAD entity type (e.g. `site`, `sample_group`)                  |
+| `identity_type`                      | `uuid`, `business_key`, `provider_key`, `authority_key`                |
+| `identity_value`                     | The serialized identifier value                                        |
 | `identity_signals` (JSONB, nullable) | Additional identity evidence (authority keys, alternative identifiers) |
-| Audit columns | `created_at`, `created_by` |
-| **Uniqueness** | `(scope_uuid, entity_type, identity_type, identity_value)` |
+| Audit columns                        | `created_at`, `created_by`                                             |
+| **Uniqueness**                       | `(scope_uuid, entity_type, identity_type, identity_value)`             |
 
 A Source Identity may be observed in multiple Submissions. A junction table (`submission_source_identities`) records which Submission carried which Source Identities, reflecting the M:N relation from [CM § Relations](./CONCEPTUAL_MODEL.md#relations-and-cardinalities) (relation 3).
 
@@ -100,34 +102,46 @@ The `tracked_identity_uuid` **is** the SEAD universal identity (FR-1). Where SEA
 
 **Design decision:** Creating historical Binding records for UUIDs that predate SIMS deployment is out of scope. Pre-existing `{entity}_uuid` values are treated as authoritative Tracked Identities without provenance tracking.
 
+### Binding Sets
+
+Represents the atomic batch of identity resolution outcomes. Owns lifecycle, audit, and Change Request reference.
+
+| Column | Purpose |
+|---|---|
+| `binding_set_uuid` (PK) | Unique identifier |
+| `submission_uuid` (FK, nullable) | The Submission that triggered this resolution batch |
+| `lifecycle_state` | `proposed`, `confirmed`, `rejected`, `superseded`, `invalidated` |
+| `change_request_name` (nullable) | Sqitch change name linking this Binding Set to a Change Request in the SEAD Change Control System |
+| Audit columns | `created_at`, `created_by`, `confirmed_at` |
+
+Lifecycle transitions follow [CM § Binding Set Lifecycle](./CONCEPTUAL_MODEL.md#binding-set-lifecycle). All Bindings within a set share the set’s lifecycle state.
+
 ### Bindings
 
-Represents the governed assertion linking a Source Identity to a Tracked Identity.
+Represents one source-to-tracked identity correspondence within a Binding Set.
 
 | Column | Purpose |
 |---|---|
 | `binding_uuid` (PK) | Unique identifier |
+| `binding_set_uuid` (FK) | The owning Binding Set |
 | `source_identity_uuid` (FK) | The Source Identity |
 | `tracked_identity_uuid` (FK) | The Tracked Identity |
-| `lifecycle_state` | `proposed`, `confirmed`, `rejected`, `superseded`, `invalidated` |
 | `method` | How the binding was established (e.g. `exact_match`, `business_key`, `manual`, `policy`) |
-| `change_request_name` (nullable) | Sqitch change name linking this Binding to a Change Request in the SEAD Change Control System |
 | `provenance` (JSONB, nullable) | Supporting evidence, resolution context |
-| Audit columns | `created_at`, `created_by`, `confirmed_at` |
 
-Lifecycle transitions follow [CM § Binding Lifecycle](./CONCEPTUAL_MODEL.md#binding-lifecycle). A Source Identity normally has at most one Confirmed Binding at any time.
+A Source Identity normally has at most one Binding within a current confirmed Binding Set at any time.
 
 ### Change Request References
 
 Change Requests are owned by the SEAD Change Control System (Sqitch) and referenced by their unique Sqitch change name. SIMS does not store or manage Change Request state.
 
-The `bindings` table carries an optional `change_request_name` column linking a confirmed Binding to the Change Request it supports. This is the sole integration point between SIMS and the Change Control System.
+The `binding_sets` table carries an optional `change_request_name` column linking a confirmed Binding Set to the Change Request it supports. This is the sole integration point between SIMS and the Change Control System.
 
 ---
 
 ## Core Operations
 
-These operations implement the decision flow defined in [DESIGN_VIEW.md § Decision flow](./DESIGN_VIEW.md#decision-flow). They map directly to the three-step sequence: Identity Resolution → Binding → Change Request.
+These operations implement the decision flow defined in [DESIGN_VIEW.md § Decision flow](./DESIGN_VIEW.md#decision-flow). They map directly to the three-step sequence: Identity Resolution → Binding (within a Binding Set) → Change Request.
 
 ### 1. Resolve Identity
 
@@ -152,32 +166,38 @@ Implements step 1 of the decision flow: **Identity Resolution**.
 
 Implements step 2 of the decision flow: **Binding**.
 
-**Input:** Resolution outcome from step 1.
+**Input:** Resolution outcomes from step 1 (one or more resolved Source Identities).
+
+**Output:** A Proposed Binding Set containing individual Bindings.
 
 **Behavior:**
 
-- If `matched`: create a Proposed Binding linking the Source Identity to the existing Tracked Identity.
-- If `new`: allocate a new Tracked Identity (mint UUID; optionally reserve integer PK), then create a Proposed Binding.
-- If `unresolved`: record the unresolved case for later review. No Binding is created.
+- Create a new Binding Set in `proposed` state.
+- For each resolved Source Identity:
+  - If `matched`: create a Binding within the set linking the Source Identity to the existing Tracked Identity.
+  - If `new`: allocate a new Tracked Identity (mint UUID; optionally reserve integer PK), then create a Binding within the set.
+  - If `unresolved`: record the unresolved case for later review. No Binding is created for this Source Identity.
 
 **Policy enforcement** (applied between Resolution and Binding per [DV § Policy boundary](./DESIGN_VIEW.md#policy-boundary)):
 
 - Evaluate whether a provider-supplied UUID is accepted as the SEAD universal identity or retained only as a provider key (FR-11).
 - Evaluate whether an unmatched shared metadata entity triggers allocation or is held as unresolved.
 
-Proposed Bindings may be confirmed automatically (for provider-owned entities with high-confidence matches) or require review (for shared metadata entities or low-confidence matches).
+Proposed Binding Sets may be confirmed automatically (for provider-owned entities with high-confidence matches) or require review (for shared metadata entities or low-confidence matches).
 
 ### 3. Associate with Change Request
 
 Implements step 3 of the decision flow: **Change Request** association.
 
-**Input:** One or more confirmed Bindings and an externally provided Change Request name (Sqitch change name).
+**Input:** A confirmed Binding Set and an externally provided Change Request name (Sqitch change name).
 
 **Behavior:**
 
-- Record the association between confirmed Bindings and the named Change Request.
+- Record the association between the confirmed Binding Set and the named Change Request by setting `change_request_name` on the Binding Set.
 - The Change Request itself is created and managed by the SEAD Change Control System, not by SIMS.
 - SIMS does not alter identity correspondence when recording this association (FR-25).
+
+**Design decision:** For the initial release, SIMS stores only a reference (the Sqitch change name) to the SEAD Change Control System. It does not query Change Request status or store additional Change Request metadata. Integration between the two systems is intentionally loose and may be tightened in future releases beyond the initial SIMS scope.
 
 ### 4. Detect Change (Update Foundation)
 
@@ -230,13 +250,13 @@ The identity system needs to know which SEAD tables are tracked entities, their 
 
 ### What the system needs per tracked entity
 
-| Attribute | Purpose |
-|---|---|
-| Entity type and PK column | Target for Tracked Identity allocation |
-| Entity subtype | Governs intake rules and resolution strategy (provider-owned, shared metadata, relationship) |
-| Aggregate membership | Defines change-detection scope and update semantics |
-| FK dependencies | Determines allocation order within a Submission |
-| Business-key fields | Enables business-key serialization and resolution |
+| Attribute                 | Purpose                                                                                      |
+|---------------------------|----------------------------------------------------------------------------------------------|
+| Entity type and PK column | Target for Tracked Identity allocation                                                       |
+| Entity subtype            | Governs intake rules and resolution strategy (provider-owned, shared metadata, relationship) |
+| Aggregate membership      | Defines change-detection scope and update semantics                                          |
+| FK dependencies           | Determines allocation order within a Submission                                              |
+| Business-key fields       | Enables business-key serialization and resolution                                            |
 
 ### Source of truth
 
@@ -258,8 +278,6 @@ These questions must be resolved before DDL is finalized and core operations are
 
 4. **Allocation origin model**: Not all identity operations originate from provider submissions. SEAD administrator actions and Sqitch change requests are additional origins. The Source Scope / Submission model may need scopes that represent internal SEAD origins.
 
-5. **Change Request integration**: What information beyond the Sqitch change name should SIMS record when associating Bindings with a Change Request? Should SIMS query the Change Control System for status, or only store the reference?
-
 ---
 
 ## Rollout Approach
@@ -274,6 +292,6 @@ Rollout is incremental. Each phase stabilizes before the next begins.
 
 4. **Entity table integration**: Reuse existing `{entity}_uuid` columns on tracked SEAD entity tables. Add UUID columns only where missing. Pre-existing UUIDs are treated as authoritative without retroactive Binding records.
 
-5. **Change Request integration**: Record associations between confirmed Bindings and externally managed Change Requests (Sqitch). Validate integration with the SEAD Change Control System.
+5. **Change Request integration**: Record associations between confirmed Binding Sets and externally managed Change Requests (Sqitch). Validate integration with the SEAD Change Control System.
 
 Detailed rollout planning (timelines, specific table selection, migration scripts) belongs to project planning, not this document.
