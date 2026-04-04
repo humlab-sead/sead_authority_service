@@ -231,10 +231,12 @@ When a provider supplies a UUID:
 
 When a provider supplies a natural key or key set:
 
-- The key is serialized into a deterministic string representation.
-- Serialization rules (field selection, ordering, normalization) are defined per entity type.
-- The serialized key is stored as the Source Identity's `identity_value` with `identity_type = 'business_key'`.
+- The submitting system (typically Shape Shifter) constructs a deterministic serialized string from the provider's data, using the `identity_columns` defined in the target model (`sead_standard_model.yml`).
+- SIMS receives the serialized string as an opaque token and stores it as the Source Identity's `identity_value` with `identity_type = 'business_key'`.
+- SIMS does not interpret the internal structure of the business key. It uses the string solely for equality comparison and uniqueness enforcement.
 - Used for resolution against existing Tracked Identities or existing SEAD data.
+
+**Design decision:** Business-key serialization (field selection, ordering, normalization) is the responsibility of the submitting system, not SIMS. Different data providers have different schemas; only the submitting system (Shape Shifter) understands the column-level mapping from provider data to target model fields. SIMS requires only that the serialized string is deterministic within a Source Scope — the same entity with the same input always produces the same string — to guarantee idempotency (FR-12, FR-13).
 
 ### Authority-key intake
 
@@ -272,11 +274,9 @@ The current design intent is that SIMS consumes Shape Shifter's target model as 
 
 These questions must be resolved before DDL is finalized and core operations are coded.
 
-1. **Business-key serialization**: What normalization and serialization rules govern business-key construction per entity type? (Affects Source Identity uniqueness and idempotency.)
+1. **Change-detection hash scope**: What entity data constitutes the aggregate payload for hashing? Which owned child rows are included, whether associations count, and which fields are excluded. Depends on aggregate boundary definitions.
 
-2. **Change-detection hash scope**: What entity data constitutes the aggregate payload for hashing? Which owned child rows are included, whether associations count, and which fields are excluded. Depends on aggregate boundary definitions.
-
-3. **Allocation origin model**: Not all identity operations originate from provider submissions. SEAD administrator actions and Sqitch change requests are additional origins. The Source Scope / Submission model may need scopes that represent internal SEAD origins.
+2. **Allocation origin model**: Not all identity operations originate from provider submissions. SEAD administrator actions and Sqitch change requests are additional origins. The Source Scope / Submission model may need scopes that represent internal SEAD origins.
 
 ---
 
