@@ -106,13 +106,6 @@ Controlled vocabularies maintained by SEAD administrators. Providers reference e
 | 41 | contact_type | tbl_contact_types | classifier | contact_type_name | no | contacts |
 | 42 | feature_type | tbl_feature_types | classifier | feature_type_name | no | excavation |
 | 43 | contact | tbl_contacts | lookup | *(no business key)* | no | contacts |
-| 37 | identification_level | tbl_identification_levels | classifier | identification_level_abbrev | no | taxonomy |
-| 38 | taxa_tree_master | tbl_taxa_tree_master | classifier | genus_id, species | no | taxonomy |
-| 39 | age_type | tbl_age_types | classifier | age_type | no | dating |
-| 40 | relative_age_type | tbl_relative_age_types | classifier | age_type | no | dating |
-| 41 | dating_uncertainty | tbl_dating_uncertainty | classifier | uncertainty | no | dating |
-| 42 | contact_type | tbl_contact_types | classifier | contact_type_name | no | contacts |
-| 43 | feature_type | tbl_feature_types | classifier | feature_type_name | no | excavation |
 
 > **Notes:**
 > - `abundance_element_group` has no `target_table` — it exists only as a Shape Shifter grouping concept, not as a SEAD database table.
@@ -315,7 +308,8 @@ The following SEAD tables are visible in the ERD but absent from the Shape Shift
 ## 8. Summary
 
 | Category                              | Count  |
-|---------------------------------------|-2      |
+|---------------------------------------|--------|
+| Provider-owned aggregate roots        | 2      |
 | Provider-owned aggregate children     | 8      |
 | Shared metadata — provider-extensible | 12     |
 | Shared metadata — SEAD-administered   | 21     |

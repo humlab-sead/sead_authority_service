@@ -30,7 +30,7 @@ The table below maps each CM concept to its implementation anchor. This is the p
 | **Tracked Identity**    | `tracked_identities` table | SEAD-side UUID anchor; lifecycle per [CM § Tracked Identity Lifecycle](./CONCEPTUAL_MODEL.md#tracked-identity-lifecycle)  |
 | **Binding**             | `bindings` table           | Links Source Identity → Tracked Identity; belongs to one Binding Set                                                     |
 | **Binding Set**         | `binding_sets` table       | Atomic batch of Bindings; owns lifecycle, audit, and Change Request reference (FR-26)                                     |
-| **Identity Resolution** | Service operation          | Stateless process; outcomes expressed as a Binding Set containing Bindings and unresolved cases                           |
+| **Identity Resolution** | Service operation          | Stateless process; outcomes expressed as a Binding Set containing Bindings (rejected submissions receive diagnostics)     |
 | **Change Request**      | External reference (by name) | Owned by SEAD Change Control System (Sqitch); SIMS records association between Bindings and Change Request name          |
 
 ### Key structural principles
@@ -86,17 +86,30 @@ Represents a persistent identity for a domain entity as expressed within a Sourc
 
 A Source Identity may be observed in multiple Submissions. A junction table (`submission_source_identities`) records which Submission carried which Source Identities, reflecting the M:N relation from [CM § Relations](./CONCEPTUAL_MODEL.md#relations-and-cardinalities) (relation 3).
 
+### Submission–Source Identity Junction
+
+Records which Source Identities were carried by which Submissions.
+
+| Column                        | Purpose                                                  |
+|-------------------------------|----------------------------------------------------------|
+| `submission_uuid` (PK, FK)    | References `submissions`                                 |
+| `source_identity_uuid` (PK, FK) | References `source_identities`                        |
+| `observed_at`                 | Timestamp when this Source Identity was observed in this Submission |
+
+The composite primary key `(submission_uuid, source_identity_uuid)` enforces uniqueness.
+
 ### Tracked Identities
 
 Represents the SEAD-side identity anchor for a domain entity.
 
-| Column | Purpose |
-|---|---|
-| `tracked_identity_uuid` (PK) | The SEAD universal identity (UUID) for this entity |
-| `entity_type` | Target SEAD entity type |
-| `sead_internal_id` (nullable) | The SEAD integer PK, once materialized |
-| `lifecycle_state` | `allocated`, `pending_materialization`, `materialized`, `invalidated` |
-| Audit columns | `created_at`, `created_by`, `materialized_at` |
+| Column                        | Purpose                                                               |
+|-------------------------------|-----------------------------------------------------------------------|
+| `tracked_identity_uuid` (PK)  | The SEAD universal identity (UUID) for this entity                    |
+| `entity_type`                 | Target SEAD entity type                                               |
+| `sead_internal_id` (nullable) | The SEAD integer PK, once materialized                                |
+| `content_hash` (nullable)     | Opaque aggregate content hash for change detection (FR-24)            |
+| `lifecycle_state`             | `allocated`, `pending_materialization`, `materialized`, `invalidated` |
+| Audit columns                 | `created_at`, `created_by`, `materialized_at`                         |
 
 The `tracked_identity_uuid` **is** the SEAD universal identity (FR-1). Where SEAD entity tables already have `{entity}_uuid` columns, those columns are reused directly — no new UUID columns are introduced (FR-3). The `sead_internal_id` maps to the relational PK (FR-2).
 
@@ -155,10 +168,10 @@ Implements step 1 of the decision flow: **Identity Resolution**.
 2. Evaluate incoming identity signals against existing Tracked Identities using matching rules appropriate to the entity type:
    - Provider-owned entities: match by provider key or business key.
    - Shared metadata entities: reconciliation against existing SEAD definitions (FR-17). Reconciliation procedure is owned by the SEAD Shape Shifter workflow, not SIMS (see design decision below).
-   - If reconciliation fails for shared metadata, surface unresolved state rather than allocating (FR-20).
-3. Return one of: `matched` (existing Tracked Identity found), `unresolved` (no match, allocation blocked by policy), or `new` (no match, allocation permitted).
+   - If reconciliation fails for shared metadata, reject the submission with diagnostic information rather than allocating (FR-20).
+3. Return one of: `matched` (existing Tracked Identity found) or `new` (no match, allocation permitted). For shared metadata entities where policy blocks allocation, resolution rejects the submission.
 
-**Design decision:** Specifying the procedure for reconciling shared metadata entities is out of scope for SIMS. Reconciliation is a concern of the SEAD Shape Shifter workflow, which performs semi-automatic reconciliation of incoming shared entities and generates a separate Change Request for them as part of the submission workflow. SIMS consumes the reconciliation outcome (matched or unresolved) but does not define matching rules.
+**Design decision:** Specifying the procedure for reconciling shared metadata entities is out of scope for SIMS. Reconciliation is a concern of the SEAD Shape Shifter workflow, which performs semi-automatic reconciliation of incoming shared entities and generates a separate Change Request for them as part of the submission workflow. SIMS consumes the reconciliation outcome (matched or rejected) but does not define matching rules.
 
 **Idempotency:** The same identity signals within the same scope always produce the same resolution outcome (FR-12, FR-13).
 
@@ -176,12 +189,11 @@ Implements step 2 of the decision flow: **Binding**.
 - For each resolved Source Identity:
   - If `matched`: create a Binding within the set linking the Source Identity to the existing Tracked Identity.
   - If `new`: allocate a new Tracked Identity (mint UUID; optionally reserve integer PK), then create a Binding within the set.
-  - If `unresolved`: record the unresolved case for later review. No Binding is created for this Source Identity.
 
 **Policy enforcement** (applied between Resolution and Binding per [DV § Policy boundary](./DESIGN_VIEW.md#policy-boundary)):
 
 - Evaluate whether a provider-supplied UUID is accepted as the SEAD universal identity or retained only as a provider key (FR-11).
-- Evaluate whether an unmatched shared metadata entity triggers allocation or is held as unresolved.
+- Evaluate whether an unmatched shared metadata entity triggers allocation or causes the submission to be rejected with diagnostics.
 
 **Design decision:** Identity policy (FR-11) is stored as a configuration file for the initial release. This is sufficient given the small number of entity types and the low rate of policy changes. The representation may evolve to a database table or API-managed resource in future releases if runtime administration becomes necessary. Policy enforcement may also become a Shape Shifter responsibility as part of its quality-assurance workflow, in which case SIMS would consume policy decisions rather than evaluate them directly.
 
@@ -300,7 +312,7 @@ Rollout is incremental. Each phase stabilizes before the next begins.
 
 2. **Pilot**: Select a small set of tracked entity types (e.g. sites, sample groups). Implement resolution and binding for provider-owned entities. Validate idempotency and lifecycle correctness.
 
-3. **Shared metadata**: Extend resolution to shared metadata entities (classifiers, lookup tables). Implement reconciliation and unresolved-state surfacing.
+3. **Shared metadata**: Extend resolution to shared metadata entities (classifiers, lookup tables). Implement reconciliation and rejection-with-diagnostics for unmatched entities.
 
 4. **Entity table integration**: Reuse existing `{entity}_uuid` columns on tracked SEAD entity tables. Add UUID columns only where missing. Pre-existing UUIDs are treated as authoritative without retroactive Binding records.
 

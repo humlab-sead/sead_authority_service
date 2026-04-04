@@ -46,7 +46,7 @@ The decision flow maps to the conceptual model's core concepts (see [CM § Core 
 
 1. **Identity Resolution** — Determine whether the incoming identity signals (within a **Source Scope**) match an existing **Tracked Identity**. For shared metadata entities, this includes reconciliation against SEAD's existing definitions. Resolution evaluates **Source Identity** signals: local IDs, business keys, provider keys, authority keys.
 
-2. **Binding** — If resolution finds a match, create a **Proposed Binding** linking the Source Identity to the Tracked Identity. If no match exists, allocate a new Tracked Identity and bind to it. For shared metadata entities, allocation may be blocked: unresolved state is surfaced rather than silently creating a new identity (FR-20). The Bindings produced by a resolution batch are grouped into a **Binding Set** — the atomic unit that is confirmed or rejected together (FR-26). Binding Set lifecycle is defined in [CM § Binding Set Lifecycle](./CONCEPTUAL_MODEL.md#binding-set-lifecycle).
+2. **Binding** — If resolution finds a match, create a **Proposed Binding** linking the Source Identity to the Tracked Identity. If no match exists, allocate a new Tracked Identity and bind to it. For shared metadata entities, allocation is blocked: the submission is rejected with diagnostic information rather than silently creating a new identity (FR-20). The Bindings produced by a resolution batch are grouped into a **Binding Set** — the atomic unit that is confirmed or rejected together (FR-26). Binding Set lifecycle is defined in [CM § Binding Set Lifecycle](./CONCEPTUAL_MODEL.md#binding-set-lifecycle).
 
 3. **Change Request** — Once identity correspondence is established through a confirmed Binding Set, the Binding Set is associated with a **Change Request** — an external object owned by the SEAD Change Control System (Sqitch), referenced by unique name. The Change Request governs business-data mutation; it does not alter identity correspondence. SIMS records the association but does not manage the Change Request lifecycle. This separation ensures identity allocation remains independent of data mutation (FR-25) and supports aggregate-level change detection (FR-24).
 
@@ -55,7 +55,7 @@ The decision flow maps to the conceptual model's core concepts (see [CM § Core 
 Identity policy is applied between steps 1 and 2. The policy governs:
 
 - whether a provider-supplied UUID is accepted as the SEAD universal identity or recorded only as a provider key (FR-11),
-- whether an unmatched shared metadata entity triggers allocation or is held as unresolved.
+- whether an unmatched shared metadata entity triggers allocation or causes the submission to be rejected with diagnostics.
 
 Policy is administrable and may vary by entity type.
 

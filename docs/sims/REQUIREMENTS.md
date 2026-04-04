@@ -176,7 +176,7 @@ FR-18. The system shall support many-to-many associations between tracked entiti
 
 FR-19. The system shall distinguish owned child value objects from independently tracked entities.
 
-FR-20. The system shall surface unresolved reconciliation state when an incoming shared metadata or classifier entity cannot be matched to an existing SEAD entity, rather than silently allocating a new identity.
+FR-20. The system shall reject a submission with diagnostic information when an incoming shared metadata or classifier entity cannot be matched to an existing SEAD entity, rather than silently allocating a new identity.
 
 ### Submission and traceability requirements
 
@@ -226,7 +226,7 @@ Expected outcome:
 - the system does not treat those values as provider-owned entities by default,
 - instead it attempts reconciliation against shared SEAD metadata,
 - if matched, the shared SEAD entity is reused,
-- if not matched, the system surfaces that unresolved state for later handling according to SEAD policy.
+- if not matched, the system rejects the submission with diagnostic information identifying the unmatched entities, according to SEAD policy.
 
 ### Scenario 3: Entity association rather than ownership
 

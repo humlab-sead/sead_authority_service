@@ -75,7 +75,7 @@ A **Binding Set** is the atomic unit of identity resolution output. It groups on
 
 ### Identity Resolution
 
-**Identity Resolution** is the process by which SEAD determines whether a Source Identity corresponds to an existing Tracked Identity, requires a new Tracked Identity to be allocated, or cannot yet be resolved. It operates within the context of a Source Scope and evaluates identity signals such as local identifiers, authority identifiers, business keys, alternative identifiers, and other matching evidence. Its outcomes are expressed through Bindings and unresolved cases.
+**Identity Resolution** is the process by which SEAD determines whether a Source Identity corresponds to an existing Tracked Identity or requires a new Tracked Identity to be allocated. It operates within the context of a Source Scope and evaluates identity signals such as local identifiers, authority identifiers, business keys, alternative identifiers, and other matching evidence. Its outcomes are expressed through Bindings. For shared metadata entities where reconciliation fails, the submission is rejected with diagnostic information rather than silently allocating a new identity.
 
 - May be performed by rules, matching logic, or manual review
 - Does not require materialization: resolution may succeed before the entity exists in SEAD
@@ -211,7 +211,7 @@ A Tracked Identity has been allocated and bound within a Confirmed Binding Set, 
 ## Deferred Issues
 
 1. **Source Identity Observation**: an explicit per-submission observation concept may be needed if per-delivery state tracking becomes important.
-2. **Unresolved case handling**: formal treatment of unresolved outcomes and associated review or work items.
+2. ~~**Unresolved case handling**~~: Removed — unmatched shared metadata entities are rejected with diagnostic information rather than held in an intermediate state. No separate handling or review queue is needed.
 3. **Merge and split semantics**: two Source Identities later found to be the same entity, or one later split into two.
 4. **Binding evidence model**: detailed structure for recording the basis of binding decisions.
 5. **Change Request integration**: detailed rules for how SIMS associates Binding Sets with externally managed Change Requests.
