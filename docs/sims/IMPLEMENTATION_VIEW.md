@@ -183,6 +183,8 @@ Implements step 2 of the decision flow: **Binding**.
 - Evaluate whether a provider-supplied UUID is accepted as the SEAD universal identity or retained only as a provider key (FR-11).
 - Evaluate whether an unmatched shared metadata entity triggers allocation or is held as unresolved.
 
+**Design decision:** Identity policy (FR-11) is stored as a configuration file for the initial release. This is sufficient given the small number of entity types and the low rate of policy changes. The representation may evolve to a database table or API-managed resource in future releases if runtime administration becomes necessary. Policy enforcement may also become a Shape Shifter responsibility as part of its quality-assurance workflow, in which case SIMS would consume policy decisions rather than evaluate them directly.
+
 Proposed Binding Sets may be confirmed automatically (for provider-owned entities with high-confidence matches) or require review (for shared metadata entities or low-confidence matches).
 
 ### 3. Associate with Change Request
@@ -274,9 +276,7 @@ These questions must be resolved before DDL is finalized and core operations are
 
 2. **Change-detection hash scope**: What entity data constitutes the aggregate payload for hashing? Which owned child rows are included, whether associations count, and which fields are excluded. Depends on aggregate boundary definitions.
 
-3. **Identity policy representation**: How is the administrable identity policy (FR-11) stored and managed? Configuration file, database table, or API-managed resource?
-
-4. **Allocation origin model**: Not all identity operations originate from provider submissions. SEAD administrator actions and Sqitch change requests are additional origins. The Source Scope / Submission model may need scopes that represent internal SEAD origins.
+3. **Allocation origin model**: Not all identity operations originate from provider submissions. SEAD administrator actions and Sqitch change requests are additional origins. The Source Scope / Submission model may need scopes that represent internal SEAD origins.
 
 ---
 
