@@ -44,7 +44,7 @@ The decision flow maps to the conceptual model's core concepts (see [CM § Core 
 
 2. **Binding** — If resolution finds a match, create a **Proposed Binding** linking the Source Identity to the Tracked Identity. If no match exists, allocate a new Tracked Identity and bind to it. For shared metadata entities, allocation may be blocked: unresolved state is surfaced rather than silently creating a new identity (FR-20). Bindings follow the lifecycle defined in [CM § Binding Lifecycle](./CONCEPTUAL_MODEL.md#binding-lifecycle).
 
-3. **Change Request** — Once identity correspondence is established through confirmed Bindings, proposed domain-level changes are bundled into a **Change Request** for review, approval, or rejection. The Change Request governs business-data mutation; it does not alter identity correspondence. This separation ensures identity allocation remains independent of data mutation (FR-25) and supports aggregate-level change detection (FR-24).
+3. **Change Request** — Once identity correspondence is established through confirmed Bindings, the confirmed Bindings are associated with a **Change Request** — an external object owned by the SEAD Change Control System (Sqitch), referenced by unique name. The Change Request governs business-data mutation; it does not alter identity correspondence. SIMS records the association but does not manage the Change Request lifecycle. This separation ensures identity allocation remains independent of data mutation (FR-25) and supports aggregate-level change detection (FR-24).
 
 ### Policy boundary
 

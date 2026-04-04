@@ -74,10 +74,10 @@ A **Binding** is an explicit, managed assertion that a given Source Identity cor
 
 ### Change Request
 
-A **Change Request** is a governed package of proposed domain-level changes to SEAD, created after identity resolution has determined how relevant source identities correspond to tracked identities. It is the unit of review, quality assurance, approval, rejection, or deferral before ingestion into the SEAD data model. A Change Request does not define identity correspondence; it consumes correspondence already established through Identity Resolution and Binding.
+A **Change Request** is a governed package of proposed domain-level changes to SEAD. It is owned and managed by the SEAD Change Control System (powered by Sqitch) and referenced by a unique name (the Sqitch change name). SIMS does not own or manage Change Requests; it associates confirmed Bindings with a Change Request to record which identity correspondences support which domain changes. A Change Request does not define identity correspondence; it consumes correspondence already established through Identity Resolution and Binding.
 
-The Change Request is part of the SEAD Change Control System.
-
+- Owned by the SEAD Change Control System, not by SIMS
+- Referenced by unique name
 - May be accepted, rejected, blocked, or deferred by QA
 - May include creates (materializing new entities) and updates
 - A rejected or deferred Change Request does not invalidate prior identity resolution history
@@ -196,7 +196,7 @@ A Tracked Identity has been allocated and bound, but the Change Request arising 
 2. **Unresolved case handling**: formal treatment of unresolved outcomes and associated review or work items.
 3. **Merge and split semantics**: two Source Identities later found to be the same entity, or one later split into two.
 4. **Binding evidence model**: detailed structure for recording the basis of binding decisions.
-5. **Change Request lifecycle**: formal states and transitions for Change Requests.
+5. **Change Request integration**: detailed rules for how SIMS associates Bindings with externally managed Change Requests.
 6. **Materialized SEAD entity modeling**: the relationship between a Tracked Identity and the actual SEAD domain entity.
 7. **Detailed policy for binding review**: governance rules for when and how Proposed Bindings are reviewed and Confirmed.
 
@@ -212,4 +212,4 @@ A Tracked Identity has been allocated and bound, but the Change Request arising 
 | **Tracked Identity** | Expresses how SEAD identifies that entity. |
 | **Identity Resolution** | Determines whether and how the two correspond. |
 | **Binding** | Records that correspondence as a historical governed assertion. |
-| **Change Request** | Bundles the resulting domain changes for review and ingestion. |
+| **Change Request** | External governed object (Sqitch) that bundles domain changes; SIMS references it by name. |
