@@ -30,6 +30,10 @@ The identity system anchors identity at the entity level only. Owned child struc
 
 Provider keys, business keys, and authority keys are identity *signals* (see [CM § Source Identity](./CONCEPTUAL_MODEL.md#source-identity)). They contribute to resolution but must never replace the canonical SEAD universal identity. A resolved SEAD UUID is the authoritative reference; external keys are mappings attached to it.
 
+### 3. A Change Request must not be applied until all referenced identities are resolved
+
+A Change Request must not be applied to SEAD until every entity it references has a resolved identity expressed through a confirmed Binding Set. This applies regardless of whether the entities originate from an external provider submission or from internal SEAD administration. The manual curation of internally administered entities is out of scope for SIMS — it is the responsibility of the submitting system (Shape Shifter internal workflow, a dedicated admin tool, or another client). SIMS provides the identity resolution API; the tooling that prepares and submits internal entities is a separate concern.
+
 ---
 
 ## Architectural View

@@ -274,11 +274,21 @@ The current design intent is that SIMS consumes Shape Shifter's target model as 
 
 ---
 
-## Open Implementation Questions
+## Internal Origins
 
-These questions must be resolved before DDL is finalized and core operations are coded.
+Not all identity operations originate from external provider submissions. SEAD administrator actions (e.g. adding a new method or classifier) and infrastructure changes (e.g. Sqitch migrations) also produce entities that require resolved identities before they can enter a Change Request (FR-27).
 
-1. **Allocation origin model**: Not all identity operations originate from provider submissions. SEAD administrator actions and Sqitch change requests are additional origins. The Source Scope / Submission model may need scopes that represent internal SEAD origins.
+### Approach
+
+Internal origins use the same Source Scope / Submission model as external providers. Well-known internal Source Scopes represent SEAD-internal origins:
+
+- `sead://admin` — SEAD administrator actions (adding or modifying classifiers, methods, etc.)
+- `sead://migration` — Sqitch-driven schema or data migrations
+- `sead://reconciliation` — Reconciliation outputs
+
+Internal actions create Submissions within these scopes, pass through normal identity resolution, produce Binding Sets, and associate with Change Requests — the same pipeline as external provider data. No special-case handling is needed in the data model or core operations.
+
+**Design decision:** The tooling for manually curating SEAD-administered entities and submitting them through SIMS is out of scope. SIMS provides the identity resolution API and enforces the requirement that a Change Request must reference confirmed Binding Sets (FR-27). How internal entities are prepared and submitted is the responsibility of the curation tool — whether that is an internal Shape Shifter workflow (treating SEAD admin data the same way as external provider data), a dedicated admin tool, or a lightweight CLI client. This is a tooling gap, not a SIMS design gap.
 
 ---
 

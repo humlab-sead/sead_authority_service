@@ -196,6 +196,10 @@ FR-25. The system shall keep identity allocation logic independent of business-d
 
 FR-26. The system shall group the Bindings produced by an identity resolution batch into a Binding Set that is confirmed or rejected as an atomic unit.
 
+### Change Request completeness requirements
+
+FR-27. The system shall require that all entities referenced by a Change Request have resolved identities expressed through confirmed Binding Sets before the Change Request can be applied to SEAD. This applies to entities originating from external provider submissions and from internal SEAD administration alike.
+
 ---
 
 ## Usage Scenarios
