@@ -96,7 +96,9 @@ Represents the SEAD-side identity anchor for a domain entity.
 | `lifecycle_state` | `allocated`, `pending_materialization`, `materialized`, `invalidated` |
 | Audit columns | `created_at`, `created_by`, `materialized_at` |
 
-The `tracked_identity_uuid` **is** the SEAD universal identity (FR-1). Where SEAD entity tables already have `{entity}_uuid` columns, those columns hold this value (FR-3). The `sead_internal_id` maps to the relational PK (FR-2).
+The `tracked_identity_uuid` **is** the SEAD universal identity (FR-1). Where SEAD entity tables already have `{entity}_uuid` columns, those columns are reused directly — no new UUID columns are introduced (FR-3). The `sead_internal_id` maps to the relational PK (FR-2).
+
+**Design decision:** Creating historical Binding records for UUIDs that predate SIMS deployment is out of scope. Pre-existing `{entity}_uuid` values are treated as authoritative Tracked Identities without provenance tracking.
 
 ### Bindings
 
@@ -248,17 +250,15 @@ These questions must be resolved before DDL is finalized and core operations are
 
 1. **Business-key serialization**: What normalization and serialization rules govern business-key construction per entity type? (Affects Source Identity uniqueness and idempotency.)
 
-2. **Existing UUID columns**: Some SEAD tables already have `{entity}_uuid` columns. How are those reconciled with the Tracked Identity UUID? Do they become the same column, or does a migration align them?
+2. **Change-detection hash scope**: What entity data constitutes the aggregate payload for hashing? Which owned child rows are included, whether associations count, and which fields are excluded. Depends on aggregate boundary definitions.
 
-3. **Change-detection hash scope**: What entity data constitutes the aggregate payload for hashing? Which owned child rows are included, whether associations count, and which fields are excluded. Depends on aggregate boundary definitions.
+3. **Reconciliation mechanics**: For shared metadata entities, what matching rules apply (exact, fuzzy, configurable per type)? Who resolves unresolved state (automated retry, manual curation, API callback)?
 
-4. **Reconciliation mechanics**: For shared metadata entities, what matching rules apply (exact, fuzzy, configurable per type)? Who resolves unresolved state (automated retry, manual curation, API callback)?
+4. **Identity policy representation**: How is the administrable identity policy (FR-11) stored and managed? Configuration file, database table, or API-managed resource?
 
-5. **Identity policy representation**: How is the administrable identity policy (FR-11) stored and managed? Configuration file, database table, or API-managed resource?
+5. **Allocation origin model**: Not all identity operations originate from provider submissions. SEAD administrator actions and Sqitch change requests are additional origins. The Source Scope / Submission model may need scopes that represent internal SEAD origins.
 
-6. **Allocation origin model**: Not all identity operations originate from provider submissions. SEAD administrator actions and Sqitch change requests are additional origins. The Source Scope / Submission model may need scopes that represent internal SEAD origins.
-
-7. **Change Request integration**: What information beyond the Sqitch change name should SIMS record when associating Bindings with a Change Request? Should SIMS query the Change Control System for status, or only store the reference?
+6. **Change Request integration**: What information beyond the Sqitch change name should SIMS record when associating Bindings with a Change Request? Should SIMS query the Change Control System for status, or only store the reference?
 
 ---
 
@@ -272,7 +272,7 @@ Rollout is incremental. Each phase stabilizes before the next begins.
 
 3. **Shared metadata**: Extend resolution to shared metadata entities (classifiers, lookup tables). Implement reconciliation and unresolved-state surfacing.
 
-4. **Entity table integration**: Add or align `{entity}_uuid` columns on tracked SEAD entity tables. Backfill existing rows. Establish the Tracked Identity → SEAD internal identity mapping for materialized entities.
+4. **Entity table integration**: Reuse existing `{entity}_uuid` columns on tracked SEAD entity tables. Add UUID columns only where missing. Pre-existing UUIDs are treated as authoritative without retroactive Binding records.
 
 5. **Change Request integration**: Record associations between confirmed Bindings and externally managed Change Requests (Sqitch). Validate integration with the SEAD Change Control System.
 
