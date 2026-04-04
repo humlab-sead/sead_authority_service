@@ -102,7 +102,7 @@ From CONCEPTUAL_MODEL.md § Deferred Issues — 7 items.
 | # | Deferred Issue                                     | Blocks Phase 1?                                                                                |
 |---|----------------------------------------------------|------------------------------------------------------------------------------------------------|
 | 1 | Source Identity Observation (per-submission state) | No — junction table handles M:N                                                                |
-| 2 | ~~Unresolved case handling~~                       | **No** — Removed. Unmatched shared metadata entities are rejected with diagnostics; no intermediate state or review queue needed. |
+| 2 | ~~Unresolved case handling~~                       | **No** — Removed. Unmatched shared metadata entities are rejected with diagnostics;            |
 | 3 | Merge and split semantics                          | No — future concern                                                                            |
 | 4 | Binding evidence model                             | No — `provenance` JSONB is sufficient for now                                                  |
 | 5 | CR integration details                             | No — association is by name, deliberately loose                                                |
@@ -132,7 +132,7 @@ This is the weakest document in the suite:
 |---------------------------------------------|---------------------------|------------------------------------------------------|
 | ~~Content hash column on `tracked_identities`~~ | ~~Must fix~~ Fixed    | ~~Add `content_hash TEXT NULL` column to DDL~~       |
 | ~~`submission_source_identities` junction DDL~~ | ~~Must fix~~ Fixed    | ~~Add explicit column definitions~~                  |
-| ~~Unresolved case storage~~                        | ~~**Should fix**~~ Resolved | Removed — unmatched entities are rejected, no intermediate state |
+| ~~Unresolved case storage~~                 | **Resolved**              | Removed — unmatched entities are rejected, no intermediate state |
 | API endpoint contracts                      | **Phase 1 task**          | Not a doc gap — stated as deferred in REQUIREMENTS   |
 | Index strategy                              | **During implementation** | Can be specified in DDL scripts                      |
 | TRACKED_ENTITIES.md data errors             | **Should fix**            | Duplicate rows, summary count                        |
@@ -144,6 +144,6 @@ This is the weakest document in the suite:
 The documentation is **implementation-ready for Phase 1** (infrastructure + pilot per the Rollout plan). The conceptual model, requirements, design rules, and storage design are internally consistent and sufficiently detailed to write DDL + service code.
 
 **Before starting code, fix these 3 items:**
-1. Add `content_hash` column to `tracked_identities` table specification
-2. Add `submission_source_identities` junction table DDL
-3. Fix TRACKED_ENTITIES.md data errors (duplicate rows, summary count)
+1. **Resolved** Add `content_hash` column to `tracked_identities` table specification
+2. **Resolved** Add `submission_source_identities` junction table DDL
+3. **Resolved** Fix TRACKED_ENTITIES.md data errors (duplicate rows, summary count)

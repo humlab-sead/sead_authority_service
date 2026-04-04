@@ -128,6 +128,7 @@ markers = [
   "integration: marks tests that hit external services (e.g., Ollama, DB)",
   "debug: marks tests for debugging purposes (typically run manually)",
   "manual: marks tests requiring manual setup (e.g., real database)",
+  "identity: marks tests for the SIMS identity module",
 ]
 # python_files = "test_*.py" "*_test.py"
 # Uncomment to see logs during test runs:
