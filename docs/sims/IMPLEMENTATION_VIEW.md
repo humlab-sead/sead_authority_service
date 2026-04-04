@@ -12,7 +12,7 @@ Domain concepts, functional requirements, lifecycles, and design rules are not r
 
 ## Technology Context
 
-- **PostgreSQL 12+** with `uuid-ossp` or `pgcrypto` for UUID generation.
+- **PostgreSQL 16+** with `uuid-ossp` or `pgcrypto` for UUID generation.
 - **Sqitch** for database change control and migration sequencing.
 - **Python REST API** (FastAPI) as the service layer, hosted in the `sead_authority_service` repository (`src/identity/`).
 
@@ -106,13 +106,13 @@ The `tracked_identity_uuid` **is** the SEAD universal identity (FR-1). Where SEA
 
 Represents the atomic batch of identity resolution outcomes. Owns lifecycle, audit, and Change Request reference.
 
-| Column | Purpose |
-|---|---|
-| `binding_set_uuid` (PK) | Unique identifier |
-| `submission_uuid` (FK, nullable) | The Submission that triggered this resolution batch |
-| `lifecycle_state` | `proposed`, `confirmed`, `rejected`, `superseded`, `invalidated` |
+| Column                           | Purpose                                                                                           |
+|----------------------------------|---------------------------------------------------------------------------------------------------|
+| `binding_set_uuid` (PK)          | Unique identifier                                                                                 |
+| `submission_uuid` (FK, nullable) | The Submission that triggered this resolution batch                                               |
+| `lifecycle_state`                | `proposed`, `confirmed`, `rejected`, `superseded`, `invalidated`                                  |
 | `change_request_name` (nullable) | Sqitch change name linking this Binding Set to a Change Request in the SEAD Change Control System |
-| Audit columns | `created_at`, `created_by`, `confirmed_at` |
+| Audit columns                    | `created_at`, `created_by`, `confirmed_at`                                                        |
 
 Lifecycle transitions follow [CM § Binding Set Lifecycle](./CONCEPTUAL_MODEL.md#binding-set-lifecycle). All Bindings within a set share the set’s lifecycle state.
 
@@ -120,14 +120,14 @@ Lifecycle transitions follow [CM § Binding Set Lifecycle](./CONCEPTUAL_MODEL.md
 
 Represents one source-to-tracked identity correspondence within a Binding Set.
 
-| Column | Purpose |
-|---|---|
-| `binding_uuid` (PK) | Unique identifier |
-| `binding_set_uuid` (FK) | The owning Binding Set |
-| `source_identity_uuid` (FK) | The Source Identity |
-| `tracked_identity_uuid` (FK) | The Tracked Identity |
-| `method` | How the binding was established (e.g. `exact_match`, `business_key`, `manual`, `policy`) |
-| `provenance` (JSONB, nullable) | Supporting evidence, resolution context |
+| Column                         | Purpose                                                                                  |
+|--------------------------------|------------------------------------------------------------------------------------------|
+| `binding_uuid` (PK)            | Unique identifier                                                                        |
+| `binding_set_uuid` (FK)        | The owning Binding Set                                                                   |
+| `source_identity_uuid` (FK)    | The Source Identity                                                                      |
+| `tracked_identity_uuid` (FK)   | The Tracked Identity                                                                     |
+| `method`                       | How the binding was established (e.g. `exact_match`, `business_key`, `manual`, `policy`) |
+| `provenance` (JSONB, nullable) | Supporting evidence, resolution context                                                  |
 
 A Source Identity normally has at most one Binding within a current confirmed Binding Set at any time.
 
@@ -205,11 +205,15 @@ Implements step 3 of the decision flow: **Change Request** association.
 
 Supports FR-24 (aggregate-level change detection) and FR-25 (identity independent of mutation).
 
+**Input:** A Tracked Identity and a content hash provided by the submitting system.
+
 **Behavior:**
 
-- Compare incoming content against an existing materialized Tracked Identity.
-- Hash scope and normalization rules are per entity type and per aggregate boundary.
-- Returns: `insert` (new entity), `update` (content differs), or `skip` (content unchanged).
+- The submitting system (typically Shape Shifter) computes a deterministic content hash over the aggregate payload — the root entity row plus all owned child rows as defined by the target model's `aggregate_parent` hierarchy.
+- SIMS receives the content hash as an opaque fingerprint and compares it against the stored hash for the Tracked Identity.
+- Returns: `insert` (no prior hash — new entity), `update` (hash differs — content changed), or `skip` (hash matches — content unchanged).
+
+**Design decision:** Aggregate content hashing (field selection, child-row inclusion, normalization, ordering) is the responsibility of the submitting system, not SIMS. The target model's `aggregate_parent` field defines aggregate boundaries; Shape Shifter already uses this metadata for topological processing and is the natural place to own hash computation. Routing all aggregate data through SIMS solely for hashing would conflate identity management with data transformation. SIMS requires only that the hash is deterministic — the same aggregate content always produces the same hash — to support reliable change detection.
 
 This operation feeds into Change Request association: detected changes become proposed updates associated with a Change Request.
 
@@ -258,7 +262,7 @@ The identity system needs to know which SEAD tables are tracked entities, their 
 |---------------------------|----------------------------------------------------------------------------------------------|
 | Entity type and PK column | Target for Tracked Identity allocation                                                       |
 | Entity subtype            | Governs intake rules and resolution strategy (provider-owned, shared metadata, relationship) |
-| Aggregate membership      | Defines change-detection scope and update semantics                                          |
+| Aggregate membership      | Defines aggregate boundaries (used by submitting system for content hashing)                  |
 | FK dependencies           | Determines allocation order within a Submission                                              |
 | Business-key fields       | Enables business-key serialization and resolution                                            |
 
@@ -274,9 +278,7 @@ The current design intent is that SIMS consumes Shape Shifter's target model as 
 
 These questions must be resolved before DDL is finalized and core operations are coded.
 
-1. **Change-detection hash scope**: What entity data constitutes the aggregate payload for hashing? Which owned child rows are included, whether associations count, and which fields are excluded. Depends on aggregate boundary definitions.
-
-2. **Allocation origin model**: Not all identity operations originate from provider submissions. SEAD administrator actions and Sqitch change requests are additional origins. The Source Scope / Submission model may need scopes that represent internal SEAD origins.
+1. **Allocation origin model**: Not all identity operations originate from provider submissions. SEAD administrator actions and Sqitch change requests are additional origins. The Source Scope / Submission model may need scopes that represent internal SEAD origins.
 
 ---
 
