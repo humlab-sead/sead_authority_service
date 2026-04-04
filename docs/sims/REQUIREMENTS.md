@@ -145,23 +145,7 @@ Characteristics:
 
 ### Entity and value object distinction
 
-This document uses definitions grounded in domain-driven design.
-
-**An entity** is a domain object that:
-
-- has stable identity that persists across state changes, submissions, and system boundaries,
-- can be uniquely identified independent of its current attribute values,
-- has a meaningful lifecycle that may include creation, update, and deprecation,
-- can be referenced before its full state is known,
-- must be reconciled and de-duplicated when the same thing may arrive from multiple sources.
-
-**A value object** is a domain object that:
-
-- is defined entirely by its attributes,
-- is interchangeable with any other value object carrying the same attribute values,
-- has no independent lifecycle or stable identity,
-- belongs to an owning entity as part of that entity's aggregate state,
-- is replaced rather than independently updated or reconciled.
+This document uses domain-driven design (DDD) concepts as defined in [CONCEPTUAL_MODEL.md § Domain Modeling Foundations](./CONCEPTUAL_MODEL.md#domain-modeling-foundations): **entity**, **value object**, and **aggregate**.
 
 **A tracked entity** is an entity for which this system manages stable UUID identity. Not every domain object needs to be tracked. Determining which SEAD objects qualify as tracked entities is a SEAD domain-modeling task, deferred to SEAD model specification work. That work may draw on Shape Shifter's target model conformance definitions as an input.
 
@@ -208,6 +192,17 @@ This is important for relationships such as site-to-location where the schema ex
 #### Reconciliation linkage
 
 A provider object or classifier is matched to an existing SEAD object without implying ownership.
+
+### Conceptual model alignment
+
+The domain concepts above are elaborated in [CONCEPTUAL_MODEL.md](./CONCEPTUAL_MODEL.md), which defines the full conceptual model for SIMS. The following CM concepts are relevant to how these requirements are realized:
+
+- **Source Scope**: the external namespace (system, provider, dataset) within which source identifiers are unique and interpretable. This is the identity context implied by "identity scope" in FR-13 and "submission context" in the API concepts.
+- **Binding**: the explicit, governed correspondence between a source-side identity and a SEAD-side tracked identity. Bindings are the decision objects that record the outcome of identity resolution (FR-12, FR-14) and support traceability (FR-22, FR-23).
+- **Change Request**: the governed package of proposed domain changes created after identity resolution. This is the mechanism through which identity decisions are separated from business-data mutation (FR-25) and supports update workflows (FR-24).
+- **Identity Resolution**: the process that evaluates identity evidence and determines whether to reuse an existing tracked identity, allocate a new one, or leave the case unresolved. This process implements the resolution and allocation logic required by FR-6 through FR-11.
+
+See [CONCEPTUAL_MODEL.md § Core Concepts](./CONCEPTUAL_MODEL.md#core-concepts) for full definitions, relations, and lifecycle semantics.
 
 ---
 
@@ -278,6 +273,18 @@ FR-25. The system shall keep identity allocation logic independent of business-d
 ---
 
 ## Usage Scenarios
+
+> **Cross-reference**: [CONCEPTUAL_MODEL.md § Canonical Use Cases](./CONCEPTUAL_MODEL.md#canonical-use-cases) provides identity-centered use cases that complement these requirements-level scenarios. The mapping is:
+>
+> | REQ scenario | CM use case(s) |
+> |---|---|
+> | Scenario 1 (provider submits entity data) | UC 2 (new source identity matched to existing tracked identity), UC 3 (new source identity requiring new tracked identity) |
+> | Scenario 2 (classifier reconciliation) | UC 2 (matched to existing tracked identity), plus unresolved case handling ([CM deferred issue 2](./CONCEPTUAL_MODEL.md#deferred-issues)) |
+> | Scenario 3 (association, not ownership) | Not identity-specific; modeled through CM relations (independent tracked identities with separate bindings) |
+> | Scenario 4 (authority-backed reconciliation) | UC 2 (matched via authority key as identity signal) |
+> | — | UC 1 (existing source identity with existing binding) — covers repeat submissions, not explicitly a REQ scenario |
+> | — | UC 4 (confirmed binding later corrected) — covers error correction, not explicitly a REQ scenario |
+> | — | UC 5 (change request rejected) — covers governance outcomes, not explicitly a REQ scenario |
 
 ### Scenario 1: Provider submits entity data
 

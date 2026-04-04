@@ -4,7 +4,21 @@
 
 The SEAD Identity Management System (SIMS) separates externally expressed identity from SEAD-managed identity and makes the correspondence between them explicit, governed, and historically traceable. Source data is received through **Submissions**, interpreted within a **Source Scope**, and represented through **Source Identities**. These are resolved against SEAD-managed **Tracked Identities** through the **Identity Resolution** process. The result is recorded as historical **Bindings**. Once identities have been resolved, proposed domain changes may be bundled into a **Change Request** for review, quality assurance, and possible ingestion into SEAD.
 
-The model aligns with domain-driven design principles: tracked entities are domain entities or aggregates, while subordinate parts are generally treated as value objects without separate identity.
+The model aligns with domain-driven design principles, as defined in the next section.
+
+---
+
+## Domain Modeling Foundations
+
+This conceptual model uses the following domain-driven design (DDD) distinctions as its modeling vocabulary. These definitions are authoritative for all SIMS documentation; other documents (including [REQUIREMENTS.md](./REQUIREMENTS.md)) reference these definitions rather than restating them.
+
+**Entity**: a domain object that has stable identity persisting across state changes, submissions, and system boundaries. An entity can be uniquely identified independent of its current attribute values, has a meaningful lifecycle (creation, update, deprecation), and must be reconciled when the same thing may arrive from multiple sources.
+
+**Value object**: a domain object defined entirely by its attributes, interchangeable with any other value object carrying the same values, with no independent lifecycle or stable identity. A value object belongs to an owning entity as part of that entity's aggregate state and is replaced rather than independently updated or reconciled.
+
+**Aggregate**: a cluster of entities and value objects with a single entity serving as the aggregate root. External references target only the root; internal parts are accessed through it. Aggregates define consistency and identity boundaries.
+
+Within SIMS, tracked entities are entities or aggregate roots that receive SEAD-managed identity. Subordinate parts within an aggregate are generally treated as value objects without separate identity.
 
 ---
 
@@ -325,6 +339,36 @@ A Binding was previously Confirmed but is later found to be wrong. A new Propose
 ### 5. Change request rejected before materialization
 
 A Tracked Identity has been allocated and bound, but the Change Request arising from the Submission is rejected or indefinitely blocked. The Tracked Identity may later be invalidated. The identity and its historical relations remain recorded, but neither the identity nor any allocated identifiers may be reused.
+
+---
+
+## Identifier Type Vocabulary
+
+[REQUIREMENTS.md](./REQUIREMENTS.md) defines five identifier types used across SEAD. The table below maps each to the CM concept that carries or manages it.
+
+| Identifier type (REQ) | Definition | CM concept |
+|---|---|---|
+| **SEAD internal identity** | Integer primary key inside SEAD's relational schema (`{entity}_id`) | Property of a materialized SEAD entity; linked to a **Tracked Identity** after materialization. |
+| **SEAD universal identity** | Stable UUID for a tracked entity (`{entity}_uuid`) | The identity value assigned to a **Tracked Identity**. |
+| **Business key** | Natural key or key set that uniquely identifies an entity in practice | An identity signal carried by a **Source Identity** and used during **Identity Resolution**. |
+| **Provider key** | Identifier used by a remote data provider | An identity signal carried by a **Source Identity**, retained in the identity system even when not promoted into SEAD tables. |
+| **Authority key** | Identifier from an external reference system (e.g. Wikidata, GeoNames) | An identity signal carried by a **Source Identity**, useful for reconciliation and de-duplication of shared metadata. |
+
+> **DRY note**: REQUIREMENTS.md defines these identifier types fully. This table bridges them to CM concepts without restating those definitions.
+
+---
+
+## Entity Subtypes and Identity Policy
+
+[REQUIREMENTS.md](./REQUIREMENTS.md) distinguishes three identity patterns among tracked entities, which affect how Identity Resolution proceeds:
+
+- **Provider-owned entities**: identity is allocated based on incoming evidence; reconciliation against shared SEAD structures is not the primary concern.
+- **Shared metadata entities**: must be reconciled against existing SEAD definitions rather than simply allocated new identity; insertion without reconciliation risks duplication.
+- **Relationship entities**: bridge records that may qualify as tracked entities when they carry their own attributes or independent lifetime.
+
+REQUIREMENTS.md also specifies an **identity policy** (FR-11) that governs whether a provider-supplied UUID is accepted as the SEAD universal identity or treated only as a provider key. This policy determines how Identity Resolution handles incoming identifiers and is administrable per entity type.
+
+> **DRY note**: Entity subtype and policy definitions are owned by REQUIREMENTS.md. This section provides conceptual-model-level context for those distinctions.
 
 ---
 
