@@ -140,9 +140,11 @@ Implements step 1 of the decision flow: **Identity Resolution**.
 1. Look up the Source Identity within its scope. If it already has a confirmed Binding, return that Tracked Identity.
 2. Evaluate incoming identity signals against existing Tracked Identities using matching rules appropriate to the entity type:
    - Provider-owned entities: match by provider key or business key.
-   - Shared metadata entities: reconciliation against existing SEAD definitions (FR-17).
+   - Shared metadata entities: reconciliation against existing SEAD definitions (FR-17). Reconciliation procedure is owned by the SEAD Shape Shifter workflow, not SIMS (see design decision below).
    - If reconciliation fails for shared metadata, surface unresolved state rather than allocating (FR-20).
 3. Return one of: `matched` (existing Tracked Identity found), `unresolved` (no match, allocation blocked by policy), or `new` (no match, allocation permitted).
+
+**Design decision:** Specifying the procedure for reconciling shared metadata entities is out of scope for SIMS. Reconciliation is a concern of the SEAD Shape Shifter workflow, which performs semi-automatic reconciliation of incoming shared entities and generates a separate Change Request for them as part of the submission workflow. SIMS consumes the reconciliation outcome (matched or unresolved) but does not define matching rules.
 
 **Idempotency:** The same identity signals within the same scope always produce the same resolution outcome (FR-12, FR-13).
 
@@ -252,13 +254,11 @@ These questions must be resolved before DDL is finalized and core operations are
 
 2. **Change-detection hash scope**: What entity data constitutes the aggregate payload for hashing? Which owned child rows are included, whether associations count, and which fields are excluded. Depends on aggregate boundary definitions.
 
-3. **Reconciliation mechanics**: For shared metadata entities, what matching rules apply (exact, fuzzy, configurable per type)? Who resolves unresolved state (automated retry, manual curation, API callback)?
+3. **Identity policy representation**: How is the administrable identity policy (FR-11) stored and managed? Configuration file, database table, or API-managed resource?
 
-4. **Identity policy representation**: How is the administrable identity policy (FR-11) stored and managed? Configuration file, database table, or API-managed resource?
+4. **Allocation origin model**: Not all identity operations originate from provider submissions. SEAD administrator actions and Sqitch change requests are additional origins. The Source Scope / Submission model may need scopes that represent internal SEAD origins.
 
-5. **Allocation origin model**: Not all identity operations originate from provider submissions. SEAD administrator actions and Sqitch change requests are additional origins. The Source Scope / Submission model may need scopes that represent internal SEAD origins.
-
-6. **Change Request integration**: What information beyond the Sqitch change name should SIMS record when associating Bindings with a Change Request? Should SIMS query the Change Control System for status, or only store the reference?
+5. **Change Request integration**: What information beyond the Sqitch change name should SIMS record when associating Bindings with a Change Request? Should SIMS query the Change Control System for status, or only store the reference?
 
 ---
 
