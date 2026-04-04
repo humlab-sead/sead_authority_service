@@ -270,21 +270,18 @@ class TestSourceIdentityRepository:
             "source_identity_uuid": IDENTITY_UUID,
             "scope_uuid": SCOPE_UUID,
             "entity_type": "site",
-            "identity_type": "business_key",
-            "identity_value": "ABC-001",
-            "identity_signals": None,
             "created_by": None,
             "created_at": NOW,
         }
 
     @pytest.mark.asyncio
-    async def test_find_by_signals_returns_none(self) -> None:
+    async def test_find_by_key_returns_none(self) -> None:
         from src.identity.repository import SourceIdentityRepository
 
         cursor = _make_cursor(return_row=None)
         conn = _make_conn(cursor)
         with _patch_connection(conn):
-            result = await SourceIdentityRepository().find_by_signals(
+            result = await SourceIdentityRepository().find_by_key(
                 SCOPE_UUID, "site", "business_key", "MISSING"
             )
         assert result is None
@@ -294,35 +291,36 @@ class TestSourceIdentityRepository:
         from src.identity.repository import SourceIdentityRepository
 
         row = self._make_identity_row()
-        cursor = _make_cursor(return_row=row)
+        cursor = _make_cursor()
+        # First fetchone: key lookup returns None (not found)
+        # Second fetchone: header INSERT returns the row
+        cursor.fetchone.side_effect = [None, row]
         conn = _make_conn(cursor)
         with _patch_connection(conn):
             result = await SourceIdentityRepository().create_or_get(
                 scope_uuid=SCOPE_UUID,
                 entity_type="site",
-                identity_type="business_key",
-                identity_value="ABC-001",
+                keys=[("business_key", "ABC-001")],
             )
         assert isinstance(result, SourceIdentity)
         assert result.entity_type == "site"
-        assert result.identity_value == "ABC-001"
 
     @pytest.mark.asyncio
     async def test_create_or_get_sql_uses_on_conflict(self) -> None:
-        """Confirm the upsert SQL contains ON CONFLICT clause."""
+        """Confirm the key-insert SQL contains ON CONFLICT clause."""
         from src.identity.repository import SourceIdentityRepository
 
         row = self._make_identity_row()
-        cursor = _make_cursor(return_row=row)
+        cursor = _make_cursor()
+        cursor.fetchone.side_effect = [None, row]
         conn = _make_conn(cursor)
         with _patch_connection(conn):
             await SourceIdentityRepository().create_or_get(
                 scope_uuid=SCOPE_UUID,
                 entity_type="site",
-                identity_type="business_key",
-                identity_value="ABC-001",
+                keys=[("business_key", "ABC-001")],
             )
-        # The SQL passed to execute should contain ON CONFLICT
+        # The last execute call is the key INSERT — must contain ON CONFLICT
         sql_call = cursor.execute.call_args[0][0]
         assert "ON CONFLICT" in sql_call
 

@@ -17,6 +17,7 @@ from src.identity.models import (
     ResolutionOutcome,
     ResolutionRequest,
     SourceIdentity,
+    SourceIdentityKey,
     SourceScope,
     Submission,
     TrackedIdentity,
@@ -120,23 +121,29 @@ class TestSourceIdentity:
             source_identity_uuid=uuid4(),
             scope_uuid=uuid4(),
             entity_type="site",
-            identity_type=IdentityType.BUSINESS_KEY,
-            identity_value="site_name=Nordic Site",
             created_at=NOW,
         )
-        assert si.identity_signals is None
+        assert si.keys == []
+        assert si.created_by is None
 
-    def test_with_signals(self):
-        si = SourceIdentity(
-            source_identity_uuid=uuid4(),
-            scope_uuid=uuid4(),
-            entity_type="location",
-            identity_type=IdentityType.AUTHORITY_KEY,
-            identity_value="geonames:12345",
-            identity_signals={"geonames_id": 12345, "country_code": "SE"},
-            created_at=NOW,
+    def test_with_keys(self):
+        si_uuid = uuid4()
+        key = SourceIdentityKey(
+            key_uuid=uuid4(),
+            source_identity_uuid=si_uuid,
+            key_type=IdentityType.BUSINESS_KEY,
+            key_value="site_name=Nordic Site",
         )
-        assert si.identity_signals["geonames_id"] == 12345
+        si = SourceIdentity(
+            source_identity_uuid=si_uuid,
+            scope_uuid=uuid4(),
+            entity_type="site",
+            created_at=NOW,
+            keys=[key],
+        )
+        assert len(si.keys) == 1
+        assert si.keys[0].key_value == "site_name=Nordic Site"
+        assert si.keys[0].key_type == IdentityType.BUSINESS_KEY
 
 
 class TestTrackedIdentity:

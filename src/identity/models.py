@@ -31,8 +31,8 @@ class SourceScope(BaseModel):
     """External namespace within which Source Identities are unique."""
 
     scope_uuid: UUID
-    scope_name: str
-    parent_scope_uuid: UUID | None = None
+    scope_name: str = Field(description="Unique URI-style identifier, e.g. 'sead://admin' or 'provider://gbif'.")
+    parent_scope_uuid: UUID | None = Field(default=None, description="Parent scope for hierarchical namespacing; None for root scopes.")
     description: str | None = None
     created_at: datetime
     created_by: str | None = None
@@ -43,28 +43,40 @@ class Submission(BaseModel):
 
     submission_uuid: UUID
     scope_uuid: UUID
-    submission_name: str
-    status: SubmissionStatus = SubmissionStatus.PENDING
+    submission_name: str = Field(description="Human-readable label for the batch or ingest event.")
+    status: SubmissionStatus = Field(default=SubmissionStatus.PENDING, description="Lifecycle state: PENDING → COMPLETED or FAILED.")
     created_at: datetime
     created_by: str | None = None
-    completed_at: datetime | None = None
+    completed_at: datetime | None = Field(default=None, description="Set when status transitions to COMPLETED or FAILED.")
 
 
 class SourceIdentity(BaseModel):
-    """Persistent identity for a domain entity as expressed within a Source Scope.
+    """Header record: provider's claim about one domain entity within a Source Scope.
 
-    Carries all identity signals supplied by the provider. Uniqueness is enforced
-    per (scope_uuid, entity_type, identity_type, identity_value).
+    Identity evidence (keys) live in SourceIdentityKey rows linked by source_identity_uuid.
+    The ``keys`` field is populated when the identity is fetched together with its keys;
+    it is empty for bare header lookups.
     """
 
     source_identity_uuid: UUID
     scope_uuid: UUID
-    entity_type: str
-    identity_type: IdentityType
-    identity_value: str
-    identity_signals: dict | None = None
+    entity_type: str = Field(description="SEAD entity type, e.g. 'site', 'sample_group', 'taxa_tree_master'.")
     created_at: datetime
     created_by: str | None = None
+    keys: list["SourceIdentityKey"] = Field(default_factory=list, description="Identity evidence keys; empty for bare header lookups, populated by repository joins.")
+
+
+class SourceIdentityKey(BaseModel):
+    """One identity key associated with a Source Identity.
+
+    A source identity may carry multiple key types (e.g. a UUID and a business key).
+    Uniqueness is enforced per (source_identity_uuid, key_type).
+    """
+
+    key_uuid: UUID
+    source_identity_uuid: UUID
+    key_type: IdentityType = Field(description="Discriminator: 'uuid', 'business_key', 'provider_key', or 'authority_key'.")
+    key_value: str = Field(description="Serialised key value, e.g. 'site_name=Nordic Site' or a UUID string.")
 
 
 class TrackedIdentity(BaseModel):
@@ -75,14 +87,14 @@ class TrackedIdentity(BaseModel):
     content_hash supports aggregate-level change detection (FR-24).
     """
 
-    tracked_identity_uuid: UUID
-    entity_type: str
-    sead_internal_id: int | None = None
-    content_hash: str | None = None
-    lifecycle_state: TrackedIdentityState = TrackedIdentityState.ALLOCATED
+    tracked_identity_uuid: UUID = Field(description="Universal SEAD identity UUID (FR-1). Stable across schema migrations.")
+    entity_type: str = Field(description="SEAD entity type, e.g. 'site', 'sample_group'.")
+    sead_internal_id: int | None = Field(default=None, description="Relational PK in the target SEAD table; set when lifecycle_state is MATERIALIZED (FR-2).")
+    content_hash: str | None = Field(default=None, description="Deterministic aggregate content hash for change detection (FR-24).")
+    lifecycle_state: TrackedIdentityState = Field(default=TrackedIdentityState.ALLOCATED, description="ALLOCATED → MATERIALIZED → RETIRED lifecycle.")
     created_at: datetime
     created_by: str | None = None
-    materialized_at: datetime | None = None
+    materialized_at: datetime | None = Field(default=None, description="Timestamp when sead_internal_id was first assigned.")
 
 
 class BindingSet(BaseModel):
@@ -93,11 +105,11 @@ class BindingSet(BaseModel):
 
     binding_set_uuid: UUID
     submission_uuid: UUID | None = None
-    lifecycle_state: BindingSetState = BindingSetState.PROPOSED
-    change_request_name: str | None = None
+    lifecycle_state: BindingSetState = Field(default=BindingSetState.PROPOSED, description="PROPOSED → CONFIRMED governance lifecycle (FR-26).")
+    change_request_name: str | None = Field(default=None, description="Sqitch change request name linking this set to a schema migration (FR-25).")
     created_at: datetime
     created_by: str | None = None
-    confirmed_at: datetime | None = None
+    confirmed_at: datetime | None = Field(default=None, description="Timestamp of lifecycle transition to CONFIRMED.")
 
 
 class Binding(BaseModel):
@@ -107,8 +119,8 @@ class Binding(BaseModel):
     binding_set_uuid: UUID
     source_identity_uuid: UUID
     tracked_identity_uuid: UUID
-    method: BindingMethod
-    provenance: dict | None = None
+    method: BindingMethod = Field(description="How the correspondence was established: UUID match, business key, exact match, or allocation.")
+    provenance: dict | None = Field(default=None, description="Audit evidence: match score, matched field, applied policy, etc.")
 
 
 # ---------------------------------------------------------------------------
@@ -119,8 +131,8 @@ class Binding(BaseModel):
 class IdentitySignal(BaseModel):
     """An identity signal submitted for resolution."""
 
-    identity_type: IdentityType
-    identity_value: str
+    identity_type: IdentityType = Field(description="Key type discriminator driving lookup strategy.")
+    identity_value: str = Field(description="Serialised key value, e.g. 'site_name=Nordic Site'.")
     signals: dict | None = Field(
         default=None,
         description="Additional evidence: authority keys, alternative identifiers.",
@@ -133,9 +145,9 @@ class ResolutionRequest(BaseModel):
     Represents one domain entity submitted for identity resolution within a scope.
     """
 
-    entity_type: str
-    primary_signal: IdentitySignal
-    additional_signals: list[IdentitySignal] = Field(default_factory=list)
+    entity_type: str = Field(description="SEAD entity type, e.g. 'site', 'taxa_tree_master'.")
+    primary_signal: IdentitySignal = Field(description="The main identity key used for idempotency lookup (FR-12).")
+    additional_signals: list[IdentitySignal] = Field(default_factory=list, description="Optional supplementary keys that are also stored, e.g. an authority UUID alongside a business key.")
 
 
 class ResolutionOutcome(BaseModel):
@@ -154,7 +166,7 @@ class BindRequest(BaseModel):
     """Input to the Bind operation: resolution outcomes to package into a Binding Set."""
 
     submission_uuid: UUID
-    resolution_outcomes: list[ResolutionOutcome]
+    resolution_outcomes: list[ResolutionOutcome] = Field(description="Outcomes from resolve_identity calls to package into a single Binding Set.")
 
 
 class BindingSetResponse(BaseModel):
@@ -164,7 +176,7 @@ class BindingSetResponse(BaseModel):
     submission_uuid: UUID | None
     lifecycle_state: BindingSetState
     change_request_name: str | None
-    binding_count: int
+    binding_count: int = Field(description="Number of source↔tracked Binding rows within this set.")
     created_at: datetime
     confirmed_at: datetime | None = None
 

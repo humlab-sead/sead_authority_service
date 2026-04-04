@@ -18,7 +18,6 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
-import psycopg
 from loguru import logger
 from psycopg.rows import dict_row
 
@@ -27,6 +26,7 @@ from src.identity.models import (
     Binding,
     BindingSet,
     SourceIdentity,
+    SourceIdentityKey,
     SourceScope,
     Submission,
     TrackedIdentity,
@@ -179,10 +179,11 @@ class SubmissionRepository:
 
 
 class SourceIdentityRepository:
-    """CRUD for sead_identity.source_identities.
+    """CRUD for sead_identity.source_identities and source_identity_keys.
 
-    Upsert semantics: create_or_get() returns the existing row on conflict,
-    which is the primary idempotency guarantee for FR-12/FR-13.
+    Idempotency (FR-12, FR-13): create_or_get() first tries to find an existing
+    source identity by any of the supplied keys; only inserts a new header row
+    (and its key rows) when none is found.
     """
 
     async def get(self, source_identity_uuid: UUID) -> SourceIdentity | None:
@@ -195,25 +196,29 @@ class SourceIdentityRepository:
                 row = await cur.fetchone()
         return SourceIdentity(**row) if row else None
 
-    async def find_by_signals(
+    async def find_by_key(
         self,
         scope_uuid: UUID,
         entity_type: str,
-        identity_type: str,
-        identity_value: str,
+        key_type: str,
+        key_value: str,
     ) -> SourceIdentity | None:
-        """Look up a Source Identity by its uniqueness key."""
+        """Look up a Source Identity via a key stored in source_identity_keys."""
         async with get_connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cur:
                 await cur.execute(
                     """
-                    SELECT * FROM sead_identity.source_identities
-                    WHERE scope_uuid = %s
-                      AND entity_type = %s
-                      AND identity_type = %s
-                      AND identity_value = %s
+                    SELECT si.*
+                    FROM sead_identity.source_identities si
+                    JOIN sead_identity.source_identity_keys sik
+                      ON sik.source_identity_uuid = si.source_identity_uuid
+                    WHERE si.scope_uuid  = %s
+                      AND si.entity_type = %s
+                      AND sik.key_type   = %s
+                      AND sik.key_value  = %s
+                    LIMIT 1
                     """,
-                    (str(scope_uuid), entity_type, identity_type, identity_value),
+                    (str(scope_uuid), entity_type, key_type, key_value),
                 )
                 row = await cur.fetchone()
         return SourceIdentity(**row) if row else None
@@ -222,37 +227,63 @@ class SourceIdentityRepository:
         self,
         scope_uuid: UUID,
         entity_type: str,
-        identity_type: str,
-        identity_value: str,
-        identity_signals: dict | None = None,
+        keys: list[tuple[str, str]],
         created_by: str | None = None,
     ) -> SourceIdentity:
-        """Idempotent upsert — returns existing row on conflict (FR-12, FR-13)."""
-        source_identity_uuid = _uuid()
+        """Idempotent upsert — returns existing identity if any key already matches.
+
+        All work is done in one connection to avoid N separate pool acquisitions.
+        ``keys`` is a list of (key_type, key_value) pairs, e.g.
+        [("business_key", "ABC-001"), ("uuid", "550e8400-...")]
+        """
         async with get_connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cur:
+                # 1. Search for any existing identity matching a supplied key
+                for key_type, key_value in keys:
+                    await cur.execute(
+                        """
+                        SELECT si.*
+                        FROM sead_identity.source_identities si
+                        JOIN sead_identity.source_identity_keys sik
+                          ON sik.source_identity_uuid = si.source_identity_uuid
+                        WHERE si.scope_uuid  = %s
+                          AND si.entity_type = %s
+                          AND sik.key_type   = %s
+                          AND sik.key_value  = %s
+                        LIMIT 1
+                        """,
+                        (str(scope_uuid), entity_type, key_type, key_value),
+                    )
+                    row = await cur.fetchone()
+                    if row:
+                        return SourceIdentity(**row)
+
+                # 2. Nothing found — insert header row
+                source_identity_uuid = _uuid()
                 await cur.execute(
                     """
                     INSERT INTO sead_identity.source_identities
-                        (source_identity_uuid, scope_uuid, entity_type,
-                         identity_type, identity_value, identity_signals, created_by)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (scope_uuid, entity_type, identity_type, identity_value)
-                        DO UPDATE SET identity_signals = EXCLUDED.identity_signals
+                        (source_identity_uuid, scope_uuid, entity_type, created_by)
+                    VALUES (%s, %s, %s, %s)
                     RETURNING *
                     """,
-                    (
-                        str(source_identity_uuid),
-                        str(scope_uuid),
-                        entity_type,
-                        identity_type,
-                        identity_value,
-                        psycopg.types.json.Jsonb(identity_signals) if identity_signals else None,
-                        created_by,
-                    ),
+                    (str(source_identity_uuid), str(scope_uuid), entity_type, created_by),
                 )
                 row = await cur.fetchone()
-        assert row is not None
+                assert row is not None
+
+                # 3. Insert key rows (ON CONFLICT protects against duplicates)
+                for key_type, key_value in keys:
+                    await cur.execute(
+                        """
+                        INSERT INTO sead_identity.source_identity_keys
+                            (source_identity_uuid, key_type, key_value)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (source_identity_uuid, key_type) DO NOTHING
+                        """,
+                        (str(source_identity_uuid), key_type, key_value),
+                    )
+
         return SourceIdentity(**row)
 
     async def link_to_submission(self, submission_uuid: UUID, source_identity_uuid: UUID) -> None:

@@ -1,32 +1,24 @@
 -- SIMS: source_identities
--- Persistent identity for a domain entity as expressed within a Source Scope.
--- Carries all identity signals supplied by the provider.
--- Uniqueness enforced per (scope, entity_type, identity_type, identity_value) — supports idempotency (FR-12, FR-13).
+-- Header record representing a provider's claim about one domain entity within a Source Scope.
+-- Identity evidence (keys) are stored in source_identity_keys (see 003b).
+-- Idempotency (FR-12, FR-13) is enforced at the key level: before inserting a new header,
+-- the repository looks up whether any of the submitted keys already exist.
 
 create table sead_identity.source_identities (
     source_identity_uuid uuid        not null default gen_random_uuid(),
     scope_uuid           uuid        not null references sead_identity.source_scopes (scope_uuid),
     entity_type          text        not null,
-    identity_type        text        not null
-                                     check (identity_type in ('uuid', 'business_key', 'provider_key', 'authority_key')),
-    identity_value       text        not null,
-    identity_signals     jsonb,
     created_at           timestamptz not null default now(),
     created_by           text,
 
-    constraint source_identities_pkey primary key (source_identity_uuid),
-    constraint source_identities_unique
-        unique (scope_uuid, entity_type, identity_type, identity_value)
+    constraint source_identities_pkey primary key (source_identity_uuid)
 );
 
 create index source_identities_scope_entity_idx
     on sead_identity.source_identities (scope_uuid, entity_type);
 
 comment on table sead_identity.source_identities is
-    'Persistent identity for a domain entity as expressed within a Source Scope. '
-    'Carries identity signals (UUID, business key, provider key, authority key). '
-    'Unique per (scope, entity_type, identity_type, identity_value) for idempotency (FR-12, FR-13).';
+    'Header record for a provider entity identity within a Source Scope. '
+    'A source identity groups all key evidence (UUID, business key, provider key, authority key) '
+    'for one provider entity. Keys live in source_identity_keys (one-to-many).';
 
-comment on column sead_identity.source_identities.identity_signals is
-    'Additional identity evidence as JSONB: authority keys, alternative identifiers, '
-    'reconciliation hints. Opaque to SIMS; interpreted by resolution strategy.';

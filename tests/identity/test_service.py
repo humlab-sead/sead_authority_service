@@ -22,6 +22,7 @@ from src.identity.models import (
     ResolutionOutcome,
     ResolutionRequest,
     SourceIdentity,
+    SourceIdentityKey,
     SourceScope,
 )
 from src.identity.policy import EntityPolicy, IdentityPolicy
@@ -48,13 +49,11 @@ BINDING_SET_UUID = uuid4()
 BINDING_UUID = uuid4()
 
 
-def _make_source_identity(identity_type: str = "business_key") -> SourceIdentity:
+def _make_source_identity() -> SourceIdentity:
     return SourceIdentity(
         source_identity_uuid=SOURCE_IDENTITY_UUID,
         scope_uuid=SCOPE_UUID,
         entity_type="site",
-        identity_type=IdentityType(identity_type),
-        identity_value="ABC-001",
         created_at=NOW,
     )
 
@@ -431,7 +430,7 @@ class TestBind:
         binding_set_repo.transition.return_value = _make_binding_set("confirmed")
 
         source_identity_repo = AsyncMock()
-        source_identity_repo.get.return_value = _make_source_identity("business_key")
+        source_identity_repo.get.return_value = _make_source_identity()
 
         binding_repo = AsyncMock()
         binding_repo.create.return_value = _make_binding("business_key")
@@ -459,7 +458,20 @@ class TestBind:
         binding_set_repo.transition.return_value = _make_binding_set("confirmed")
 
         source_identity_repo = AsyncMock()
-        source_identity_repo.get.return_value = _make_source_identity("uuid")
+        source_identity_repo.get.return_value = SourceIdentity(
+            source_identity_uuid=SOURCE_IDENTITY_UUID,
+            scope_uuid=SCOPE_UUID,
+            entity_type="site",
+            created_at=NOW,
+            keys=[
+                SourceIdentityKey(
+                    key_uuid=uuid4(),
+                    source_identity_uuid=SOURCE_IDENTITY_UUID,
+                    key_type=IdentityType.UUID,
+                    key_value="550e8400-e29b-41d4-a716-446655440000",
+                )
+            ],
+        )
 
         binding_repo = AsyncMock()
         binding_repo.create.return_value = _make_binding("uuid_accepted")

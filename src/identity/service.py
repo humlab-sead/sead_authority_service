@@ -139,15 +139,13 @@ class IdentityService:
         Implements FR-12 and FR-13 (idempotency).
         """
         ep: EntityPolicy = self.policy.get_entity_policy(request.entity_type)
-        primary = request.primary_signal
 
-        # 1. Upsert Source Identity
+        # 1. Upsert Source Identity — pass all signals as keys
+        all_signals: list[IdentitySignal] = [request.primary_signal, *request.additional_signals]
         source_identity = await self.source_identity_repo.create_or_get(
             scope_uuid=scope_uuid,
             entity_type=request.entity_type,
-            identity_type=primary.identity_type.value,
-            identity_value=primary.identity_value,
-            identity_signals=_signals_to_dict(request),
+            keys=[(sig.identity_type.value, sig.identity_value) for sig in all_signals],
             created_by=created_by,
         )
 
@@ -400,39 +398,18 @@ class IdentityService:
 # ---------------------------------------------------------------------------
 
 
-def _signals_to_dict(request: ResolutionRequest) -> dict | None:
-    """Serialise all identity signals from a ResolutionRequest into a JSONB-compatible dict."""
-    signals: dict = {
-        "primary": {
-            "identity_type": request.primary_signal.identity_type.value,
-            "identity_value": request.primary_signal.identity_value,
-        }
-    }
-    if request.primary_signal.signals:
-        signals["primary"]["signals"] = request.primary_signal.signals
-    if request.additional_signals:
-        signals["additional"] = [
-            {
-                "identity_type": s.identity_type.value,
-                "identity_value": s.identity_value,
-                **({"signals": s.signals} if s.signals else {}),
-            }
-            for s in request.additional_signals
-        ]
-    return signals
-
-
 def _infer_method_from_match(source: SourceIdentity | None) -> BindingMethod:
-    """Determine the binding method from the source identity's identity type."""
-    if source is None:
+    """Determine the binding method from the source identity's key types.
+
+    Examines the first populated key; falls back to BUSINESS_KEY when keys are
+    not loaded (bare header fetch) or source is None.
+    """
+    if source is None or not source.keys:
         return BindingMethod.BUSINESS_KEY
-    try:
-        id_type = IdentityType(source.identity_type)
-    except ValueError:
-        return BindingMethod.BUSINESS_KEY
-    if id_type == IdentityType.UUID:
+    first_type = source.keys[0].key_type
+    if first_type == IdentityType.UUID:
         return BindingMethod.UUID_ACCEPTED
-    if id_type == IdentityType.AUTHORITY_KEY:
+    if first_type == IdentityType.AUTHORITY_KEY:
         return BindingMethod.EXACT_MATCH
     return BindingMethod.BUSINESS_KEY
 
