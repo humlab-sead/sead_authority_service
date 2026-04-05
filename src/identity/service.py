@@ -156,7 +156,7 @@ class IdentityService:
             await self.source_identity_repo.link_to_submission(submission_uuid, source_identity.source_identity_uuid)
 
         # 3. Check for an existing confirmed binding
-        existing: tuple[Binding, BindingSet] | None = await self.binding_repo.find_confirmed_binding(source_identity.source_identity_uuid)
+        existing: tuple[Binding, BindingSetState] | None = await self.binding_repo.find_confirmed_binding(source_identity.source_identity_uuid)
         if existing is not None:
             binding, _ = existing
             logger.debug(
