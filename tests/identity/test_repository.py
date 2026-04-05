@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import contextlib
 from datetime import datetime, timezone
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
@@ -43,12 +42,12 @@ from src.identity.types import (
 # ---------------------------------------------------------------------------
 
 NOW = datetime(2026, 4, 4, 12, 0, 0, tzinfo=timezone.utc)
-SCOPE_UUID = uuid4()
-SUBMISSION_UUID = uuid4()
-IDENTITY_UUID = uuid4()
-TRACKED_UUID = uuid4()
-BINDING_SET_UUID = uuid4()
-BINDING_UUID = uuid4()
+SCOPE_UUID: UUID = uuid4()
+SUBMISSION_UUID: UUID = uuid4()
+IDENTITY_UUID: UUID = uuid4()
+TRACKED_UUID: UUID = uuid4()
+BINDING_SET_UUID: UUID = uuid4()
+BINDING_UUID: UUID = uuid4()
 
 
 def _make_cursor(return_row: dict | None = None, return_rows: list[dict] | None = None) -> MagicMock:

@@ -16,11 +16,9 @@ Requirements:
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
-import pytest_asyncio
 
 from src.identity.models import ResolutionRequest, IdentitySignal
 from src.identity.service import IdentityService

@@ -1,20 +1,14 @@
 """Unit tests for SIMS domain models and types."""
 
 from datetime import datetime, timezone
-from uuid import UUID, uuid4
-
-import pytest
+from uuid import uuid4
 
 from src.identity.models import (
     Binding,
     BindingSet,
-    BindingSetResponse,
-    BindRequest,
-    ChangeDetectionRequest,
     ChangeDetectionResult,
     IdentitySignal,
     RejectDiagnostics,
-    ResolutionOutcome,
     ResolutionRequest,
     SourceIdentity,
     SourceIdentityKey,
@@ -188,6 +182,7 @@ class TestBindingSet:
             confirmed_at=NOW,
         )
         assert bs.lifecycle_state == BindingSetState.CONFIRMED
+        assert bs.change_request_name is not None
         assert bs.change_request_name.startswith("deploy/")
 
 
@@ -203,7 +198,7 @@ class TestBinding:
         assert b.provenance is None
 
     def test_with_provenance(self):
-        b = Binding(
+        b: Binding = Binding(
             binding_uuid=uuid4(),
             binding_set_uuid=uuid4(),
             source_identity_uuid=uuid4(),
@@ -211,6 +206,7 @@ class TestBinding:
             method=BindingMethod.EXACT_MATCH,
             provenance={"match_score": 1.0, "field": "site_uuid"},
         )
+        assert b.provenance is not None
         assert b.provenance["match_score"] == 1.0
 
 

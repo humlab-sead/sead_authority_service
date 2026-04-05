@@ -7,7 +7,7 @@ instances. This tests the service orchestration logic in isolation.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -26,12 +26,12 @@ from src.identity.models import (
     SourceScope,
 )
 from src.identity.policy import EntityPolicy, IdentityPolicy
+from src.identity.service import IdentityService
 from src.identity.types import (
     BindingMethod,
     BindingSetState,
     ChangeOutcome,
     IdentityType,
-    SubmissionStatus,
     TrackedIdentityState,
 )
 
@@ -41,12 +41,12 @@ NOW = datetime(2026, 4, 4, 12, 0, 0, tzinfo=timezone.utc)
 # Test fixtures & helpers
 # ---------------------------------------------------------------------------
 
-SCOPE_UUID = uuid4()
-SUBMISSION_UUID = uuid4()
-SOURCE_IDENTITY_UUID = uuid4()
-TRACKED_UUID = uuid4()
-BINDING_SET_UUID = uuid4()
-BINDING_UUID = uuid4()
+SCOPE_UUID: UUID = uuid4()
+SUBMISSION_UUID: UUID = uuid4()
+SOURCE_IDENTITY_UUID: UUID = uuid4()
+TRACKED_UUID: UUID = uuid4()
+BINDING_SET_UUID: UUID = uuid4()
+BINDING_UUID: UUID = uuid4()
 
 
 def _make_source_identity() -> SourceIdentity:
@@ -73,8 +73,7 @@ def _make_binding(method: str = "business_key") -> Binding:
         binding_set_uuid=BINDING_SET_UUID,
         source_identity_uuid=SOURCE_IDENTITY_UUID,
         tracked_identity_uuid=TRACKED_UUID,
-        method=BindingMethod(method),
-        created_at=NOW,
+        method=BindingMethod(method)
     )
 
 
@@ -147,8 +146,8 @@ class TestGetOrCreateScope:
         scope_repo = AsyncMock()
         scope_repo.get_by_name.return_value = existing
 
-        service = _make_service(scope_repo=scope_repo)
-        result = await service.get_or_create_scope("sead://admin")
+        service: IdentityService = _make_service(scope_repo=scope_repo)
+        result: SourceScope = await service.get_or_create_scope("sead://admin")
 
         assert result.scope_name == "sead://admin"
         scope_repo.create.assert_not_called()
@@ -160,8 +159,8 @@ class TestGetOrCreateScope:
         scope_repo.get_by_name.return_value = None
         scope_repo.create.return_value = new_scope
 
-        service = _make_service(scope_repo=scope_repo)
-        result = await service.get_or_create_scope("test://new")
+        service: IdentityService = _make_service(scope_repo=scope_repo)
+        result: SourceScope = await service.get_or_create_scope("test://new")
 
         assert result.scope_name == "test://new"
         scope_repo.create.assert_called_once()
@@ -188,8 +187,8 @@ class TestResolveIdentity:
         binding_repo = AsyncMock()
         binding_repo.find_confirmed_binding.return_value = None
 
-        service = _make_service(source_identity_repo=source_identity_repo, binding_repo=binding_repo)
-        outcome = await service.resolve_identity(SCOPE_UUID, self._request(), submission_uuid=SUBMISSION_UUID)
+        service: IdentityService = _make_service(source_identity_repo=source_identity_repo, binding_repo=binding_repo)
+        outcome: ResolutionOutcome = await service.resolve_identity(SCOPE_UUID, self._request(), submission_uuid=SUBMISSION_UUID)
 
         assert outcome.outcome == "new"
         assert outcome.tracked_identity_uuid is None
@@ -205,8 +204,8 @@ class TestResolveIdentity:
         binding_repo = AsyncMock()
         binding_repo.find_confirmed_binding.return_value = (existing_binding, "confirmed")
 
-        service = _make_service(source_identity_repo=source_identity_repo, binding_repo=binding_repo)
-        outcome = await service.resolve_identity(SCOPE_UUID, self._request())
+        service: IdentityService = _make_service(source_identity_repo=source_identity_repo, binding_repo=binding_repo)
+        outcome: ResolutionOutcome = await service.resolve_identity(SCOPE_UUID, self._request())
 
         assert outcome.outcome == "matched"
         assert outcome.tracked_identity_uuid == TRACKED_UUID
@@ -218,7 +217,7 @@ class TestResolveIdentity:
         binding_repo = AsyncMock()
         binding_repo.find_confirmed_binding.return_value = None
 
-        service = _make_service(source_identity_repo=source_identity_repo, binding_repo=binding_repo)
+        service: IdentityService = _make_service(source_identity_repo=source_identity_repo, binding_repo=binding_repo)
         await service.resolve_identity(SCOPE_UUID, self._request(), submission_uuid=SUBMISSION_UUID)
 
         source_identity_repo.link_to_submission.assert_called_once_with(SUBMISSION_UUID, SOURCE_IDENTITY_UUID)
@@ -230,7 +229,7 @@ class TestResolveIdentity:
         binding_repo = AsyncMock()
         binding_repo.find_confirmed_binding.return_value = None
 
-        service = _make_service(source_identity_repo=source_identity_repo, binding_repo=binding_repo)
+        service: IdentityService = _make_service(source_identity_repo=source_identity_repo, binding_repo=binding_repo)
         await service.resolve_identity(SCOPE_UUID, self._request(), submission_uuid=None)
 
         source_identity_repo.link_to_submission.assert_not_called()
@@ -242,8 +241,8 @@ class TestResolveIdentity:
         binding_repo = AsyncMock()
         binding_repo.find_confirmed_binding.return_value = None
 
-        service = _make_service(source_identity_repo=source_identity_repo, binding_repo=binding_repo)
-        outcome = await service.resolve_identity(SCOPE_UUID, self._request())
+        service: IdentityService = _make_service(source_identity_repo=source_identity_repo, binding_repo=binding_repo)
+        outcome: ResolutionOutcome = await service.resolve_identity(SCOPE_UUID, self._request())
 
         assert outcome.entity_type == "site"
 
@@ -285,13 +284,13 @@ class TestBind:
         binding_repo = AsyncMock()
         binding_repo.create.return_value = _make_binding("allocated")
 
-        service = _make_service(
+        service: IdentityService = _make_service(
             binding_set_repo=binding_set_repo,
             tracked_identity_repo=tracked_identity_repo,
             source_identity_repo=source_identity_repo,
             binding_repo=binding_repo,
         )
-        result = await service.bind(SUBMISSION_UUID, [self._new_outcome()])
+        result: BindingSetResponse = await service.bind(SUBMISSION_UUID, [self._new_outcome()])
 
         tracked_identity_repo.mint.assert_called_once_with(entity_type="site", created_by=None)
         assert isinstance(result, BindingSetResponse)
@@ -311,7 +310,7 @@ class TestBind:
         binding_repo = AsyncMock()
         binding_repo.create.return_value = _make_binding("allocated")
 
-        service = _make_service(
+        service: IdentityService = _make_service(
             binding_set_repo=binding_set_repo,
             tracked_identity_repo=tracked_identity_repo,
             source_identity_repo=source_identity_repo,
@@ -341,7 +340,7 @@ class TestBind:
         binding_repo = AsyncMock()
         binding_repo.create.return_value = _make_binding("business_key")
 
-        service = _make_service(
+        service: IdentityService = _make_service(
             binding_set_repo=binding_set_repo,
             source_identity_repo=source_identity_repo,
             binding_repo=binding_repo,
@@ -367,7 +366,7 @@ class TestBind:
         binding_repo = AsyncMock()
         binding_repo.create.return_value = _make_binding("business_key")
 
-        service = _make_service(
+        service: IdentityService = _make_service(
             binding_set_repo=binding_set_repo,
             source_identity_repo=source_identity_repo,
             tracked_identity_repo=tracked_identity_repo,
@@ -405,13 +404,13 @@ class TestBind:
         tracked_identity_repo = AsyncMock()
         binding_repo = AsyncMock()
 
-        service = _make_service(
+        service: IdentityService = _make_service(
             binding_set_repo=binding_set_repo,
             tracked_identity_repo=tracked_identity_repo,
             binding_repo=binding_repo,
             policy=policy,
         )
-        result = await service.bind(SUBMISSION_UUID, [outcome])
+        result: BindingSetResponse = await service.bind(SUBMISSION_UUID, [outcome])
 
         tracked_identity_repo.mint.assert_not_called()
         binding_repo.create.assert_not_called()
@@ -441,7 +440,7 @@ class TestBind:
             outcome="matched",
             tracked_identity_uuid=TRACKED_UUID,
         )
-        service = _make_service(
+        service: IdentityService = _make_service(
             binding_set_repo=binding_set_repo,
             source_identity_repo=source_identity_repo,
             binding_repo=binding_repo,
@@ -482,7 +481,7 @@ class TestBind:
             outcome="matched",
             tracked_identity_uuid=TRACKED_UUID,
         )
-        service = _make_service(
+        service: IdentityService = _make_service(
             binding_set_repo=binding_set_repo,
             source_identity_repo=source_identity_repo,
             binding_repo=binding_repo,
@@ -505,8 +504,8 @@ class TestConfirmBindingSet:
         binding_set_repo = AsyncMock()
         binding_set_repo.transition.return_value = confirmed_set
 
-        service = _make_service(binding_set_repo=binding_set_repo)
-        result = await service.confirm_binding_set(BINDING_SET_UUID)
+        service: IdentityService = _make_service(binding_set_repo=binding_set_repo)
+        result: BindingSet | None = await service.confirm_binding_set(BINDING_SET_UUID)
 
         binding_set_repo.transition.assert_called_once_with(BINDING_SET_UUID, BindingSetState.CONFIRMED)
         assert result is confirmed_set
@@ -516,8 +515,8 @@ class TestConfirmBindingSet:
         binding_set_repo = AsyncMock()
         binding_set_repo.transition.return_value = None
 
-        service = _make_service(binding_set_repo=binding_set_repo)
-        result = await service.confirm_binding_set(BINDING_SET_UUID)
+        service: IdentityService = _make_service(binding_set_repo=binding_set_repo)
+        result: BindingSet | None = await service.confirm_binding_set(BINDING_SET_UUID)
 
         assert result is None
 
@@ -537,10 +536,11 @@ class TestAssociateChangeRequest:
         binding_set_repo = AsyncMock()
         binding_set_repo.associate_change_request.return_value = updated_set
 
-        service = _make_service(binding_set_repo=binding_set_repo)
-        result = await service.associate_change_request(BINDING_SET_UUID, "2026-04-04-add-site")
+        service: IdentityService = _make_service(binding_set_repo=binding_set_repo)
+        result: BindingSet | None = await service.associate_change_request(BINDING_SET_UUID, "2026-04-04-add-site")
 
         binding_set_repo.associate_change_request.assert_called_once_with(BINDING_SET_UUID, "2026-04-04-add-site")
+        assert result is not None
         assert result.change_request_name == "2026-04-04-add-site"
 
     @pytest.mark.asyncio
@@ -548,8 +548,8 @@ class TestAssociateChangeRequest:
         binding_set_repo = AsyncMock()
         binding_set_repo.associate_change_request.return_value = None
 
-        service = _make_service(binding_set_repo=binding_set_repo)
-        result = await service.associate_change_request(BINDING_SET_UUID, "some-cr")
+        service: IdentityService = _make_service(binding_set_repo=binding_set_repo)
+        result: BindingSet | None = await service.associate_change_request(BINDING_SET_UUID, "some-cr")
 
         assert result is None
 
@@ -574,8 +574,8 @@ class TestDetectChange:
         tracked_identity_repo = AsyncMock()
         tracked_identity_repo.get.return_value = tracked
 
-        service = _make_service(tracked_identity_repo=tracked_identity_repo)
-        result = await service.detect_change(self._request("abc123"))
+        service: IdentityService = _make_service(tracked_identity_repo=tracked_identity_repo)
+        result: ChangeDetectionResult = await service.detect_change(self._request("abc123"))
 
         assert result.outcome == ChangeOutcome.INSERT
         assert result.previous_hash is None
@@ -589,8 +589,8 @@ class TestDetectChange:
         tracked_identity_repo = AsyncMock()
         tracked_identity_repo.get.return_value = tracked
 
-        service = _make_service(tracked_identity_repo=tracked_identity_repo)
-        result = await service.detect_change(self._request("abc123"))
+        service: IdentityService = _make_service(tracked_identity_repo=tracked_identity_repo)
+        result: ChangeDetectionResult = await service.detect_change(self._request("abc123"))
 
         assert result.outcome == ChangeOutcome.SKIP
         assert result.previous_hash == "abc123"
@@ -604,8 +604,8 @@ class TestDetectChange:
         tracked_identity_repo = AsyncMock()
         tracked_identity_repo.get.return_value = tracked
 
-        service = _make_service(tracked_identity_repo=tracked_identity_repo)
-        result = await service.detect_change(self._request("new_hash"))
+        service: IdentityService = _make_service(tracked_identity_repo=tracked_identity_repo)
+        result: ChangeDetectionResult = await service.detect_change(self._request("new_hash"))
 
         assert result.outcome == ChangeOutcome.UPDATE
         assert result.previous_hash == "old_hash"
@@ -616,7 +616,7 @@ class TestDetectChange:
         tracked_identity_repo = AsyncMock()
         tracked_identity_repo.get.return_value = None
 
-        service = _make_service(tracked_identity_repo=tracked_identity_repo)
+        service: IdentityService = _make_service(tracked_identity_repo=tracked_identity_repo)
         with pytest.raises(LookupError, match=str(TRACKED_UUID)):
             await service.detect_change(self._request("abc123"))
 
@@ -632,8 +632,8 @@ class TestGetBindingSet:
         binding_set_repo = AsyncMock()
         binding_set_repo.get.return_value = None
 
-        service = _make_service(binding_set_repo=binding_set_repo)
-        result = await service.get_binding_set(BINDING_SET_UUID)
+        service: IdentityService = _make_service(binding_set_repo=binding_set_repo)
+        result: BindingSetResponse | None = await service.get_binding_set(BINDING_SET_UUID)
 
         assert result is None
 
@@ -646,8 +646,8 @@ class TestGetBindingSet:
         binding_repo = AsyncMock()
         binding_repo.list_by_set.return_value = [_make_binding(), _make_binding()]
 
-        service = _make_service(binding_set_repo=binding_set_repo, binding_repo=binding_repo)
-        result = await service.get_binding_set(BINDING_SET_UUID)
+        service: IdentityService = _make_service(binding_set_repo=binding_set_repo, binding_repo=binding_repo)
+        result: BindingSetResponse | None = await service.get_binding_set(BINDING_SET_UUID)
 
         assert result is not None
         assert result.binding_count == 2
