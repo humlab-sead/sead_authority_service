@@ -114,7 +114,7 @@ bin
 *.pdf
 *.pid
 *.out
-deprecated
+**/deprecated
 output*.xlsx
 **/*.mdb
 sead-tools
