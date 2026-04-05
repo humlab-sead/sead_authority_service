@@ -55,7 +55,7 @@ async def _seed(dry_run: bool, verify: bool) -> int:
 
     await setup_config_store()
 
-    async with await get_connection() as conn:
+    async with get_connection() as conn:
         async with conn.cursor() as cur:
 
             # ------------------------------------------------------------------
