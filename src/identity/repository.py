@@ -94,10 +94,10 @@ class SourceScopeRepository:
             async with conn.cursor(row_factory=dict_row) as cur:
                 await cur.execute(
                     """
-                    INSERT INTO sead_identity.source_scopes
+                    insert into sead_identity.source_scopes
                         (scope_uuid, scope_name, parent_scope_uuid, description, created_by)
-                    VALUES (%s, %s, %s, %s, %s)
-                    RETURNING *
+                    values (%s, %s, %s, %s, %s)
+                    returning *
                     """,
                     (str(scope_uuid), scope_name, str(parent_scope_uuid) if parent_scope_uuid else None, description, created_by),
                 )
@@ -106,9 +106,9 @@ class SourceScopeRepository:
         return SourceScope(**row)
 
 
-# ---------------------------------------------------------------------------
+#**************************************************************************************
 # SubmissionRepository
-# ---------------------------------------------------------------------------
+#**************************************************************************************
 
 
 class SubmissionRepository:
@@ -130,7 +130,7 @@ class SubmissionRepository:
         submission_name: str,
         created_by: str | None = None,
     ) -> Submission:
-        submission_uuid = _uuid()
+        submission_uuid: UUID = _uuid()
         async with get_connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cur:
                 await cur.execute(
@@ -147,7 +147,7 @@ class SubmissionRepository:
         return Submission(**row)
 
     async def update_status(self, submission_uuid: UUID, status: SubmissionStatus) -> Submission | None:
-        completed_at = _now() if status in (SubmissionStatus.COMPLETED, SubmissionStatus.FAILED) else None
+        completed_at: datetime | None = _now() if status in (SubmissionStatus.COMPLETED, SubmissionStatus.FAILED) else None
         async with get_connection() as conn:
             async with conn.cursor(row_factory=dict_row) as cur:
                 await cur.execute(
@@ -175,7 +175,7 @@ class SubmissionRepository:
 
 # ---------------------------------------------------------------------------
 # SourceIdentityRepository
-# ---------------------------------------------------------------------------
+#**************************************************************************************
 
 
 class SourceIdentityRepository:
@@ -301,9 +301,9 @@ class SourceIdentityRepository:
                 )
 
 
-# ---------------------------------------------------------------------------
+#**************************************************************************************
 # TrackedIdentityRepository
-# ---------------------------------------------------------------------------
+#**************************************************************************************
 
 
 class TrackedIdentityRepository:
@@ -391,9 +391,9 @@ class TrackedIdentityRepository:
         return TrackedIdentity(**row) if row else None
 
 
-# ---------------------------------------------------------------------------
+#**************************************************************************************
 # BindingSetRepository
-# ---------------------------------------------------------------------------
+#**************************************************************************************
 
 
 class BindingSetRepository:
@@ -472,9 +472,9 @@ class BindingSetRepository:
         return [BindingSet(**r) for r in rows]
 
 
-# ---------------------------------------------------------------------------
+#**************************************************************************************
 # BindingRepository
-# ---------------------------------------------------------------------------
+#**************************************************************************************
 
 
 class BindingRepository:
