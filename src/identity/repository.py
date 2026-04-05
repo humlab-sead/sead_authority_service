@@ -20,13 +20,13 @@ from uuid import UUID, uuid4
 
 from loguru import logger
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 from src.configuration import get_connection
 from src.identity.models import (
     Binding,
     BindingSet,
     SourceIdentity,
-    SourceIdentityKey,
     SourceScope,
     Submission,
     TrackedIdentity,
@@ -62,7 +62,7 @@ class SourceScopeRepository:
                     "SELECT * FROM sead_identity.source_scopes WHERE scope_uuid = %s",
                     (str(scope_uuid),),
                 )
-                row = await cur.fetchone()
+                row: dict[str, Any] | None = await cur.fetchone()
         return SourceScope(**row) if row else None
 
     async def get_by_name(self, scope_name: str) -> SourceScope | None:
@@ -516,10 +516,10 @@ class BindingRepository:
                         str(source_identity_uuid),
                         str(tracked_identity_uuid),
                         method.value,
-                        psycopg.types.json.Jsonb(provenance) if provenance else None,
+                        Jsonb(provenance) if provenance else None,
                     ),
                 )
-                row = await cur.fetchone()
+                row: dict[str, Any] | None = await cur.fetchone()
         assert row is not None
         return Binding(**row)
 
@@ -530,7 +530,7 @@ class BindingRepository:
                     "SELECT * FROM sead_identity.bindings WHERE binding_set_uuid = %s",
                     (str(binding_set_uuid),),
                 )
-                rows = await cur.fetchall()
+                rows: list[dict[str, Any]] = await cur.fetchall()
         return [Binding(**r) for r in rows]
 
     async def find_confirmed_binding(
@@ -552,7 +552,7 @@ class BindingRepository:
                     """,
                     (str(source_identity_uuid),),
                 )
-                row = await cur.fetchone()
+                row: dict[str, Any] | None = await cur.fetchone()
         if not row:
             return None
         set_state = row.pop("set_state")

@@ -44,6 +44,8 @@ from src.identity.models import (
     ResolutionRequest,
     SourceIdentity,
     SourceScope,
+    Submission,
+    TrackedIdentity,
 )
 from src.identity.policy import EntityPolicy, IdentityPolicy
 from src.identity.repository import (
@@ -90,13 +92,13 @@ class IdentityService:
         binding_repo: BindingRepository | None = None,
         policy: IdentityPolicy | None = None,
     ) -> None:
-        self.scope_repo = scope_repo or SourceScopeRepository()
-        self.submission_repo = submission_repo or SubmissionRepository()
-        self.source_identity_repo = source_identity_repo or SourceIdentityRepository()
-        self.tracked_identity_repo = tracked_identity_repo or TrackedIdentityRepository()
-        self.binding_set_repo = binding_set_repo or BindingSetRepository()
-        self.binding_repo = binding_repo or BindingRepository()
-        self.policy = policy or IdentityPolicy()
+        self.scope_repo: SourceScopeRepository = scope_repo or SourceScopeRepository()
+        self.submission_repo: SubmissionRepository = submission_repo or SubmissionRepository()
+        self.source_identity_repo: SourceIdentityRepository = source_identity_repo or SourceIdentityRepository()
+        self.tracked_identity_repo: TrackedIdentityRepository = tracked_identity_repo or TrackedIdentityRepository()
+        self.binding_set_repo: BindingSetRepository = binding_set_repo or BindingSetRepository()
+        self.binding_repo: BindingRepository = binding_repo or BindingRepository()
+        self.policy: IdentityPolicy = policy or IdentityPolicy()
 
     # ------------------------------------------------------------------
     # Scope helpers
@@ -109,10 +111,10 @@ class IdentityService:
         created_by: str | None = None,
     ) -> SourceScope:
         """Return the named scope, creating it if it does not exist."""
-        existing = await self.scope_repo.get_by_name(scope_name)
+        existing: SourceScope | None = await self.scope_repo.get_by_name(scope_name)
         if existing:
             return existing
-        created = await self.scope_repo.create(scope_name, description=description, created_by=created_by)
+        created: SourceScope = await self.scope_repo.create(scope_name, description=description, created_by=created_by)
         logger.info(f"Created scope '{scope_name}' ({created.scope_uuid})")
         return created
 
@@ -142,7 +144,7 @@ class IdentityService:
 
         # 1. Upsert Source Identity — pass all signals as keys
         all_signals: list[IdentitySignal] = [request.primary_signal, *request.additional_signals]
-        source_identity = await self.source_identity_repo.create_or_get(
+        source_identity: SourceIdentity = await self.source_identity_repo.create_or_get(
             scope_uuid=scope_uuid,
             entity_type=request.entity_type,
             keys=[(sig.identity_type.value, sig.identity_value) for sig in all_signals],
@@ -154,7 +156,7 @@ class IdentityService:
             await self.source_identity_repo.link_to_submission(submission_uuid, source_identity.source_identity_uuid)
 
         # 3. Check for an existing confirmed binding
-        existing = await self.binding_repo.find_confirmed_binding(source_identity.source_identity_uuid)
+        existing: tuple[Binding, BindingSet] | None = await self.binding_repo.find_confirmed_binding(source_identity.source_identity_uuid)
         if existing is not None:
             binding, _ = existing
             logger.debug(
@@ -204,12 +206,12 @@ class IdentityService:
             raise ValueError("bind() requires at least one ResolutionOutcome")
 
         # Create the proposed Binding Set
-        binding_set = await self.binding_set_repo.create(submission_uuid=submission_uuid, created_by=created_by)
+        binding_set: BindingSet = await self.binding_set_repo.create(submission_uuid=submission_uuid, created_by=created_by)
         bindings: list[Binding] = []
 
         for outcome in outcomes:
-            ep = self.policy.get_entity_policy(outcome.entity_type)
-            binding = await self._bind_single(outcome, binding_set.binding_set_uuid, ep, created_by)
+            ep: EntityPolicy = self.policy.get_entity_policy(outcome.entity_type)
+            binding: Binding | None = await self._bind_single(outcome, binding_set.binding_set_uuid, ep, created_by)
             if binding is not None:
                 bindings.append(binding)
 
@@ -219,7 +221,7 @@ class IdentityService:
         )
 
         if should_auto_confirm:
-            binding_set = await self.binding_set_repo.transition(binding_set.binding_set_uuid, BindingSetState.CONFIRMED)
+            binding_set = await self.binding_set_repo.transition(binding_set.binding_set_uuid, BindingSetState.CONFIRMED)  # type: ignore[assignment]
             logger.info(f"Binding set {binding_set.binding_set_uuid} auto-confirmed ({len(bindings)} bindings)")
         else:
             logger.info(f"Binding set {binding_set.binding_set_uuid} remains proposed — awaiting manual confirmation")
@@ -237,8 +239,8 @@ class IdentityService:
         if outcome.outcome == "matched":
             assert outcome.tracked_identity_uuid is not None
             # Determine binding method from how the source identity was constructed
-            source = await self.source_identity_repo.get(outcome.source_identity_uuid)
-            method = _infer_method_from_match(source)
+            source: SourceIdentity | None = await self.source_identity_repo.get(outcome.source_identity_uuid)
+            method: BindingMethod = _infer_method_from_match(source)
             return await self.binding_repo.create(
                 binding_set_uuid=binding_set_uuid,
                 source_identity_uuid=outcome.source_identity_uuid,
@@ -255,7 +257,7 @@ class IdentityService:
             )
             return None
 
-        tracked = await self.tracked_identity_repo.mint(entity_type=outcome.entity_type, created_by=created_by)
+        tracked: TrackedIdentity = await self.tracked_identity_repo.mint(entity_type=outcome.entity_type, created_by=created_by)
         return await self.binding_repo.create(
             binding_set_uuid=binding_set_uuid,
             source_identity_uuid=outcome.source_identity_uuid,
@@ -274,7 +276,7 @@ class IdentityService:
         scope_uuid: UUID,
         submission_name: str,
         created_by: str | None = None,
-    ):
+    ) -> Submission:
         """Create and return a new Submission within the given scope."""
         return await self.submission_repo.create(
             scope_uuid=scope_uuid,
@@ -294,9 +296,9 @@ class IdentityService:
         created_by: str | None = None,
     ) -> BindingSetResponse:
         """Shorthand for resolve_identity × N → bind."""
-        outcomes = []
+        outcomes: list[ResolutionOutcome] = []
         for req in requests:
-            outcome = await self.resolve_identity(scope_uuid, req, submission_uuid=submission_uuid, created_by=created_by)
+            outcome: ResolutionOutcome = await self.resolve_identity(scope_uuid, req, submission_uuid=submission_uuid, created_by=created_by)
             outcomes.append(outcome)
         return await self.bind(submission_uuid=submission_uuid, outcomes=outcomes, created_by=created_by)
 
@@ -310,7 +312,7 @@ class IdentityService:
         This is a no-op if the set was already auto-confirmed at bind time.
         Returns the updated BindingSet, or None if not found.
         """
-        result = await self.binding_set_repo.transition(binding_set_uuid, BindingSetState.CONFIRMED)
+        result: BindingSet | None = await self.binding_set_repo.transition(binding_set_uuid, BindingSetState.CONFIRMED)
         if result:
             logger.info(f"Binding set {binding_set_uuid} confirmed")
         return result
@@ -325,7 +327,7 @@ class IdentityService:
         Only succeeds if the Binding Set is in the ``confirmed`` state.
         Returns the updated BindingSet, or None if not found or not confirmed.
         """
-        result = await self.binding_set_repo.associate_change_request(binding_set_uuid, cr_name)
+        result: BindingSet | None = await self.binding_set_repo.associate_change_request(binding_set_uuid, cr_name)
         if result:
             logger.info(f"Binding set {binding_set_uuid} associated with change request '{cr_name}'")
         else:
@@ -351,14 +353,14 @@ class IdentityService:
 
         Implements FR-24 (aggregate-level change detection).
         """
-        tracked = await self.tracked_identity_repo.get(request.tracked_identity_uuid)
+        tracked: TrackedIdentity | None = await self.tracked_identity_repo.get(request.tracked_identity_uuid)
         if tracked is None:
             raise LookupError(f"TrackedIdentity {request.tracked_identity_uuid} not found")
 
         previous_hash = tracked.content_hash
 
         if previous_hash is None:
-            outcome = ChangeOutcome.INSERT
+            outcome: ChangeOutcome = ChangeOutcome.INSERT
         elif previous_hash == request.content_hash:
             outcome = ChangeOutcome.SKIP
         else:
@@ -406,7 +408,7 @@ def _infer_method_from_match(source: SourceIdentity | None) -> BindingMethod:
     """
     if source is None or not source.keys:
         return BindingMethod.BUSINESS_KEY
-    first_type = source.keys[0].key_type
+    first_type: IdentityType = source.keys[0].key_type
     if first_type == IdentityType.UUID:
         return BindingMethod.UUID_ACCEPTED
     if first_type == IdentityType.AUTHORITY_KEY:

@@ -108,7 +108,7 @@ class IdentityPolicy:
     # ------------------------------------------------------------------
 
     def _load(self) -> None:
-        path = self.policy_path
+        path: Path = self.policy_path
         if not path.is_file():
             raise FileNotFoundError(f"Identity policy file not found: {path}")
         with path.open("r", encoding="utf-8") as fh:
@@ -121,7 +121,7 @@ class IdentityPolicy:
 
 def _resolve_policy_path() -> Path:
     """Return the policy file path, honouring the IDENTITY_POLICY_FILE env var."""
-    env_override = os.environ.get("IDENTITY_POLICY_FILE")
+    env_override: str | None = os.environ.get("IDENTITY_POLICY_FILE")
     if env_override:
         return Path(env_override)
     return _DEFAULT_POLICY_PATH
@@ -134,7 +134,7 @@ _VALID_SUBTYPES: frozenset[str] = frozenset({"provider_owned", "shared_metadata"
 
 def _validate_policy(entities: dict, defaults: dict) -> None:
     """Raise ValueError on a malformed policy file. Called once on load."""
-    missing = _REQUIRED_FIELDS - set(defaults)
+    missing: frozenset[str] = _REQUIRED_FIELDS - set(defaults)
     if missing:
         raise ValueError(f"Identity policy 'defaults' block is missing fields: {missing}")
 
