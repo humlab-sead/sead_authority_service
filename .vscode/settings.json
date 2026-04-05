@@ -30,7 +30,7 @@
     "python.testing.pytestEnabled": true,
     "pgFormatter.configFile": "${workspaceFolder}/.pg_format",
     "[sql]": {
-        "editor.defaultFormatter": "bradymholt.pgformatter"
+        "editor.defaultFormatter": "sqlfluff.vscode-sqlfluff"
     },
     "python.analysis.exclude": [
         "bin",
