@@ -517,8 +517,8 @@ class BindingRepository(BaseRepository[Binding]):
             """
             INSERT INTO sead_identity.bindings
                 (binding_uuid, binding_set_uuid, source_identity_uuid,
-                 tracked_identity_uuid, method, provenance, created_by)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                 tracked_identity_uuid, method, provenance)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING *
             """,
             (
@@ -528,7 +528,6 @@ class BindingRepository(BaseRepository[Binding]):
                 tracked_identity_uuid,
                 method.value,
                 Jsonb(provenance) if provenance is not None else None,
-                created_by,
             ),
         )
         return self._to_model_required(row)
