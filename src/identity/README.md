@@ -2,7 +2,7 @@
 
 The SEAD Identity Management System (SIMS) implemented as a FastAPI sub-module of `sead_authority_service`. Provides stable UUID-based identities for tracked SEAD entities and resolves provider submissions to those identities.
 
-**Design context:** `docs/sims/` · **Operations:** `docs/sims/OPERATIONS.md`
+**Design context:** `docs/SIMS/` · **Operations:** `docs/SIMS/OPERATIONS.md`
 
 ---
 

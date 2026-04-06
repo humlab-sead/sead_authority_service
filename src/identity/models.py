@@ -1,8 +1,8 @@
 """Domain models for the SIMS identity module.
 
 Maps directly to the CM concepts and storage structures defined in:
-  docs/sims/CONCEPTUAL_MODEL.md
-  docs/sims/IMPLEMENTATION_VIEW.md § Storage Design
+  docs/SIMS/design/CONCEPTUAL_MODEL.md
+  docs/SIMS/design/IMPLEMENTATION_VIEW.md § Storage Design
 """
 
 from __future__ import annotations

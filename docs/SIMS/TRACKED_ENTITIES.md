@@ -355,7 +355,7 @@ The following SEAD tables are visible in the ERD but absent from the Shape Shift
 
 ## Cross-References
 
-- [REQUIREMENTS.md](./REQUIREMENTS.md) — entity subtypes and identity type definitions
-- [DESIGN_VIEW.md](./DESIGN_VIEW.md) — Resolve → Allocate → Map decision flow
-- [IMPLEMENTATION_VIEW.md](./IMPLEMENTATION_VIEW.md) — DDL and identity allocation structures
-- [ASSESSMENT.md](./ASSESSMENT.md) — readiness checklist items A1–A4, C1
+- [REQUIREMENTS.md](./design/REQUIREMENTS.md) — entity subtypes and identity type definitions
+- [DESIGN_VIEW.md](./design/DESIGN_VIEW.md) — Resolve → Allocate → Map decision flow
+- [IMPLEMENTATION_VIEW.md](./design/IMPLEMENTATION_VIEW.md) — DDL and identity allocation structures
+- [ASSESSMENT.md](./design/ASSESSMENT.md) — readiness checklist items A1–A4, C1

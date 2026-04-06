@@ -102,7 +102,7 @@ OpenRefine → POST /reconcile → router.py
 - **Configuration**: Lazy-loading config resolution (`src/configuration/`)
 - **LLM Providers**: OpenAI, Anthropic, Ollama support (`src/llm/providers/`)
 - **MCP Server**: Embedded retrieval server (`src/mcp_server/`)
-- **Identity Module**: SIMS identity policy and allocation (`src/identity/`); design docs in [`docs/sims/`](docs/sims/)
+- **Identity Module**: SIMS identity policy and allocation (`src/identity/`); design docs in [`docs/SIMS/`](docs/SIMS/)
 
 ## 📦 Installation
 

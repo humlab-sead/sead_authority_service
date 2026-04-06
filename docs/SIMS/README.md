@@ -14,8 +14,8 @@ SIMS provides stable identity tracking for SEAD entities: UUID allocation, ident
 
 ## Reference Material
 
-- [existing_examples/](./archived/existing_examples/) — Existing SEAD identity patterns (BugsCEP, allocation SQL)
-- [sead_model/](../../docs/SEAD/) — Current SEAD database schema reference (tables, sequences, constraints)
+- [existing_examples/](./existing_examples/) — Existing SEAD identity patterns (BugsCEP, allocation SQL)
+- [sead_model/](./sead_model/) — Current SEAD database schema reference (tables, sequences, constraints)
 
 ## Boundary to Shape Shifter
 

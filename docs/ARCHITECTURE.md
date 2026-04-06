@@ -431,7 +431,7 @@ LLMProvider (abstract base)
 
 **Purpose**: SEAD Identity Management System (SIMS) — policy and allocation logic for incoming data submissions. Migrated from the retired `sead_identity_system` repository.
 
-**Design documentation**: [docs/sims/](sims/) — REQUIREMENTS, DESIGN_VIEW, IMPLEMENTATION_VIEW, ASSESSMENT, TRACKED_ENTITIES.
+**Design documentation**: [docs/SIMS/](SIMS/) — REQUIREMENTS, DESIGN_VIEW, IMPLEMENTATION_VIEW, ASSESSMENT, TRACKED_ENTITIES.
 
 **Status**: Package stub created; implementation pending.
 
@@ -452,7 +452,7 @@ LLMProvider (abstract base)
 | `derived` | Identity composed from FK references (bridge entities) |
 | `child` | Inherits parent aggregate identity; no independent UUID |
 
-**Decision flow** (see [docs/sims/DESIGN_VIEW.md](sims/DESIGN_VIEW.md)):
+**Decision flow** (see [docs/SIMS/design/DESIGN_VIEW.md](SIMS/design/DESIGN_VIEW.md)):
 ```
 Incoming entity
   → Resolve: does a match exist in identity_registry?
@@ -506,7 +506,7 @@ class LLMReconciliationStrategy:
 
 **Purpose**: SEAD Identity Management System (SIMS) — policy and allocation logic for incoming data submissions. Migrated from the retired `sead_identity_system` repository.
 
-**Design documentation**: [docs/sims/](sims/) — REQUIREMENTS, DESIGN_VIEW, IMPLEMENTATION_VIEW, ASSESSMENT, TRACKED_ENTITIES.
+**Design documentation**: [docs/SIMS/](SIMS/) — REQUIREMENTS, DESIGN_VIEW, IMPLEMENTATION_VIEW, ASSESSMENT, TRACKED_ENTITIES.
 
 **Status**: Package stub created; implementation pending.
 
@@ -527,7 +527,7 @@ class LLMReconciliationStrategy:
 | `derived` | Identity composed from FK references (bridge entities) |
 | `child` | Inherits parent aggregate identity; no independent UUID |
 
-**Decision flow** (see [docs/sims/DESIGN_VIEW.md](sims/DESIGN_VIEW.md)):
+**Decision flow** (see [docs/SIMS/design/DESIGN_VIEW.md](SIMS/design/DESIGN_VIEW.md)):
 ```
 Incoming entity
   → Resolve: does a match exist in identity_registry?

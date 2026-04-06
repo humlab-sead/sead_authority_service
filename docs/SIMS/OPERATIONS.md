@@ -1,7 +1,7 @@
 # SIMS Operations Guide
 
 Operational reference for the SEAD Identity Management System (`src/identity/`).  
-For design context see the frozen design docs in `docs/sims/`. For the module API see `src/identity/README.md`.
+For design context see the frozen design docs in `docs/SIMS/design`. For the module API see `src/identity/README.md`.
 
 ---
 
@@ -127,7 +127,7 @@ Entities not listed in the file fall back to the `defaults:` block (currently `s
 2. For each entity, check the `identity_tracking` and `reconciliation` fields.
 3. Update `config/identity_policy.yml` to reflect new or changed entity entries.
 4. Run the unit test suite to verify policy loads correctly: `uv run pytest tests/identity/test_policy.py -v`.
-5. Update `docs/sims/TRACKED_ENTITIES.md` to keep the entity register in sync.
+5. Update `docs/SIMS/TRACKED_ENTITIES.md` to keep the entity register in sync.
 
 There is no automated sync — this is intentional (D5: avoids runtime cross-repo dependency).
 
