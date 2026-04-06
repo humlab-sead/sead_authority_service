@@ -99,20 +99,31 @@ OpenRefine → POST /reconcile → router.py:reconcile() →
 
 ### SIMS Identity Module (`src/identity/`)
 
-The SEAD Identity Management System (SIMS) is integrated into this service. It provides identity policy and allocation logic for incoming SEAD data submissions.
+The SEAD Identity Management System (SIMS) is **fully implemented** and live. It provides identity resolution, UUID allocation, and binding lifecycle management for incoming SEAD data submissions.
 
 **Design docs**: [docs/sims/](../docs/sims/) — REQUIREMENTS, DESIGN_VIEW, IMPLEMENTATION_VIEW, ASSESSMENT, TRACKED_ENTITIES.
 
-**Planned submodules** (implementation not yet started):
-- `src/identity/models.py` — Domain models: `IdentityEvidence`, `AllocationResult`, `ResolutionRequest`, `IdentityRecord`
-- `src/identity/policy.py` — Resolve → Allocate → Map decision logic driven by entity `identity_tracking` and `reconciliation` properties
-- `src/identity/registry.py` — UUID minting, identity evidence recording, idempotency against `identity_registry` table
+**Implemented modules**:
+- `src/identity/types.py` — `StrEnum` types: `IdentityType`, `SubmissionStatus`, `TrackedIdentityState`, `BindingSetState`, `BindingMethod`, `ChangeOutcome`
+- `src/identity/models.py` — Pydantic domain models and DTOs: `SourceScope`, `Submission`, `SourceIdentity`, `TrackedIdentity`, `BindingSet`, `Binding`, `ResolutionRequest`, `ResolutionOutcome`, `BindingSetResponse`, `ChangeDetectionRequest`, `ChangeDetectionResult`
+- `src/identity/policy.py` — `IdentityPolicy` loads `config/identity_policy.yml`; exposes `get_entity_policy(entity_type)` driving resolve/allocate/auto-confirm behaviour
+- `src/identity/repository.py` — Async repositories for all six identity tables, using `get_connection()`
+- `src/identity/service.py` — `IdentityService` orchestrates: `get_or_create_scope`, `create_submission`, `resolve_identity`, `bind`, `confirm_binding_set`, `associate_change_request`, `detect_change`, `get_binding_set`, `list_scopes`
+
+**HTTP endpoints** (registered in `main.py` under prefix `/identity`):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/identity/resolve` | Resolve + bind a batch of source identities |
+| `GET` | `/identity/binding-sets/{uuid}` | Get binding set status |
+| `POST` | `/identity/binding-sets/{uuid}/confirm` | Confirm a proposed binding set |
+| `POST` | `/identity/binding-sets/{uuid}/change-request` | Associate a Sqitch CR name |
+| `POST` | `/identity/detect-change` | Content-hash change detection |
+| `GET` | `/identity/scopes` | List all known source scopes |
 
 **Entity metadata source of truth**: `sead_standard_model.yml` in the Shape Shifter repo defines per-entity `identity_tracking` and `reconciliation` properties that drive SIMS policy decisions.
 
 **Key identity tracking values**: `tracked` (UUID + PK, aggregate roots), `reconciled` (matched by business key), `derived` (identity from FK references), `child` (inherits parent aggregate identity).
-
-**Do not** place identity SQL scripts in `schema/sql/` until the `identity_registry` and `identity_evidence` tables are designed — the old `entity_metadata_functions.sql` referenced retired aggregate model tables and was removed.
 
 ### RAG Hybrid Strategy (New Pattern)
 Phase 1 implementation uses embedded MCP server for small-prompt reconciliation:
@@ -188,7 +199,8 @@ test(loaders): add comprehensive UCanAccessSqlLoader tests
 - [src/reconcile.py](../src/reconcile.py) - Core reconciliation logic
 - [src/strategies/strategy.py](../src/strategies/strategy.py) - Base strategy class and registry
 - [src/configuration/](../src/configuration/) - Config provider pattern
-- [src/identity/](../src/identity/) - SIMS identity module (stub; implementation pending)
+- [src/identity/](../src/identity/) - SIMS identity module (fully implemented)
+- [src/api/identity_router.py](../src/api/identity_router.py) - SIMS HTTP endpoints (prefix `/identity`)
 - [config/entities.yml](../config/entities.yml) - Entity definitions (source of truth)
 - [docs/sims/](../docs/sims/) - SIMS design documentation
 - [Makefile](../Makefile) - All developer commands
