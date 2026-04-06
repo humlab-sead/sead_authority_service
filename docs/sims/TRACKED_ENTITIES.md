@@ -2,6 +2,8 @@
 
 > **Checklist coverage:** A1 (entity enumeration), A2 (aggregate boundaries), A3 (associations), A4 (shared-metadata classification), C1 (business keys).
 
+> **Policy sync notice.** This file mirrors `config/identity_policy.yml`. When onboarding a new entity, update both files together — add the entity to Section 2 here and add its policy block to `identity_policy.yml`.
+
 ## 1. Scope
 
 This document enumerates the SEAD entities relevant to the SIMS identity system. The primary source is the Shape Shifter target model (`sead_standard_model.yml`, 49 entities) cross-referenced with the SEAD ERD color-coded classification.
@@ -22,6 +24,29 @@ This document enumerates the SEAD entities relevant to the SIMS identity system.
 | Relationship    | Association connecting two or more entities                  | REQUIREMENTS.md §Entity Subtypes |
 | TM Role         | Target model role (`fact`, `lookup`, `classifier`, `bridge`) | sead_standard_model.yml          |
 | Business key    | The `identity_columns` field from the target model           | sead_standard_model.yml          |
+
+---
+
+## 1.5 SIMS Identity Policy Coverage
+
+The table below shows every entity registered in `config/identity_policy.yml` with its policy subtype, key flags, and implementation phase. Entities not listed here fall under the `defaults` block in the policy file (`shared_metadata`, `allow_allocation: false`, `auto_confirm: false`).
+
+| Entity | Policy Subtype | accept_uuid | allow_allocation | auto_confirm | Phase |
+|--------|---------------|:-----------:|:----------------:|:------------:|-------|
+| site | provider_owned | no | yes | yes | **Phase 1 – live** |
+| sample_group | provider_owned | no | yes | yes | **Phase 1 – live** |
+| sample | provider_owned | no | yes | yes | **Phase 1 – live** |
+| analysis_entity | provider_owned | no | yes | yes | **Phase 1 – live** |
+| dataset | provider_owned | no | yes | yes | **Phase 1 – live** |
+| taxa_tree_master | shared_metadata | yes | no | no | Phase 2+ – planned |
+| feature_type | shared_metadata | yes | no | no | Phase 2+ – planned |
+| method | shared_metadata | yes | no | no | Phase 2+ – planned |
+| data_type | shared_metadata | yes | no | no | Phase 2+ – planned † |
+| unit | shared_metadata | yes | no | no | Phase 2+ – planned † |
+| sample_dimension | relationship | no | no | no | Phase 2+ – planned |
+| abundance | relationship | no | no | no | Phase 2+ – planned |
+
+† `data_type` and `unit` are registered in `identity_policy.yml` but are not yet present in the Shape Shifter target model (`sead_standard_model.yml`). They are reserved for a future model extension.
 
 ---
 
