@@ -1,5 +1,7 @@
 # SIMS Documentation Suite — Implementation Readiness Assessment
 
+> **Status: Frozen (2026-04-06).** All gaps resolved. Implementation complete (Phases 1–2). This document is preserved as design rationale.
+
 ## Overall Verdict
 
 **Ready for Phase 1 implementation**, with a short list of gaps to address before or during coding.

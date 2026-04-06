@@ -1,5 +1,7 @@
 # SEAD Identity System Requirements
 
+> **Status: Frozen (2026-04-06).** Implementation complete. This document is preserved as design rationale. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
+
 ## Purpose
 
 > **Module location**: SIMS is implemented as the `src/identity/` module within the [`sead_authority_service`](https://github.com/humlab-sead/sead_authority_service) repository. There is no separate `sead_identity_system` deployment. See [docs/sims/README.md](./README.md) for full context.

@@ -1,5 +1,7 @@
 # Systems Design
 
+> **Status: Frozen (2026-04-06).** Implementation complete. This document is preserved as design rationale. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
+
 ## Purpose
 
 This document gives the system design view of the SEAD Identity System: architectural boundaries, design rules, and the decision flow that ties the system's responsibilities together.

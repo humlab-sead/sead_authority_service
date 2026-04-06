@@ -1,5 +1,7 @@
 # SIMS Conceptual Model
 
+> **Status: Frozen (2026-04-06).** Implementation complete. This document is preserved as design rationale. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
+
 ## Overview
 
 The SEAD Identity Management System (SIMS) separates externally expressed identity from SEAD-managed identity and makes the correspondence between them explicit, governed, and historically traceable. Source data is received through **Submissions**, interpreted within a **Source Scope**, and represented through **Source Identities**. These are resolved against SEAD-managed **Tracked Identities** through the **Identity Resolution** process. The results are grouped into **Binding Sets** — atomic batches of **Bindings** that are confirmed or rejected together. Once identities have been resolved, a Binding Set may be associated with a **Change Request** for review, quality assurance, and possible ingestion into SEAD.

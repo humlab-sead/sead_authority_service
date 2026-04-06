@@ -1,5 +1,7 @@
 # Implementation View
 
+> **Status: Frozen (2026-04-06).** Implementation complete. This document is preserved as design rationale. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
+
 ## Purpose
 
 This document is the implementation-level view of the SEAD Identity System.
@@ -13,8 +15,8 @@ Domain concepts, functional requirements, lifecycles, and design rules are not r
 ## Technology Context
 
 - **PostgreSQL 16+** with `uuid-ossp` or `pgcrypto` for UUID generation.
-- **Sqitch** for database change control and migration sequencing.
 - **Python REST API** (FastAPI) as the service layer, hosted in the `sead_authority_service` repository (`src/identity/`).
+- Schema migrations are plain SQL files in `schema/sql/identity/` applied directly (no migration framework).
 
 ---
 
