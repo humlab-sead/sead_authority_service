@@ -156,13 +156,17 @@ async def resolve(
     "/binding-sets/{binding_set_uuid}",
     response_model=BindingSetResponse,
     summary="Get binding set status",
+    responses={404: {"description": "Binding set not found"}},
 )
 async def get_binding_set(
     binding_set_uuid: UUID,
     _config: ConfigLike = Depends(get_config_dep),
     service: IdentityService = Depends(get_identity_service),
 ) -> BindingSetResponse:
-    """Return the current state of a Binding Set."""
+    """Return the current state of a Binding Set.
+
+    Path parameter: `binding_set_uuid` — UUID returned by ``POST /identity/resolve``.
+    """
     result = await service.get_binding_set(binding_set_uuid)
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Binding set {binding_set_uuid} not found")
@@ -173,6 +177,7 @@ async def get_binding_set(
     "/binding-sets/{binding_set_uuid}/confirm",
     response_model=BindingSetResponse,
     summary="Confirm a proposed binding set",
+    responses={404: {"description": "Binding set not found"}},
 )
 async def confirm_binding_set(
     binding_set_uuid: UUID,
@@ -181,6 +186,8 @@ async def confirm_binding_set(
 ) -> BindingSetResponse:
     """Manually confirm a Binding Set that was left in ``proposed`` state.
 
+    Applies to shared-metadata sets where ``auto_confirm`` is false. No
+    request body required — the binding set UUID in the path is sufficient.
     Idempotent for already-confirmed sets.
     """
     binding_set = await service.confirm_binding_set(binding_set_uuid)
@@ -195,6 +202,7 @@ async def confirm_binding_set(
     "/binding-sets/{binding_set_uuid}/change-request",
     response_model=BindingSetResponse,
     summary="Associate a Sqitch Change Request with a confirmed binding set",
+    responses={404: {"description": "Binding set not found or not in confirmed state"}},
 )
 async def associate_change_request(
     binding_set_uuid: UUID,
@@ -202,7 +210,11 @@ async def associate_change_request(
     _config: ConfigLike = Depends(get_config_dep),
     service: IdentityService = Depends(get_identity_service),
 ) -> BindingSetResponse:
-    """Record a Sqitch Change Request name against a confirmed Binding Set (FR-25, FR-27)."""
+    """Record a Sqitch Change Request name against a confirmed Binding Set (FR-25, FR-27).
+
+    Example body: ``{"change_request_name": "deploy/2026-04-01/site-batch-1"}``.
+    The binding set must already be in ``confirmed`` state.
+    """
     binding_set = await service.associate_change_request(binding_set_uuid, body.change_request_name)
     if binding_set is None:
         raise HTTPException(
@@ -218,6 +230,7 @@ async def associate_change_request(
     "/detect-change",
     response_model=ChangeDetectionResult,
     summary="Detect content change for a tracked identity",
+    responses={404: {"description": "Tracked identity not found"}},
 )
 async def detect_change(
     body: ChangeDetectionRequest,
@@ -227,6 +240,7 @@ async def detect_change(
     """Compare an incoming content hash against the stored hash (FR-24).
 
     Returns ``insert``, ``update``, or ``skip``.
+    Example body: ``{"tracked_identity_uuid": "<uuid>", "content_hash": "<xxh64 hex>"}``.
     """
     try:
         return await service.detect_change(body)
