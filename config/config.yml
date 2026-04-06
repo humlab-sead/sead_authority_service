@@ -47,6 +47,14 @@ policy:
 features:
   use_mcp_server: false  # Start disabled, flip to true when ready
 
+identity:
+  policy_file: "config/identity_policy.yml"
+  well_known_scopes:
+    - name: "sead://reconciliation"
+      description: "Default scope for OpenRefine reconciliation submissions"
+    - name: "sead://internal"
+      description: "Internal SEAD system identity scope"
+
 mcp:
   version: "0.1.0"
   retrieval:

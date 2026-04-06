@@ -1,5 +1,7 @@
 # SEAD Identity System Requirements
 
+> **Status: Frozen (2026-04-06).** Implementation complete. This document is preserved as design rationale. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
+
 ## Purpose
 
 > **Module location**: SIMS is implemented as the `src/identity/` module within the [`sead_authority_service`](https://github.com/humlab-sead/sead_authority_service) repository. There is no separate `sead_identity_system` deployment. See [docs/sims/README.md](./README.md) for full context.
@@ -15,19 +17,7 @@ It is intentionally focused on:
 
 ### Out Of Scope For This Document
 
-AI agents, take notice! The following are **out of scope** for this document, and should **not** be included in this document:
-
-- implementation details,
-- implementation plans,
-- non-functional requirements (NFRs)
-- deployment phases,
-- infrastructure architecture,
-- performance targets,
-- authentication details,
-- endpoint-level contracts or payload definitions,
-- database migration steps,
-- rollout plans,
-- code-level hashing or serialization rules.
+This document covers requirements only. Implementation details, NFRs, infrastructure, deployment, authentication, endpoint contracts, and rollout plans belong in separate documents.
 
 ---
 
@@ -84,84 +74,19 @@ The system **must**:
 
 ### Core identity concepts
 
-The system must distinguish the following concepts clearly.
+The system must distinguish the following identifier types.
 
-#### SEAD internal identity
-
-The current SEAD primary key used inside the relational schema.
-
-Characteristics:
-
-- entity-scoped,
-- integer sequences, 
-- relational,
-- internal to SEAD,
-- should **not** be exposed as a public identity.
-- represented in SEAD as `{entity}_id` where applicable.
-
-#### SEAD universal identity
-
-The stable UUID used to identify **a tracked SEAD entity** across system boundaries.
-
-Characteristics:
-
-- globally scoped,
-- externally usable,
-- stable across submissions,
-- represented in SEAD as `{entity}_uuid` where applicable.
-
-#### Business key
-
-A natural key or key set that uniquely identifies an entity in practice.
-
-Characteristics:
-
-- defined per entity type,
-- used primarily for reconciliation,
-- may come from SEAD conventions or provider data,
-- may or may not be globally stable.
-
-#### Provider key
-
-An identifier used by a remote data provider.
-
-Characteristics:
-
-- may be a UUID,
-- may be a business key,
-- may be internal to the provider,
-- should generally be retained in the identity system even when not promoted into SEAD tables.
-
-#### Authority key
-
-An identifier from an external authority or reference system, such as Wikidata, GeoNames, or a domain ontology.
-
-Characteristics:
-
-- useful for reconciliation,
-- useful for de-duplication of shared metadata,
-- not always available from providers,
-- may become strategically important for shared SEAD entities.
+| Type | Definition | Scope | In SEAD |
+|---|---|---|---|
+| **SEAD internal identity** | Integer sequence primary key | Entity-scoped, relational | `{entity}_id` — not a public identity |
+| **SEAD universal identity** | Stable UUID for a tracked entity | Global, externally usable | `{entity}_uuid` |
+| **Business key** | Natural key or key set identifying an entity in practice | Per entity type | Used for reconciliation; may come from SEAD or provider |
+| **Provider key** | Identifier used by a remote data provider | Provider-internal | Retained in identity system even if not promoted to SEAD tables |
+| **Authority key** | Identifier from an external reference system (e.g. Wikidata, GeoNames) | External authority | Supports reconciliation and de-duplication of shared metadata |
 
 ### Entity and value object distinction
 
-This document uses definitions grounded in domain-driven design.
-
-**An entity** is a domain object that:
-
-- has stable identity that persists across state changes, submissions, and system boundaries,
-- can be uniquely identified independent of its current attribute values,
-- has a meaningful lifecycle that may include creation, update, and deprecation,
-- can be referenced before its full state is known,
-- must be reconciled and de-duplicated when the same thing may arrive from multiple sources.
-
-**A value object** is a domain object that:
-
-- is defined entirely by its attributes,
-- is interchangeable with any other value object carrying the same attribute values,
-- has no independent lifecycle or stable identity,
-- belongs to an owning entity as part of that entity's aggregate state,
-- is replaced rather than independently updated or reconciled.
+This document uses domain-driven design (DDD) concepts as defined in [CONCEPTUAL_MODEL.md § Domain Modeling Foundations](./CONCEPTUAL_MODEL.md#domain-modeling-foundations): **entity**, **value object**, and **aggregate**.
 
 **A tracked entity** is an entity for which this system manages stable UUID identity. Not every domain object needs to be tracked. Determining which SEAD objects qualify as tracked entities is a SEAD domain-modeling task, deferred to SEAD model specification work. That work may draw on Shape Shifter's target model conformance definitions as an input.
 
@@ -193,21 +118,15 @@ Value objects belong to an owning entity and are managed as part of that entity'
 
 ### Relationship types
 
-The domain model must support more than one relationship type.
+The domain model must support:
 
-#### Ownership
+- **Ownership**: the child is part of the aggregate state of a parent entity.
+- **Association**: two entities are linked without ownership (e.g. site-to-location).
+- **Reconciliation linkage**: a provider object or classifier is matched to an existing SEAD object without implying ownership.
 
-The child is part of the aggregate state of a parent entity.
+### Conceptual model alignment
 
-#### Association
-
-Two entities are linked, but one does not own the identity of the other.
-
-This is important for relationships such as site-to-location where the schema expresses association rather than strict containment.
-
-#### Reconciliation linkage
-
-A provider object or classifier is matched to an existing SEAD object without implying ownership.
+The domain concepts above are elaborated in [CONCEPTUAL_MODEL.md](./CONCEPTUAL_MODEL.md), which defines the full conceptual model including core concepts, relations, lifecycles, and canonical use cases.
 
 ---
 
@@ -243,7 +162,7 @@ FR-11. The system shall enforce an administrable identity policy that governs wh
 
 FR-12. The system shall return the same resolved SEAD identity for the same accepted identifier across repeated submissions.
 
-FR-13. The system shall prevent duplicate identity allocation for the same accepted identifier within the same identity scope.
+FR-13. The system shall prevent duplicate identity allocation for the same accepted identifier within the same source scope.
 
 FR-14. The system shall support stable lookup of existing mappings between provider identifiers, business keys, authority keys, UUID identity, and SEAD internal identity.
 
@@ -259,7 +178,7 @@ FR-18. The system shall support many-to-many associations between tracked entiti
 
 FR-19. The system shall distinguish owned child value objects from independently tracked entities.
 
-FR-20. The system shall surface unresolved reconciliation state when an incoming shared metadata or classifier entity cannot be matched to an existing SEAD entity, rather than silently allocating a new identity.
+FR-20. The system shall reject a submission with diagnostic information when an incoming shared metadata or classifier entity cannot be matched to an existing SEAD entity, rather than silently allocating a new identity.
 
 ### Submission and traceability requirements
 
@@ -275,9 +194,19 @@ FR-24. The system shall maintain identity state sufficient for aggregate-level c
 
 FR-25. The system shall keep identity allocation logic independent of business-data mutation logic.
 
+### Binding set requirements
+
+FR-26. The system shall group the Bindings produced by an identity resolution batch into a Binding Set that is confirmed or rejected as an atomic unit.
+
+### Change Request completeness requirements
+
+FR-27. The system shall require that all entities referenced by a Change Request have resolved identities expressed through confirmed Binding Sets before the Change Request can be applied to SEAD. This applies to entities originating from external provider submissions and from internal SEAD administration alike.
+
 ---
 
 ## Usage Scenarios
+
+The scenarios below describe requirements-level situations. [CONCEPTUAL_MODEL.md § Canonical Use Cases](./CONCEPTUAL_MODEL.md#canonical-use-cases) provides corresponding identity-centered use cases.
 
 ### Scenario 1: Provider submits entity data
 
@@ -299,7 +228,7 @@ Expected outcome:
 - the system does not treat those values as provider-owned entities by default,
 - instead it attempts reconciliation against shared SEAD metadata,
 - if matched, the shared SEAD entity is reused,
-- if not matched, the system surfaces that unresolved state for later handling according to SEAD policy.
+- if not matched, the system rejects the submission with diagnostic information identifying the unmatched entities, according to SEAD policy.
 
 ### Scenario 3: Entity association rather than ownership
 
@@ -325,14 +254,14 @@ Expected outcome:
 
 ## High Level API Behaviour
 
-The API exposes the identity system as a service. Clients present identity evidence, request resolution or allocation within a submission context, and receive stable identity results. Endpoint design belongs in a later API specification.
+The API exposes the identity system as a service. Clients present identity evidence, request resolution or allocation within a source scope, and receive stable identity results. Endpoint design belongs in a later API specification.
 
 ### API-visible concepts
 
 At a high level, the API should expose behavior around:
 
 - tracked entity types,
-- submission contexts,
+- source scopes and submissions,
 - identity evidence,
 - resolved identity,
 - minted identity,

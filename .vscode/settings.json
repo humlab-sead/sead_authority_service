@@ -30,7 +30,7 @@
     "python.testing.pytestEnabled": true,
     "pgFormatter.configFile": "${workspaceFolder}/.pg_format",
     "[sql]": {
-        "editor.defaultFormatter": "bradymholt.pgformatter"
+        "editor.defaultFormatter": "sqlfluff.vscode-sqlfluff"
     },
     "python.analysis.exclude": [
         "bin",
@@ -40,14 +40,21 @@
         ".git",
         "logs",
         "tmp",
-        ".venv"
+        ".venv",
+        "**/node_modules",
+        "**/.*",
     ],
     "python.analysis.ignore": [
         ".venv"
     ],
     "files.exclude": {
         "**/.git": true,
-        "**/.DS_Store": true
+        "**/.DS_Store": true,
+        "**/__pycache__": true,
+        "**/.ruff_cache": true,
+        "**/*.egg-info": true,
+        "**/dist": true,
+        "**/htmlcov": true,
     },
     "search.exclude": {
         "**/.venv": true,

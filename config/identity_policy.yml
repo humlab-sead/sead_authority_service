@@ -1,0 +1,108 @@
+# SIMS Identity Policy Configuration
+#
+# Controls per-entity-type identity behaviour. Loaded once at startup by
+# src.identity.policy.IdentityPolicy.
+#
+# Fields per entity:
+#   entity_subtype:    provider_owned | shared_metadata | relationship
+#   accept_uuid:       true  → accept caller-supplied UUID (FR-11)
+#                      false → always allocate a fresh UUID; caller UUID is ignored
+#   allow_allocation:  true  → service may mint a new TrackedIdentity when no match is found
+#   auto_confirm:      true  → Binding Sets are auto-confirmed without manual review
+#
+# Notes:
+#   - Phase 1 covers provider_owned entities only.
+#   - shared_metadata and relationship entities are listed for completeness;
+#     their policy handling will be implemented in Phase 2+.
+#   - Entity names match tbl_* suffixes in the SEAD standard model.
+
+entities:
+
+  # ── Provider-owned (aggregate roots) ──────────────────────────────────────
+
+  site:
+    entity_subtype: provider_owned
+    accept_uuid: false
+    allow_allocation: true
+    auto_confirm: true
+
+  sample_group:
+    entity_subtype: provider_owned
+    accept_uuid: false
+    allow_allocation: true
+    auto_confirm: true
+
+  sample:
+    entity_subtype: provider_owned
+    accept_uuid: false
+    allow_allocation: true
+    auto_confirm: true
+
+  analysis_entity:
+    entity_subtype: provider_owned
+    accept_uuid: false
+    allow_allocation: true
+    auto_confirm: true
+
+  dataset:
+    entity_subtype: provider_owned
+    accept_uuid: false
+    allow_allocation: true
+    auto_confirm: true
+
+  # ── Shared metadata (reconciled by business key) ──────────────────────────
+  # Phase 2+: manual review required; auto_confirm is explicitly false.
+
+  taxa_tree_master:
+    entity_subtype: shared_metadata
+    accept_uuid: true
+    allow_allocation: false
+    auto_confirm: false
+
+  feature_type:
+    entity_subtype: shared_metadata
+    accept_uuid: true
+    allow_allocation: false
+    auto_confirm: false
+
+  method:
+    entity_subtype: shared_metadata
+    accept_uuid: true
+    allow_allocation: false
+    auto_confirm: false
+
+  data_type:
+    entity_subtype: shared_metadata
+    accept_uuid: true
+    allow_allocation: false
+    auto_confirm: false
+
+  unit:
+    entity_subtype: shared_metadata
+    accept_uuid: true
+    allow_allocation: false
+    auto_confirm: false
+
+  # ── Relationship / child entities (identity derived from parent) ──────────
+  # Phase 2+: identity comes from FK, not from UUID allocation.
+
+  sample_dimension:
+    entity_subtype: relationship
+    accept_uuid: false
+    allow_allocation: false
+    auto_confirm: false
+
+  abundance:
+    entity_subtype: relationship
+    accept_uuid: false
+    allow_allocation: false
+    auto_confirm: false
+
+# ── Global defaults ──────────────────────────────────────────────────────────
+# Applied when an entity_type is not listed above.
+
+defaults:
+  entity_subtype: shared_metadata
+  accept_uuid: true
+  allow_allocation: false
+  auto_confirm: false
