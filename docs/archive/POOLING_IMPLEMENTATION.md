@@ -213,4 +213,4 @@ If needed, revert these commits:
 
 Fixes: "current transaction is aborted, commands ignored until end of transaction block"
 
-See also: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for production deployment guidance.
+See also: [docs/OPERATIONS.md](docs/OPERATIONS.md) for production deployment guidance.
