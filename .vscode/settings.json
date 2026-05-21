@@ -25,7 +25,6 @@
     "python.testing.pytestArgs": [
         "tests"
     ],
-    
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "pgFormatter.configFile": "${workspaceFolder}/.pg_format",
@@ -33,19 +32,40 @@
         "editor.defaultFormatter": "sqlfluff.vscode-sqlfluff"
     },
     "python.analysis.exclude": [
-        "bin",
-        "data",
-        "dist",
-        "**/__pycache__",
-        ".git",
-        "logs",
-        "tmp",
-        ".venv",
-        "**/node_modules",
         "**/.*",
+        "**/__pycache__/**",
+        "**/.pytest_cache/**",
+        "**/.ruff_cache/**",
+        "**/.mypy_cache/**",
+        "**/.git/**",
+        "**/.tox/**",
+        "**/.nox/**",
+        "**/.venv/**",
+        "**/venv/**",
+        "**/env/**",
+        "**/coverage/**",
+        "**/dist/**",
+        "**/build/**",
+        "**/node_modules/**",
+        "**/.vite/**",
+        "**/output/**",
+        "**/tmp/**",
+        "htmlcov/**",
+        "**/*.egg-info/**",
+
+        "logs/**",
+        "bin/**",
+        "docs/**",
+        "docker/**",
+        "data/**",
+        "schema/**",
+        "sead-tools/**",
+        "deprecated/**",
     ],
-    "python.analysis.ignore": [
-        ".venv"
+    "python.analysis.include": [
+        "src",
+        "tests",
+        "scripts",
     ],
     "files.exclude": {
         "**/.git": true,
@@ -61,13 +81,15 @@
         "**/__pycache__": true
     },
     "markdownlint.ignore": [
-        ".github/copilot-instructions.md",
-        "AGENTS.md"
+        ".github/**/*-instructions.md",
+        "**/AGENTS.md"
     ],
     "github.copilot.chat.diagnostics.ignoreFiles": [
-        ".github/copilot-instructions.md",
-        "AGENTS.md"
+        ".github/**/*-instructions.md",
+        "**/AGENTS.md"
     ],
+    "python.analysis.indexing": true,
+    "python.analysis.userFileIndexingLimit": 500,
     "python.analysis.inlayHints.functionReturnTypes": true,
     "python.analysis.inlayHints.variableTypes": true,
     "python.analysis.typeCheckingMode": "standard",
