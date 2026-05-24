@@ -74,12 +74,13 @@ def _make_submission() -> MagicMock:
     return sub
 
 
-def _make_outcome(outcome: str = "new") -> ResolutionOutcome:
+def _make_outcome(outcome: str = "new", *, target_id: int | None = None) -> ResolutionOutcome:
     return ResolutionOutcome(
         source_identity_uuid=uuid4(),
         entity_type="site",
         outcome=outcome,
         tracked_identity_uuid=TRACKED_UUID if outcome == "matched" else None,
+        target_id=target_id,
     )
 
 
@@ -148,6 +149,15 @@ class TestResolveEndpoint:
         assert "scope_uuid" in data
         assert "binding_set" in data
         assert "outcomes" in data
+
+    def test_resolve_response_includes_target_id_when_present(self):
+        svc = _make_service_mock(resolve_identity=AsyncMock(return_value=_make_outcome("matched", target_id=4321)))
+        client = _make_client(svc)
+
+        response = client.post("/identity/resolve", json=self.VALID_BODY)
+
+        data = response.json()
+        assert data["outcomes"][0]["target_id"] == 4321
 
     def test_resolve_calls_get_or_create_scope(self):
         svc = _make_service_mock()

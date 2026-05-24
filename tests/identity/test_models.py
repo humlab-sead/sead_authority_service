@@ -9,6 +9,7 @@ from src.identity.models import (
     ChangeDetectionResult,
     IdentitySignal,
     RejectDiagnostics,
+    ResolutionOutcome,
     ResolutionRequest,
     SourceIdentity,
     SourceIdentityKey,
@@ -236,6 +237,29 @@ class TestResolutionRequest:
             ],
         )
         assert len(req.additional_signals) == 1
+
+
+class TestResolutionOutcome:
+    def test_defaults(self):
+        outcome = ResolutionOutcome(
+            source_identity_uuid=uuid4(),
+            entity_type="site",
+            outcome="new",
+        )
+
+        assert outcome.tracked_identity_uuid is None
+        assert outcome.target_id is None
+
+    def test_with_target_id(self):
+        outcome = ResolutionOutcome(
+            source_identity_uuid=uuid4(),
+            entity_type="site",
+            outcome="matched",
+            tracked_identity_uuid=uuid4(),
+            target_id=4321,
+        )
+
+        assert outcome.target_id == 4321
 
 
 class TestChangeDetection:

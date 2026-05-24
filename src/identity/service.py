@@ -159,6 +159,7 @@ class IdentityService:
         existing: tuple[Binding, BindingSetState] | None = await self.binding_repo.find_confirmed_binding(source_identity.source_identity_uuid)
         if existing is not None:
             binding, _ = existing
+            tracked_identity: TrackedIdentity | None = await self.tracked_identity_repo.get(binding.tracked_identity_uuid)
             logger.debug(
                 f"resolve_identity: matched existing binding "
                 f"source={source_identity.source_identity_uuid} → tracked={binding.tracked_identity_uuid}"
@@ -168,6 +169,7 @@ class IdentityService:
                 entity_type=request.entity_type,
                 outcome="matched",
                 tracked_identity_uuid=binding.tracked_identity_uuid,
+                target_id=tracked_identity.sead_internal_id if tracked_identity is not None else None,
             )
 
         # 4. No existing binding — allocation deferred
@@ -179,6 +181,7 @@ class IdentityService:
             entity_type=request.entity_type,
             outcome="new",
             tracked_identity_uuid=None,
+            target_id=None,
         )
 
     # ------------------------------------------------------------------
@@ -258,6 +261,8 @@ class IdentityService:
             return None
 
         tracked: TrackedIdentity = await self.tracked_identity_repo.mint(entity_type=outcome.entity_type, created_by=created_by)
+        outcome.tracked_identity_uuid = tracked.tracked_identity_uuid
+        outcome.target_id = tracked.sead_internal_id
         return await self.binding_repo.create(
             binding_set_uuid=binding_set_uuid,
             source_identity_uuid=outcome.source_identity_uuid,

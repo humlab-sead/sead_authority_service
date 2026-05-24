@@ -63,6 +63,7 @@ def _make_tracked_identity(state: str = "allocated") -> MagicMock:
     t.tracked_identity_uuid = TRACKED_UUID
     t.entity_type = "site"
     t.lifecycle_state = TrackedIdentityState(state)
+    t.sead_internal_id = None
     t.content_hash = None
     return t
 
@@ -192,6 +193,7 @@ class TestResolveIdentity:
 
         assert outcome.outcome == "new"
         assert outcome.tracked_identity_uuid is None
+        assert outcome.target_id is None
         assert outcome.source_identity_uuid == SOURCE_IDENTITY_UUID
 
     @pytest.mark.asyncio
@@ -201,14 +203,48 @@ class TestResolveIdentity:
         source_identity_repo.link_to_submission = AsyncMock()
 
         existing_binding = _make_binding()
+        tracked_identity = _make_tracked_identity("materialized")
+        tracked_identity.sead_internal_id = 4321
         binding_repo = AsyncMock()
         binding_repo.find_confirmed_binding.return_value = (existing_binding, "confirmed")
 
-        service: IdentityService = _make_service(source_identity_repo=source_identity_repo, binding_repo=binding_repo)
+        tracked_identity_repo = AsyncMock()
+        tracked_identity_repo.get.return_value = tracked_identity
+
+        service: IdentityService = _make_service(
+            source_identity_repo=source_identity_repo,
+            binding_repo=binding_repo,
+            tracked_identity_repo=tracked_identity_repo,
+        )
         outcome: ResolutionOutcome = await service.resolve_identity(SCOPE_UUID, self._request())
 
         assert outcome.outcome == "matched"
         assert outcome.tracked_identity_uuid == TRACKED_UUID
+        assert outcome.target_id == 4321
+
+    @pytest.mark.asyncio
+    async def test_returns_matched_with_null_target_id_when_tracked_identity_not_materialized(self) -> None:
+        source_identity_repo = AsyncMock()
+        source_identity_repo.create_or_get.return_value = _make_source_identity()
+        source_identity_repo.link_to_submission = AsyncMock()
+
+        existing_binding = _make_binding()
+        binding_repo = AsyncMock()
+        binding_repo.find_confirmed_binding.return_value = (existing_binding, "confirmed")
+
+        tracked_identity_repo = AsyncMock()
+        tracked_identity_repo.get.return_value = _make_tracked_identity("allocated")
+
+        service: IdentityService = _make_service(
+            source_identity_repo=source_identity_repo,
+            binding_repo=binding_repo,
+            tracked_identity_repo=tracked_identity_repo,
+        )
+        outcome: ResolutionOutcome = await service.resolve_identity(SCOPE_UUID, self._request())
+
+        assert outcome.outcome == "matched"
+        assert outcome.tracked_identity_uuid == TRACKED_UUID
+        assert outcome.target_id is None
 
     @pytest.mark.asyncio
     async def test_links_to_submission_when_provided(self) -> None:
@@ -294,6 +330,36 @@ class TestBind:
 
         tracked_identity_repo.mint.assert_called_once_with(entity_type="site", created_by=None)
         assert isinstance(result, BindingSetResponse)
+
+    @pytest.mark.asyncio
+    async def test_bind_new_outcome_populates_outcome_target_fields_from_tracked_identity(self) -> None:
+        binding_set_repo = AsyncMock()
+        binding_set_repo.create.return_value = _make_binding_set("proposed")
+        binding_set_repo.transition.return_value = _make_binding_set("confirmed")
+
+        tracked_identity = _make_tracked_identity("materialized")
+        tracked_identity.sead_internal_id = 4321
+        tracked_identity_repo = AsyncMock()
+        tracked_identity_repo.mint.return_value = tracked_identity
+
+        source_identity_repo = AsyncMock()
+        source_identity_repo.get.return_value = _make_source_identity()
+
+        binding_repo = AsyncMock()
+        binding_repo.create.return_value = _make_binding("allocated")
+
+        outcome = self._new_outcome()
+        service: IdentityService = _make_service(
+            binding_set_repo=binding_set_repo,
+            tracked_identity_repo=tracked_identity_repo,
+            source_identity_repo=source_identity_repo,
+            binding_repo=binding_repo,
+        )
+
+        await service.bind(SUBMISSION_UUID, [outcome])
+
+        assert outcome.tracked_identity_uuid == TRACKED_UUID
+        assert outcome.target_id == 4321
 
     @pytest.mark.asyncio
     async def test_bind_new_outcome_auto_confirms_for_provider_owned(self) -> None:
