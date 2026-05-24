@@ -6,6 +6,8 @@ This directory only contains the Docker build inputs for `sead_authority_service
 
 - `docker/Dockerfile`: image definition used for both manual builds and the disabled GHCR workflow.
 - `docker/build.sh`: manual replacement for the disabled GHCR workflow.
+- `docker/.env.example`: single runtime environment template for deployments.
+- `docker/config/`: tracked, sanitized config template copied from the deployment config directory.
 - `sead-tools/sead_authority_service/docker-compose.yml`: the single deployment compose file.
 - `sead-tools/sead_authority_service/.env`: target-environment settings for that deployment.
 - `sead-tools/sead_authority_service/config/`: mounted runtime configuration.
@@ -53,6 +55,9 @@ Smoke-test examples:
 ## Run the staging deployment
 
 The deployment compose file lives in `sead-tools/sead_authority_service` and reads its environment from the local `.env` file in that directory.
+
+Start from `docker/.env.example` when you need to create or refresh a target deployment `.env` file.
+Start from `docker/config/` when you need to create or refresh the mounted runtime config directory.
 
 ```bash
 cd sead-tools/sead_authority_service

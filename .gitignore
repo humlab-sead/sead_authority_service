@@ -109,6 +109,7 @@ update
 csv_files
 tests/output
 **/.env*
+!docker/.env.example
 **/chat*.json
 bin
 *.pdf
