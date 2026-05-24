@@ -58,10 +58,11 @@ The deployment compose file lives in `sead-tools/sead_authority_service` and rea
 
 Start from `docker/.env.example` when you need to create or refresh a target deployment `.env` file.
 Start from `docker/config/` when you need to create or refresh the mounted runtime config directory.
+Build or pull the target image first; the compose file is runtime-only and does not build images.
 
 ```bash
 cd sead-tools/sead_authority_service
-docker compose up -d --build
+docker compose up -d
 ```
 
 The service mounts:
