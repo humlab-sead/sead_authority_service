@@ -25,7 +25,7 @@ This script always builds from GitHub, not from the local worktree.
 
 Options:
     --git-ref REF        Git branch or tag to build from
-    --target-env ENV     Deployment target environment: dev, staging, prod
+    --target-env ENV     Deployment target environment: dev, staging, production
     -t, --tag TAG        Override the derived image tag
     -p, --push           Push the image to GHCR after a successful build
     --no-cache           Build without using the Docker layer cache
@@ -34,7 +34,7 @@ Options:
 Examples:
     ${script_name} --git-ref dev
     ${script_name} --git-ref main --target-env staging
-    ${script_name} --git-ref v1.2.0 --target-env prod --push
+    ${script_name} --git-ref v1.2.0 --target-env production --push
 EOF
 
     if [[ -n "${1:-}" ]]; then
@@ -79,7 +79,7 @@ if [[ -z "${git_ref}" ]]; then
 fi
 
 case "${target_env}" in
-    dev|staging|prod)
+    dev|staging|production)
         ;;
     *)
         print_usage "unsupported target environment '${target_env}'"
@@ -88,7 +88,7 @@ esac
 
 if [[ -z "${image_tag}" ]]; then
     if [[ "${git_ref}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.].*)?$ ]]; then
-        if [[ "${target_env}" == "prod" ]]; then
+        if [[ "${target_env}" == "production" ]]; then
             image_tag="${git_ref}"
         else
             image_tag="${target_env}"
@@ -101,7 +101,7 @@ if [[ -z "${image_tag}" ]]; then
             staging)
                 image_tag="staging"
                 ;;
-            prod)
+            production)
                 if [[ "${git_ref}" == "main" ]]; then
                     image_tag="latest"
                 else
