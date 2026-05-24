@@ -160,6 +160,10 @@ class ResolutionOutcome(BaseModel):
         default=None,
         description="Set when outcome is 'matched'. For 'new', set after Bind.",
     )
+    target_id: int | None = Field(
+        default=None,
+        description="Target-facing SEAD integer ID when the tracked identity is already materialized.",
+    )
 
 
 class BindRequest(BaseModel):
