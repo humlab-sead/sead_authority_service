@@ -17,7 +17,7 @@ class SiteRepository(BaseRepository):
     async def fetch_site_distances(self, coordinate: dict[str, float], site_ids: list[int]) -> dict[int, float]:
         sql: str = self.get_sql_queries().get("fetch_site_distances", "")
         rows: list[dict[str, Any]] = await self.fetch_all(sql, {"lat": coordinate["lat"], "lon": coordinate["lon"], "site_ids": site_ids})
-        distances: dict[int, float] = {row["site_id"]: row["distance_km"] for row in rows}
+        distances: dict[int, float] = {row["site_id"]: row["distance_km"] for row in rows if row["distance_km"] is not None}
         return distances
 
     async def fetch_site_location_similarity(self, candidates: list[dict], place: str) -> dict[int, float]:
@@ -27,7 +27,7 @@ class SiteRepository(BaseRepository):
         sql: str = self.get_sql_queries().get("fetch_site_location_similarity", "")
         site_ids: list[int] = [c["site_id"] for c in candidates]
         rows: list[dict[str, Any]] = await self.fetch_all(sql, {"place": place, "site_ids": site_ids})
-        place_results: dict[int, float] = {row["site_id"]: row["place_sim"] for row in rows}
+        place_results: dict[int, float] = {row["site_id"]: row["place_sim"] for row in rows if row["place_sim"] is not None}
         return place_results
 
 
@@ -80,6 +80,8 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
             site_id = candidate["site_id"]
             if site_id in distances:
                 distance = distances[site_id]
+                if distance is None:
+                    continue
                 # Max boost of very_near_distance_km for sites within 1km, diminishing to 0 at 100km
                 proximity_boost = max(0, very_near_distance_km * (1 - min(distance / to_far_distance_km, 1.0)))
                 candidate["name_sim"] = min(1.0, candidate["name_sim"] + proximity_boost)

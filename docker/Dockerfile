@@ -14,7 +14,7 @@
 #   With uv:      docker build -f docker/Dockerfile --build-arg USE_UV=true -t sead-authority-service .
 
 # Stage 1: Builder
-FROM python:3.13-slim as builder
+FROM python:3.13-slim AS builder
 
 # Build arguments
 ARG USE_UV=false
@@ -74,6 +74,8 @@ FROM python:3.13-slim
 
 # Build arguments for runtime configuration
 ARG APP_PORT=8000
+ARG USER_UID=1002
+ARG USER_GID=33
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -82,7 +84,13 @@ ENV PYTHONUNBUFFERED=1 \
     APP_PORT=${APP_PORT}
 
 # Create app user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+# Use existing group if GID already exists (e.g., www-data GID 33)
+RUN GROUP_NAME=$(getent group ${USER_GID} | cut -d: -f1) && \
+    if [ -z "$GROUP_NAME" ]; then \
+        groupadd --gid ${USER_GID} appuser; \
+        GROUP_NAME=appuser; \
+    fi && \
+    useradd --uid ${USER_UID} -g ${GROUP_NAME} --home-dir=/app --shell=/bin/bash appuser
 
 # Install runtime dependencies only
 RUN apt-get update && apt-get install -y \
@@ -103,7 +111,7 @@ COPY --from=builder /build/main.py ./
 
 # Create directories for logs and data
 RUN mkdir -p logs data && \
-    chown -R appuser:appuser ${APP_HOME}
+    chown -R ${USER_UID}:${USER_GID} ${APP_HOME}
 
 # Switch to non-root user
 USER appuser
@@ -116,4 +124,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${APP_PORT}/is_alive || exit 1
 
 # Default command - can be overridden in docker-compose
-CMD uvicorn main:app --host 0.0.0.0 --port ${APP_PORT}
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${APP_PORT}"]

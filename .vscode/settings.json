@@ -16,7 +16,10 @@
         "titleBar.activeBackground": "#1c3045",
         "titleBar.activeForeground": "#e7e7e7",
         "titleBar.inactiveBackground": "#1c304599",
-        "titleBar.inactiveForeground": "#e7e7e799"
+        "titleBar.inactiveForeground": "#e7e7e799",
+        "editor.background": "#000000",
+        "sideBar.background": "#000000",
+        "panel.background": "#000000"
     },
     "peacock.remoteColor": "#1c3045",
     "python.testing.pytestArgs": [
@@ -26,37 +29,67 @@
     "python.testing.pytestEnabled": true,
     "pgFormatter.configFile": "${workspaceFolder}/.pg_format",
     "[sql]": {
-        "editor.defaultFormatter": "bradymholt.pgformatter"
+        "editor.defaultFormatter": "sqlfluff.vscode-sqlfluff"
     },
     "python.analysis.exclude": [
-        "bin",
-        "data",
-        "dist",
-        "**/__pycache__",
-        ".git",
-        "logs",
-        "tmp",
-        ".venv"
+        "**/.*",
+        "**/__pycache__/**",
+        "**/.pytest_cache/**",
+        "**/.ruff_cache/**",
+        "**/.mypy_cache/**",
+        "**/.git/**",
+        "**/.tox/**",
+        "**/.nox/**",
+        "**/.venv/**",
+        "**/venv/**",
+        "**/env/**",
+        "**/coverage/**",
+        "**/dist/**",
+        "**/build/**",
+        "**/node_modules/**",
+        "**/.vite/**",
+        "**/output/**",
+        "**/tmp/**",
+        "htmlcov/**",
+        "**/*.egg-info/**",
+
+        "logs/**",
+        "bin/**",
+        "docs/**",
+        "docker/**",
+        "data/**",
+        "schema/**",
+        "sead-tools/**",
+        "deprecated/**",
     ],
-    "python.analysis.ignore": [
-        ".venv"
+    "python.analysis.include": [
+        "src",
+        "tests",
+        "scripts",
     ],
     "files.exclude": {
         "**/.git": true,
-        "**/.DS_Store": true
+        "**/.DS_Store": true,
+        "**/__pycache__": true,
+        "**/.ruff_cache": true,
+        "**/*.egg-info": true,
+        "**/dist": true,
+        "**/htmlcov": true,
     },
     "search.exclude": {
         "**/.venv": true,
         "**/__pycache__": true
     },
     "markdownlint.ignore": [
-        ".github/copilot-instructions.md",
-        "AGENTS.md"
+        ".github/**/*-instructions.md",
+        "**/AGENTS.md"
     ],
     "github.copilot.chat.diagnostics.ignoreFiles": [
-        ".github/copilot-instructions.md",
-        "AGENTS.md"
+        ".github/**/*-instructions.md",
+        "**/AGENTS.md"
     ],
+    "python.analysis.indexing": true,
+    "python.analysis.userFileIndexingLimit": 500,
     "python.analysis.inlayHints.functionReturnTypes": true,
     "python.analysis.inlayHints.variableTypes": true,
     "python.analysis.typeCheckingMode": "standard",

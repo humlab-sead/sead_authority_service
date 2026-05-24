@@ -1,0 +1,126 @@
+# Docker configuration template for SEAD Authority Service
+# This directory mirrors the deployment config layout without environment-specific secrets.
+
+options:
+  id_base: "https://w3id.org/sead/id/"
+  auto_accept_threshold: 0.90
+  default_query_limit: 10
+  database:
+    dbname: "${SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME:-sead_staging}"
+    host: "${SEAD_AUTHORITY_OPTIONS_DATABASE_HOST:-localhost}"
+    port: "${SEAD_AUTHORITY_OPTIONS_DATABASE_PORT:-5432}"
+    user: "${SEAD_AUTHORITY_OPTIONS_DATABASE_USER:-sead_user}"
+    pool_min_size: 2
+    pool_max_size: 10
+    pool_timeout: 30.0
+
+policy:
+  site:
+    proximity_boost:
+      very_near_distance_km: 0.2
+      to_far_distance_km: 10.0
+    place_name_similarity_boost:
+      similarity_threshold: 0.3
+      max_boost: 0.1
+  modification_type:
+    lookup_format: "json"
+    lookup_fields_map:
+      id: "modification_type_id"
+      label: "modification_type_name"
+      description: "modification_type_description"
+    entity_type_description: "modification type"
+    roles:
+      - role: system
+        content: You are archaeological specialist with expertise in identifying and classifying archaeological samples based on their features and characteristics.
+    context: |
+      You are provided with known modification types, each with an id, a label and a description.
+    output:
+      format: json
+  geonames:
+    options:
+      username: "${GEONAMES_USERNAME:-demo}"
+      lang: "en"
+      country_bias: "en"
+      fuzzy: 0.8
+      feature_classes: ["P", "A"]
+      orderby: "relevance"
+      style: "FULL"
+
+features:
+  use_mcp_server: false
+
+mcp:
+  version: "0.1.0"
+  retrieval:
+    k_fuzzy: 30
+    k_sem: 30
+    k_final: 20
+    min_score_threshold: 0.6
+  enable_caching: true
+  cache_ttl_seconds: 86400
+  embedding:
+    model: "sentence-transformers/all-mpnet-base-v2"
+    dimensions: 768
+
+table_specs: "@include: entities.yml"
+
+llm:
+  provider: "${LLM_PROVIDER:-openai}"
+  options:
+    max_tokens: 10000
+    temperature: 0.1
+  enable_translation: true
+  enable_semantic_matching: true
+  translation_target_lang: "en"
+  semantic_batch_size: 50
+  openai:
+    model: "${OPENAI_MODEL:-gpt-4o-mini}"
+    provider_id: "openapi"
+    api_key: "${OPENAI_API_KEY}"
+    options:
+      temperature: 0.1
+      max_tokens: 4096
+      stream: false
+  ollama:
+    provider_id: "ollama"
+    model: "${OLLAMA_MODEL:-gpt-oss:20b}"
+    host: "${OLLAMA_BASE_URL:-http://localhost:11434}"
+    timeout: 30
+    options:
+      temperature: 0.1
+      num_predict: 4096
+  anthropic:
+    provider_id: "anthropic"
+    model: "${ANTHROPIC_MODEL:-claude-2}"
+    api_key: "${ANTHROPIC_API_KEY}"
+    options:
+      temperature: 0.1
+      max_tokens: 1000
+  prompts: "@include: prompts.yml"
+
+geonames:
+  options:
+    username: "${GEONAMES_USERNAME:-demo}"
+    lang: "en"
+    country_bias: "en"
+    fuzzy: 0.8
+    feature_classes: ["P", "A"]
+    orderby: "relevance"
+    style: "FULL"
+
+logging:
+  folder: ./logs
+  handlers:
+    - sink: "sys.stdout"
+      level: "INFO"
+      format: "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>"
+      backtrace: true
+      diagnose: true
+    - sink: "sead_authority.log"
+      level: "DEBUG"
+      format: "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
+      rotation: "10 MB"
+      retention: "30 days"
+      compression: "zip"
+      backtrace: true
+      diagnose: true

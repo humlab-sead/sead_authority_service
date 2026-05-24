@@ -9,15 +9,17 @@
 
 {%- if entity.materialized | default(false) %}
 
+
 drop materialized view if exists authority.{{ entity_key }} cascade;
 
 create materialized view authority.{{ entity_key }} as
-{%- else %}
+{% else %}
+
 
 drop view if exists authority.{{ entity_key }} cascade;
 
 create or replace view authority.{{ entity_key }} as
-{%- endif %}
+{% endif %}
   select
     t.{{ entity.id_column }},
     t.{{ entity.label_column }} as label,
@@ -41,6 +43,7 @@ create or replace view authority.{{ entity_key }} as
 
 {%- if entity.materialized | default(false) %}
 
+
 -- Required to allow REFRESH MATERIALIZED VIEW CONCURRENTLY
 create unique index if not exists {{ entity_key }}_uidx
   on authority.{{ entity_key }} ({{ entity.id_column }});
@@ -53,12 +56,13 @@ create index if not exists {{ entity_key }}_norm_trgm
 -- (First-time populate)
 -- refresh materialized view concurrently authority.{{ entity_key }};
 -- analyze authority.{{ entity_key }};
-{%- else %}
+{% else %}
+
 
 create index if not exists {{ entity.table_name }}_norm_trgm
   on public.{{ entity.table_name }}
     using gin ( (authority.immutable_unaccent(lower({{ entity.label_column }}))) gin_trgm_ops );
-{%- endif %}
+{% endif %}
 
 /***************************************************************************************************
  ** Procedure  authority.fuzzy_{{ entity_key }}
@@ -66,7 +70,8 @@ create index if not exists {{ entity.table_name }}_norm_trgm
  ** Usage      SELECT * FROM authority.fuzzy_{{ entity_key }}('query text', 10);
 {%- if trigram_config.filter_params %}
  ** Params     {% for param in trigram_config.filter_params %}{{ param.name }}: {{ param.description | default('filter parameter') }}{% if not loop.last %}, {% endif %}{% endfor %}
-{%- endif %}
+{% endif %}
+
  ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_{{ entity_key }}(text, integer{% for param in trigram_config.filter_params | default([]) %}, {{ param.type }}{% endfor %}) cascade;

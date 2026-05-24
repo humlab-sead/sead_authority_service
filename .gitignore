@@ -108,12 +108,15 @@ logs
 update
 csv_files
 tests/output
-**/.env*
+**/.env
+**/.env.*
+!docker/.env.example
 **/chat*.json
 bin
 *.pdf
 *.pid
 *.out
-deprecated
+**/deprecated
 output*.xlsx
 **/*.mdb
+sead-tools

@@ -316,46 +316,73 @@ class TestConfigureLogging:
     """Tests for configure_logging function."""
 
     @patch("src.utility.logger")
-    def test_configure_logging_no_opts(self, mock_logger):
-        """Test configure_logging with no options."""
+    @patch("src.utility.os.makedirs")
+    def test_configure_logging_no_opts(self, mock_makedirs, mock_logger):
+        """Test configure_logging with no options - adds console and file handlers."""
         configure_logging(None)
         mock_logger.remove.assert_called_once()
-        mock_logger.add.assert_called_once_with(
-            sys.stdout,
-            level="INFO",
-            format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",
-        )
+        mock_makedirs.assert_called_once_with("./logs", exist_ok=True)
+
+        # Should be called twice: console + file
+        assert mock_logger.add.call_count == 2
+
+        # Check console handler (first call)
+        console_call = mock_logger.add.call_args_list[0]
+        assert console_call[0][0] == sys.stdout
+        assert console_call[1]["level"] == "INFO"
+        assert console_call[1]["backtrace"] is True
+        assert console_call[1]["diagnose"] is True
+
+        # Check file handler (second call)
+        file_call = mock_logger.add.call_args_list[1]
+        assert "sead_authority.log" in file_call[0][0]
+        assert file_call[1]["rotation"] == "10 MB"
+        assert file_call[1]["retention"] == "30 days"
 
     @patch("src.utility.logger")
-    def test_configure_logging_with_stdout(self, mock_logger):
+    @patch("src.utility.os.makedirs")
+    def test_configure_logging_with_stdout(self, mock_makedirs, mock_logger):
         """Test configure_logging with stdout handler."""
         opts = {"handlers": [{"sink": "sys.stdout", "level": "DEBUG"}]}
         configure_logging(opts)
+        mock_makedirs.assert_called_once_with("./logs", exist_ok=True)
         mock_logger.configure.assert_called_once()
-        # Check that sys.stdout was substituted
+        # Check that sys.stdout was substituted and backtrace/diagnose added
         handlers = mock_logger.configure.call_args[1]["handlers"]
         assert handlers[0]["sink"] is sys.stdout
+        assert handlers[0]["backtrace"] is True
+        assert handlers[0]["diagnose"] is True
 
     @patch("src.utility.logger")
-    @patch("src.utility.datetime")
-    def test_configure_logging_with_file(self, mock_datetime, mock_logger):
+    @patch("src.utility.os.makedirs")
+    def test_configure_logging_with_file(self, mock_makedirs, mock_logger):
         """Test configure_logging with file handler."""
-        mock_datetime.now.return_value.strftime.return_value = "20231201_120000"
-
         opts = {"folder": "test_logs", "handlers": [{"sink": "test.log", "level": "ERROR"}]}
         configure_logging(opts)
 
+        mock_makedirs.assert_called_once_with("test_logs", exist_ok=True)
         handlers = mock_logger.configure.call_args[1]["handlers"]
-        expected_path = os.path.join("test_logs", "20231201_120000_test.log")
+        expected_path = os.path.join("test_logs", "test.log")
         assert handlers[0]["sink"] == expected_path
+        # Check that rotation, retention, backtrace, diagnose were added
+        assert handlers[0]["rotation"] == "10 MB"
+        assert handlers[0]["retention"] == "30 days"
+        assert handlers[0]["backtrace"] is True
+        assert handlers[0]["diagnose"] is True
 
     @patch("src.utility.logger")
-    def test_configure_logging_no_sink(self, mock_logger):
-        """Test configure_logging with handler missing sink."""
+    @patch("src.utility.os.makedirs")
+    def test_configure_logging_no_sink(self, mock_makedirs, mock_logger):
+        """Test configure_logging with handler missing sink - handler is skipped."""
         opts = {"handlers": [{"level": "DEBUG"}]}  # No sink
         configure_logging(opts)
-        # Should not call configure since handler has no sink
-        mock_logger.configure.assert_called_once_with(handlers=opts["handlers"])
+        mock_makedirs.assert_called_once_with("./logs", exist_ok=True)
+        # Handler without sink gets skipped (continue), so backtrace/diagnose not added
+        mock_logger.configure.assert_called_once()
+        handlers = mock_logger.configure.call_args[1]["handlers"]
+        # Handler should still be in list but unmodified (skipped by continue)
+        assert "backtrace" not in handlers[0]
+        assert "diagnose" not in handlers[0]
 
     @patch("src.utility.logger")
     def test_configure_logging_opts_without_handlers(self, mock_logger):
@@ -620,13 +647,13 @@ class TestDatabaseUtilities:
     def test_create_db_uri(self):
         """Test create_db_uri function."""
         uri = create_db_uri(host="localhost", port=5432, user="testuser", dbname="testdb")
-        expected = "postgresql+psycopg://testuser@localhost:5432/testdb"
+        expected = "postgresql://testuser@localhost:5432/testdb"
         assert uri == expected
 
     def test_create_db_uri_string_port(self):
         """Test create_db_uri with string port."""
         uri = create_db_uri(host="localhost", port="5432", user="testuser", dbname="testdb")
-        expected = "postgresql+psycopg://testuser@localhost:5432/testdb"
+        expected = "postgresql://testuser@localhost:5432/testdb"
         assert uri == expected
 
     def test_create_db_uri_custom_driver(self):
@@ -637,7 +664,7 @@ class TestDatabaseUtilities:
     def test_create_db_uri_with_password(self):
         """Test create_db_uri with password."""
         uri = create_db_uri(host="localhost", port=5432, user="testuser", password="secret", dbname="testdb")
-        assert uri == "postgresql+psycopg://testuser:secret@localhost:5432/testdb"
+        assert uri == "postgresql://testuser:secret@localhost:5432/testdb"
 
 
 class TestIntegration:

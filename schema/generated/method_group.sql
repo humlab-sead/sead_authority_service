@@ -6,20 +6,25 @@
 **        If the entity has embeddings, also install semantic-{entity}.sql to create
 **        the embeddings table and semantic search functions.
 **********************************************************************************************/
+
 drop view if exists authority.method_group cascade;
 
-create or replace view authority.method_group as  select
+create or replace view authority.method_group as
+  select
     t.method_group_id,
     t.group_name as label,
     authority.immutable_unaccent(lower(t.group_name)) as norm_label,
     t.description  from public.tbl_method_groups as t;
+
 create index if not exists tbl_method_groups_norm_trgm
   on public.tbl_method_groups
     using gin ( (authority.immutable_unaccent(lower(group_name))) gin_trgm_ops );
+
 /***************************************************************************************************
  ** Procedure  authority.fuzzy_method_group
  ** What       Trigram fuzzy search function using pg_trgm similarity
- ** Usage      SELECT * FROM authority.fuzzy_method_group('query text', 10); ****************************************************************************************************/
+ ** Usage      SELECT * FROM authority.fuzzy_method_group('query text', 10);
+ ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_method_group(text, integer) cascade;
 

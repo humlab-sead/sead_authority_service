@@ -52,8 +52,8 @@ class TestMultipleReconciliationStrategy:
 
         result: list[dict[str, Any]] = await strategy.find_candidates(f"Hej {key}", limit=5)
 
-        test_provider.connection_mock.cursor_instance.execute.assert_called()
-        test_provider.connection_mock.cursor_instance.fetchall.assert_called()
+        test_provider.connection_mock.cursor_instance.execute.assert_called()  # type: ignore
+        test_provider.connection_mock.cursor_instance.fetchall.assert_called()  # type: ignore
         assert result == mock_rows
 
     @pytest.mark.parametrize(

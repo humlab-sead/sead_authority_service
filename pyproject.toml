@@ -17,6 +17,7 @@ dependencies = [
     "openpyxl>=3.1.5",
     "pandas>=2.3.3",
     "psycopg>=3.2.13",
+    "psycopg-pool>=3.2.0",
     "pyaml>=25.7.0",
     "python-multipart>=0.0.20",
     "sqlalchemy>=2.0.44",
@@ -120,13 +121,25 @@ warn_return_any = false
 [tool.pytest.ini_options]
 addopts = "-q -ra --strict-markers"
 testpaths = ["tests"]
-python_classes = "Test*"
-python_functions = "test_*"
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+norecursedirs = [
+  ".git",
+  ".venv",
+  "venv",
+  "build",
+  "dist",
+  "node_modules",
+  "tests/integration",
+  "tests/manual"
+]
 asyncio_mode = "auto"
 markers = [
-  "integration: marks tests that hit external services (e.g., Ollama, DB)",
-  "debug: marks tests for debugging purposes (typically run manually)",
-  "manual: marks tests requiring manual setup (e.g., real database)",
+  "integration: marks tests that hit external services",
+  "debug: marks tests for debugging purposes",
+  "manual: marks tests requiring manual setup",
+  "identity: marks tests for the SIMS identity module",
 ]
 # python_files = "test_*.py" "*_test.py"
 # Uncomment to see logs during test runs:
