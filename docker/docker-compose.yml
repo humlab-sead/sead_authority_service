@@ -1,0 +1,12 @@
+services:
+  sead-authority-service:
+    image: ghcr.io/humlab-sead/sead_authority_service:${SEAD_AUTHORITY_IMAGE_TAG:-latest}
+    platform: linux/amd64
+    restart: always
+    env_file:
+      - ./.env
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs:rw
+    ports:
+      - "${SEAD_AUTHORITY_PORT:-8024}:8000"
