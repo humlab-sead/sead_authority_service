@@ -18,6 +18,8 @@ The GitHub Actions Docker workflow is intentionally disabled. For now, image rel
 
 Build the same image artifact name used by the disabled GitHub Actions workflow.
 
+When you run `docker/build.sh` from a deployment folder, it reads that folder's `.env` first. For parameterless builds, set at least `SEAD_AUTHORITY_GIT_REF` and `SEAD_AUTHORITY_ENVIRONMENT` in the deployment `.env`.
+
 ```bash
 ./docker/build.sh --git-ref dev --target-env dev
 ```
@@ -34,8 +36,8 @@ Default tag selection is deployment-oriented:
 
 - `--target-env dev` produces `:dev`
 - `--target-env staging` produces `:staging`
-- `--target-env prod` produces `:latest` for `--git-ref main`
-- `--target-env prod` produces the release tag itself for version refs such as `v1.2.0`
+- `--target-env production` produces `:latest` for `--git-ref main`
+- `--target-env production` produces the release tag itself for version refs such as `v1.2.0`
 
 Use `--tag` when you need to override the derived tag explicitly.
 
@@ -49,8 +51,18 @@ Smoke-test examples:
 ./docker/build.sh --git-ref main --target-env staging
 
 # Production release image -> ghcr.io/humlab-sead/sead_authority_service:v1.2.0
-./docker/build.sh --git-ref v1.2.0 --target-env prod
+./docker/build.sh --git-ref v1.2.0 --target-env production
 ```
+
+Deploy-folder no-argument workflow:
+
+```bash
+cd sead-tools/sead_authority_service
+/home/roger/source/sead_authority_service/docker/build.sh
+docker compose up -d
+```
+
+The deploy folder is a symlink outside the tracked repository tree, so a relative path back to `docker/build.sh` is not stable. The no-argument workflow depends on the deployment folder `.env` providing `SEAD_AUTHORITY_GIT_REF` and `SEAD_AUTHORITY_ENVIRONMENT`.
 
 ## Run the staging deployment
 

@@ -3,12 +3,22 @@
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/.." && pwd)"
 script_name="$(basename "${BASH_SOURCE[0]}")"
 image_ref="ghcr.io/humlab-sead/sead_authority_service"
-git_repo="https://github.com/humlab-sead/sead_authority_service.git"
-git_ref=""
+git_repo_default="https://github.com/humlab-sead/sead_authority_service.git"
+caller_env_file="${PWD}/.env"
+if [[ -f "${caller_env_file}" && "${caller_env_file}" != "${script_dir}/.env" ]]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "${caller_env_file}"
+    set +a
+fi
+
+git_repo="${SEAD_AUTHORITY_GIT_REPO:-${git_repo_default}}"
+git_ref="${SEAD_AUTHORITY_GIT_REF:-}"
 target_env="${SEAD_AUTHORITY_ENVIRONMENT:-staging}"
-image_tag=""
+image_tag="${SEAD_AUTHORITY_IMAGE_TAG:-}"
 push_image=false
 no_cache=false
 
@@ -22,6 +32,7 @@ Usage: ${script_name} [OPTIONS]
 
 Build the same image artifact previously produced by the disabled GitHub Actions workflow.
 This script always builds from GitHub, not from the local worktree.
+When run from a deployment folder, it will source that folder's .env first.
 
 Options:
     --git-ref REF        Git branch or tag to build from
@@ -35,6 +46,7 @@ Examples:
     ${script_name} --git-ref dev
     ${script_name} --git-ref main --target-env staging
     ${script_name} --git-ref v1.2.0 --target-env production --push
+    cd sead-tools/sead_authority_service && /home/roger/source/sead_authority_service/docker/build.sh
 EOF
 
     if [[ -n "${1:-}" ]]; then
@@ -75,7 +87,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${git_ref}" ]]; then
-    print_usage "--git-ref is required"
+    print_usage "--git-ref is required unless SEAD_AUTHORITY_GIT_REF is set in the environment or local .env"
 fi
 
 case "${target_env}" in
@@ -120,7 +132,7 @@ build_cmd=(
     buildx
     build
     --platform linux/amd64
-    --file docker/Dockerfile
+    --file "${repo_root}/docker/Dockerfile"
     --tag "${image_ref}:${image_tag}"
     --build-arg USE_UV=true
     --build-arg FROM_GITHUB=true
@@ -140,11 +152,10 @@ else
     build_cmd+=(--load)
 fi
 
-build_cmd+=(.)
+build_cmd+=("${repo_root}")
 
 echo "info: building ${image_ref}:${image_tag} from ${git_repo}@${git_ref} for ${target_env}"
 
-cd "${script_dir}"
 "${build_cmd[@]}"
 
 if [[ "${push_image}" == true ]]; then
