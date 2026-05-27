@@ -25,4 +25,4 @@ SIMS provides stable identity tracking for SEAD entities: UUID allocation, ident
 
 ## Source of Truth
 
-Entity metadata (roles, identity tracking, reconciliation strategies, aggregate boundaries) is defined in Shape Shifter's `sead_standard_model.yml`. The Authority Service consumes these properties at runtime to drive identity policy decisions. The `TRACKED_ENTITIES.md` document is generated from that target model.
+Entity metadata (roles, identity tracking, reconciliation strategies, aggregate boundaries) is defined in Shape Shifter's `sead_superset_model.yml`. The Authority Service consumes these properties at runtime to drive identity policy decisions. The `TRACKED_ENTITIES.md` document is generated from that target model.

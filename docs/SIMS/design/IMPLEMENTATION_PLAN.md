@@ -50,7 +50,7 @@ All decisions confirmed (2026-04-04).
 | D1 | Schema namespace       | **`sead_identity` schema**                                                                                 | Separate from `authority` (reconciliation). Clean boundary.                               |
 | D2 | UUID generation        | **PostgreSQL-side `gen_random_uuid()`**                                                                    | Single source of truth. Avoids Python/DB mismatch.                                        |
 | D4 | API auth               | **Deferred to Phase 3**                                                                                    | Pilot runs on staging; reconciliation endpoints already unauthenticated.                  |
-| D5 | Entity metadata source | **Local config file (`config/identity_policy.yml`)** seeded from Shape Shifter's `sead_standard_model.yml` | Avoids runtime cross-repo dependency. Refresh manually per release.                       |
+| D5 | Entity metadata source | **Local config file (`config/identity_policy.yml`)** seeded from Shape Shifter's `sead_superset_model.yml` | Avoids runtime cross-repo dependency. Refresh manually per release.                       |
 | D6 | Binding auto-confirm   | **Provider-owned entities: auto-confirm. Shared metadata: require review.**                                | Per IMPLEMENTATION_VIEW § Bind. Phase 1 covers only provider-owned → always auto-confirm. |
 
 ---
@@ -300,7 +300,7 @@ tests/config/config.yml            ← Add test identity config
 | Risk                                                                            | Likelihood | Impact | Mitigation                                                           |
 |---------------------------------------------------------------------------------|------------|--------|----------------------------------------------------------------------|
 | Schema namespace conflicts with existing `authority` schema                     | Low        | Medium | Use separate `sead_identity` schema (D1)                             |
-| Entity metadata drift between Shape Shifter target model and SIMS policy config | Medium     | Medium | Seed from `sead_standard_model.yml`; version-tag the extract (D5)    |
+| Entity metadata drift between Shape Shifter target model and SIMS policy config | Medium     | Medium | Seed from `sead_superset_model.yml`; version-tag the extract (D5)    |
 | Idempotency edge cases in concurrent submissions                                | Medium     | High   | Rely on DB uniqueness constraint; add advisory locks if needed       |
 | Reconciliation integration complexity (Phase 3)                                 | High       | High   | Phase 1 avoids shared metadata entirely — risk is deferred           |
 | Test database setup complexity                                                  | Medium     | Low    | Use Docker Compose for isolated test DB; reuse existing pool pattern |

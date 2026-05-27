@@ -119,7 +119,7 @@ Fully implemented SEAD Identity Management System (SIMS). Manages stable UUID al
 - **`service.py`**: `IdentityService` orchestrates the full resolution and binding lifecycle
 - **`types.py`**: `StrEnum` types for identity state, binding method, and change outcomes
 
-Per-entity identity tracking values (defined in `sead_standard_model.yml` in the Shape Shifter repo): `tracked` (UUID + PK, aggregate roots), `reconciled` (matched by business key), `derived` (composed from FK references), `child` (inherits parent identity).
+Per-entity identity tracking values (defined in `sead_superset_model.yml` in the Shape Shifter repo): `tracked` (UUID + PK, aggregate roots), `reconciled` (matched by business key), `derived` (composed from FK references), `child` (inherits parent identity).
 
 ### Schema Generation (`src/scripts/`, `schema/`)
 

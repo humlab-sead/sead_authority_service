@@ -249,7 +249,7 @@ When a provider supplies a UUID:
 
 When a provider supplies a natural key or key set:
 
-- The submitting system (typically Shape Shifter) constructs a deterministic serialized string from the provider's data, using the `identity_columns` defined in the target model (`sead_standard_model.yml`).
+- The submitting system (typically Shape Shifter) constructs a deterministic serialized string from the provider's data, using the `identity_columns` defined in the target model (`sead_superset_model.yml`).
 - SIMS receives the serialized string as an opaque token and stores it as the Source Identity's `identity_value` with `identity_type = 'business_key'`.
 - SIMS does not interpret the internal structure of the business key. It uses the string solely for equality comparison and uniqueness enforcement.
 - Used for resolution against existing Tracked Identities or existing SEAD data.
@@ -282,7 +282,7 @@ The identity system needs to know which SEAD tables are tracked entities, their 
 
 ### Source of truth
 
-Shape Shifter's target model (`sead_standard_model.yml`) already catalogues SEAD entities with role (fact, classifier, lookup, bridge), foreign keys, identity columns, and unique sets. That metadata overlaps substantially with what SIMS needs.
+Shape Shifter's target model (`sead_superset_model.yml`) already catalogues SEAD entities with role (fact, classifier, lookup, bridge), foreign keys, identity columns, and unique sets. That metadata overlaps substantially with what SIMS needs.
 
 The current design intent is that SIMS consumes Shape Shifter's target model as the source of truth for entity metadata, augmented by SIMS-specific attributes (reconciliation strategy, policy overrides) stored locally. See [TRACKED_ENTITIES.md](./TRACKED_ENTITIES.md) for the entity register derived from the target model.
 
