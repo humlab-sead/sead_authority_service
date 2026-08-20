@@ -8,14 +8,14 @@ Complete after Phase 1 is deployed to staging.
 
 ## Step 1 — Freeze Design Docs
 
-- [x] Add a `> **Status: Frozen (2026-04-06)**` notice to the top of each design doc:
-  - `docs/SIMS/design/REQUIREMENTS.md`
-  - `docs/SIMS/design/CONCEPTUAL_MODEL.md`
-  - `docs/SIMS/design/DESIGN_VIEW.md`
-  - `docs/SIMS/design/IMPLEMENTATION_VIEW.md`
-  - `docs/SIMS/design/SEQUENCE_DIAGRAMS.md`
-  - `docs/SIMS/design/ASSESSMENT.md`
-- [x] Move `docs/SIMS/design/IMPLEMENTATION_PLAN.md` to `docs/SIMS/archived/` once Phase 2 planning begins (it's a live planning doc until then).
+- [x] Add a `> **Status: Frozen (2026-04-06)**` notice to the top of each system reference doc:
+  - `docs/SIMS/REQUIREMENTS.md`
+  - `docs/SIMS/CONCEPTUAL_MODEL.md`
+  - `docs/SIMS/DESIGN_VIEW.md`
+  - `docs/SIMS/IMPLEMENTATION_VIEW.md`
+  - `docs/SIMS/SEQUENCE_DIAGRAMS.md`
+  - `docs/SIMS/archived/ASSESSMENT.md`
+- [x] Moved `IMPLEMENTATION_PLAN.md` to `docs/SIMS/archived/` (2026-08-20) once Phase 2 planning began.
 
 ---
 

@@ -120,3 +120,4 @@ bin
 output*.xlsx
 **/*.mdb
 sead-tools
+chat-transcripts
