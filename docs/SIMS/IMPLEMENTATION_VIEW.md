@@ -6,7 +6,7 @@
 
 This document is the implementation-level view of the SEAD Identity System.
 
-It sits after [REQUIREMENTS.md](./REQUIREMENTS.md) (what the system must do), [CONCEPTUAL_MODEL.md](./CONCEPTUAL_MODEL.md) (core concepts, relations, lifecycles), and [DESIGN_VIEW.md](./DESIGN_VIEW.md) (design rules and decision flow). It maps those concepts and rules to concrete implementation structures.
+It sits after [REQUIREMENTS.md](./REQUIREMENTS.md) (what the system must do) and [CONCEPTUAL_MODEL.md](./CONCEPTUAL_MODEL.md) (core concepts, design rules, decision flow). It maps those concepts and rules to concrete implementation structures.
 
 Domain concepts, functional requirements, lifecycles, and design rules are not restated here.
 
@@ -156,7 +156,7 @@ The `binding_sets` table carries an optional `change_request_name` column linkin
 
 ## Core Operations
 
-These operations implement the decision flow defined in [DESIGN_VIEW.md § Decision flow](./DESIGN_VIEW.md#decision-flow). They map directly to the three-step sequence: Identity Resolution → Binding (within a Binding Set) → Change Request.
+These operations implement the decision flow defined in [CONCEPTUAL_MODEL.md § Decision Flow](./CONCEPTUAL_MODEL.md#decision-flow). They map directly to the three-step sequence: Identity Resolution → Binding (within a Binding Set) → Change Request.
 
 ### 1. Resolve Identity
 
@@ -192,7 +192,7 @@ Implements step 2 of the decision flow: **Binding**.
   - If `matched`: create a Binding within the set linking the Source Identity to the existing Tracked Identity.
   - If `new`: allocate a new Tracked Identity (mint UUID; optionally reserve integer PK), then create a Binding within the set.
 
-**Policy enforcement** (applied between Resolution and Binding per [DV § Policy boundary](./DESIGN_VIEW.md#policy-boundary)):
+**Policy enforcement** (applied between Resolution and Binding per [CONCEPTUAL_MODEL.md § Policy boundary](./CONCEPTUAL_MODEL.md#policy-boundary)):
 
 - Evaluate whether a provider-supplied UUID is accepted as the SEAD universal identity or retained only as a provider key (FR-11).
 - Evaluate whether an unmatched shared metadata entity triggers allocation or causes the submission to be rejected with diagnostics.

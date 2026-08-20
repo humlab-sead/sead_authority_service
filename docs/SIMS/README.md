@@ -17,10 +17,9 @@ SIMS provides stable identity tracking for SEAD entities: UUID allocation, ident
 | Document | Contents |
 |---|---|
 | [REQUIREMENTS.md](./REQUIREMENTS.md) | Functional requirements (FR-1..27) and entity/identity taxonomy |
-| [CONCEPTUAL_MODEL.md](./CONCEPTUAL_MODEL.md) | Domain concepts, relations, lifecycles |
-| [DESIGN_VIEW.md](./DESIGN_VIEW.md) | System design: intent, rules, decision flow |
+| [CONCEPTUAL_MODEL.md](./CONCEPTUAL_MODEL.md) | Domain concepts, design rules, decision flow |
 | [IMPLEMENTATION_VIEW.md](./IMPLEMENTATION_VIEW.md) | Storage design, rollout strategy, SQL structures |
-| [SEQUENCE_DIAGRAMS.md](./SEQUENCE_DIAGRAMS.md) | Visual reference of core workflows |
+| [DIAGRAMS.md](./DIAGRAMS.md) | Visual reference of core workflows and state machines |
 | [OPERATIONS.md](./OPERATIONS.md) | Deployment, configuration, troubleshooting |
 | [TRACKED_ENTITIES.md](./TRACKED_ENTITIES.md) | Entity register (generated from Shape Shifter) |
 

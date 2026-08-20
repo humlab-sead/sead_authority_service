@@ -1,8 +1,8 @@
-# SIMS Sequence Diagrams
+# SIMS Diagrams
 
 > **Status: Frozen (2026-04-06).** Stable system reference — update only on design changes. Implementation complete (Phases 1–2). See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
 
-Sequence diagrams covering the core SIMS workflows. See [DESIGN_VIEW.md](./DESIGN_VIEW.md) for the decision flow and [IMPLEMENTATION_VIEW.md](./IMPLEMENTATION_VIEW.md) for structural details.
+Diagrams covering the core SIMS workflows and state machines. See [CONCEPTUAL_MODEL.md § Decision Flow](./CONCEPTUAL_MODEL.md#decision-flow) for the decision flow and [IMPLEMENTATION_VIEW.md](./IMPLEMENTATION_VIEW.md) for structural details.
 
 ---
 
@@ -232,4 +232,91 @@ sequenceDiagram
     else Hash matches (skip)
         IdentityService-->>Client: ChangeDetectionResult{outcome=skip}
     end
+```
+
+---
+
+## 7. Binding Set State Machine
+
+Lifecycle states of a SIMS `BindingSet` from creation to final outcome.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+
+    [*] --> Proposed : Resolve request\n(manual review required)
+    [*] --> Confirmed : Resolve request\n(auto-confirm policy)
+
+    Proposed --> Confirmed : POST /binding-sets/{uuid}/confirm
+    Proposed --> Rejected : Operator rejects
+    Proposed --> Superseded : Newer binding set\nreplaces this one
+
+    Confirmed --> Invalidated : Source data\nwithdrawn
+
+    Rejected --> [*]
+    Superseded --> [*]
+    Invalidated --> [*]
+
+    note right of Proposed
+        Awaiting operator review.
+        UUID allocated; not yet
+        safe for downstream use.
+    end note
+
+    note right of Confirmed
+        UUID stable and safe
+        for downstream ingestion.
+    end note
+
+    classDef proposed fill:#fff7d6,stroke:#d6a300,color:#2b2b2b;
+    classDef confirmed fill:#dff7e8,stroke:#2e9f5b,color:#1d3a29;
+    classDef rejected fill:#ffe0e0,stroke:#d64545,color:#4a1f1f;
+    classDef terminal fill:#eeeeee,stroke:#888888,color:#333333;
+
+    class Proposed proposed;
+    class Confirmed confirmed;
+    class Rejected,Superseded,Invalidated terminal;
+```
+
+---
+
+## 8. Tracked Identity State Machine
+
+Lifecycle states of a `TrackedIdentity` (a stable UUID allocated to a SEAD entity).
+
+```mermaid
+stateDiagram-v2
+    direction LR
+
+    [*] --> Allocated : UUID allocated\non first resolution
+
+    Allocated --> PendingMaterialization : Binding confirmed;\nawaiting Clearinghouse ingestion
+
+    PendingMaterialization --> Materialized : Clearinghouse\ncommit confirmed
+
+    Materialized --> Invalidated : Source data\nwithdrawn or superseded
+
+    Allocated --> Invalidated : Allocation voided\nbefore materialization
+
+    Invalidated --> [*]
+
+    note right of Allocated
+        UUID exists; not yet
+        written to SEAD.
+    end note
+
+    note right of Materialized
+        UUID is live in the
+        SEAD Clearinghouse.
+    end note
+
+    classDef allocated fill:#fff7d6,stroke:#d6a300,color:#2b2b2b;
+    classDef pending fill:#e8f4fd,stroke:#4a90d9,color:#1a3a5c;
+    classDef materialized fill:#dff7e8,stroke:#2e9f5b,color:#1d3a29;
+    classDef invalidated fill:#eeeeee,stroke:#888888,color:#333333;
+
+    class Allocated allocated;
+    class PendingMaterialization pending;
+    class Materialized materialized;
+    class Invalidated invalidated;
 ```
