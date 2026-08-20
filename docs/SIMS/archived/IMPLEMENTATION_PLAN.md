@@ -2,7 +2,7 @@
 
 ## Scope
 
-Phase 1 implementation of the SEAD Identity Management System as described in the [IMPLEMENTATION_VIEW](./IMPLEMENTATION_VIEW.md). Covers Rollout phases 1–2 (Infrastructure + Pilot). Phases 3–5 (Shared metadata, Entity table integration, CR integration) are outlined for sequencing but not detailed here.
+Phase 1 implementation of the SEAD Identity Management System as described in the [IMPLEMENTATION_VIEW](../IMPLEMENTATION_VIEW.md). Covers Rollout phases 1–2 (Infrastructure + Pilot). Phases 3–5 (Shared metadata, Entity table integration, CR integration) are outlined for sequencing but not detailed here.
 
 **Repository:** `sead_authority_service` — branch `dev`
 **Module root:** `src/identity/`

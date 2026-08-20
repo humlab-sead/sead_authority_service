@@ -1,6 +1,6 @@
 # Implementation View
 
-> **Status: Frozen (2026-04-06).** Implementation complete. This document is preserved as design rationale. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
+> **Status: Frozen (2026-04-06).** Stable system reference — update only on design changes. Implementation complete (Phases 1–2). See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
 
 ## Purpose
 
