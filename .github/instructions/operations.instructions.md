@@ -69,8 +69,11 @@ Those topics belong in developer-facing documentation, design/architecture docum
 
 ## Sources to trust
 
-
-- `AGENTS.md` — canonical architecture and operational rules
-- `docs/DEVELOPMENT.md` — scope boundary for local vs runtime configuration
+- `.github/workflows/` — CI/CD stages, triggers, and release automation
+- `docker/` — container build, runtime topology, deployment configuration, and example environment settings
+- `Makefile` and deployment scripts — supported operational commands and automation
+- `config/` — service configuration and runtime defaults
+- `AGENTS.md` — architecture and operational constraints
+- `docs/DEVELOPMENT.md` — scope boundary for local versus runtime configuration
 
 Verify operational claims against current workflow files, Docker config, and runtime configuration before documenting them.
