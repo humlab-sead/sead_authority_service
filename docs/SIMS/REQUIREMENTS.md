@@ -84,11 +84,9 @@ The system must distinguish the following identifier types.
 | **Provider key** | Identifier used by a remote data provider | Provider-internal | Retained in identity system even if not promoted to SEAD tables |
 | **Authority key** | Identifier from an external reference system (e.g. Wikidata, GeoNames) | External authority | Supports reconciliation and de-duplication of shared metadata |
 
-### Entity and value object distinction
+### Tracked entities
 
-This document uses domain-driven design (DDD) concepts as defined in [CONCEPTUAL_MODEL.md § Domain Modeling Foundations](./CONCEPTUAL_MODEL.md#domain-modeling-foundations): **entity**, **value object**, and **aggregate**.
-
-**A tracked entity** is an entity for which this system manages stable UUID identity. Not every domain object needs to be tracked. Determining which SEAD objects qualify as tracked entities is a SEAD domain-modeling task, deferred to SEAD model specification work. That work may draw on Shape Shifter's target model conformance definitions as an input.
+A **tracked entity** is an entity for which this system manages a stable SEAD universal identity. Not every domain object needs to be tracked; determining which SEAD objects qualify is a SEAD domain-modeling task, deferred to SEAD model specification work. This document uses the domain-driven design vocabulary (entity, value object, aggregate) defined in [CONCEPTUAL_MODEL.md § Domain Modeling Foundations](./CONCEPTUAL_MODEL.md#domain-modeling-foundations).
 
 ### Entity subtypes
 
@@ -112,10 +110,6 @@ Some many-to-many associations are represented as bridge records. In most cases 
 
 In Shape Shifter terms, these correspond to **bridge** entities.
 
-### Value objects and owned child structures
-
-Value objects belong to an owning entity and are managed as part of that entity's aggregate state. They do not receive stable identity and cannot be independently referenced or reconciled.
-
 ### Relationship types
 
 The domain model must support:
@@ -126,7 +120,7 @@ The domain model must support:
 
 ### Conceptual model alignment
 
-The domain concepts above are elaborated in [CONCEPTUAL_MODEL.md](./CONCEPTUAL_MODEL.md), which defines the full conceptual model including core concepts, relations, lifecycles, and canonical use cases.
+The full conceptual model — core concepts (Source Scope, Submission, Source Identity, Tracked Identity, Binding, Binding Set, Identity Resolution, Change Request), relations, lifecycles, and canonical use cases — is defined in [CONCEPTUAL_MODEL.md](./CONCEPTUAL_MODEL.md).
 
 ---
 
