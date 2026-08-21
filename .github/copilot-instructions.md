@@ -42,6 +42,12 @@ Request flow: `OpenRefine → POST /reconcile → router.py → reconcile.py →
 - Use `docs/` (current). Ignore `docs/archive/`. Treat `docs/proposals/` as future backlog unless actively working on a proposal.
 - For proposal work: follow `.github/instructions/proposal-writing-guide.instructions.md` and use `docs/templates/PROPOSAL_TEMPLATE.md`.
 
+## Documentation Evidence
+
+- Treat current code, configuration, scripts, workflows, and generated artifacts as authoritative for the behavior each implements.
+- Treat `docs/archive/` as historical context, not current practice.
+- Verify documentation claims against the source that implements or executes the described behavior.
+
 ## Documentation vocabulary
 
 - Use plain, concrete language in generated code, comments, docstrings, PR text, and documentation.
