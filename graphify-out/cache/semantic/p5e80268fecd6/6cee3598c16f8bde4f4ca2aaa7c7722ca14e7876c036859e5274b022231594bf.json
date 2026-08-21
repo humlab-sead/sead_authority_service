@@ -1,0 +1,1 @@
+{"nodes": [{"id": "src_resources_taxon_resource", "label": "Taxon Resource", "file_type": "code", "source_file": "src/resources/taxon.yml", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null, "rationale": "Empty placeholder resource for taxon lookup", "verification": "unverified"}], "edges": [], "hyperedges": []}
