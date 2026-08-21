@@ -54,18 +54,7 @@ Request flow: `OpenRefine → POST /reconcile → router.py → reconcile.py →
 - Comments and docstrings should explain behavior, responsibility, assumptions, inputs, outputs, and side effects. Avoid metaphorical or fashion-driven wording when a simpler phrase is equally accurate.
 - Write docstrings using concrete behavior-first wording. Prefer direct statements such as `Reads sample rows from a CSV file.`, `Returns validation errors for missing required fields.`, `Uses the site ID to find matching sample groups.`, and `Does not write changes to the database.` Avoid vague wording such as `Ingests artifacts across the import boundary.`, `Resolves canonical entities for downstream consumers.`, and `Emits signals for the review surface.`
 
-## Scoped instructions
+# Cross-cutting instructions (no path trigger — load when relevant)
 
-Instruction files auto-load via `applyTo:` when a matching file is open — no manual reference needed:
-
-- `python.instructions.md` — all `src/**/*` Python files
-- `readme.instructions.md` — `README.md`
-- `design.instructions.md` — `docs/DESIGN.md`
-- `development.instructions.md` — `docs/DEVELOPMENT.md`
-- `testing.instructions.md` — `docs/TESTING.md`
-- `operations.instructions.md` — `docs/OPERATIONS.md`
-- `proposal-writing-guide.instructions.md` — `docs/proposals/**`
-
-Cross-cutting (no path trigger — load when relevant):
 - `diagrams.instructions.md`: Mermaid diagram style and conventions
 - `github-workflow.instructions.md`: issue creation and commit workflow
