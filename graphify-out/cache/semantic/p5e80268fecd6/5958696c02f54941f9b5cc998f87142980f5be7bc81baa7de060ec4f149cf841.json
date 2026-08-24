@@ -1,0 +1,1 @@
+{"nodes": [{"id": "changelog", "label": "CHANGELOG.md - Version History", "file_type": "document", "source_file": "CHANGELOG.md", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null, "rationale": "Automated version history via semantic-release with Conventional Commits"}], "edges": [], "hyperedges": []}

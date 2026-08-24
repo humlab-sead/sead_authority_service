@@ -1,7 +1,11 @@
 SHELL := /bin/bash
 
+-include .env
+export
+
 UVICORN_PORT := 8000
 SEAD_TOOLS_DIR := /home/sead/sead-tools/sead_authority_service
+
 
 test-workflow:
 	@./scripts/test-ci.sh
@@ -122,3 +126,58 @@ test-coverage:
 .PHONY: dead-code
 dead-code:
 	@uv run vulture src tests main.py
+
+
+################################################################################
+# AI Coding Assistants recipes
+# Candidates: rtk, graphify, serena, snip, headroom
+################################################################################
+
+rtk-install:
+	@echo "Installing RTK and setting up global configurations..."
+	@if ! command -v rtk &> /dev/null; then \
+		echo "RTK not found, installing..."; \
+		brew install rtk; \
+	else \
+		brew upgrade rtk &> /dev/null; \
+	fi
+	@rtk init -g --copilot
+	@rtk init -g --codex
+
+.PHONY: graphify
+graphify: graphify-install graphify-create graphify-update graphify-skills
+	@echo "done!"
+
+graphify-install:
+	@uv add --dev graphifyy[all]
+	@uv tool install "graphifyy[openai]"
+	@graphify install && \
+		graphify install --platform copilot &&  \
+			graphify install --platform codex
+	@graphify hook install
+	@echo "✓ Graphify installed and pre-commit hook set up"
+
+
+graphify-create:
+	@echo "Creating graphify project (using AI service keys from environment variables)..."
+	@uv tool upgrade graphifyy
+	@uv run graphify extract . --project --backend openai --wiki --force
+
+graphify-cluster:
+	@uv run graphify cluster-only $(HOME)/source/sead_authority_service
+	@uv run graphify export callflow-html
+
+graphify-update:
+	@uv tool upgrade graphifyy
+	@uv run graphify update $(HOME)/source/sead_authority_service
+	@git add graphify-out
+	@if git diff --cached --quiet -- graphify-out; then \
+		echo "No changes in graphify-out"; \
+	else \
+		git commit -m "chore: updated graphify graph"; \
+	fi
+
+graphify-skills:
+	@uv run graphify install
+	@uv run graphify copilot install --project
+	@uv run graphify codex install --project

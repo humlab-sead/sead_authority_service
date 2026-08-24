@@ -33,6 +33,7 @@ dev = [
     "httpx >=0.24.1,<1",
     "vulture>=2.14",
     "pytest-cov>=7.0.0",
+    "graphifyy[all]>=0.9.48",
 ]
 
 [tool.ruff]
