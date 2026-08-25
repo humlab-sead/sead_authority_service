@@ -133,51 +133,58 @@ dead-code:
 # Candidates: rtk, graphify, serena, snip, headroom
 ################################################################################
 
-rtk-install:
-	@echo "Installing RTK and setting up global configurations..."
-	@if ! command -v rtk &> /dev/null; then \
-		echo "RTK not found, installing..."; \
-		brew install rtk; \
-	else \
-		brew upgrade rtk &> /dev/null; \
-	fi
-	@rtk init -g --copilot
-	@rtk init -g --codex
+.PHONY: rtk rtk-setup rtk-status
 
-.PHONY: graphify
-graphify: graphify-install graphify-create graphify-update graphify-skills
-	@echo "done!"
+rtk: rtk-status
 
-graphify-install:
-	@uv add --dev graphifyy[all]
-	@uv tool install "graphifyy[openai]"
-	@graphify install && \
-		graphify install --platform copilot &&  \
-			graphify install --platform codex
-	@graphify hook install
-	@echo "✓ Graphify installed and pre-commit hook set up"
+rtk-setup:
+	@command -v rtk >/dev/null 2>&1 || { \
+		echo "RTK is not installed."; \
+		echo "Install with: brew install rtk-ai/tap/rtk"; \
+		exit 1; \
+	}
+	@rtk init --copilot
+	@rtk init --codex
+	@echo "✓ RTK project integrations installed"
 
+rtk-status:
+	@rtk --version
+	@rtk gain
 
+.PHONY: \
+	graphify \
+	graphify-setup \
+	graphify-create \
+	graphify-update \
+	graphify-skills \
+	graphify-cluster
+
+# Update the existing knowledge graph.
+graphify: graphify-update
+
+# One-time project setup for new developers.
+graphify-setup: graphify-skills
+	@echo "✓ Graphify setup complete"
+
+# Create/recreate the knowledge graph.
 graphify-create:
-	@echo "Creating graphify project (using AI service keys from environment variables)..."
-	@uv tool upgrade graphifyy
+	@echo "Creating Graphify knowledge graph..."
 	@uv run graphify extract . --project --backend openai --wiki --force
 
-graphify-cluster:
-	@uv run graphify cluster-only $(HOME)/source/sead_authority_service
-	@uv run graphify export callflow-html
-
+# Update the existing knowledge graph.
 graphify-update:
-	@uv tool upgrade graphifyy
-	@uv run graphify update $(HOME)/source/sead_authority_service
-	@git add graphify-out
-	@if git diff --cached --quiet -- graphify-out; then \
-		echo "No changes in graphify-out"; \
-	else \
-		git commit -m "chore: updated graphify graph"; \
-	fi
+	@echo "Updating Graphify knowledge graph..."
+	@uv run graphify update .
+	@echo "✓ Graphify graph updated"
 
+# Install project-local agent integrations.
 graphify-skills:
-	@uv run graphify install
-	@uv run graphify copilot install --project
-	@uv run graphify codex install --project
+	@echo "Installing Graphify agent integrations..."
+	@uv run graphify install --project
+	@uv run graphify install --project --platform copilot
+	@uv run graphify install --project --platform codex
+	@echo "✓ Graphify agent integrations installed"
+
+graphify-cluster:
+	@uv run graphify cluster-only .
+	@uv run graphify export callflow-html
