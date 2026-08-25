@@ -1,12 +1,14 @@
 # SIMS Conceptual Model and Systems Design
 
-> **Status: Frozen (2026-04-06).** Stable system reference — update only on design changes. Implementation complete (Phases 1–2). See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
+> **Status:** Reflects the implementation as of Phases 1–2 (complete). Phases 3–5 (shared metadata, entity table integration, Change Request integration) are outlined but not yet implemented. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
 
 ## Overview
 
 The SEAD Identity Management System (SIMS) separates externally expressed identity from SEAD-managed identity and makes the correspondence between them explicit, governed, and historically traceable. Source data is received through **Submissions**, interpreted within a **Source Scope**, and represented through **Source Identities**. These are resolved against SEAD-managed **Tracked Identities** through the **Identity Resolution** process. The results are grouped into **Binding Sets** — atomic batches of **Bindings** that are confirmed or rejected together. Once identities have been resolved, a Binding Set may be associated with a **Change Request** for review, quality assurance, and possible ingestion into SEAD.
 
 The model aligns with domain-driven design principles, as defined in the next section.
+
+**An identity is not the same thing as an identifier.** A Source Identity or Tracked Identity is a persistent identity record; identifiers such as UUIDs, local IDs, business keys, and authority IDs are values carried by or associated with those records, used as evidence during Identity Resolution. "Identity" throughout this document refers to the record, not the value.
 
 ---
 
@@ -87,7 +89,7 @@ A **Binding Set** is the atomic unit of identity resolution output. It groups on
 
 ### Identity Resolution
 
-**Identity Resolution** is the process by which SEAD determines whether a Source Identity corresponds to an existing Tracked Identity or requires a new Tracked Identity to be allocated. It operates within the context of a Source Scope and evaluates identity signals such as local identifiers, authority identifiers, business keys, alternative identifiers, and other matching evidence. Its outcomes are expressed through Bindings. For shared metadata entities where reconciliation fails, the submission is rejected with diagnostic information rather than silently allocating a new identity.
+**Identity Resolution** is the process by which SEAD determines whether a Source Identity corresponds to an existing Tracked Identity or requires a new Tracked Identity to be allocated. It operates within the context of a Source Scope and evaluates identity signals such as local identifiers, authority identifiers, business keys, alternative identifiers, and other matching evidence. Its outcomes are expressed through Bindings. For **shared metadata entities** — reference structures used across datasets and providers, such as classifiers and lookups, that must be reconciled against existing SEAD definitions rather than freshly allocated (see [REQUIREMENTS.md § Entity subtypes](./REQUIREMENTS.md#entity-subtypes)) — a failed reconciliation causes the submission to be rejected with diagnostic information rather than silently allocating a new identity.
 
 - May be performed by rules, matching logic, or manual review
 - Does not require materialization: resolution may succeed before the entity exists in SEAD
@@ -101,6 +103,14 @@ A **Change Request** is a governed package of proposed domain-level changes to S
 - May be accepted, rejected, blocked, or deferred by QA
 - May include creates (materializing new entities) and updates
 - A rejected or deferred Change Request does not invalidate prior identity resolution history
+
+### Materialization
+
+**Materialization** is the act of creating or establishing the actual SEAD domain entity represented by an already allocated Tracked Identity. A Tracked Identity may exist before materialization — identity can be resolved and recorded before the corresponding SEAD entity record exists. Materialization typically follows acceptance of an associated Change Request.
+
+- Not required for a Tracked Identity to exist or be bound
+- Governed by Change Request acceptance, not by SIMS directly
+- See [Tracked Identity Lifecycle](#tracked-identity-lifecycle) for the states before and after materialization
 
 ---
 
@@ -140,7 +150,7 @@ Policy is administrable and may vary by entity type.
 | 7  | Binding Set — Binding                  | 1:N (a Binding Set contains one or more Bindings; a Binding belongs to exactly one Binding Set)            |
 | 8  | Identity Resolution — Binding Set      | 1:1 (resolution produces one Binding Set)                                                                  |
 | 9  | Identity Resolution — Tracked Identity | Resolution may reuse an existing, allocate a new, or select no Tracked Identity                            |
-| 10 | Change Request — Binding Set           | M:N (a Change Request consumes confirmed Binding Sets; a Binding Set may support multiple Change Requests) |
+| 10 | Change Request — Binding Set           | 1:N (a Change Request may consume many confirmed Binding Sets; a Binding Set is associated with zero or one Change Request) |
 | 11 | Submission — Change Request            | M:N (a Submission may give rise to many Change Requests and vice versa)                                    |
 
 ---
@@ -224,12 +234,21 @@ Rejected, Superseded, and Invalidated are terminal states. A Binding Set is curr
 
 ## Tracked Identity Lifecycle
 
-| Condition                   | Meaning                                                                            |
-|-----------------------------|------------------------------------------------------------------------------------|
-| **Allocated**               | The identity exists in SEAD's identity system.                                     |
-| **Pending Materialization** | Allocated but not yet represented as an accepted SEAD entity.                      |
-| **Materialized**            | Represented by a SEAD entity in the domain model.                                  |
-| **Invalidated**             | No longer valid for active use, but retained for history, audit, and traceability. |
+Allocation is the event that creates a Tracked Identity in the `Pending Materialization` state; it is not itself a separate lifecycle state.
+
+| State                        | Meaning                                                                            |
+|-------------------------------|------------------------------------------------------------------------------------|
+| **Pending Materialization**   | The identity has been allocated, but no accepted SEAD entity exists yet.           |
+| **Materialized**              | The identity corresponds to an accepted SEAD entity in the domain model.           |
+| **Invalidated**               | No longer valid for active use, but retained for history, audit, and traceability. |
+
+**Allowed transitions:**
+
+```
+Pending Materialization → Materialized
+Pending Materialization → Invalidated
+Materialized            → Invalidated
+```
 
 If a related Change Request is never accepted and the tracked entity is never materialized, the Tracked Identity may be invalidated.
 

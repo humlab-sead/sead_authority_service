@@ -1,7 +1,7 @@
 # SIMS Operations Guide
 
 Operational reference for the SEAD Identity Management System (`src/identity/`).  
-For design context see the frozen system reference docs in `docs/SIMS/`. For the module API see `src/identity/README.md`.
+For design context see the system reference docs in `docs/SIMS/` (reflect Phases 1–2 implementation). For the module API see `src/identity/README.md`.
 
 ---
 

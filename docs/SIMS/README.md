@@ -12,7 +12,7 @@ SIMS provides stable identity tracking for SEAD entities: UUID allocation, ident
 
 ## Documentation Map
 
-### System reference (long-term, frozen)
+### System reference
 
 | Document | Contents |
 |---|---|

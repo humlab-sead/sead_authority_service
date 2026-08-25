@@ -1,6 +1,6 @@
 # SIMS Diagrams
 
-> **Status: Frozen (2026-04-06).** Stable system reference — update only on design changes. Implementation complete (Phases 1–2). See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
+> **Status:** Reflects the implementation as of Phases 1–2 (complete). Phases 3–5 (shared metadata, entity table integration, Change Request integration) are outlined but not yet implemented. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
 
 Diagrams covering the core SIMS workflows and state machines. See [CONCEPTUAL_MODEL.md § Decision Flow](./CONCEPTUAL_MODEL.md#decision-flow) for the decision flow and [IMPLEMENTATION_VIEW.md](./IMPLEMENTATION_VIEW.md) for structural details.
 
