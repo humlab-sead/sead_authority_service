@@ -1,6 +1,6 @@
 ---
 description: "Use for OPERATIONS.md, deployment/runbook docs, environments, runtime configuration, CI/CD, observability, rollback, and incident-readiness documentation."
-applyTo: "docs/OPERATIONS.md"
+applyTo: "docs/OPERATIONS.md,docs/SIMS/OPERATIONS.md"
 ---
 # Operations Docs
 
@@ -39,6 +39,7 @@ Those topics belong in developer-facing documentation, design/architecture docum
 ## Scope boundaries
 
 - `docs/OPERATIONS.md`: runtime environments, release flow, deployment, verification, recovery, and operational dependencies
+- `docs/SIMS/OPERATIONS.md`: SIMS identity module — deployment, configuration, troubleshooting (subsystem runbook)
 - `docs/DEVELOPMENT.md`: contributor workflow, commit conventions, local commands, development and testing practices
 - `README.md`: short overview and entry-point links, not the full runbook
 - `docs/archive/`: historical reference only; do not treat archived docs as the source of truth for current operations

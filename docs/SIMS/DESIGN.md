@@ -1,10 +1,10 @@
-# Implementation View
+# Design
 
 > **Status:** Reflects the implementation as of Phases 1–2 (complete). Phases 3–5 (shared metadata, entity table integration, Change Request integration) are outlined but not yet implemented. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
 
 ## Purpose
 
-This document is the implementation-level view of the SEAD Identity System.
+This document is the design view of the SEAD Identity System.
 
 It sits after [REQUIREMENTS.md](./REQUIREMENTS.md) (what the system must do) and [CONCEPTUAL_MODEL.md](./CONCEPTUAL_MODEL.md) (core concepts, design rules, decision flow). It maps those concepts and rules to concrete implementation structures.
 

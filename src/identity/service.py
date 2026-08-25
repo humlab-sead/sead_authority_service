@@ -1,6 +1,6 @@
 """SIMS Identity Service — core operations.
 
-Orchestrates the four operations from IMPLEMENTATION_VIEW § Core Operations:
+Orchestrates the four operations from DESIGN.md § Core Operations:
 
   1. resolve_identity  — upsert Source Identity, check for existing Binding
   2. bind              — create Binding Set, mint Tracked Identities, create Bindings

@@ -2,7 +2,7 @@
 
 Maps directly to the CM concepts and storage structures defined in:
   docs/SIMS/CONCEPTUAL_MODEL.md
-  docs/SIMS/IMPLEMENTATION_VIEW.md § Storage Design
+  docs/SIMS/DESIGN.md § Storage Design
 """
 
 from __future__ import annotations

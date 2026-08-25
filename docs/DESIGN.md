@@ -245,6 +245,6 @@ Loguru throughout. All modules use `from loguru import logger`. No `print()` for
 - [DEVELOPMENT.md](DEVELOPMENT.md) — local setup, contributor workflow, and common commands
 - [TESTING.md](TESTING.md) — test strategy, levels, and repository-specific testing guidance
 - [OPERATIONS.md](OPERATIONS.md) — environments, deployment, CI/CD, rollback, and observability
-- [SIMS documentation](SIMS/) — REQUIREMENTS, CONCEPTUAL_MODEL, IMPLEMENTATION_VIEW, DIAGRAMS, OPERATIONS, TRACKED_ENTITIES
+- [SIMS documentation](SIMS/) — REQUIREMENTS, CONCEPTUAL_MODEL, DESIGN, DIAGRAMS, OPERATIONS, TRACKED_ENTITIES
 - API reference: `http://localhost:8000/docs` (Swagger) or `/redoc` when running locally
 
