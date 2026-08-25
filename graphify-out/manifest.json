@@ -1613,12 +1613,6 @@
     "ast_hash": "f09e3e62878b2b5c202f26fc664c9969",
     "semantic_hash": "f09e3e62878b2b5c202f26fc664c9969"
   },
-  "docs/SIMS/REVIEW_CONCEPTUAL_MODEL.md": {
-    "mtime": 1787665083.3427656,
-    "seen": 1787665314.7118678,
-    "ast_hash": "e93ca833b9a51dfe9d14c452b9743847",
-    "semantic_hash": ""
-  },
   ".github/instructions/requirements.instructions.md": {
     "mtime": 1787674035.4012356,
     "seen": 1787674141.8688443,
@@ -1629,12 +1623,6 @@
     "mtime": 1787674037.2413414,
     "seen": 1787674141.8688698,
     "ast_hash": "b43e01a22e37a41001e94ead3441f9f5",
-    "semantic_hash": ""
-  },
-  "docs/SIMS/PLAN_HARMONIZE_SIMS_DOCS.md": {
-    "mtime": 1787674039.2094545,
-    "seen": 1787674141.8688726,
-    "ast_hash": "830bdd299bb17972fc82f25c21f7d60b",
     "semantic_hash": ""
   }
 }
