@@ -258,23 +258,23 @@ If a related Change Request is never accepted and the tracked entity is never ma
 
 Each use case follows the general flow: Submission → Source Scope → Source Identity → Identity Resolution → Binding Set → Change Request → (optional) Materialization. Identity Resolution and Change Request are distinct stages: the first establishes identity correspondence (grouped in a Binding Set), the second governs whether domain changes are accepted into SEAD.
 
-### 1. Existing source identity bound to existing tracked identity
+### 1. Reuse a confirmed binding for a known source identity
 
 A Submission contains a Source Identity already known within its Source Scope. Identity Resolution finds an existing confirmed Binding to a Tracked Identity. The Submission is bundled into a Change Request using that Tracked Identity as the SEAD-side anchor.
 
-### 2. New source identity matched to existing tracked identity
+### 2. Match a new source identity to an existing tracked identity
 
 A Submission contains a previously unseen Source Identity. Identity Resolution determines that it corresponds to an existing Tracked Identity. A Proposed Binding is created within a Binding Set. The Binding Set is later Confirmed. The Submission results in a Change Request associated with that Binding Set.
 
-### 3. New source identity requiring a new tracked identity
+### 3. Allocate a new tracked identity for an unmatched source identity
 
 A Submission contains a Source Identity for which no suitable Tracked Identity exists. Identity Resolution allocates a new Tracked Identity and creates a Proposed Binding within a Binding Set. If the Binding Set is confirmed, the resulting Change Request may later materialize the entity in SEAD.
 
-### 4. Confirmed binding later corrected
+### 4. Correct a confirmed binding
 
 A Binding within a previously Confirmed Binding Set is later found to be wrong. A new Binding Set is created containing a Proposed Binding to the correct Tracked Identity. The new Binding Set is Confirmed; the old Binding Set transitions to Superseded. Historical traceability is preserved.
 
-### 5. Change request rejected before materialization
+### 5. Invalidate a tracked identity after a rejected change request
 
 A Tracked Identity has been allocated and bound within a Confirmed Binding Set, but the Change Request associated with the Binding Set is rejected or indefinitely blocked. The Tracked Identity may later be invalidated. The Binding Set and its historical relations remain recorded, but neither the identity nor any allocated identifiers may be reused.
 
