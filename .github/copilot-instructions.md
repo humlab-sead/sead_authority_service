@@ -53,3 +53,7 @@ Request flow: `OpenRefine → POST /reconcile → router.py → reconcile.py →
 - `writing-style.instructions.md`: prose, docstrings, PR text, and AI coding-agent instructions
 - `diagrams.instructions.md`: Mermaid diagram style and conventions
 - `github-workflow.instructions.md`: issue creation and commit workflow
+
+## graphify
+
+For repo architecture or relationship questions, follow the graphify quick start in `AGENTS.md`.
