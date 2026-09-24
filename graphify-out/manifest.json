@@ -18,10 +18,10 @@
     "semantic_hash": "6d640299eeeea40c9aa97a696af6a7f5"
   },
   "pyproject.toml": {
-    "mtime": 1787303557.9953606,
-    "seen": 1787310000.7655215,
-    "ast_hash": "77cc587dcf7e8a4e5f9ed0c7730158d6",
-    "semantic_hash": "77cc587dcf7e8a4e5f9ed0c7730158d6"
+    "mtime": 1788958338.719679,
+    "seen": 1790175345.8531566,
+    "ast_hash": "211d3470110da1d895c0ee465c07ce00",
+    "semantic_hash": ""
   },
   "schema/__deploy__.sql": {
     "mtime": 1779621834.7506933,
@@ -1199,12 +1199,6 @@
     "ast_hash": "0bdb83d7aaa8200f7234f69f83b1c01c",
     "semantic_hash": "0bdb83d7aaa8200f7234f69f83b1c01c"
   },
-  "docs/SIMS/proposals/provider-proposed-shared-metadata.md": {
-    "mtime": 1787295326.5462701,
-    "seen": 1787310000.7658446,
-    "ast_hash": "a5054642b903048171a3a2301ee02991",
-    "semantic_hash": "a5054642b903048171a3a2301ee02991"
-  },
   "docs/TESTING.md": {
     "mtime": 1779621834.7506933,
     "seen": 1787310000.7658455,
@@ -1542,16 +1536,16 @@
     "semantic_hash": "b0fad7e787fb0491129db5acb39fea24"
   },
   ".github/instructions/proposal-document-structure.instructions.md": {
-    "mtime": 1787298351.552188,
-    "seen": 1787324983.835702,
-    "ast_hash": "f636ee1ce950fd3637c640d90e564c13",
-    "semantic_hash": "f636ee1ce950fd3637c640d90e564c13"
+    "mtime": 1787675742.711451,
+    "seen": 1790175345.853348,
+    "ast_hash": "fd22ffb31d120608d520df1781c44e54",
+    "semantic_hash": ""
   },
   ".github/instructions/proposal-writing-guide.instructions.md": {
-    "mtime": 1787297404.9017832,
-    "seen": 1787324983.8357031,
-    "ast_hash": "29c6a5559cca8f467bc1d2c1dec696f1",
-    "semantic_hash": "29c6a5559cca8f467bc1d2c1dec696f1"
+    "mtime": 1787675743.6075027,
+    "seen": 1790175345.8533492,
+    "ast_hash": "5a29624d37ec2ba3d6d9fec080f0b5b8",
+    "semantic_hash": ""
   },
   ".github/instructions/python.instructions.md": {
     "mtime": 1787142932.3685763,
@@ -1623,6 +1617,12 @@
     "mtime": 1787674037.2413414,
     "seen": 1787674141.8688698,
     "ast_hash": "b43e01a22e37a41001e94ead3441f9f5",
+    "semantic_hash": ""
+  },
+  "docs/SIMS/proposals/PROVIDER_SUPPLIED_SHARED_METADATA.md": {
+    "mtime": 1787676136.4461033,
+    "seen": 1790175345.853392,
+    "ast_hash": "51d9e41be3775206492140477d05b202",
     "semantic_hash": ""
   }
 }
