@@ -29,7 +29,7 @@ from src.identity.models import (
     SourceScope,
 )
 from src.identity.policy import CAPABILITY_VERSION, IdentityPolicy
-from src.identity.service import IdentityBindingConflict, IdentityService
+from src.identity.service import IdentityBatchConflict, IdentityBindingConflict, IdentityService
 
 identity_router = APIRouter(prefix="/identity", tags=["identity"])
 
@@ -70,6 +70,9 @@ class ResolveRequest(BaseModel):
 
     scope_name: str = Field(
         description="Source Scope name, e.g. 'sead://reconciliation' or a provider URI."
+    )
+    run_id: str = Field(
+        description="Stable idempotency key for this batch, scoped to the source scope. Reused across retries."
     )
     submission_name: str = Field(
         description="Human-readable name for this submission batch."
@@ -168,7 +171,10 @@ async def get_capabilities(
     summary="Resolve and bind a batch of source identities",
     responses={
         status.HTTP_409_CONFLICT: {
-            "description": "Approved aggregate ID conflicts with SIMS identity data or the source has a proposed binding"
+            "description": (
+                "Approved aggregate ID conflicts, a proposed binding is unresolved, "
+                "or the run key was reused with a different payload"
+            )
         }
     },
 )
@@ -178,61 +184,39 @@ async def resolve(
     service: IdentityService = Depends(get_identity_service),
     policy: IdentityPolicy = Depends(get_identity_policy),
 ) -> ResolveResponse:
-    """Resolve and immediately bind a batch of domain entities.
+    """Resolve and bind a batch of domain entities atomically.
 
-    Steps performed atomically from the caller's perspective:
+    The run key ``(scope_name, run_id)`` makes the batch idempotent:
     1. Reject unconfigured entity types and unsupported operations.
-    2. Upsert the Source Scope (creates it if unknown).
-    3. Create a Submission within that scope.
-    4. For each resolution request: upsert Source Identity, check for existing Binding.
-    5. Bind all outcomes into a single Binding Set.
-       - Provider-owned entities: auto-confirm.
-       - Shared metadata entities: set is left in ``proposed`` state.
+    2. Replay the stored result when the same run key and payload fingerprint recur.
+    3. Reject a reused run key whose payload differs.
+    4. Otherwise resolve and bind the batch in one transaction and persist the result.
 
-    Idempotent: submitting the same entities within the same scope always produces
-    the same Source Identity records and, if already bound, the same Tracked Identity
-    UUIDs (FR-12, FR-13).
+    Idempotent: submitting the same entities within the same scope and run always
+    produces the same Source Identity records and, if already bound, the same
+    Tracked Identity UUIDs (FR-12, FR-13).
     """
     for req in body.requests:
         _require_supported_operation(policy, req)
 
-    scope = await service.get_or_create_scope(
-        body.scope_name,
-        created_by=body.created_by,
-    )
-    submission = await service.create_submission(
-        scope_uuid=scope.scope_uuid,
-        submission_name=body.submission_name,
-        created_by=body.created_by,
-    )
-
-    outcomes: list[ResolutionOutcome] = []
-    for req in body.requests:
-        try:
-            outcome = await service.resolve_identity(
-                scope_uuid=scope.scope_uuid,
-                request=req,
-                submission_uuid=submission.submission_uuid,
-                created_by=body.created_by,
-            )
-        except IdentityBindingConflict as exc:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-        outcomes.append(outcome)
-
     try:
-        binding_set = await service.bind(
-            submission_uuid=submission.submission_uuid,
-            outcomes=outcomes,
+        result = await service.resolve_batch(
+            scope_name=body.scope_name,
+            submission_name=body.submission_name,
+            run_id=body.run_id,
+            requests=body.requests,
             created_by=body.created_by,
         )
+    except IdentityBatchConflict as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except IdentityBindingConflict as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     return ResolveResponse(
-        submission_uuid=submission.submission_uuid,
-        scope_uuid=scope.scope_uuid,
-        binding_set=binding_set,
-        outcomes=outcomes,
+        submission_uuid=result.submission_uuid,
+        scope_uuid=result.scope_uuid,
+        binding_set=result.binding_set,
+        outcomes=result.outcomes,
     )
 
 

@@ -211,6 +211,25 @@ class ChangeDetectionResult(BaseModel):
     previous_hash: str | None = Field(default=None, description="The previously stored hash, if any.")
 
 
+class ResolveBatchResult(BaseModel):
+    """The complete outcome of one atomic resolve batch."""
+
+    submission_uuid: UUID
+    scope_uuid: UUID
+    binding_set: BindingSetResponse
+    outcomes: list[ResolutionOutcome]
+
+
+class ResolveBatchRecord(BaseModel):
+    """Stored idempotency record for one scoped run key."""
+
+    scope_name: str
+    run_id: str
+    request_fingerprint: str
+    result: ResolveBatchResult
+    created_at: datetime
+
+
 class RejectDiagnostics(BaseModel):
     """Diagnostic payload returned when a submission is rejected due to unmatched entities."""
 

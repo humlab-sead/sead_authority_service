@@ -25,6 +25,8 @@ from src.configuration import get_connection
 from src.identity.models import (
     Binding,
     BindingSet,
+    ResolveBatchRecord,
+    ResolveBatchResult,
     SourceIdentity,
     SourceScope,
     Submission,
@@ -534,6 +536,63 @@ class BindingSetRepository(BaseRepository[BindingSet]):
             (submission_uuid,),
         )
         return [self._to_model_required(r) for r in rows]
+
+
+# ---------------------------------------------------------------------------
+# ResolveBatchRepository
+# ---------------------------------------------------------------------------
+
+
+class ResolveBatchRepository(BaseRepository[ResolveBatchRecord]):
+    """Idempotency store for one scoped resolve run key.
+
+    A run key is ``(scope_name, run_id)``. Each successful batch persists its
+    fingerprint and full result so an identical retry can replay the stored
+    response without allocating new identities.
+    """
+
+    model = ResolveBatchRecord
+    table_name = "sead_identity.resolve_batches"
+    pk_column = "scope_name"
+
+    async def find(self, scope_name: str, run_id: str) -> ResolveBatchRecord | None:
+        """Return the stored batch for a run key, or None when unknown."""
+        row = await self._fetchone(
+            """
+            SELECT * FROM sead_identity.resolve_batches
+            WHERE scope_name = %s AND run_id = %s
+            """,
+            (scope_name, run_id),
+        )
+        return self._to_model(row)
+
+    async def create(
+        self,
+        scope_name: str,
+        run_id: str,
+        request_fingerprint: str,
+        result: ResolveBatchResult,
+    ) -> ResolveBatchRecord:
+        """Persist one completed batch result for a run key."""
+        row = await self._fetchone(
+            """
+            INSERT INTO sead_identity.resolve_batches
+                (scope_name, run_id, request_fingerprint, result)
+            VALUES (%s, %s, %s, %s)
+            RETURNING *
+            """,
+            (scope_name, run_id, request_fingerprint, Jsonb(result.model_dump(mode="json"))),
+        )
+        return self._to_model_required(row)
+
+    async def acquire_run_lock(self, scope_name: str, run_id: str) -> None:
+        """Serialize concurrent requests for one run key with a transaction advisory lock."""
+        async with get_connection() as conn, conn.cursor() as cur:
+            lock_key = json.dumps([scope_name, run_id], separators=(",", ":"))
+            await cur.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (lock_key,),
+            )
 
 
 # ---------------------------------------------------------------------------

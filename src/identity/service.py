@@ -29,6 +29,8 @@ Usage example::
 
 from __future__ import annotations
 
+import hashlib
+import json
 from uuid import UUID
 
 from loguru import logger
@@ -43,6 +45,8 @@ from src.identity.models import (
     IdentitySignal,
     ResolutionOutcome,
     ResolutionRequest,
+    ResolveBatchRecord,
+    ResolveBatchResult,
     SourceIdentity,
     SourceScope,
     Submission,
@@ -53,6 +57,7 @@ from src.identity.repository import (
     BindingRepository,
     BindingSetRepository,
     RepositoryError,
+    ResolveBatchRepository,
     SourceIdentityRepository,
     SourceScopeRepository,
     SubmissionRepository,
@@ -63,12 +68,15 @@ from src.identity.types import (
     BindingSetState,
     ChangeOutcome,
     IdentityType,
-    TrackedIdentityState,
 )
 
 
 class IdentityBindingConflict(ValueError):
     """Raised when a resolution conflicts with an active identity binding."""
+
+
+class IdentityBatchConflict(ValueError):
+    """Raised when a scoped run key is reused with a different payload."""
 
 
 class IdentityService:
@@ -96,6 +104,7 @@ class IdentityService:
         tracked_identity_repo: TrackedIdentityRepository | None = None,
         binding_set_repo: BindingSetRepository | None = None,
         binding_repo: BindingRepository | None = None,
+        resolve_batch_repo: ResolveBatchRepository | None = None,
         policy: IdentityPolicy | None = None,
     ) -> None:
         self.scope_repo: SourceScopeRepository = scope_repo or SourceScopeRepository()
@@ -104,6 +113,7 @@ class IdentityService:
         self.tracked_identity_repo: TrackedIdentityRepository = tracked_identity_repo or TrackedIdentityRepository()
         self.binding_set_repo: BindingSetRepository = binding_set_repo or BindingSetRepository()
         self.binding_repo: BindingRepository = binding_repo or BindingRepository()
+        self.resolve_batch_repo: ResolveBatchRepository = resolve_batch_repo or ResolveBatchRepository()
         self.policy: IdentityPolicy = policy or IdentityPolicy()
 
     # ------------------------------------------------------------------
@@ -368,6 +378,72 @@ class IdentityService:
         )
 
     # ------------------------------------------------------------------
+    # Atomic batch — resolve + bind + persist replay in one transaction
+    # ------------------------------------------------------------------
+
+    async def resolve_batch(
+        self,
+        scope_name: str,
+        submission_name: str,
+        run_id: str,
+        requests: list[ResolutionRequest],
+        created_by: str | None = None,
+    ) -> ResolveBatchResult:
+        """Resolve and bind one batch atomically, replaying an identical run.
+
+        The scoped run key is ``(scope_name, run_id)``. Within one database
+        transaction this method:
+        1. Serializes on the run key with an advisory lock.
+        2. Replays the stored result when the key and fingerprint match.
+        3. Rejects a reused key whose payload fingerprint differs.
+        4. Otherwise creates the scope, submission, source identities, one
+           Binding Set, and tracked identities, then persists the result for
+           future replay.
+
+        A failure at any step rolls back every write, including the replay record.
+        """
+        fingerprint = _request_fingerprint(submission_name, requests)
+
+        async with get_connection():
+            await self.resolve_batch_repo.acquire_run_lock(scope_name, run_id)
+            existing: ResolveBatchRecord | None = await self.resolve_batch_repo.find(scope_name, run_id)
+            if existing is not None:
+                if existing.request_fingerprint != fingerprint:
+                    raise IdentityBatchConflict(
+                        f"Run '{run_id}' for scope '{scope_name}' was already resolved with a different payload"
+                    )
+                logger.info(f"resolve_batch: replaying stored result for run '{run_id}'")
+                return existing.result
+
+            scope = await self.get_or_create_scope(scope_name, created_by=created_by)
+            submission = await self.create_submission(scope.scope_uuid, submission_name, created_by=created_by)
+
+            outcomes: list[ResolutionOutcome] = []
+            for request in requests:
+                outcome = await self.resolve_identity(
+                    scope_uuid=scope.scope_uuid,
+                    request=request,
+                    submission_uuid=submission.submission_uuid,
+                    created_by=created_by,
+                )
+                outcomes.append(outcome)
+
+            binding_set = await self.bind(
+                submission_uuid=submission.submission_uuid,
+                outcomes=outcomes,
+                created_by=created_by,
+            )
+
+            result = ResolveBatchResult(
+                submission_uuid=submission.submission_uuid,
+                scope_uuid=scope.scope_uuid,
+                binding_set=binding_set,
+                outcomes=outcomes,
+            )
+            await self.resolve_batch_repo.create(scope_name, run_id, fingerprint, result)
+            return result
+
+    # ------------------------------------------------------------------
     # Submission helper
     # ------------------------------------------------------------------
 
@@ -500,6 +576,16 @@ class IdentityService:
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+def _request_fingerprint(submission_name: str, requests: list[ResolutionRequest]) -> str:
+    """Return a deterministic SHA-256 fingerprint of a batch payload."""
+    payload = {
+        "submission_name": submission_name,
+        "requests": [request.model_dump(mode="json") for request in requests],
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _infer_method_from_match(source: SourceIdentity | None) -> BindingMethod:
