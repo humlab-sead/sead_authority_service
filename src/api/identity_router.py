@@ -28,6 +28,7 @@ from src.identity.models import (
     ResolutionRequest,
     SourceScope,
 )
+from src.identity.policy import CAPABILITY_VERSION, IdentityPolicy
 from src.identity.service import IdentityBindingConflict, IdentityService
 
 identity_router = APIRouter(prefix="/identity", tags=["identity"])
@@ -52,6 +53,11 @@ def get_identity_service() -> IdentityService:
     one per request is cheap and avoids shared-state problems.
     """
     return IdentityService()
+
+
+def get_identity_policy() -> IdentityPolicy:
+    """FastAPI dependency — returns a fresh policy snapshot for capability checks."""
+    return IdentityPolicy()
 
 
 # ---------------------------------------------------------------------------
@@ -88,9 +94,71 @@ class AssociateChangeRequestBody(BaseModel):
     change_request_name: str = Field(description="Sqitch change name to associate with this Binding Set.")
 
 
+class EntityCapabilityResponse(BaseModel):
+    """Published capability for one configured entity type."""
+
+    entity_type: str
+    entity_subtype: str
+    bind_existing: bool
+    allocate_new: bool
+    auto_confirm: bool
+    accept_uuid: bool
+
+
+class CapabilitiesResponse(BaseModel):
+    """Response body for GET /identity/capabilities."""
+
+    version: str
+    entities: list[EntityCapabilityResponse]
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
+
+def _require_supported_operation(policy: IdentityPolicy, request: ResolutionRequest) -> None:
+    """Raise HTTP 422 when *request* targets an unconfigured or unsupported operation."""
+    operation = "bind_existing" if request.approved_aggregate_id is not None else "allocate_new"
+    if request.entity_type not in policy.known_entity_types():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Entity type '{request.entity_type}' is not configured in SIMS",
+        )
+    if not policy.supports(request.entity_type, operation):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Operation '{operation}' is not supported for entity type '{request.entity_type}'",
+        )
+
+
+@identity_router.get(
+    "/capabilities",
+    response_model=CapabilitiesResponse,
+    summary="List configured SIMS identity capabilities",
+)
+async def get_capabilities(
+    policy: IdentityPolicy = Depends(get_identity_policy),
+) -> CapabilitiesResponse:
+    """Return the supported identity operations for each configured entity type.
+
+    Capability support is derived from validated entity configuration. Unlisted
+    entity types have no capabilities and are rejected by the resolve endpoint.
+    """
+    return CapabilitiesResponse(
+        version=CAPABILITY_VERSION,
+        entities=[
+            EntityCapabilityResponse(
+                entity_type=cap.entity_type,
+                entity_subtype=cap.entity_subtype,
+                bind_existing=cap.bind_existing,
+                allocate_new=cap.allocate_new,
+                auto_confirm=cap.auto_confirm,
+                accept_uuid=cap.accept_uuid,
+            )
+            for cap in policy.get_capabilities()
+        ],
+    )
 
 
 @identity_router.post(
@@ -108,14 +176,16 @@ async def resolve(
     body: ResolveRequest,
     _config: ConfigLike = Depends(get_config_dep),
     service: IdentityService = Depends(get_identity_service),
+    policy: IdentityPolicy = Depends(get_identity_policy),
 ) -> ResolveResponse:
     """Resolve and immediately bind a batch of domain entities.
 
     Steps performed atomically from the caller's perspective:
-    1. Upsert the Source Scope (creates it if unknown).
-    2. Create a Submission within that scope.
-    3. For each resolution request: upsert Source Identity, check for existing Binding.
-    4. Bind all outcomes into a single Binding Set.
+    1. Reject unconfigured entity types and unsupported operations.
+    2. Upsert the Source Scope (creates it if unknown).
+    3. Create a Submission within that scope.
+    4. For each resolution request: upsert Source Identity, check for existing Binding.
+    5. Bind all outcomes into a single Binding Set.
        - Provider-owned entities: auto-confirm.
        - Shared metadata entities: set is left in ``proposed`` state.
 
@@ -123,6 +193,9 @@ async def resolve(
     the same Source Identity records and, if already bound, the same Tracked Identity
     UUIDs (FR-12, FR-13).
     """
+    for req in body.requests:
+        _require_supported_operation(policy, req)
+
     scope = await service.get_or_create_scope(
         body.scope_name,
         created_by=body.created_by,

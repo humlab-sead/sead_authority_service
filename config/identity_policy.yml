@@ -7,115 +7,146 @@
 #   entity_subtype:    provider_owned | shared_metadata | relationship
 #   accept_uuid:       true  → accept caller-supplied UUID (FR-11)
 #                      false → always allocate a fresh UUID; caller UUID is ignored
-#   allow_allocation:  true  → service may mint a new TrackedIdentity when no match is found
 #   auto_confirm:      true  → Binding Sets are auto-confirmed without manual review
+#   operations:        the SIMS identity operations this entity type supports
+#       bind_existing:  true → accept approved_aggregate_id to bind an existing identity
+#       allocate_new:   true → mint a new tracked aggregate after an approved miss
 #
 # Notes:
-#   - entity_subtype describes ownership; allow_allocation and auto_confirm
-#     are separate policy settings.
+#   - entity_subtype describes ownership; operations define the capability contract.
 #   - Entity names match tbl_* suffixes in the SEAD standard model.
+#   - Only site binding and site/sample allocation are currently verified against
+#     a disposable database; the remaining operation flags are configuration, not
+#     deployment approval.
 
 entities:
 
   # ── Provider-owned (aggregate roots) ──────────────────────────────────────
+  # SIMS mints a new tracked aggregate per submission; no approved-existing binding.
 
   sample_group:
     entity_subtype: provider_owned
     accept_uuid: false
-    allow_allocation: true
     auto_confirm: true
+    operations:
+      bind_existing: false
+      allocate_new: true
 
   sample:
     entity_subtype: provider_owned
     accept_uuid: false
-    allow_allocation: true
     auto_confirm: true
+    operations:
+      bind_existing: false
+      allocate_new: true
     # Allocation fails unless the sample ID allocator has been initialized from existing IDs.
 
   analysis_entity:
     entity_subtype: provider_owned
     accept_uuid: false
-    allow_allocation: true
     auto_confirm: true
+    operations:
+      bind_existing: false
+      allocate_new: true
     # Allocation fails unless the analysis_entity ID allocator has been initialized from existing IDs.
 
   dataset:
     entity_subtype: provider_owned
     accept_uuid: false
-    allow_allocation: true
     auto_confirm: true
+    operations:
+      bind_existing: false
+      allocate_new: true
     # Allocation fails unless the dataset ID allocator has been initialized from existing IDs.
 
   submission:
     entity_subtype: provider_owned
     accept_uuid: false
-    allow_allocation: true
     auto_confirm: true
+    operations:
+      bind_existing: false
+      allocate_new: true
     # Allocation fails unless the submission ID allocator has been initialized from existing IDs.
 
   # ── Shared metadata (reconciled by business key) ──────────────────────────
+  # Shape Shifter reconciles these and supplies an approved aggregate ID, or
+  # (for site) approves a miss so SIMS can allocate.
 
   site:
     entity_subtype: shared_metadata
     accept_uuid: false
-    allow_allocation: true
     auto_confirm: true
-    # Proposed operation allowlist; not parsed or enforced by SIMS yet:
-    # operations:
-    #   bind_existing: true  # Shape Shifter supplies an approved site_id.
-    #   allocate_new: true   # Shape Shifter approves a miss; SIMS assigns site_id.
-    # Replace allow_allocation with this mapping when operation checks are implemented.
+    operations:
+      bind_existing: true   # Shape Shifter supplies an approved site ID.
+      allocate_new: true    # Shape Shifter approves a miss; SIMS assigns a site ID.
 
   taxa_tree_master:
     entity_subtype: shared_metadata
     accept_uuid: true
-    allow_allocation: false
     auto_confirm: false
+    operations:
+      bind_existing: true
+      allocate_new: false
 
   feature_type:
     entity_subtype: shared_metadata
     accept_uuid: true
-    allow_allocation: false
     auto_confirm: false
+    operations:
+      bind_existing: true
+      allocate_new: false
 
   method:
     entity_subtype: shared_metadata
     accept_uuid: true
-    allow_allocation: false
     auto_confirm: false
+    operations:
+      bind_existing: true
+      allocate_new: false
 
   data_type:
     entity_subtype: shared_metadata
     accept_uuid: true
-    allow_allocation: false
     auto_confirm: false
+    operations:
+      bind_existing: true
+      allocate_new: false
 
   unit:
     entity_subtype: shared_metadata
     accept_uuid: true
-    allow_allocation: false
     auto_confirm: false
+    operations:
+      bind_existing: true
+      allocate_new: false
 
   # ── Relationship / child entities (identity derived from parent) ──────────
-  # Phase 2+: identity comes from FK, not from UUID allocation.
+  # Not tracked in SIMS; no identity operations are supported.
 
   sample_dimension:
     entity_subtype: relationship
     accept_uuid: false
-    allow_allocation: false
     auto_confirm: false
+    operations:
+      bind_existing: false
+      allocate_new: false
 
   abundance:
     entity_subtype: relationship
     accept_uuid: false
-    allow_allocation: false
     auto_confirm: false
+    operations:
+      bind_existing: false
+      allocate_new: false
 
 # ── Global defaults ──────────────────────────────────────────────────────────
-# Applied when an entity_type is not listed above.
+# Applied when an entity_type is not listed above. Such types have no capabilities
+# and are rejected by the resolve endpoint.
 
 defaults:
   entity_subtype: shared_metadata
   accept_uuid: true
-  allow_allocation: false
   auto_confirm: false
+  operations:
+    bind_existing: false
+    allocate_new: false
