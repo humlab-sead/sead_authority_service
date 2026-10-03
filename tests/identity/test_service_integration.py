@@ -24,7 +24,7 @@ from httpx import ASGITransport, AsyncClient
 
 from main import app
 from src.api.identity_router import get_identity_service
-from src.configuration import get_config_provider, get_connection, setup_config_store
+from src.configuration import get_connection
 from src.identity.models import IdentitySignal, ResolutionRequest
 from src.identity.repository import ResolveBatchRepository
 from src.identity.service import IdentityBatchConflict, IdentityBindingConflict, IdentityService
@@ -54,7 +54,7 @@ def skip_without_db(fn):
 
 @pytest.fixture
 def service() -> IdentityService:
-    """Live IdentityService (uses real DB connection via get_connection())."""
+    """Live IdentityService pointed at the session-configured disposable DB."""
     return IdentityService()
 
 
@@ -65,21 +65,9 @@ def scope_name() -> str:
 
 
 @pytest.fixture
-async def disposable_service() -> IdentityService:
-    """Use only the helper-owned loopback database for allocator integration tests."""
-    database_host = os.environ.get("SEAD_AUTHORITY_OPTIONS_DATABASE_HOST")
-    database_port = os.environ.get("SEAD_AUTHORITY_OPTIONS_DATABASE_PORT")
-    database_name = os.environ.get("SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME")
-    if (database_host, database_port, database_name) != ("127.0.0.1", "55432", "sead_staging"):
-        pytest.skip("Allocator integration tests require the helper-owned 127.0.0.1:55432/sead_staging database")
-
-    await setup_config_store(filename="config/config.yml", force=True, env_filename="", env_prefix="SEAD_AUTHORITY")
-    try:
-        yield IdentityService()
-    finally:
-        pool = get_config_provider().get_config().get("runtime:connection_pool")
-        if pool is not None:
-            await pool.close()
+def disposable_service() -> IdentityService:
+    """Live IdentityService pointed at the session-configured disposable DB."""
+    return IdentityService()
 
 
 def _site_request(label: str) -> ResolutionRequest:
@@ -699,6 +687,7 @@ class TestApprovedExistingAggregateId:
                     "/identity/resolve",
                     json={
                         "scope_name": scope_name,
+                        "run_id": f"run-approved-1-{uuid4().hex}",
                         "submission_name": f"approved-1-{uuid4().hex}",
                         "requests": [request],
                     },
@@ -711,6 +700,7 @@ class TestApprovedExistingAggregateId:
                     "/identity/resolve",
                     json={
                         "scope_name": scope_name,
+                        "run_id": f"run-approved-2-{uuid4().hex}",
                         "submission_name": f"approved-2-{uuid4().hex}",
                         "requests": [request],
                     },
@@ -727,6 +717,7 @@ class TestApprovedExistingAggregateId:
                     "/identity/resolve",
                     json={
                         "scope_name": scope_name,
+                        "run_id": f"run-approved-conflict-{uuid4().hex}",
                         "submission_name": f"approved-conflict-{uuid4().hex}",
                         "requests": [conflicting_request],
                     },
@@ -762,6 +753,13 @@ class TestResolveAndBindSampleGroup:
     @skip_without_db
     @pytest.mark.asyncio
     async def test_bind_sample_group_auto_confirms(self, service, scope_name):
+        async with get_connection() as connection, connection.cursor() as cursor:
+            await cursor.execute(
+                "SELECT 1 FROM sead_identity.internal_id_allocators WHERE entity_type = 'sample_group'"
+            )
+            if await cursor.fetchone() is None:
+                pytest.skip("sample_group ID allocator is not bootstrapped in the disposable database")
+
         scope = await service.get_or_create_scope(scope_name, created_by="test")
         sub = await service.create_submission(scope.scope_uuid, "batch-sg", created_by="test")
 
