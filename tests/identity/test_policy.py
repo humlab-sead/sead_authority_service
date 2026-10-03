@@ -286,8 +286,17 @@ class TestRealPolicyFile:
     def test_site_in_real_policy(self) -> None:
         policy = IdentityPolicy()
         ep = policy.get_entity_policy("site")
-        assert ep.is_provider_owned
+        assert ep.is_shared_metadata
         assert ep.allow_allocation is True
+        assert ep.auto_confirm is True
+
+    def test_submission_in_real_policy(self) -> None:
+        policy = IdentityPolicy()
+        ep = policy.get_entity_policy("submission")
+        assert ep.is_provider_owned
+        assert ep.accept_uuid is False
+        assert ep.allow_allocation is True
+        assert ep.auto_confirm is True
 
     def test_taxa_tree_master_in_real_policy(self) -> None:
         policy = IdentityPolicy()

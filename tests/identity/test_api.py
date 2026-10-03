@@ -21,6 +21,7 @@ from src.identity.models import (
     ResolutionOutcome,
     SourceScope,
 )
+from src.identity.service import IdentityBindingConflict
 from src.identity.types import BindingSetState, ChangeOutcome
 
 NOW = datetime(2026, 4, 4, 12, 0, 0, tzinfo=timezone.utc)
@@ -74,13 +75,13 @@ def _make_submission() -> MagicMock:
     return sub
 
 
-def _make_outcome(outcome: str = "new", *, target_id: int | None = None) -> ResolutionOutcome:
+def _make_outcome(outcome: str = "new", *, aggregate_id: int | None = None) -> ResolutionOutcome:
     return ResolutionOutcome(
         source_identity_uuid=uuid4(),
         entity_type="site",
         outcome=outcome,
         tracked_identity_uuid=TRACKED_UUID if outcome == "matched" else None,
-        target_id=target_id,
+        aggregate_id=aggregate_id,
     )
 
 
@@ -151,13 +152,78 @@ class TestResolveEndpoint:
         assert "outcomes" in data
 
     def test_resolve_response_includes_target_id_when_present(self):
-        svc = _make_service_mock(resolve_identity=AsyncMock(return_value=_make_outcome("matched", target_id=4321)))
+        svc = _make_service_mock(resolve_identity=AsyncMock(return_value=_make_outcome("matched", aggregate_id=4321)))
         client = _make_client(svc)
 
         response = client.post("/identity/resolve", json=self.VALID_BODY)
 
         data = response.json()
         assert data["outcomes"][0]["target_id"] == 4321
+        assert "aggregate_id" not in data["outcomes"][0]
+
+    def test_resolve_passes_approved_aggregate_id_to_service(self):
+        svc = _make_service_mock(resolve_identity=AsyncMock(return_value=_make_outcome("matched", aggregate_id=4321)))
+        client = _make_client(svc)
+        body = {
+            **self.VALID_BODY,
+            "requests": [{**self.VALID_BODY["requests"][0], "approved_aggregate_id": 4321}],
+        }
+
+        response = client.post("/identity/resolve", json=body)
+
+        assert response.status_code == 200
+        resolved_request = svc.resolve_identity.await_args.kwargs["request"]
+        assert resolved_request.approved_aggregate_id == 4321
+
+    def test_resolve_returns_409_for_approved_aggregate_conflict(self):
+        svc = _make_service_mock(
+            resolve_identity=AsyncMock(side_effect=IdentityBindingConflict("approved aggregate ID conflicts"))
+        )
+        client = _make_client(svc)
+        body = {
+            **self.VALID_BODY,
+            "requests": [{**self.VALID_BODY["requests"][0], "approved_aggregate_id": 9876}],
+        }
+
+        response = client.post("/identity/resolve", json=body)
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == "approved aggregate ID conflicts"
+
+    def test_resolve_returns_409_for_binding_phase_conflict(self):
+        svc = _make_service_mock(bind=AsyncMock(side_effect=IdentityBindingConflict("unresolved proposed binding")))
+        client = _make_client(svc)
+
+        response = client.post("/identity/resolve", json=self.VALID_BODY)
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == "unresolved proposed binding"
+
+    def test_resolve_rejects_nonpositive_approved_aggregate_id(self):
+        svc = _make_service_mock()
+        client = _make_client(svc)
+        body = {
+            **self.VALID_BODY,
+            "requests": [{**self.VALID_BODY["requests"][0], "approved_aggregate_id": 0}],
+        }
+
+        response = client.post("/identity/resolve", json=body)
+
+        assert response.status_code == 422
+        svc.resolve_identity.assert_not_called()
+
+    def test_resolve_rejects_legacy_approved_target_id(self):
+        svc = _make_service_mock()
+        client = _make_client(svc)
+        body = {
+            **self.VALID_BODY,
+            "requests": [{**self.VALID_BODY["requests"][0], "approved_target_id": 77}],
+        }
+
+        response = client.post("/identity/resolve", json=body)
+
+        assert response.status_code == 422
+        svc.resolve_identity.assert_not_called()
 
     def test_resolve_calls_get_or_create_scope(self):
         svc = _make_service_mock()

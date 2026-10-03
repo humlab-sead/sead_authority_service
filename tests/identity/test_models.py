@@ -149,20 +149,20 @@ class TestTrackedIdentity:
             created_at=NOW,
         )
         assert ti.lifecycle_state == TrackedIdentityState.ALLOCATED
-        assert ti.sead_internal_id is None
+        assert ti.aggregate_id is None
         assert ti.content_hash is None
 
     def test_materialized(self):
         ti = TrackedIdentity(
             tracked_identity_uuid=uuid4(),
             entity_type="site",
-            sead_internal_id=4321,
+            aggregate_id=4321,
             lifecycle_state=TrackedIdentityState.MATERIALIZED,
             content_hash="abc123",
             created_at=NOW,
             materialized_at=NOW,
         )
-        assert ti.sead_internal_id == 4321
+        assert ti.aggregate_id == 4321
         assert ti.content_hash == "abc123"
 
 
@@ -222,6 +222,17 @@ class TestResolutionRequest:
         )
         assert req.additional_signals == []
 
+    def test_approved_aggregate_id(self):
+        req = ResolutionRequest(
+            entity_type="site",
+            approved_aggregate_id=4321,
+            primary_signal=IdentitySignal(
+                identity_type=IdentityType.BUSINESS_KEY,
+                identity_value="site_name=Nordic Site",
+            ),
+        )
+        assert req.approved_aggregate_id == 4321
+
     def test_with_additional_signals(self):
         req = ResolutionRequest(
             entity_type="location",
@@ -248,18 +259,19 @@ class TestResolutionOutcome:
         )
 
         assert outcome.tracked_identity_uuid is None
-        assert outcome.target_id is None
+        assert outcome.aggregate_id is None
 
-    def test_with_target_id(self):
+    def test_aggregate_id_keeps_target_id_wire_name(self):
         outcome = ResolutionOutcome(
             source_identity_uuid=uuid4(),
             entity_type="site",
             outcome="matched",
             tracked_identity_uuid=uuid4(),
-            target_id=4321,
+            aggregate_id=4321,
         )
 
-        assert outcome.target_id == 4321
+        assert outcome.aggregate_id == 4321
+        assert outcome.model_dump(by_alias=True)["target_id"] == 4321
 
 
 class TestChangeDetection:

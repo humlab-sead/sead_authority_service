@@ -334,7 +334,7 @@ class TestTrackedIdentityRepository:
         return {
             "tracked_identity_uuid": TRACKED_UUID,
             "entity_type": "site",
-            "sead_internal_id": None,
+            "aggregate_id": None,
             "content_hash": None,
             "lifecycle_state": state,
             "created_by": None,
@@ -346,14 +346,64 @@ class TestTrackedIdentityRepository:
     async def test_mint_returns_allocated_identity(self) -> None:
         from src.identity.repository import TrackedIdentityRepository
 
-        row = self._make_tracked_row("allocated")
+        row = {**self._make_tracked_row("allocated"), "aggregate_id": 6487}
         cursor = _make_cursor(return_row=row)
         conn = _make_conn(cursor)
         with _patch_connection(conn):
             result = await TrackedIdentityRepository().mint("site")
         assert isinstance(result, TrackedIdentity)
         assert result.lifecycle_state == TrackedIdentityState.ALLOCATED
+        assert result.aggregate_id == 6487
+        sql = cursor.execute.call_args[0][0].as_string()
+        assert "internal_id_allocators" in sql
+        assert "UPDATE sead_identity.internal_id_allocators" in sql
 
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("entity_type", ["sample_group", "sample", "dataset", "analysis_entity"])
+    async def test_mint_entity_returns_allocated_identity(self, entity_type: str) -> None:
+        from src.identity.repository import TrackedIdentityRepository
+
+        row = {
+            **self._make_tracked_row("allocated"),
+            "entity_type": entity_type,
+            "aggregate_id": 63820,
+        }
+        cursor = _make_cursor(return_row=row)
+        conn = _make_conn(cursor)
+        with _patch_connection(conn):
+            result = await TrackedIdentityRepository().mint(entity_type)
+        assert isinstance(result, TrackedIdentity)
+        assert result.entity_type == entity_type
+        assert result.lifecycle_state == TrackedIdentityState.ALLOCATED
+        assert result.aggregate_id == 63820
+        sql = cursor.execute.call_args[0][0].as_string()
+        assert "internal_id_allocators" in sql
+        assert "UPDATE sead_identity.internal_id_allocators" in sql
+        assert cursor.execute.call_args[0][1][0] == entity_type
+        assert cursor.execute.call_args[0][1][2] == entity_type
+
+    @pytest.mark.asyncio
+    async def test_mint_site_fails_when_allocator_is_not_initialized(self) -> None:
+        from src.identity.repository import RepositoryError, TrackedIdentityRepository
+
+        cursor = _make_cursor(return_row=None)
+        conn = _make_conn(cursor)
+        with _patch_connection(conn), pytest.raises(RepositoryError, match="allocator is not initialized"):
+            await TrackedIdentityRepository().mint("site")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("entity_type", ["sample_group", "sample", "dataset", "analysis_entity"])
+    async def test_mint_entity_fails_when_allocator_is_not_initialized(self, entity_type: str) -> None:
+        from src.identity.repository import RepositoryError, TrackedIdentityRepository
+
+        cursor = _make_cursor(return_row=None)
+        conn = _make_conn(cursor)
+        with _patch_connection(conn), pytest.raises(
+            RepositoryError, match=f"SIMS {entity_type} ID allocator is not initialized"
+        ):
+            await TrackedIdentityRepository().mint(entity_type)
+
+    @pytest.mark.asyncio
     @pytest.mark.asyncio
     async def test_update_content_hash_returns_updated(self) -> None:
         from src.identity.repository import TrackedIdentityRepository
@@ -389,6 +439,21 @@ class TestTrackedIdentityRepository:
         with _patch_connection(conn):
             result = await TrackedIdentityRepository().get(TRACKED_UUID)
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_find_by_aggregate_id_rejects_duplicate_values(self) -> None:
+        from src.identity.repository import RepositoryError, TrackedIdentityRepository
+
+        first = {**self._make_tracked_row("materialized"), "aggregate_id": 4321}
+        second = {**first, "tracked_identity_uuid": uuid4()}
+        cursor = _make_cursor(return_rows=[first, second])
+        conn = _make_conn(cursor)
+
+        with _patch_connection(conn), pytest.raises(RepositoryError, match="Multiple tracked identities"):
+            await TrackedIdentityRepository().find_by_aggregate_id("site", 4321)
+        sql = cursor.execute.call_args[0][0].as_string()
+        assert "aggregate_id = %s" in sql
+        assert cursor.execute.call_args[0][1] == ("site", 4321)
 
 
 # ---------------------------------------------------------------------------
@@ -522,3 +587,17 @@ class TestBindingRepository:
         binding, set_state = result
         assert isinstance(binding, Binding)
         assert set_state == "confirmed"
+
+    @pytest.mark.asyncio
+    async def test_list_active_bindings_returns_proposed_and_confirmed(self) -> None:
+        from src.identity.repository import BindingRepository
+
+        proposed_row = {**self._make_binding_row(), "set_state": "proposed"}
+        confirmed_row = {**self._make_binding_row(), "binding_uuid": uuid4(), "set_state": "confirmed"}
+        cursor = _make_cursor(return_rows=[proposed_row, confirmed_row])
+        conn = _make_conn(cursor)
+        with _patch_connection(conn):
+            results = await BindingRepository().list_active_bindings(IDENTITY_UUID)
+
+        assert [state for _, state in results] == [BindingSetState.PROPOSED, BindingSetState.CONFIRMED]
+        assert all(isinstance(binding, Binding) for binding, _ in results)
