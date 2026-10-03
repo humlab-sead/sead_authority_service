@@ -10,15 +10,16 @@ Usage:
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any, ClassVar, Generic, TypeVar
 from uuid import UUID, uuid4
 
 from loguru import logger
-from pydantic import BaseModel
 from psycopg.rows import dict_row
-from psycopg.types.json import Jsonb
 from psycopg.sql import SQL
+from psycopg.types.json import Jsonb
+from pydantic import BaseModel
 
 from src.configuration import get_connection
 from src.identity.models import (
@@ -268,8 +269,20 @@ class SourceIdentityRepository(BaseRepository[SourceIdentity]):
         keys: list[tuple[str, str]],
         created_by: str | None = None,
     ) -> SourceIdentity:
-        """Idempotent upsert — returns existing identity if any key already matches."""
+        """Return an existing identity or create one while holding its key locks."""
         async with get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+            lock_keys = sorted(
+                {
+                    json.dumps([str(scope_uuid), entity_type, key_type, key_value], separators=(",", ":"))
+                    for key_type, key_value in keys
+                }
+            )
+            for lock_key in lock_keys:
+                await cur.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                    (lock_key,),
+                )
+
             for key_type, key_value in keys:
                 await cur.execute(
                     """
@@ -316,6 +329,22 @@ class SourceIdentityRepository(BaseRepository[SourceIdentity]):
 
             return model
 
+    async def lock_for_binding(self, source_identity_uuids: list[UUID]) -> None:
+        """Lock source identity rows in stable order for one binding transaction."""
+        async with get_connection() as conn, conn.cursor() as cur:
+            for source_identity_uuid in sorted(set(source_identity_uuids)):
+                await cur.execute(
+                    """
+                    SELECT source_identity_uuid
+                    FROM sead_identity.source_identities
+                    WHERE source_identity_uuid = %s
+                    FOR UPDATE
+                    """,
+                    (source_identity_uuid,),
+                )
+                if await cur.fetchone() is None:
+                    raise RepositoryError(f"Source identity {source_identity_uuid} does not exist")
+
     async def link_to_submission(
         self,
         submission_uuid: UUID,
@@ -344,19 +373,23 @@ class TrackedIdentityRepository(BaseRepository[TrackedIdentity]):
     table_name = "sead_identity.tracked_identities"
     pk_column = "tracked_identity_uuid"
 
-    async def find_by_internal_id(
+    async def find_by_aggregate_id(
         self,
         entity_type: str,
-        sead_internal_id: int,
+        aggregate_id: int,
     ) -> TrackedIdentity | None:
-        row = await self._fetchone(
+        rows = await self._fetchall(
             """
             SELECT * FROM sead_identity.tracked_identities
-            WHERE entity_type = %s AND sead_internal_id = %s
+            WHERE entity_type = %s AND aggregate_id = %s
             """,
-            (entity_type, sead_internal_id),
+            (entity_type, aggregate_id),
         )
-        return self._to_model(row)
+        if len(rows) > 1:
+            raise RepositoryError(
+                f"Multiple tracked identities exist for {entity_type} aggregate ID {aggregate_id}"
+            )
+        return self._to_model(rows[0] if rows else None)
 
     async def mint(
         self,
@@ -366,13 +399,24 @@ class TrackedIdentityRepository(BaseRepository[TrackedIdentity]):
         tracked_identity_uuid = _uuid()
         row = await self._fetchone(
             """
+            WITH allocated_id AS (
+                UPDATE sead_identity.internal_id_allocators
+                SET next_internal_id = next_internal_id + 1
+                WHERE entity_type = %s
+                RETURNING next_internal_id - 1 AS aggregate_id
+            )
             INSERT INTO sead_identity.tracked_identities
-                (tracked_identity_uuid, entity_type, created_by)
-            VALUES (%s, %s, %s)
+                (tracked_identity_uuid, entity_type, aggregate_id, created_by)
+            SELECT %s, %s, allocated_id.aggregate_id, %s
+            FROM allocated_id
             RETURNING *
             """,
-            (tracked_identity_uuid, entity_type, created_by),
+            (entity_type, tracked_identity_uuid, entity_type, created_by),
         )
+        if row is None:
+            raise RepositoryError(
+                f"SIMS {entity_type} ID allocator is not initialized; bootstrap existing {entity_type} IDs before allocation"
+            )
         logger.debug(
             "Minted TrackedIdentity {} for entity_type={}",
             tracked_identity_uuid,
@@ -400,19 +444,19 @@ class TrackedIdentityRepository(BaseRepository[TrackedIdentity]):
         self,
         tracked_identity_uuid: UUID,
         state: TrackedIdentityState,
-        sead_internal_id: int | None = None,
+        aggregate_id: int | None = None,
     ) -> TrackedIdentity | None:
         materialized_at = _now() if state == TrackedIdentityState.MATERIALIZED else None
         row = await self._fetchone(
             """
             UPDATE sead_identity.tracked_identities
             SET lifecycle_state = %s,
-                sead_internal_id = COALESCE(%s, sead_internal_id),
+                aggregate_id = COALESCE(%s, aggregate_id),
                 materialized_at = COALESCE(%s, materialized_at)
             WHERE tracked_identity_uuid = %s
             RETURNING *
             """,
-            (state.value, sead_internal_id, materialized_at, tracked_identity_uuid),
+            (state.value, aggregate_id, materialized_at, tracked_identity_uuid),
         )
         return self._to_model(row)
 
@@ -565,3 +609,23 @@ class BindingRepository(BaseRepository[Binding]):
         set_state = BindingSetState(row.pop("set_state"))
         binding = self._to_model_required(row)
         return binding, set_state
+
+    async def list_active_bindings(self, source_identity_uuid: UUID) -> list[tuple[Binding, BindingSetState]]:
+        """Return proposed and confirmed bindings for one source identity."""
+        rows = await self._fetchall(
+            """
+            SELECT b.*, bs.lifecycle_state AS set_state
+            FROM sead_identity.bindings b
+            JOIN sead_identity.binding_sets bs
+              ON bs.binding_set_uuid = b.binding_set_uuid
+            WHERE b.source_identity_uuid = %s
+              AND bs.lifecycle_state IN ('proposed', 'confirmed')
+            ORDER BY bs.created_at DESC
+            """,
+            (source_identity_uuid,),
+        )
+        bindings: list[tuple[Binding, BindingSetState]] = []
+        for row in rows:
+            set_state = BindingSetState(row.pop("set_state"))
+            bindings.append((self._to_model_required(row), set_state))
+        return bindings

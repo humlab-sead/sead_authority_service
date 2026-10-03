@@ -11,20 +11,13 @@
 #   auto_confirm:      true  → Binding Sets are auto-confirmed without manual review
 #
 # Notes:
-#   - Phase 1 covers provider_owned entities only.
-#   - shared_metadata and relationship entities are listed for completeness;
-#     their policy handling will be implemented in Phase 2+.
+#   - entity_subtype describes ownership; allow_allocation and auto_confirm
+#     are separate policy settings.
 #   - Entity names match tbl_* suffixes in the SEAD standard model.
 
 entities:
 
   # ── Provider-owned (aggregate roots) ──────────────────────────────────────
-
-  site:
-    entity_subtype: provider_owned
-    accept_uuid: false
-    allow_allocation: true
-    auto_confirm: true
 
   sample_group:
     entity_subtype: provider_owned
@@ -37,21 +30,41 @@ entities:
     accept_uuid: false
     allow_allocation: true
     auto_confirm: true
+    # Allocation fails unless the sample ID allocator has been initialized from existing IDs.
 
   analysis_entity:
     entity_subtype: provider_owned
     accept_uuid: false
     allow_allocation: true
     auto_confirm: true
+    # Allocation fails unless the analysis_entity ID allocator has been initialized from existing IDs.
 
   dataset:
     entity_subtype: provider_owned
     accept_uuid: false
     allow_allocation: true
     auto_confirm: true
+    # Allocation fails unless the dataset ID allocator has been initialized from existing IDs.
+
+  submission:
+    entity_subtype: provider_owned
+    accept_uuid: false
+    allow_allocation: true
+    auto_confirm: true
+    # Allocation fails unless the submission ID allocator has been initialized from existing IDs.
 
   # ── Shared metadata (reconciled by business key) ──────────────────────────
-  # Phase 2+: manual review required; auto_confirm is explicitly false.
+
+  site:
+    entity_subtype: shared_metadata
+    accept_uuid: false
+    allow_allocation: true
+    auto_confirm: true
+    # Proposed operation allowlist; not parsed or enforced by SIMS yet:
+    # operations:
+    #   bind_existing: true  # Shape Shifter supplies an approved site_id.
+    #   allocate_new: true   # Shape Shifter approves a miss; SIMS assigns site_id.
+    # Replace allow_allocation with this mapping when operation checks are implemented.
 
   taxa_tree_master:
     entity_subtype: shared_metadata

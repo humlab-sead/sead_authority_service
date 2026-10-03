@@ -28,7 +28,7 @@ from src.identity.models import (
     ResolutionRequest,
     SourceScope,
 )
-from src.identity.service import IdentityService
+from src.identity.service import IdentityBindingConflict, IdentityService
 
 identity_router = APIRouter(prefix="/identity", tags=["identity"])
 
@@ -98,6 +98,11 @@ class AssociateChangeRequestBody(BaseModel):
     response_model=ResolveResponse,
     status_code=status.HTTP_200_OK,
     summary="Resolve and bind a batch of source identities",
+    responses={
+        status.HTTP_409_CONFLICT: {
+            "description": "Approved aggregate ID conflicts with SIMS identity data or the source has a proposed binding"
+        }
+    },
 )
 async def resolve(
     body: ResolveRequest,
@@ -130,19 +135,25 @@ async def resolve(
 
     outcomes: list[ResolutionOutcome] = []
     for req in body.requests:
-        outcome = await service.resolve_identity(
-            scope_uuid=scope.scope_uuid,
-            request=req,
-            submission_uuid=submission.submission_uuid,
-            created_by=body.created_by,
-        )
+        try:
+            outcome = await service.resolve_identity(
+                scope_uuid=scope.scope_uuid,
+                request=req,
+                submission_uuid=submission.submission_uuid,
+                created_by=body.created_by,
+            )
+        except IdentityBindingConflict as exc:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
         outcomes.append(outcome)
 
-    binding_set = await service.bind(
-        submission_uuid=submission.submission_uuid,
-        outcomes=outcomes,
-        created_by=body.created_by,
-    )
+    try:
+        binding_set = await service.bind(
+            submission_uuid=submission.submission_uuid,
+            outcomes=outcomes,
+            created_by=body.created_by,
+        )
+    except IdentityBindingConflict as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     return ResolveResponse(
         submission_uuid=submission.submission_uuid,

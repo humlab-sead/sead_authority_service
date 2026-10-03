@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.identity.types import (
     BindingMethod,
@@ -80,21 +80,24 @@ class SourceIdentityKey(BaseModel):
 
 
 class TrackedIdentity(BaseModel):
-    """SEAD-side identity anchor for a domain entity.
+    """SIMS identity record for a tracked aggregate.
 
-    tracked_identity_uuid IS the SEAD universal identity (FR-1).
-    sead_internal_id maps to the relational PK once materialized (FR-2).
+    SIMS mints and stores the tracked UUID and entity-scoped aggregate ID.
+    Consumers interpret the aggregate ID using their own data model.
     content_hash supports aggregate-level change detection (FR-24).
     """
 
-    tracked_identity_uuid: UUID = Field(description="Universal SEAD identity UUID (FR-1). Stable across schema migrations.")
-    entity_type: str = Field(description="SEAD entity type, e.g. 'site', 'sample_group'.")
-    sead_internal_id: int | None = Field(default=None, description="Relational PK in the target SEAD table; set when lifecycle_state is MATERIALIZED (FR-2).")
+    tracked_identity_uuid: UUID = Field(description="SIMS-minted UUID for this tracked aggregate.")
+    entity_type: str = Field(description="Configured tracked aggregate type, e.g. 'site' or 'sample_group'.")
+    aggregate_id: int | None = Field(
+        default=None,
+        description="SIMS-minted, entity-scoped aggregate ID. Consumers interpret this value using their own data model.",
+    )
     content_hash: str | None = Field(default=None, description="Deterministic aggregate content hash for change detection (FR-24).")
     lifecycle_state: TrackedIdentityState = Field(default=TrackedIdentityState.ALLOCATED, description="ALLOCATED → MATERIALIZED → RETIRED lifecycle.")
     created_at: datetime
     created_by: str | None = None
-    materialized_at: datetime | None = Field(default=None, description="Timestamp when sead_internal_id was first assigned.")
+    materialized_at: datetime | None = Field(default=None, description="Timestamp when the consumer first applied the aggregate data.")
 
 
 class BindingSet(BaseModel):
@@ -145,9 +148,16 @@ class ResolutionRequest(BaseModel):
     Represents one domain entity submitted for identity resolution within a scope.
     """
 
-    entity_type: str = Field(description="SEAD entity type, e.g. 'site', 'taxa_tree_master'.")
+    model_config = ConfigDict(extra="forbid")
+
+    entity_type: str = Field(description="Configured tracked aggregate type, e.g. 'site' or 'taxa_tree_master'.")
     primary_signal: IdentitySignal = Field(description="The main identity key used for idempotency lookup (FR-12).")
     additional_signals: list[IdentitySignal] = Field(default_factory=list, description="Optional supplementary keys that are also stored, e.g. an authority UUID alongside a business key.")
+    approved_aggregate_id: int | None = Field(
+        default=None,
+        gt=0,
+        description="SIMS-issued aggregate ID selected by the consumer for binding.",
+    )
 
 
 class ResolutionOutcome(BaseModel):
@@ -160,9 +170,10 @@ class ResolutionOutcome(BaseModel):
         default=None,
         description="Set when outcome is 'matched'. For 'new', set after Bind.",
     )
-    target_id: int | None = Field(
+    aggregate_id: int | None = Field(
         default=None,
-        description="Target-facing SEAD integer ID when the tracked identity is already materialized.",
+        serialization_alias="target_id",
+        description="SIMS-issued aggregate ID. Serialized as target_id for API compatibility; consumers interpret it.",
     )
 
 
