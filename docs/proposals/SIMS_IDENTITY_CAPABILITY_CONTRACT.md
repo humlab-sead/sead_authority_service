@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft. Specifies the Phase 1 generic capability contract; implementation and validation are pending.
+Implemented and disposable-validated (2026-10-03). Specifies the Phase 1 generic capability contract.
 
 ## Summary
 
