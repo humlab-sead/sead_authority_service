@@ -26,7 +26,8 @@ from main import app
 from src.api.identity_router import get_identity_service
 from src.configuration import get_config_provider, get_connection, setup_config_store
 from src.identity.models import IdentitySignal, ResolutionRequest
-from src.identity.service import IdentityBindingConflict, IdentityService
+from src.identity.repository import ResolveBatchRepository
+from src.identity.service import IdentityBatchConflict, IdentityBindingConflict, IdentityService
 from src.identity.types import BindingMethod, BindingSetState, ChangeOutcome, IdentityType, TrackedIdentityState
 
 # ---------------------------------------------------------------------------
@@ -927,3 +928,130 @@ class TestGetBindingSetLookup:
         assert "sead://reconciliation" in names
         assert "sead://migration" in names
         assert "sead://admin" in names
+
+
+class TestResolveBatchIdempotency:
+    """Whole-batch atomicity and replay against the helper-owned disposable DB."""
+
+    def _batch_request(self, entity_type: str, label: str) -> ResolutionRequest:
+        return ResolutionRequest(
+            entity_type=entity_type,
+            primary_signal=IdentitySignal(identity_type=IdentityType.BUSINESS_KEY, identity_value=label),
+        )
+
+    async def _allocator_next(self, entity_type: str) -> int:
+        async with get_connection() as connection, connection.cursor() as cursor:
+            await cursor.execute(
+                "SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = %s",
+                (entity_type,),
+            )
+            row = await cursor.fetchone()
+            return row[0]
+
+    @skip_without_db
+    @pytest.mark.asyncio
+    async def test_same_key_same_payload_replays_stored_result(self, disposable_service, scope_name):
+        run_id = f"run-{uuid4().hex}"
+        request = self._batch_request("site", f"Replay site {uuid4().hex}")
+
+        first = await disposable_service.resolve_batch(scope_name, "batch-replay", run_id, [request], created_by="test")
+        second = await disposable_service.resolve_batch(scope_name, "batch-replay", run_id, [request], created_by="test")
+
+        assert first.submission_uuid == second.submission_uuid
+        assert first.scope_uuid == second.scope_uuid
+        assert first.binding_set.binding_set_uuid == second.binding_set.binding_set_uuid
+        assert first.outcomes[0].aggregate_id == second.outcomes[0].aggregate_id
+        assert first.outcomes[0].tracked_identity_uuid == second.outcomes[0].tracked_identity_uuid
+
+    @skip_without_db
+    @pytest.mark.asyncio
+    async def test_reused_run_with_changed_payload_conflicts(self, disposable_service, scope_name):
+        run_id = f"run-{uuid4().hex}"
+        first_request = self._batch_request("site", f"Changed payload A {uuid4().hex}")
+
+        await disposable_service.resolve_batch(scope_name, "batch-changed", run_id, [first_request], created_by="test")
+
+        second_request = self._batch_request("site", f"Changed payload B {uuid4().hex}")
+        with pytest.raises(IdentityBatchConflict, match="different payload"):
+            await disposable_service.resolve_batch(scope_name, "batch-changed", run_id, [second_request], created_by="test")
+
+    @skip_without_db
+    @pytest.mark.asyncio
+    async def test_concurrent_same_run_requests_serialize(self, disposable_service, scope_name):
+        run_id = f"run-{uuid4().hex}"
+        request = self._batch_request("site", f"Concurrent run site {uuid4().hex}")
+
+        results = await asyncio.gather(
+            *(
+                disposable_service.resolve_batch(scope_name, "batch-concurrent", run_id, [request], created_by="test")
+                for _ in range(5)
+            )
+        )
+
+        assert len({result.submission_uuid for result in results}) == 1
+        assert len({result.outcomes[0].aggregate_id for result in results}) == 1
+        assert len({result.outcomes[0].tracked_identity_uuid for result in results}) == 1
+
+    @skip_without_db
+    @pytest.mark.asyncio
+    async def test_outcomes_preserve_request_order(self, disposable_service, scope_name):
+        site_request_a = self._batch_request("site", f"Order site A {uuid4().hex}")
+        sample_request = self._batch_request("sample", f"Order sample {uuid4().hex}")
+        site_request_b = self._batch_request("site", f"Order site B {uuid4().hex}")
+        requests = [site_request_a, sample_request, site_request_b]
+
+        result = await disposable_service.resolve_batch(
+            scope_name, "batch-order", f"run-{uuid4().hex}", requests, created_by="test"
+        )
+
+        assert [outcome.entity_type for outcome in result.outcomes] == ["site", "sample", "site"]
+
+    @skip_without_db
+    @pytest.mark.asyncio
+    async def test_distinct_run_proposed_binding_conflicts(self, disposable_service, scope_name):
+        scope = await disposable_service.get_or_create_scope(scope_name, created_by="test")
+        request = self._batch_request("site", f"Proposed batch site {uuid4().hex}")
+        outcome = await disposable_service.resolve_identity(scope.scope_uuid, request, created_by="test")
+
+        materialized_sites = [
+            identity
+            for identity in await disposable_service.tracked_identity_repo.list_all()
+            if identity.entity_type == "site" and identity.lifecycle_state == TrackedIdentityState.MATERIALIZED
+        ]
+        assert materialized_sites
+        proposed_set = await disposable_service.binding_set_repo.create(submission_uuid=None, created_by="test")
+        await disposable_service.binding_repo.create(
+            binding_set_uuid=proposed_set.binding_set_uuid,
+            source_identity_uuid=outcome.source_identity_uuid,
+            tracked_identity_uuid=materialized_sites[0].tracked_identity_uuid,
+            method=BindingMethod.BUSINESS_KEY,
+            created_by="test",
+        )
+
+        next_before = await self._allocator_next("site")
+
+        with pytest.raises(IdentityBindingConflict, match="unresolved proposed binding"):
+            await disposable_service.resolve_batch(scope_name, "batch-proposed", f"run-{uuid4().hex}", [request], created_by="test")
+
+        assert await self._allocator_next("site") == next_before
+
+    @skip_without_db
+    @pytest.mark.asyncio
+    async def test_failed_batch_rolls_back_without_advancing_allocator(self, disposable_service, scope_name):
+        run_id = f"run-{uuid4().hex}"
+        next_before = await self._allocator_next("site")
+
+        valid_request = self._batch_request("site", f"Rollback valid site {uuid4().hex}")
+        bad_request = ResolutionRequest(
+            entity_type="site",
+            approved_aggregate_id=999999999,
+            primary_signal=IdentitySignal(identity_type=IdentityType.BUSINESS_KEY, identity_value=f"Rollback bad {uuid4().hex}"),
+        )
+
+        with pytest.raises(IdentityBindingConflict):
+            await disposable_service.resolve_batch(
+                scope_name, "batch-rollback", run_id, [valid_request, bad_request], created_by="test"
+            )
+
+        assert await self._allocator_next("site") == next_before
+        assert await ResolveBatchRepository().find(scope_name, run_id) is None
