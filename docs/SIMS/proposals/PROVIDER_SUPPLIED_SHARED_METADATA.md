@@ -2,117 +2,112 @@
 
 ## Status
 
-- Proposed feature / change request
-- Scope: SIMS shared-metadata policy, requirements, and service (Phase 3+)
-- Goal: Let providers propose genuinely new shared metadata entries whose identity is minted by SIMS, subject to human confirmation
+- Proposed feature; revise before implementation to follow the generic SIMS identity contract
+- Scope: generic configured allocation requiring confirmation, with consuming-workflow coordination outside SIMS
+- Goal: Allow a caller to request a new tracked identity under validated SIMS configuration without making SIMS responsible for SEAD reconciliation or data materialization
+
+**Architecture constraint:** SIMS owns and mints tracked aggregate identities and guarantees uniqueness only within its own store. SIMS does not classify entities using SEAD-specific policy, inspect SEAD data, or create or update SEAD rows. A consuming workflow owns reconciliation, curator interaction, and materialization under the SIMS–SEAD trust contract.
 
 ## Summary
 
-`REQUIREMENTS.md` FR-20 defines only one outcome for an unmatched classifier or lookup: reject with diagnostics. But `TRACKED_ENTITIES.md` already claims providers *may propose new entries* in the Provider-Extensible shared-metadata group. This proposal adds the missing workflow: unmatched provider-extensible entry → SIMS mints a UUID and holds the identity as pending → a SEAD curator confirms (materializes the entry) or rejects. It applies only to Provider-Extensible metadata; SEAD-Administered vocabularies keep the reject path.
+Some consuming workflows need a reviewed path for allocating a new identity when reconciliation finds no existing domain entity. The target model may label such an entity as shared metadata, but SIMS must not encode SEAD-specific entity groups or perform that reconciliation. This proposal covers only the generic SIMS allocation and binding state needed by a caller that has made an approved request.
 
 ## Problem
 
-Providers must be able to introduce genuinely new shared entries — a new site, project, location, or method — into SEAD. Today they cannot through SIMS:
+The generic SIMS service must be able to represent a configured request for a new tracked identity that requires confirmation. Today:
 
-- Shared metadata is configured `allow_allocation: false`, so SIMS never mints an identity for an unmatched entry.
-- FR-20 forces the submission to be rejected with diagnostics instead.
-- `TRACKED_ENTITIES.md` says "providers may propose new entries", but no requirement or code path supports that claim.
+- Allocation behavior is not yet driven by the target generic configuration contract.
+- SIMS must not infer a no-match from SEAD data or decide whether a candidate matches a SEAD row.
+- A pending SIMS identity must not be described as a SEAD row or as proof that SEAD data has been materialized.
 
-The only workarounds are out-of-band (email/issue a SEAD admin to pre-create the entry) or abusing the provider-owned path, which would let providers create shared vocabulary without review. Both are wrong.
+The consuming workflow remains responsible for reviewing the proposed domain data and submitting an approved allocation request or binding decision.
 
 ## Scope
 
-- A proposal workflow for the Provider-Extensible shared-metadata group.
-- SIMS mints the UUID at proposal time; the Binding Set stays `PROPOSED`; the identity starts in `Pending Materialization`.
-- Curator review: confirm (materialize into the SEAD table) or reject (return FR-20-style diagnostics, create nothing).
-- A policy mode for allocation-without-auto-confirmation on this group.
-- A new functional requirement (FR-28) and a scoping note on FR-20.
+- Generic validated configuration for allocation that requires confirmation.
+- SIMS stores the newly minted aggregate identity and a proposed Binding Set using shared service logic.
+- A caller-owned review and materialization workflow that confirms or rejects the proposed identity association; SIMS does not write SEAD data.
+- A functional requirement for configured pending allocation and confirmation behavior.
 
 ## Non-Goals
 
-- SEAD-Administered vocabularies (`lookup-only`) — providers reference these only; no proposal path.
 - Fuzzy-matching or duplicate-detection quality improvements.
-- Building the curator review user interface.
+- Building the consuming workflow's curator review user interface.
+- Reconciliation against SEAD data, SEAD table/column mapping, and SEAD row creation or update.
 
 ## Current Behavior
 
-- `config/identity_policy.yml`: shared metadata is `accept_uuid: true`, `allow_allocation: false`, `auto_confirm: false`.
-- FR-20: unmatched shared metadata or classifier → reject with diagnostics.
-- Existing lifecycle supports the workflow's states: Binding Sets are `PROPOSED → CONFIRMED | REJECTED`, and TrackedIdentity has `Pending Materialization → Materialized` (allocation is the event that creates the identity, not a separate state).
+- The current identity policy contains legacy categories such as shared metadata and per-category allocation flags. These do not define the target generic configuration contract.
+- The requirements now place target-system reconciliation with the consuming workflow; SIMS does not infer an unmatched SEAD entity.
+- Binding Sets already support `PROPOSED → CONFIRMED | REJECTED`. Any consumer-side materialization occurs outside SIMS.
 
 ## Proposed Design
 
 ### Policy
 
-Add a third allocation mode to shared metadata: allocation is allowed but never auto-confirmed, and an allocated identity is not authoritative until its Binding Set is confirmed.
+Define generic, validated configuration for an allocation operation that requires confirmation. Use shared SIMS service logic for every configured entity type; do not add entity-group-specific branches.
 
-Provider-Extensible entities: `allow_allocation: true`, `auto_confirm: false`, allocated identities start in `Pending Materialization`.
-SEAD-Administered entities: unchanged (`allow_allocation: false`).
+SIMS persists the aggregate identity value, tracked UUID, and proposed Binding Set. Confirmation changes SIMS binding state only; it does not assert that a consumer has written a row. Rejection also changes SIMS binding state and preserves the identity audit record.
 
 ### Flow
 
-1. **Submit** — provider submits a classifier or lookup with key evidence (business key, optionally provider key).
-2. **Resolve** — SIMS searches for a business-key match.
-   - Match → bind to the existing entry; Binding Set `PROPOSED` → curator confirms. Existing behavior.
-   - No match, Provider-Extensible → **proposal path**.
-   - No match, SEAD-Administered → FR-20 reject with diagnostics. Unchanged.
-3. **Propose** — SIMS mints the UUID, creates a TrackedIdentity in `Pending Materialization`, records the Binding Set as `PROPOSED`. No SEAD table row is created.
-4. **Review** — a curator lists pending proposals and either:
-   - **confirms** → Binding Set `CONFIRMED`, the entry materializes into the SEAD table, identity becomes `Materialized`; or
-   - **rejects** → Binding Set `REJECTED`, provider receives diagnostics, nothing is created.
-5. **Reuse** — after confirmation, later submissions carrying the same business key resolve to the confirmed entry (FR-12/13).
+1. **Reconcile** — the consuming workflow evaluates the incoming domain data and approves an existing match, a new identity request, or rejection.
+2. **Request** — the caller sends the approved existing identity or a configured allocation request to SIMS with scoped source identity values.
+3. **Allocate** — SIMS uses the generic configured allocator, stores the aggregate identity value and tracked UUID, and creates a proposed Binding Set when confirmation is required.
+4. **Review** — the consuming workflow's curator confirms or rejects the Binding Set. SIMS records the binding decision; the consuming workflow separately applies any domain-data change.
+5. **Reuse** — later requests with the same scoped source identity resolve to the same SIMS Tracked Identity (FR-12/13).
 
 ### API
 
-- Add a review-queue read: list pending proposals (proposed Binding Sets for provider-extensible shared metadata).
-- Confirmation already exists: `POST /identity/binding-sets/{uuid}/confirm`.
+- Add a review-queue read for proposed Binding Sets only if the agreed confirmation workflow requires one.
+- Use `POST /identity/binding-sets/{uuid}/confirm` for SIMS binding confirmation; do not treat it as a SEAD materialization operation.
 
 ### Requirements
 
-- Add FR-28: *The system shall support provider-proposed new shared metadata entries whose identity is minted by SIMS and made authoritative only after human confirmation.*
-- Scope FR-20 to SEAD-Administered vocabularies, with a note that Provider-Extensible entries use the proposal path instead.
+- Add FR-28: *For a configured allocation operation that requires confirmation, the system shall persist the SIMS identity and proposed Binding Set until the caller confirms or rejects the Binding Set.*
+- Keep reconciliation and reject-on-no-match decisions with the consuming workflow; do not name SEAD-specific entity groups in SIMS requirements.
 
 ## Alternatives Considered
 
-- **Keep reject-only (FR-20 as written)** — forces the out-of-band admin workflow and contradicts "providers may propose new entries". Rejected.
-- **Auto-create like provider-owned** (`allow_allocation: true` + `auto_confirm: true`) — lets providers write shared vocabulary without review; risks duplicates and vocabulary pollution. Rejected.
-- **Proposal workflow (chosen)** — reuses the existing Binding Set and identity lifecycles and preserves the human gate.
+- **Disallow allocation in configuration** — appropriate where the consuming workflow requires an existing identity; not suitable for workflows that approve new identity requests.
+- **Auto-confirm every allocation** — removes a required review step and may be unsuitable for workflows with a human approval gate.
+- **Configured allocation with pending confirmation (recommended)** — uses generic SIMS allocation and Binding Set state while leaving domain review and materialization to the consuming workflow.
 
 ## Risks And Tradeoffs
 
 - **Review backlog** — a growing queue of pending proposals needs a curator workflow to keep it tractable.
-- **New policy semantics** — allocation-without-auto-confirm is a third mode; the two current booleans alone do not express it. Expect a policy-model change (new flag or state).
+- **Configuration semantics** — configuration must express whether an operation allocates and whether confirmation is required, without entity-specific allocator code.
 - **Concurrent duplicates** — two providers proposing the same new term produce two proposals; deduplication happens at review, not automatically.
-- **Minting vs materializing** — the proposal path must keep identity allocation separate from SEAD row creation, or an unconfirmed entry can leak into SEAD.
+- **Minting vs materializing** — SIMS identity allocation must remain separate from consumer data writes; only the consuming workflow applies domain changes.
 
 ## Testing And Validation
 
-- Unit tests: policy resolution for the new mode; service flow for propose → confirm → materialize and propose → reject.
-- Integration tests (DB-backed): a provider-extensible entity; verify no SEAD row exists until confirm; verify reject returns diagnostics and creates no row; verify a post-confirmation submission resolves to the confirmed entry.
-- Update existing tests that assert FR-20 reject behavior for Provider-Extensible entities.
+- Unit tests: generic configuration validation and service flows for allocate → confirm and allocate → reject.
+- SIMS database tests: verify identity uniqueness, pending Binding Set state, confirmation/rejection, and source-identity retry behavior without connecting to or writing a consumer database.
+- Consuming-workflow tests: verify review outcomes and domain writes occur outside SIMS and use SIMS-issued identity values.
 
 ## Acceptance Criteria
 
-- FR-28 exists in `REQUIREMENTS.md`; FR-20 is scoped to SEAD-Administered vocabularies.
-- Policy supports allocation-without-auto-confirm for Provider-Extensible shared metadata.
-- Propose → confirm produces a materialized SEAD row and a `Materialized` identity.
-- Propose → reject produces diagnostics, no SEAD row, and a `REJECTED` Binding Set.
-- Post-confirmation submissions resolve to the same entry (idempotent).
+- FR-28 describes generic configured allocation requiring confirmation; SIMS requirements do not name SEAD-specific entity groups.
+- The same allocator code serves configured entity types, with uniqueness enforced only within the SIMS identity store.
+- Allocate → confirm and allocate → reject update SIMS Binding Set state without writing consumer data.
+- The consuming workflow applies any approved domain change using the SIMS-issued identity value under the trust contract.
+- Retries for the same scoped source identity resolve to the same SIMS Tracked Identity.
 
 ## Recommended Delivery Order
 
 1. Requirements: add FR-28, scope FR-20 (docs only).
-2. Policy model: allocation-pending mode for Provider-Extensible metadata.
+2. Configuration model: generic allocation that requires Binding Set confirmation.
 3. Service: proposal path in resolve/bind; pending-proposals review endpoint.
 4. Tests for the full flow, then update affected existing tests.
 
 ## Open Questions
 
 - Must a proposal carry at least one business key? (Likely yes — matching depends on it.)
-- Who may approve proposals — SEAD admins only, or trusted providers with an elevated role?
+- Which caller roles may confirm a proposed Binding Set?
 - Should concurrent identical proposals auto-merge, or stay separate for manual dedup?
 - Is provider notification on confirm/reject in scope? (Proposed: no — API result only.)
 
 ## Final Recommendation
 
-Implement the proposal workflow for Provider-Extensible shared metadata. SIMS mints the identity at proposal time and holds it pending; a curator confirms or rejects. Keep SEAD-Administered vocabularies on the FR-20 reject path. Add FR-28 and scope FR-20 to match.
+Implement generic configured allocation with optional confirmation state in SIMS. Keep reconciliation, curator decisions about domain data, and consumer materialization outside SIMS. Finalize requirements only after the consuming workflow and confirmation responsibility are agreed.

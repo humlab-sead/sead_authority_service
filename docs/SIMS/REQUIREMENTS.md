@@ -1,6 +1,6 @@
 # SEAD Identity System Requirements
 
-> **Status:** Reflects the implementation as of Phases 1–2 (complete). Phases 3–5 (shared metadata, entity table integration, Change Request integration) are outlined but not yet implemented. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
+> **Status:** Reflects the implementation as of Phases 1–2 (complete). Generic configurable aggregate-identity allocation is the target design and is not yet implemented. Existing-data migration, production adoption, and cutover are outside the current development task. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
 
 ## Purpose
 
@@ -25,26 +25,27 @@ This document covers requirements only. Implementation details, NFRs, infrastruc
 
 ### Why the system exists
 
-SEAD currently relies on sequence-generated integer primary keys as its internal identifiers. Those identifiers work well for internal relational integrity, but they are not sufficient as stable cross-system identities.
+Tracked aggregates need stable identities that remain consistent across submissions and consumers. A consuming system may also use local relational keys, but those storage details do not define SIMS identity.
 
 This creates several problems:
 
-1. External systems cannot safely refer to SEAD entities before data is inserted.
+1. External systems cannot safely refer to tracked aggregates before the consumer materializes their data.
 2. The same incoming entity may be inserted multiple times because there is no stable identity handshake across submissions.
 3. Update workflows are weak because the system cannot reliably distinguish a changed entity from a new one.
-4. Remote systems are forced to depend on transient internal identifiers that are not appropriate as public references.
+4. Remote systems may be forced to depend on storage identifiers whose meaning is local to one consumer.
 5. Shared metadata and classifiers risk duplication when reconciliation rules are weak or absent.
 
-The SEAD Identity System exists to solve that class of problems by introducing a stable identity layer above SEAD's internal relational keys.
+SIMS solves these problems by owning stable aggregate identities and the source identities associated with them.
 
 ### Problem boundaries
 
-The system is not intended to replace any part of SEAD's relational model. It exists to complement it.
+SIMS owns identity for tracked aggregates; it does not own a consumer's data model or storage schema.
 
-The system must therefore support both of the following at the same time:
+The SIMS–SEAD trust contract requires:
 
-- SEAD continues using internal integer or bigint primary keys for relational storage.
-- SEAD gains stable, externally usable identities for tracked entities.
+- SIMS is the sole minter of tracked aggregate identities and guarantees uniqueness within its own identity store.
+- Every tracked entity represented in SEAD has a corresponding SIMS Tracked Identity. SEAD consumes SIMS-issued identity values under the trust contract.
+- SIMS does not map identity values to SEAD tables or columns and does not enforce SEAD database integrity.
 
 ---
 
@@ -52,19 +53,19 @@ The system must therefore support both of the following at the same time:
 
 ### Scope
 
-The SEAD Identity System is concerned with identity management for tracked SEAD entities and with the mapping between the identity types defined in [Domain Concepts](#domain-concepts) below.
+SIMS manages tracked aggregate identities, entity-scoped identity values, and the source identities associated with those aggregates. It uses a generic allocation mechanism configured by entity type; supporting another configured type must not require a dedicated allocator implementation.
 
-The system is also concerned with the relationship between provider-specific data and shared SEAD metadata, including reconciliation where those overlap.
+SIMS stores source identities and their associations with tracked aggregates. A consuming workflow owns reconciliation against its own domain data and submits approved identity outcomes to SIMS; SIMS does not inspect SEAD definitions or schemas.
 
 ### Goals
 
 The system **must**:
 
-1. Provide stable identities for tracked SEAD entities.
-2. Preserve SEAD's existing relational primary keys.
+1. Provide stable identities for tracked aggregates.
+2. Keep SIMS identity ownership separate from a consumer's local storage keys.
 3. Support idempotent identity allocation and resolution.
 4. Support both UUID-based and business-key-based ingestion workflows.
-5. Support reconciliation between provider data and shared SEAD metadata/classifiers.
+5. Support identity resolution using source identities and approved caller decisions without performing target-system reconciliation.
 6. Provide a foundation for later update and change-detection workflows.
 7. Support entity relationships that are not limited to simple parent-child trees.
 
@@ -76,17 +77,17 @@ The system **must**:
 
 The system must distinguish the following identifier types.
 
-| Type | Definition | Scope | In SEAD |
-|---|---|---|---|
-| **SEAD internal identity** | Integer sequence primary key | Entity-scoped, relational | `{entity}_id` — not a public identity |
-| **SEAD universal identity** | Stable UUID for a tracked entity | Global, externally usable | `{entity}_uuid` |
-| **Business key** | Natural key or key set identifying an entity in practice | Per entity type | Used for reconciliation; may come from SEAD or provider |
-| **Provider key** | Identifier used by a remote data provider | Provider-internal | Retained in identity system even if not promoted to SEAD tables |
-| **Authority key** | Identifier from an external reference system (e.g. Wikidata, GeoNames) | External authority | Supports reconciliation and de-duplication of shared metadata |
+| Type | Definition | Scope |
+|---|---|---|
+| **Aggregate identity value** | Opaque value minted and stored by SIMS for a tracked aggregate | Entity-type scoped |
+| **Tracked UUID** | Stable UUID assigned and stored by SIMS for a tracked aggregate | Global |
+| **Business key** | Natural key or key set identifying an entity in practice | Source scope or entity configuration |
+| **Provider key** | Identifier used by a data provider | Provider/source scope |
+| **Authority key** | Identifier from an external reference system (e.g. Wikidata, GeoNames) | External authority |
 
 ### Tracked entities
 
-A **tracked entity** is an entity for which this system manages a stable SEAD universal identity. Not every domain object needs to be tracked; determining which SEAD objects qualify is a SEAD domain-modeling task, deferred to SEAD model specification work. This document uses the domain-driven design vocabulary (entity, value object, aggregate) defined in [CONCEPTUAL_MODEL.md § Domain Modeling Foundations](./CONCEPTUAL_MODEL.md#domain-modeling-foundations).
+A **tracked entity** is an entity or aggregate root for which SIMS manages a stable identity. Value objects and storage-only rows are not independently tracked unless the domain model defines them as aggregates. This document uses the domain-driven design vocabulary defined in [CONCEPTUAL_MODEL.md § Domain Modeling Foundations](./CONCEPTUAL_MODEL.md#domain-modeling-foundations).
 
 ### Entity subtypes
 
@@ -94,13 +95,13 @@ Within tracked entities, this document recognizes three identity patterns.
 
 #### Provider-owned entities
 
-Entities whose data originates from a submitting provider and is treated as provider-owned content. Identity is allocated based on incoming evidence. Reconciliation against shared SEAD structures is not the primary concern.
+Entities whose data originates from a submitting provider and is treated as provider-owned content. Identity is allocated based on incoming source identities and validated SIMS configuration.
 
 In Shape Shifter terms, these correspond broadly to **fact** entities.
 
 #### Shared metadata entities
 
-Entities that function as shared reference structures used across datasets and multiple providers. These must be reconciled against existing SEAD definitions rather than simply allocated a new identity. Insertion without reconciliation risks duplication.
+Entities that function as shared reference structures used across datasets and providers. The consuming workflow reconciles these entities against its domain data and submits an approved match or permitted allocation request to SIMS. SIMS does not search or inspect the consumer's database.
 
 In Shape Shifter terms, these correspond broadly to **classifier** and **lookup** entities.
 
@@ -116,7 +117,7 @@ The domain model must support:
 
 - **Ownership**: the child is part of the aggregate state of a parent entity.
 - **Association**: two entities are linked without ownership (e.g. site-to-location).
-- **Reconciliation linkage**: a provider object or classifier is matched to an existing SEAD object without implying ownership.
+- **Reconciliation linkage**: a provider object or classifier is matched to an existing consumer-domain object without implying ownership. The consuming workflow owns that matching process.
 
 ### Conceptual model alignment
 
@@ -128,37 +129,37 @@ The full conceptual model — core concepts (Source Scope, Submission, Source Id
 
 ### Identity model requirements
 
-FR-1. The system shall maintain a stable UUID identity for each tracked SEAD entity.
+FR-1. The system shall maintain a stable tracked UUID for each tracked aggregate.
 
-FR-2. The system shall maintain a mapping between the tracked entity UUID and the corresponding SEAD internal identifier.
+FR-2. The system shall store an entity-scoped aggregate identity value with the tracked UUID and entity type.
 
-FR-3. The system shall support reuse of existing `{entity}_uuid` fields in SEAD where such fields already exist.
+FR-3. The system shall expose SIMS-issued identity values without requiring knowledge of a consumer's table or column names.
 
-FR-4. The system shall not require replacement of SEAD internal integer or bigint primary keys.
+FR-4. The system shall guarantee uniqueness of aggregate identity values within the SIMS identity store and shall not claim to enforce uniqueness in a consumer database.
 
-FR-5. The system shall distinguish between SEAD universal identity, SEAD internal identity, business keys, provider keys, and authority keys.
+FR-5. The system shall distinguish aggregate identity values, tracked UUIDs, business keys, provider keys, and authority keys.
 
 ### Identifier intake requirements
 
-FR-6. The system shall accept provider-supplied UUIDs for tracked entities when allowed by SEAD identity policy.
+FR-6. The system shall accept provider-supplied identifiers as Source Identity values when allowed by SIMS entity configuration; it shall not adopt a provider-supplied value as a SIMS-minted aggregate identity or tracked UUID.
 
-FR-7. The system shall mint a new SEAD UUID for a tracked entity when no accepted UUID is supplied.
+FR-7. The system shall mint new aggregate identity values and tracked UUIDs through a generic allocator when allocation is configured.
 
 FR-8. The system shall support business-key-based resolution for entities where business keys are defined.
 
-FR-9. The system shall retain provider keys in the identity system even when those keys are not written into SEAD tables.
+FR-9. The system shall retain provider keys in the identity system independently of whether a consuming system stores those keys.
 
 FR-10. The system shall support recording authority keys for tracked entities when such identifiers are available.
 
-FR-11. The system shall enforce an administrable identity policy that governs whether a provider-supplied UUID is accepted as the SEAD universal identity or treated only as a provider key.
+FR-11. The system shall enforce validated entity configuration that governs accepted source-key semantics and the generic identity operation.
 
 ### Idempotency and mapping requirements
 
-FR-12. The system shall return the same resolved SEAD identity for the same accepted identifier across repeated submissions.
+FR-12. The system shall return the same SIMS tracked identity for the same accepted source identity across repeated submissions.
 
 FR-13. The system shall prevent duplicate identity allocation for the same accepted identifier within the same source scope.
 
-FR-14. The system shall support stable lookup of existing mappings between provider identifiers, business keys, authority keys, UUID identity, and SEAD internal identity.
+FR-14. The system shall support stable lookup of SIMS mappings between source identities, aggregate identity values, and tracked UUIDs.
 
 ### Domain modeling requirements
 
@@ -166,13 +167,13 @@ FR-15. The system shall support tracked entities that are provider-owned data.
 
 FR-16. The system shall support tracked entities that are shared metadata.
 
-FR-17. The system shall support reconciliation of shared metadata and classifiers rather than only raw insertion.
+FR-17. The system shall support binding an approved existing Tracked Identity and shall not perform reconciliation against a consumer's domain database.
 
 FR-18. The system shall support many-to-many associations between tracked entities.
 
 FR-19. The system shall distinguish owned child value objects from independently tracked entities.
 
-FR-20. The system shall reject a submission with diagnostic information when an incoming shared metadata or classifier entity cannot be matched to an existing SEAD entity, rather than silently allocating a new identity.
+FR-20. The system shall reject a request with diagnostic information when the configured operation forbids allocation and the caller has not supplied an approved existing identity.
 
 ### Submission and traceability requirements
 
@@ -194,7 +195,13 @@ FR-26. The system shall group the Bindings produced by an identity resolution ba
 
 ### Change Request completeness requirements
 
-FR-27. The system shall require that all entities referenced by a Change Request have resolved identities expressed through confirmed Binding Sets before the Change Request can be applied to SEAD. This applies to entities originating from external provider submissions and from internal SEAD administration alike.
+FR-27. The system shall expose Binding Set confirmation state so a consuming workflow can check identity outcomes before applying its own domain changes. SIMS shall not apply or validate those changes.
+
+FR-28. The system shall allocate and persist an aggregate identity value and tracked UUID for each configured new tracked identity before returning a successful allocation result.
+
+FR-29. The system shall allocate aggregate identity values from SIMS-owned state and shall not inspect or depend on consumer tables, columns, sequences, or database constraints.
+
+FR-30. The generic allocator shall use validated entity-scoped configuration, reject conflicting identities within SIMS, and never recycle an allocated aggregate identity value.
 
 ---
 
@@ -208,21 +215,21 @@ A provider submits entities, either with provider-generated UUIDs or using busin
 
 Expected outcome:
 
-- Where UUIDs are supplied, the system determines whether they are accepted as SEAD universal identities per the configured identity policy.
+- Where UUIDs are supplied, the system records them as scoped Source Identity values according to validated entity configuration.
 - Where only business keys are supplied, the system uses defined business-key rules to resolve or identify the entity.
-- In both cases, existing identities are resolved where found; new SEAD UUIDs are minted where not.
-- Provider keys are retained in the identity system regardless of whether they are accepted as SEAD identities.
+- In both cases, existing SIMS identities are reused where a Source Identity is already bound; new SIMS aggregate identity values and tracked UUIDs are minted where allocation is configured.
+- Provider UUIDs remain distinct Source Identity values and never replace a SIMS-minted tracked UUID.
 
-### Scenario 2: Provider submits classifiers that should reconcile to shared SEAD metadata
+### Scenario 2: Provider submits entities governed by a shared-metadata policy
 
 A provider submits values for methods, sample types, bibliographic references, taxa-related structures, or other classifiers.
 
 Expected outcome:
 
 - the system does not treat those values as provider-owned entities by default,
-- instead it attempts reconciliation against shared SEAD metadata,
-- if matched, the shared SEAD entity is reused,
-- if not matched, the system rejects the submission with diagnostic information identifying the unmatched entities, according to SEAD policy.
+- instead it applies the configured resolution policy for shared metadata,
+- if matched, the existing SIMS Tracked Identity is reused,
+- if not matched and allocation is disallowed, the system rejects the request with diagnostic information.
 
 ### Scenario 3: Entity association rather than ownership
 
@@ -242,7 +249,7 @@ Expected outcome:
 
 - the authority key can be attached to a tracked entity,
 - the authority key can support reconciliation,
-- the system can retain both SEAD identity and external authoritative identity without conflating them.
+- the system can retain both SIMS aggregate identity and external authoritative identity without conflating them.
 
 ---
 

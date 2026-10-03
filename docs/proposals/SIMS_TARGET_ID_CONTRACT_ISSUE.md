@@ -8,13 +8,13 @@ Suggested body:
 
 ## Problem
 
-Shape Shifter's `sead_change_request` Delivery 1 flow can resolve and confirm SIMS Binding Sets, but it still cannot materialize new provider-owned rows into SQL because `POST /identity/resolve` does not return the target-facing SEAD integer ID needed in emitted PK/FK columns.
+Shape Shifter's `sead_change_request` Delivery 1 flow needs the SIMS-issued aggregate identity value when generating artifacts for tracked entities. `POST /identity/resolve` currently does not return that value for all configured allocation operations.
 
-Current downstream behavior is explicit: when SIMS returns Binding Set metadata without a target-facing integer ID, Shape Shifter stops before SQL generation with `SIMS target ID allocation capability incomplete`.
+Current downstream behavior is explicit: when SIMS does not return a required aggregate identity value, Shape Shifter stops before artifact generation with `SIMS target ID allocation capability incomplete`.
 
 ## Solution
 
-Extend each `ResolutionOutcome` in `POST /identity/resolve` so it may include:
+Extend each `ResolutionOutcome` in `POST /identity/resolve` so it may include the current adapter field:
 
 ```json
 {
@@ -26,14 +26,16 @@ Requirements:
 
 - field name: `target_id`
 - type: `int | null`
-- meaning: the authoritative target-facing SEAD integer ID resolved or allocated for that entity
+- meaning: the opaque, entity-scoped aggregate identity value issued by SIMS; Shape Shifter may translate it according to its target model
 - rollout: keep the field optional so existing clients remain compatible
+- ownership: SIMS allocates the value through generic code driven by validated entity configuration and guarantees uniqueness within its own identity store; it does not inspect or enforce SEAD schema or database constraints
 
 Expected behavior:
 
-- return `target_id` when SIMS can match an existing entity to its target-facing integer ID
-- return `target_id` when SIMS allocates a new entity and knows the integer ID Shape Shifter must emit
-- return `null` only when Binding Set creation succeeds but integer-ID materialization is still unavailable
+- return `target_id` when SIMS can match an existing entity to its stored aggregate identity value
+- return `target_id` when SIMS allocates a new entity using the generic configured mechanism
+- for an enabled allocation operation, fail rather than return a successful outcome with a null ID
+- use the same allocator implementation for configured entity types; entity types are not hard-coded allocator branches
 
 ## Files
 
@@ -51,6 +53,8 @@ Related authority-service handoff note:
 Suggested acceptance criteria:
 
 - `POST /identity/resolve` may return `target_id` on each `ResolutionOutcome`
-- the field is documented as the target-facing SEAD integer ID
+- the field is documented as the opaque SIMS-issued aggregate identity value carried through the current adapter field
 - existing clients remain compatible if they ignore the field
-- Shape Shifter receives non-null `target_id` values for Delivery 1 allocatable entity types
+- configured types use generic allocation and SIMS-store uniqueness
+- Shape Shifter receives non-null `target_id` values for configured allocation or binding operations that require the value
+- the work does not include existing-data migration, production validation, deployment, or cutover

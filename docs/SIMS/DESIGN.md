@@ -1,10 +1,10 @@
 # Design
 
-> **Status:** Reflects the implementation as of Phases 1–2 (complete). Phases 3–5 (shared metadata, entity table integration, Change Request integration) are outlined but not yet implemented. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
+> **Status:** Describes the current Phases 1–2 implementation and its disposable site-allocation prototype. The target architecture is a generic, entity-configured allocator owned by SIMS; it is not yet implemented. Production adoption, existing-data migration, and cutover are outside the current development task. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
 
 ## Purpose
 
-This document is the design view of the SEAD Identity System.
+This document describes the SIMS design and its current Authority Service implementation.
 
 It sits after [REQUIREMENTS.md](./REQUIREMENTS.md) (what the system must do) and [CONCEPTUAL_MODEL.md](./CONCEPTUAL_MODEL.md) (core concepts, design rules, decision flow). It maps those concepts and rules to concrete implementation structures.
 
@@ -29,17 +29,17 @@ The table below maps each CM concept to its implementation anchor. This is the p
 | **Source Scope**        | `source_scopes` table      | Hierarchical namespace; stable across submissions                                                                         |
 | **Submission**          | `submissions` table        | Temporal provenance; belongs to one Source Scope                                                                          |
 | **Source Identity**     | `source_identities` table  | Persistent per scope; carries identity signals                                                                            |
-| **Tracked Identity**    | `tracked_identities` table | SEAD-side UUID anchor; lifecycle per [CM § Tracked Identity Lifecycle](./CONCEPTUAL_MODEL.md#tracked-identity-lifecycle)  |
+| **Tracked Identity**    | `tracked_identities` table | SIMS-owned aggregate identity and UUID; lifecycle per [CM § Tracked Identity Lifecycle](./CONCEPTUAL_MODEL.md#tracked-identity-lifecycle) |
 | **Binding**             | `bindings` table           | Links Source Identity → Tracked Identity; belongs to one Binding Set                                                     |
-| **Binding Set**         | `binding_sets` table       | Atomic batch of Bindings; owns lifecycle, audit, and Change Request reference (FR-26)                                     |
+| **Binding Set**         | `binding_sets` table       | Atomic batch of Bindings; owns lifecycle, audit, and optional opaque consumer reference (FR-26)                            |
 | **Identity Resolution** | Service operation          | Stateless process; outcomes expressed as a Binding Set containing Bindings (rejected submissions receive diagnostics)     |
-| **Change Request**      | External reference (by name) | Owned by SEAD Change Control System (Sqitch); SIMS records association between Bindings and Change Request name          |
+| **Change Request**      | Optional external reference | Consumer-owned domain-change process; current SEAD integration stores a Sqitch change name                               |
 
 ### Key structural principles
 
 - Each CM concept owned by SIMS maps to its own table. No composite "allocation" table conflating Source Identity, Tracked Identity, and Binding.
-- Binding Sets are the atomic governance unit. Lifecycle state, audit trail, and Change Request references live on the Binding Set, not on individual Bindings.
-- Change Requests are external objects (owned by the SEAD Change Control System); SIMS references them by name on the Binding Set record.
+- Binding Sets are the atomic identity-governance unit. Lifecycle state, audit trail, and optional consumer references live on the Binding Set, not on individual Bindings.
+- Any consumer change reference is opaque metadata to SIMS; the current SEAD-specific Sqitch field is a legacy integration detail.
 - Binding Set lifecycle is expressed as a state column with allowed transitions enforced by application logic (or CHECK constraints).
 - Identity Resolution is a service-layer operation, not a stored object. Its outcomes are a Binding Set.
 
@@ -79,7 +79,7 @@ Represents a persistent identity for a domain entity as expressed within a Sourc
 |--------------------------------------|------------------------------------------------------------------------|
 | `source_identity_uuid` (PK)          | Unique identifier                                                      |
 | `scope_uuid` (FK)                    | The Source Scope this identity belongs to                              |
-| `entity_type`                        | Target SEAD entity type (e.g. `site`, `sample_group`)                  |
+| `entity_type`                        | Configured tracked aggregate type                                      |
 | `identity_type`                      | `uuid`, `business_key`, `provider_key`, `authority_key`                |
 | `identity_value`                     | The serialized identifier value                                        |
 | `identity_signals` (JSONB, nullable) | Additional identity evidence (authority keys, alternative identifiers) |
@@ -102,18 +102,20 @@ The composite primary key `(submission_uuid, source_identity_uuid)` enforces uni
 
 ### Tracked Identities
 
-Represents the SEAD-side identity anchor for a domain entity.
+Represents SIMS' current identity record for a tracked aggregate. This schema includes prototype fields that reflect the initial SEAD integration and are not requirements for the target generic allocator.
 
 | Column                        | Purpose                                                               |
 |-------------------------------|-----------------------------------------------------------------------|
-| `tracked_identity_uuid` (PK)  | The SEAD universal identity (UUID) for this entity                    |
-| `entity_type`                 | Target SEAD entity type                                               |
-| `sead_internal_id` (nullable) | The SEAD integer PK, once materialized                                |
+| `tracked_identity_uuid` (PK)  | SIMS' stable UUID for this tracked aggregate                           |
+| `entity_type`                 | Configured tracked aggregate type                                     |
+| `aggregate_id` (nullable)       | SIMS-minted, entity-scoped aggregate identity value; consumers interpret it using their own data models |
 | `content_hash` (nullable)     | Opaque aggregate content hash for change detection (FR-24)            |
 | `lifecycle_state`             | `allocated`, `pending_materialization`, `materialized`, `invalidated` |
 | Audit columns                 | `created_at`, `created_by`, `materialized_at`                         |
 
-The `tracked_identity_uuid` **is** the SEAD universal identity (FR-1). Where SEAD entity tables already have `{entity}_uuid` columns, those columns are reused directly — no new UUID columns are introduced (FR-3). The `sead_internal_id` maps to the relational PK (FR-2).
+SIMS mints and stores both `tracked_identity_uuid` and `aggregate_id`. The aggregate ID is unique within its entity type in the SIMS identity store. SIMS does not map it to a consumer table or column.
+
+**Historical disposable allocator prototype:** Initial verification used per-type allocator setup and a nullable SEAD integer-ID field for selected examples. That prototype does not define the target architecture. The target allocator must use generic SIMS code and validated entity-scoped configuration, mint the configured aggregate identity value and tracked UUID, and enforce uniqueness only in the SIMS identity store. SIMS must not read or allocate from SEAD tables or sequences. The target contract requires consumers to trust and store SIMS-issued values; it does not make SIMS responsible for consumer database integrity.
 
 **Design decision:** Creating historical Binding records for UUIDs that predate SIMS deployment is out of scope. Pre-existing `{entity}_uuid` values are treated as authoritative Tracked Identities without provenance tracking.
 
@@ -148,15 +150,15 @@ A Source Identity normally has at most one Binding within a current confirmed Bi
 
 ### Change Request References
 
-Change Requests are owned by the SEAD Change Control System (Sqitch) and referenced by their unique Sqitch change name. SIMS does not store or manage Change Request state.
+Change Requests are owned by consuming workflows. SIMS does not store or manage their state.
 
-The `binding_sets` table carries an optional `change_request_name` column linking a confirmed Binding Set to the Change Request it supports. This is the sole integration point between SIMS and the Change Control System.
+The current `binding_sets` table carries an optional `change_request_name` field from the SEAD integration. In the target design, any consumer change reference is opaque metadata; SIMS does not integrate with or manage a change-control system.
 
 ---
 
 ## Core Operations
 
-These operations implement the decision flow defined in [CONCEPTUAL_MODEL.md § Decision Flow](./CONCEPTUAL_MODEL.md#decision-flow). They map directly to the three-step sequence: Identity Resolution → Binding (within a Binding Set) → Change Request.
+These operations implement the identity steps defined in [CONCEPTUAL_MODEL.md § Decision Flow](./CONCEPTUAL_MODEL.md#decision-flow). A consuming workflow may separately reference a domain-change process.
 
 ### 1. Resolve Identity
 
@@ -167,13 +169,11 @@ Implements step 1 of the decision flow: **Identity Resolution**.
 **Behavior:**
 
 1. Look up the Source Identity within its scope. If it already has a confirmed Binding, return that Tracked Identity.
-2. Evaluate incoming identity signals against existing Tracked Identities using matching rules appropriate to the entity type:
-   - Provider-owned entities: match by provider key or business key.
-   - Shared metadata entities: reconciliation against existing SEAD definitions (FR-17). Reconciliation procedure is owned by the SEAD Shape Shifter workflow, not SIMS (see design decision below).
-   - If reconciliation fails for shared metadata, reject the submission with diagnostic information rather than allocating (FR-20).
-3. Return one of: `matched` (existing Tracked Identity found) or `new` (no match, allocation permitted). For shared metadata entities where policy blocks allocation, resolution rejects the submission.
+2. If the caller supplies an approved existing SIMS identity, bind the Source Identity to it (FR-17).
+3. If the caller requests a new identity, use the configured generic allocation operation. Reject the request when configuration does not permit it (FR-20).
+4. Return the existing or newly allocated Tracked Identity and its SIMS-issued identity values.
 
-**Design decision:** Specifying the procedure for reconciling shared metadata entities is out of scope for SIMS. Reconciliation is a concern of the SEAD Shape Shifter workflow, which performs semi-automatic reconciliation of incoming shared entities and generates a separate Change Request for them as part of the submission workflow. SIMS consumes the reconciliation outcome (matched or rejected) but does not define matching rules.
+**Design decision:** Reconciliation against SEAD or another consumer's domain records is outside SIMS. The consuming workflow supplies its approved match or allocation decision. SIMS stores and resolves source identities against its own Tracked Identities and applies validated SIMS configuration; it does not inspect consumer tables or implement per-entity reconciliation branches.
 
 **Idempotency:** The same identity signals within the same scope always produce the same resolution outcome (FR-12, FR-13).
 
@@ -190,30 +190,30 @@ Implements step 2 of the decision flow: **Binding**.
 - Create a new Binding Set in `proposed` state.
 - For each resolved Source Identity:
   - If `matched`: create a Binding within the set linking the Source Identity to the existing Tracked Identity.
-  - If `new`: allocate a new Tracked Identity (mint UUID; optionally reserve integer PK), then create a Binding within the set.
+  - If `new`: use the generic allocator and validated configuration to create a SIMS Tracked Identity, then create a Binding within the set. The current site prototype is not the target allocator design.
 
 **Policy enforcement** (applied between Resolution and Binding per [CONCEPTUAL_MODEL.md § Policy boundary](./CONCEPTUAL_MODEL.md#policy-boundary)):
 
-- Evaluate whether a provider-supplied UUID is accepted as the SEAD universal identity or retained only as a provider key (FR-11).
-- Evaluate whether an unmatched shared metadata entity triggers allocation or causes the submission to be rejected with diagnostics.
+- Evaluate source-key semantics and permitted identity operations from validated SIMS entity configuration (FR-11).
+- Evaluate whether the requested identity operation is permitted by validated SIMS configuration.
 
-**Design decision:** Identity policy (FR-11) is stored as a configuration file for the initial release. This is sufficient given the small number of entity types and the low rate of policy changes. The representation may evolve to a database table or API-managed resource in future releases if runtime administration becomes necessary. Policy enforcement may also become a Shape Shifter responsibility as part of its quality-assurance workflow, in which case SIMS would consume policy decisions rather than evaluate them directly.
+**Design decision:** Identity operation configuration (FR-11) is stored in SIMS. Shared service code validates and applies it for configured entity types; adding an entity type must not require a type-specific allocator branch.
 
-Proposed Binding Sets may be confirmed automatically (for provider-owned entities with high-confidence matches) or require review (for shared metadata entities or low-confidence matches).
+Proposed Binding Sets may be confirmed automatically or require review according to validated operation configuration. Caller reconciliation and approval remain outside SIMS.
 
-### 3. Associate with Change Request
+### 3. Record external reference (current integration)
 
-Implements step 3 of the decision flow: **Change Request** association.
+The current implementation can associate a confirmed Binding Set with an external reference. This is not a SIMS domain-change operation.
 
-**Input:** A confirmed Binding Set and an externally provided Change Request name (Sqitch change name).
+**Input:** A confirmed Binding Set and an opaque consumer reference. The current SEAD adapter supplies a Sqitch change name.
 
 **Behavior:**
 
-- Record the association between the confirmed Binding Set and the named Change Request by setting `change_request_name` on the Binding Set.
-- The Change Request itself is created and managed by the SEAD Change Control System, not by SIMS.
+- Record the association as opaque metadata on the Binding Set. The current schema uses `change_request_name`.
+- The consumer owns and manages the referenced change process.
 - SIMS does not alter identity correspondence when recording this association (FR-25).
 
-**Design decision:** For the initial release, SIMS stores only a reference (the Sqitch change name) to the SEAD Change Control System. It does not query Change Request status or store additional Change Request metadata. Integration between the two systems is intentionally loose and may be tightened in future releases beyond the initial SIMS scope.
+**Design decision:** SIMS does not query the reference, inspect its status, apply associated data changes, or interpret its format.
 
 ### 4. Detect Change (Update Foundation)
 
@@ -241,20 +241,20 @@ These rules make concrete the identity intake patterns from [REQUIREMENTS.md § 
 
 When a provider supplies a UUID:
 
-- Identity policy determines whether it is accepted as the SEAD universal identity or recorded only as a provider key (FR-11).
-- If accepted, the UUID becomes the Tracked Identity UUID directly.
-- If not accepted, the provider UUID is retained as a Source Identity signal (provider key) for traceability.
+- Store the provider UUID as a scoped Source Identity value according to validated SIMS configuration (FR-11).
+- Do not adopt the provider UUID as the Tracked Identity UUID. SIMS mints its own tracked UUID when it creates a Tracked Identity.
+- The current `accept_uuid` policy is legacy behavior and is not part of the target identity contract.
 
 ### Business-key intake
 
 When a provider supplies a natural key or key set:
 
-- The submitting system (typically Shape Shifter) constructs a deterministic serialized string from the provider's data, using the `identity_columns` defined in the target model (`sead_superset_model.yml`).
+- The submitting system constructs a deterministic serialized string from provider data using its own model and identity rules.
 - SIMS receives the serialized string as an opaque token and stores it as the Source Identity's `identity_value` with `identity_type = 'business_key'`.
 - SIMS does not interpret the internal structure of the business key. It uses the string solely for equality comparison and uniqueness enforcement.
-- Used for resolution against existing Tracked Identities or existing SEAD data.
+- Used for resolution against existing SIMS Tracked Identities.
 
-**Design decision:** Business-key serialization (field selection, ordering, normalization) is the responsibility of the submitting system, not SIMS. Different data providers have different schemas; only the submitting system (Shape Shifter) understands the column-level mapping from provider data to target model fields. SIMS requires only that the serialized string is deterministic within a Source Scope — the same entity with the same input always produces the same string — to guarantee idempotency (FR-12, FR-13).
+**Design decision:** Business-key serialization (field selection, ordering, normalization) is the responsibility of the submitting system, not SIMS. Different data providers have different schemas; only the submitting system understands how to map provider data to its domain model. SIMS requires only that the serialized string is deterministic within a Source Scope — the same entity with the same input always produces the same string — to guarantee idempotency (FR-12, FR-13).
 
 ### Authority-key intake
 
@@ -262,62 +262,59 @@ When an external authority identifier is available (e.g. GeoNames, Wikidata):
 
 - It is recorded in the Source Identity's `identity_signals` alongside other evidence.
 - It may contribute to reconciliation for shared metadata entities (FR-10).
-- It is preserved distinctly from provider keys and SEAD universal identity.
+- It is preserved distinctly from provider keys and SIMS tracked identity values.
 
 ---
 
-## Entity Metadata
+## Entity Configuration
 
-The identity system needs to know which SEAD tables are tracked entities, their subtypes, aggregate boundaries, and FK relationships. This metadata drives resolution strategy selection, allocation ordering, and change-detection scope.
+The target design configures tracked aggregate types and identity behavior without making SIMS aware of consumer tables, columns, primary keys, or sequences. Adding a configured type must not require a type-specific allocator branch.
 
-### What the system needs per tracked entity
+### What SIMS needs per configured type
 
-| Attribute                 | Purpose                                                                                      |
-|---------------------------|----------------------------------------------------------------------------------------------|
-| Entity type and PK column | Target for Tracked Identity allocation                                                       |
-| Entity subtype            | Governs intake rules and resolution strategy (provider-owned, shared metadata, relationship) |
-| Aggregate membership      | Defines aggregate boundaries (used by submitting system for content hashing)                  |
-| FK dependencies           | Determines allocation order within a Submission                                              |
-| Business-key fields       | Enables business-key serialization and resolution                                            |
+| Attribute | Purpose |
+|---|---|
+| Entity type | Scopes tracked identities and their configured identity values |
+| Identity strategy | Selects generic allocation or lookup behavior |
+| Source-key rules | Defines accepted source identity forms and resolution inputs |
+| Resolution policy | Defines handling for new, matched, ambiguous, or rejected identities |
 
-### Source of truth
+### Configuration ownership
 
-Shape Shifter's target model (`sead_superset_model.yml`) already catalogues SEAD entities with role (fact, classifier, lookup, bridge), foreign keys, identity columns, and unique sets. That metadata overlaps substantially with what SIMS needs.
-
-The current design intent is that SIMS consumes Shape Shifter's target model as the source of truth for entity metadata, augmented by SIMS-specific attributes (reconciliation strategy, policy overrides) stored locally. See [TRACKED_ENTITIES.md](./TRACKED_ENTITIES.md) for the entity register derived from the target model.
+SIMS configuration is the source of truth for SIMS identity behavior. A client may use its own model to decide which aggregates to submit and how to store returned values, but SIMS does not consume that model to discover target tables, columns, foreign keys, or storage identifiers.
 
 ---
 
 ## Internal Origins
 
-Not all identity operations originate from external provider submissions. SEAD administrator actions (e.g. adding a new method or classifier) and infrastructure changes (e.g. Sqitch migrations) also produce entities that require resolved identities before they can enter a Change Request (FR-27).
+SIMS accepts identity requests from scoped callers; it does not define caller workflows or require SEAD-specific origins. The following source-scope names describe the current SEAD integration and are not required by the target generic design.
 
 ### Approach
 
-Internal origins use the same Source Scope / Submission model as external providers. Well-known internal Source Scopes represent SEAD-internal origins:
+The current integration uses the same Source Scope and Submission model for external and internal requests:
 
 - `sead://admin` — SEAD administrator actions (adding or modifying classifiers, methods, etc.)
 - `sead://migration` — Sqitch-driven schema or data migrations
 - `sead://reconciliation` — Reconciliation outputs
 
-Internal actions create Submissions within these scopes, pass through normal identity resolution, produce Binding Sets, and associate with Change Requests — the same pipeline as external provider data. No special-case handling is needed in the data model or core operations.
+Internal actions create Submissions within these scopes and use the normal identity operations. A consumer may associate a Binding Set with its own change workflow; SIMS does not interpret or apply that workflow.
 
-**Design decision:** The tooling for manually curating SEAD-administered entities and submitting them through SIMS is out of scope. SIMS provides the identity resolution API and enforces the requirement that a Change Request must reference confirmed Binding Sets (FR-27). How internal entities are prepared and submitted is the responsibility of the curation tool — whether that is an internal Shape Shifter workflow (treating SEAD admin data the same way as external provider data), a dedicated admin tool, or a lightweight CLI client. This is a tooling gap, not a SIMS design gap.
+**Design decision:** Preparation, reconciliation, approval, and submission of domain data are caller responsibilities. SIMS provides configured identity operations and reports Binding Set state; it does not enforce rules for a consumer's change process.
 
 ---
 
-## Rollout Approach
+## Historical SEAD Integration Plan
 
-Rollout is incremental. Each phase stabilizes before the next begins.
+The following sequence reflects an earlier SEAD-specific integration plan. It is not the target SIMS architecture and does not authorize production adoption or cutover:
 
-1. **Infrastructure**: Deploy identity schema, core tables, and REST API to staging. No SEAD entity tables are modified.
+1. **Infrastructure**: Deploy identity schema, core tables, and REST API to staging.
 
-2. **Pilot**: Select a small set of tracked entity types (e.g. sites, sample groups). Implement resolution and binding for provider-owned entities. Validate idempotency and lifecycle correctness.
+2. **Pilot**: Validate generic identity resolution, allocation, and binding with configured entity types.
 
-3. **Shared metadata**: Extend resolution to shared metadata entities (classifiers, lookup tables). Implement reconciliation and rejection-with-diagnostics for unmatched entities.
+3. **Shared metadata**: Keep target-system reconciliation and approval in the consuming workflow; SIMS receives approved identity requests.
 
-4. **Entity table integration**: Reuse existing `{entity}_uuid` columns on tracked SEAD entity tables. Add UUID columns only where missing. Pre-existing UUIDs are treated as authoritative without retroactive Binding records.
+4. **Consumer integration**: Consumers store SIMS-issued identity values under the trust contract. SIMS does not map those values to consumer tables or columns.
 
-5. **Change Request integration**: Record associations between confirmed Binding Sets and externally managed Change Requests (Sqitch). Validate integration with the SEAD Change Control System.
+5. **Operational adoption**: Existing-data migration, deployment checks, and cutover require a separate operational plan and are outside the current development task.
 
-Detailed rollout planning (timelines, specific table selection, migration scripts) belongs to project planning, not this document.
+SIMS guarantees uniqueness only within its own identity store. Consumer database integrity remains with each consumer.

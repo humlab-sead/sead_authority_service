@@ -1,10 +1,10 @@
 # SIMS Conceptual Model and Systems Design
 
-> **Status:** Reflects the implementation as of Phases 1–2 (complete). Phases 3–5 (shared metadata, entity table integration, Change Request integration) are outlined but not yet implemented. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
+> **Status:** Reflects the implementation as of Phases 1–2 (complete). Generic configurable aggregate-identity allocation is the target design and is not yet implemented. Existing-data migration, production adoption, and cutover are outside the current development task. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
 
 ## Overview
 
-The SEAD Identity Management System (SIMS) separates externally expressed identity from SEAD-managed identity and makes the correspondence between them explicit, governed, and historically traceable. Source data is received through **Submissions**, interpreted within a **Source Scope**, and represented through **Source Identities**. These are resolved against SEAD-managed **Tracked Identities** through the **Identity Resolution** process. The results are grouped into **Binding Sets** — atomic batches of **Bindings** that are confirmed or rejected together. Once identities have been resolved, a Binding Set may be associated with a **Change Request** for review, quality assurance, and possible ingestion into SEAD.
+The SEAD Identity Management System (SIMS) owns tracked aggregate identities and the source identities associated with them. Source data is received through **Submissions**, interpreted within a **Source Scope**, and represented through **Source Identities**. These are resolved against SIMS-owned **Tracked Identities** through the **Identity Resolution** process. The results are grouped into **Binding Sets** — atomic batches of **Bindings** that are confirmed or rejected together. Once identities have been resolved, a Binding Set may be associated with a **Change Request** managed by a consuming system.
 
 The model aligns with domain-driven design principles, as defined in the next section.
 
@@ -12,13 +12,27 @@ The model aligns with domain-driven design principles, as defined in the next se
 
 ---
 
+## Identity Roles
+
+Each tracked aggregate has three distinct identity roles:
+
+- **Aggregate identity value**: an opaque, entity-scoped value minted and stored by SIMS.
+- **Tracked UUID**: the stable UUID minted and stored by SIMS for its Tracked Identity.
+- **Source identity keys**: UUIDs, business, provider, and authority identifiers scoped to their source. They identify a source's representation of an aggregate; they are not SIMS-minted aggregate identities.
+
+SIMS stores the entity type, aggregate identity value, tracked UUID, and source identity associations. It guarantees uniqueness within its own identity store. SIMS does not inspect SEAD, map identity values to SEAD tables or columns, or enforce SEAD database integrity. SEAD consumes SIMS-issued values under the SIMS–SEAD trust contract.
+
+SIMS is the sole minter of tracked aggregate identity values. Its generic allocation mechanism uses validated configuration, not entity-specific allocator code. Every tracked entity represented in SEAD must have a corresponding SIMS Tracked Identity. Establishing this condition for existing production data is separate operational work and outside the current development task. The current site allocator is a prototype, not the generic allocation design.
+
 ## Design Intent
 
-The system is designed as an identity layer between external provider workflows and the SEAD relational model. Its goals are stated in [REQUIREMENTS.md § Goals](./REQUIREMENTS.md#goals). At the design level, the following architectural boundaries apply:
+The system is designed as an identity service for tracked aggregates and their source identities. Its goals are stated in [REQUIREMENTS.md § Goals](./REQUIREMENTS.md#goals). At the design level, the following architectural boundaries apply:
 
-- SEAD integer or bigint primary keys remain the internal relational backbone. The identity layer sits above them, not instead of them.
-- A provider identifier may be accepted, mapped, reconciled, or rejected according to an administrable identity policy. It is never assumed to be identical to SEAD identity.
-- The identity system decides *what entity* is being referred to. It does not define *how entity state* is inserted, replaced, or updated. Identity management and business-data mutation are separate concerns (see [Process constraints](#process-constraints)).
+- SIMS owns and uniquely stores tracked aggregate identities and their configured identity values.
+- SIMS does not know how a consuming system stores identity values in tables or columns and does not enforce that system's database constraints.
+- SEAD consumes SIMS-issued values under the trust contract and has no tracked aggregate identities that are absent from SIMS.
+- A provider identifier may be accepted, mapped, reconciled, or rejected according to validated SIMS entity configuration. It is never assumed to be the SIMS aggregate identity.
+- The identity system decides *which aggregate* is being referred to. It does not define *how domain state* is inserted, replaced, or updated. Identity management and business-data mutation are separate concerns (see [Process constraints](#process-constraints)).
 
 ---
 
@@ -32,7 +46,7 @@ This conceptual model uses the following domain-driven design (DDD) distinctions
 
 **Aggregate**: a cluster of entities and value objects with a single entity serving as the aggregate root. External references target only the root; internal parts are accessed through it. Aggregates define consistency and identity boundaries.
 
-Within SIMS, tracked entities are entities or aggregate roots that receive SEAD-managed identity. Subordinate parts within an aggregate are generally treated as value objects without separate identity.
+Within SIMS, tracked entities are entities or aggregate roots whose identities SIMS manages. Subordinate parts within an aggregate are generally treated as value objects without separate SIMS identity; the consuming domain system owns any storage identifiers for those values.
 
 ---
 
@@ -55,7 +69,7 @@ A **Submission** is a delivered batch, message, or ingest event originating with
 
 ### Source Identity
 
-A **Source Identity** is a persistent identity for a domain entity as expressed within a given Source Scope. It is the source-side identity anchor used to distinguish that entity within its scope, independent of whether the entity has yet been bound to a Tracked Identity in SEAD.
+A **Source Identity** is a persistent identity for a domain entity as expressed within a given Source Scope. It is the source-side identity anchor used to distinguish that entity within its scope, independent of whether the entity has yet been bound to a SIMS Tracked Identity.
 
 - May persist across submissions within the same scope
 - May exist without any binding to a tracked identity
@@ -63,11 +77,12 @@ A **Source Identity** is a persistent identity for a domain entity as expressed 
 
 ### Tracked Identity
 
-A **Tracked Identity** is a persistent, allocated SEAD-side identity for a domain entity that SEAD manages or intends to manage. It is the SEAD-side identity anchor, whether or not the corresponding entity has yet been materialized in SEAD. A Tracked Identity may exist independently of any Source Identity, for example for entities created or curated directly within SEAD.
+A **Tracked Identity** is a persistent SIMS identity for a tracked aggregate. It exists independently of how or where a consuming system materializes the aggregate. A Tracked Identity may exist before any Source Identity is associated with it.
 
-- May exist before materialization (the entity record may not yet exist in SEAD)
+- May exist before a consumer materializes the aggregate
 - May exist without any source linkage
 - Lifecycle-sensitive: may be allocated, pending materialization, materialized, or invalidated (see Tracked Identity Lifecycle)
+- SIMS mints and persists its configured aggregate identity value and tracked UUID together before returning a successful allocation result.
 - Invalidated tracked identities are retained for audit but must not be reused
 
 ### Binding
@@ -75,7 +90,7 @@ A **Tracked Identity** is a persistent, allocated SEAD-side identity for a domai
 A **Binding** is an explicit assertion that a given Source Identity corresponds to a given Tracked Identity. It records the outcome of identity resolution for one Source Identity and is retained as a historical object with provenance. A Binding always belongs to exactly one Binding Set.
 
 - Provenance-bearing: records how the binding was established (method, evidence)
-- May exist before the tracked entity is materialized in SEAD
+- May exist before the consuming system materializes the aggregate
 - Lifecycle is governed by the owning Binding Set (see Binding Set Lifecycle)
 
 ### Binding Set
@@ -89,24 +104,24 @@ A **Binding Set** is the atomic unit of identity resolution output. It groups on
 
 ### Identity Resolution
 
-**Identity Resolution** is the process by which SEAD determines whether a Source Identity corresponds to an existing Tracked Identity or requires a new Tracked Identity to be allocated. It operates within the context of a Source Scope and evaluates identity signals such as local identifiers, authority identifiers, business keys, alternative identifiers, and other matching evidence. Its outcomes are expressed through Bindings. For **shared metadata entities** — reference structures used across datasets and providers, such as classifiers and lookups, that must be reconciled against existing SEAD definitions rather than freshly allocated (see [REQUIREMENTS.md § Entity subtypes](./REQUIREMENTS.md#entity-subtypes)) — a failed reconciliation causes the submission to be rejected with diagnostic information rather than silently allocating a new identity.
+**Identity Resolution** is the SIMS process for determining whether a Source Identity corresponds to an existing SIMS Tracked Identity or requires a new identity to be allocated. It operates within a Source Scope and uses source identity values and caller-approved outcomes. Its results are expressed through Bindings. Reconciliation against a consuming system's domain data is outside SIMS; the caller supplies an approved existing identity or requests a configured allocation operation.
 
-- May be performed by rules, matching logic, or manual review
-- Does not require materialization: resolution may succeed before the entity exists in SEAD
+- SIMS performs lookups within its own identity store; reconciliation and manual review against consumer data belong to the caller
+- Does not require materialization: resolution may succeed before the consuming system creates its domain object
 
 ### Change Request
 
-A **Change Request** is a governed package of proposed domain-level changes to SEAD. It is owned and managed by the SEAD Change Control System (powered by Sqitch) and referenced by a unique name (the Sqitch change name). SIMS does not own or manage Change Requests; it associates confirmed Binding Sets with a Change Request to record which identity correspondences support which domain changes. A Change Request does not define identity correspondence; it consumes correspondence already established through Identity Resolution and Binding.
+A **Change Request** is an optional external reference associated with identity work. The consuming workflow owns and manages the referenced change package. SIMS may retain the reference as opaque metadata; it does not manage or apply the change package, interpret its format, or map it to consumer storage.
 
-- Owned by the SEAD Change Control System, not by SIMS
-- Referenced by unique name
+- Owned by the consuming workflow, not by SIMS
+- Referenced by an opaque value
 - May be accepted, rejected, blocked, or deferred by QA
 - May include creates (materializing new entities) and updates
 - A rejected or deferred Change Request does not invalidate prior identity resolution history
 
 ### Materialization
 
-**Materialization** is the act of creating or establishing the actual SEAD domain entity represented by an already allocated Tracked Identity. A Tracked Identity may exist before materialization — identity can be resolved and recorded before the corresponding SEAD entity record exists. Materialization typically follows acceptance of an associated Change Request.
+**Materialization** is the consuming workflow's act of creating or establishing a domain object represented by an already allocated Tracked Identity. A Tracked Identity may exist before materialization. SIMS does not perform, verify, or guarantee consumer-side materialization.
 
 - Not required for a Tracked Identity to exist or be bound
 - Governed by Change Request acceptance, not by SIMS directly
@@ -116,24 +131,24 @@ A **Change Request** is a governed package of proposed domain-level changes to S
 
 ## Decision Flow
 
-The system sits between provider submissions (upstream) carrying identity signals and SEAD's relational persistence model (downstream) which consumes resolved identifiers. An administrable policy layer governs acceptance, reconciliation, and allocation decisions.
+SIMS receives source identities and approved identity requests from consuming workflows, then returns SIMS-owned identity results. Validated SIMS configuration governs its supported identity operations; callers own reconciliation against their own domain data.
 
 The decision flow maps to the core concepts above:
 
-1. **Identity Resolution** — Determine whether the incoming identity signals (within a **Source Scope**) match an existing **Tracked Identity**. For shared metadata entities, this includes reconciliation against SEAD's existing definitions. Resolution evaluates **Source Identity** signals: local IDs, business keys, provider keys, authority keys.
+1. **Identity Resolution** — Determine whether the incoming **Source Identity** (within a **Source Scope**) is already bound to a **Tracked Identity**, or whether the caller has supplied an approved existing identity or requested a configured allocation operation. Reconciliation against the consuming system's domain data belongs to that caller. SIMS evaluates source identity values such as local IDs, business keys, provider keys, and authority keys.
 
-2. **Binding** — If resolution finds a match, create a **Proposed Binding** linking the Source Identity to the Tracked Identity. If no match exists, allocate a new Tracked Identity and bind to it. For shared metadata entities, allocation is blocked: the submission is rejected with diagnostic information rather than silently creating a new identity (FR-20). The Bindings produced by a resolution batch are grouped into a **Binding Set** — the atomic unit that is confirmed or rejected together (FR-26). Binding Set lifecycle is defined in [Binding Set Lifecycle](#binding-set-lifecycle).
+2. **Binding** — If the caller supplies an approved existing SIMS identity, create a **Proposed Binding** linking the Source Identity to that Tracked Identity. If the caller requests a new identity and validated configuration permits allocation, allocate a Tracked Identity and bind to it. Reject unsupported or disallowed operations with diagnostics (FR-20). Group the Bindings from a resolution batch into a **Binding Set** — the atomic unit confirmed or rejected together (FR-26). Binding Set lifecycle is defined in [Binding Set Lifecycle](#binding-set-lifecycle).
 
-3. **Change Request** — Once identity correspondence is established through a confirmed Binding Set, the Binding Set is associated with a **Change Request** — an external object owned by the SEAD Change Control System (Sqitch), referenced by unique name. The Change Request governs business-data mutation; it does not alter identity correspondence. SIMS records the association but does not manage the Change Request lifecycle. This separation ensures identity allocation remains independent of data mutation (FR-25) and supports aggregate-level change detection (FR-24).
+3. **External change workflow** — A consuming workflow may associate a confirmed Binding Set with an opaque external change reference. The workflow owns any domain-data mutation. SIMS does not interpret or apply the change request. Identity allocation remains independent of data mutation (FR-25) and supports aggregate-level change detection (FR-24).
 
 ### Policy boundary
 
 Identity policy is applied between steps 1 and 2. The policy governs:
 
-- whether a provider-supplied UUID is accepted as the SEAD universal identity or recorded only as a provider key (FR-11),
-- whether an unmatched shared metadata entity triggers allocation or causes the submission to be rejected with diagnostics.
+- whether a provider-supplied UUID is accepted as a source-key type or rejected by validated SIMS configuration (FR-11),
+- whether the requested identity operation is configured, permitted, and subject to confirmation.
 
-Policy is administrable and may vary by entity type.
+Configuration may vary by entity type, but behavior is implemented by shared generic service code.
 
 ---
 
@@ -146,7 +161,7 @@ Policy is administrable and may vary by entity type.
 | 3  | Submission — Source Identity           | M:N (a Submission carries many Source Identities; a Source Identity may appear in many Submissions)        |
 | 4  | Source Identity — Binding              | 1:N (many historical Bindings; normally at most one current confirmed Binding)                             |
 | 5  | Tracked Identity — Binding             | 1:N (many Source Identities from different scopes may bind to the same Tracked Identity)                   |
-| 6  | Tracked Identity — SEAD entity         | 1:0..1 (a Tracked Identity may correspond to zero or one materialized SEAD entity)                         |
+| 6  | Tracked Identity — consuming aggregate | 1:0..1 (a Tracked Identity may exist before a consumer materializes its aggregate)                         |
 | 7  | Binding Set — Binding                  | 1:N (a Binding Set contains one or more Bindings; a Binding belongs to exactly one Binding Set)            |
 | 8  | Identity Resolution — Binding Set      | 1:1 (resolution produces one Binding Set)                                                                  |
 | 9  | Identity Resolution — Tracked Identity | Resolution may reuse an existing, allocate a new, or select no Tracked Identity                            |
@@ -160,7 +175,7 @@ Policy is administrable and may vary by entity type.
 ### Identity constraints
 
 - A Source Identity is unique only within its Source Scope.
-- A Tracked Identity is unique within SEAD's identity system.
+- A Tracked Identity is unique within the SIMS identity store.
 - A Tracked Identity refers to one intended domain entity only and must not later be reassigned.
 - A Tracked Identity may exist before materialization.
 - A Tracked Identity may exist without any Source Identity.
@@ -197,13 +212,13 @@ These rules constrain implementation choices beyond what the functional requirem
 
 The identity system anchors identity at the entity level only. Owned child structures (value objects, as defined in [Domain Modeling Foundations](#domain-modeling-foundations)) must not receive independent identity, reconciliation, or lifecycle management.
 
-### 2. Canonical SEAD identity must remain distinct from aliasing identifiers
+### 2. SIMS aggregate identity must remain distinct from source identifiers
 
-Provider keys, business keys, and authority keys are identity *signals* (see [Source Identity](#source-identity)). They contribute to resolution but must never replace the canonical SEAD universal identity. A resolved SEAD UUID is the authoritative reference; external keys are mappings attached to it.
+Provider keys, business keys, and authority keys are source identity values (see [Source Identity](#source-identity)). They contribute to resolution but do not replace the SIMS aggregate identity value or tracked UUID. SIMS stores each role separately and links source identities through Bindings.
 
-### 3. A Change Request must not be applied until all referenced identities are resolved
+### 3. Consumers apply domain changes only after identity checks
 
-A Change Request must not be applied to SEAD until every entity it references has a resolved identity expressed through a confirmed Binding Set. This applies regardless of whether the entities originate from an external provider submission or from internal SEAD administration. The manual curation of internally administered entities is out of scope for SIMS — it is the responsibility of the submitting system (Shape Shifter internal workflow, a dedicated admin tool, or another client). SIMS provides the identity resolution API; the tooling that prepares and submits internal entities is a separate concern.
+The consuming workflow must check that every entity it intends to change has an appropriate SIMS identity result before applying a domain change. The workflow also owns manual curation and internal data preparation. SIMS provides identity operations; it does not approve, apply, or validate consumer-side data changes.
 
 ---
 
@@ -238,8 +253,8 @@ Allocation is the event that creates a Tracked Identity in the `Pending Material
 
 | State                        | Meaning                                                                            |
 |-------------------------------|------------------------------------------------------------------------------------|
-| **Pending Materialization**   | The identity has been allocated, but no accepted SEAD entity exists yet.           |
-| **Materialized**              | The identity corresponds to an accepted SEAD entity in the domain model.           |
+| **Pending Materialization**   | The identity has been allocated; no consumer-side materialization has been reported. |
+| **Materialized**              | A consumer has reported that the identity corresponds to a materialized domain object. SIMS does not verify this report. |
 | **Invalidated**               | No longer valid for active use, but retained for history, audit, and traceability. |
 
 **Allowed transitions:**
@@ -250,25 +265,25 @@ Pending Materialization → Invalidated
 Materialized            → Invalidated
 ```
 
-If a related Change Request is never accepted and the tracked entity is never materialized, the Tracked Identity may be invalidated.
+Whether a Tracked Identity may be invalidated after a consumer rejects or abandons its change request requires a separate lifecycle decision.
 
 ---
 
 ## Canonical Use Cases
 
-Each use case follows the general flow: Submission → Source Scope → Source Identity → Identity Resolution → Binding Set → Change Request → (optional) Materialization. Identity Resolution and Change Request are distinct stages: the first establishes identity correspondence (grouped in a Binding Set), the second governs whether domain changes are accepted into SEAD.
+Each use case follows the general flow: Submission → Source Scope → Source Identity → Identity Resolution → Binding Set → optional external change workflow → optional consumer-side materialization. Identity Resolution establishes identity correspondence; the consuming workflow governs domain changes.
 
 ### 1. Reuse a confirmed binding for a known source identity
 
-A Submission contains a Source Identity already known within its Source Scope. Identity Resolution finds an existing confirmed Binding to a Tracked Identity. The Submission is bundled into a Change Request using that Tracked Identity as the SEAD-side anchor.
+A Submission contains a Source Identity already known within its Source Scope. Identity Resolution finds an existing confirmed Binding to a Tracked Identity. The consuming workflow may use that identity when preparing a domain change.
 
 ### 2. Match a new source identity to an existing tracked identity
 
-A Submission contains a previously unseen Source Identity. Identity Resolution determines that it corresponds to an existing Tracked Identity. A Proposed Binding is created within a Binding Set. The Binding Set is later Confirmed. The Submission results in a Change Request associated with that Binding Set.
+A Submission contains a previously unseen Source Identity. The caller supplies an approved existing Tracked Identity. SIMS creates a Proposed Binding within a Binding Set, which is later Confirmed. The consuming workflow may associate that set with its own change process.
 
 ### 3. Allocate a new tracked identity for an unmatched source identity
 
-A Submission contains a Source Identity for which no suitable Tracked Identity exists. Identity Resolution allocates a new Tracked Identity and creates a Proposed Binding within a Binding Set. If the Binding Set is confirmed, the resulting Change Request may later materialize the entity in SEAD.
+A Submission contains a Source Identity for which no suitable Tracked Identity exists. The caller requests a configured allocation; SIMS allocates a new Tracked Identity and creates a Proposed Binding within a Binding Set. If confirmed, the consuming workflow may later materialize its domain object using the SIMS-issued identity value.
 
 ### 4. Correct a confirmed binding
 
@@ -283,11 +298,11 @@ A Tracked Identity has been allocated and bound within a Confirmed Binding Set, 
 ## Deferred Issues
 
 1. **Source Identity Observation**: an explicit per-submission observation concept may be needed if per-delivery state tracking becomes important.
-2. ~~**Unresolved case handling**~~: Removed — unmatched shared metadata entities are rejected with diagnostic information rather than held in an intermediate state. No separate handling or review queue is needed.
+2. **Unresolved case handling**: Determine whether generic allocation requiring confirmation needs a review queue; SIMS does not classify SEAD-specific metadata types.
 3. **Merge and split semantics**: two Source Identities later found to be the same entity, or one later split into two.
 4. **Binding evidence model**: detailed structure for recording the basis of binding decisions.
 5. **Change Request integration**: detailed rules for how SIMS associates Binding Sets with externally managed Change Requests.
-6. **Materialized SEAD entity modeling**: the relationship between a Tracked Identity and the actual SEAD domain entity.
+6. **Consumer-reported materialization**: whether the generic SIMS lifecycle should record a consumer-reported materialization state.
 7. **Detailed policy for binding review**: governance rules for when and how Proposed Bindings are reviewed and Confirmed.
 
 ---
@@ -299,8 +314,8 @@ A Tracked Identity has been allocated and bound within a Confirmed Binding Set, 
 | **Source Scope**        | Defines where a source identity is valid.                                                        |
 | **Submission**          | Delivers source data within a source scope.                                                      |
 | **Source Identity**     | Expresses how an external source identifies an entity.                                           |
-| **Tracked Identity**    | Expresses how SEAD identifies that entity.                                                       |
+| **Tracked Identity**    | Expresses the SIMS-owned identity of a tracked aggregate.                                        |
 | **Identity Resolution** | Determines whether and how the two correspond.                                                   |
 | **Binding**             | Records one source-to-tracked correspondence with provenance.                                    |
 | **Binding Set**         | Groups Bindings into an atomic batch with shared lifecycle, audit, and Change Request reference. |
-| **Change Request**      | External governed object (Sqitch) that bundles domain changes; SIMS references it by name.       |
+| **Change Request**      | Optional opaque reference to a consumer-owned domain-change process.                              |

@@ -4,18 +4,21 @@
 
 This folder contains proposal and handoff material for changes that belong in `sead_authority_service`.
 
-Current focus:
+Approved identity-ownership decision; generic identity allocation remains the target design:
 
-- return target-facing SEAD integer IDs from `POST /identity/resolve` so downstream Shape Shifter change-request generation can complete Delivery 1 PK/FK materialization
+- SIMS owns tracked aggregate identities and is the sole minter of entity-scoped identity values. It uses generic allocation driven by validated configuration and guarantees uniqueness only within its own identity store. SEAD consumes SIMS-issued values under the trust contract; cutover and adoption of existing data are separate operational work.
 
 ## Documents
 
-- [SIMS_TARGET_ID_CONTRACT.md](./SIMS_TARGET_ID_CONTRACT.md) — main proposal for the optional `ResolutionOutcome.target_id` contract change
-- [SIMS_TARGET_ID_CONTRACT_ISSUE.md](./SIMS_TARGET_ID_CONTRACT_ISSUE.md) — ready-to-file GitHub issue draft for the same change
-- [SIMS_TARGET_ID_CONTRACT_PR.md](./SIMS_TARGET_ID_CONTRACT_PR.md) — ready-to-file PR description draft for the same change
+- [SIMS_TARGET_ID_CONTRACT.md](./SIMS_TARGET_ID_CONTRACT.md) — Authority Service contract for the generic SIMS identity value response
+- [Cross-system identity allocation phase plan](https://github.com/humlab-sead/sead_shape_shifter/blob/main/docs/proposals/CHANGE_REQUEST_INGESTER/SIMS_IDENTITY_ALLOCATION/SIMS_IDENTITY_ALLOCATION_PHASE_PLAN.md) — integration sequence with responsibilities assigned to Authority Service, Shape Shifter, and Change Control
+- [SIMS_TARGET_ID_CONTRACT_ISSUE.md](./SIMS_TARGET_ID_CONTRACT_ISSUE.md) — issue draft aligned with the generic SIMS identity contract; verify API details before filing
+- [SIMS_TARGET_ID_CONTRACT_PR.md](./SIMS_TARGET_ID_CONTRACT_PR.md) — PR draft aligned with the generic SIMS identity contract; update implementation and test evidence before use
 
 ## Current Status
 
-- proposal status: drafted
+- identity ownership decision: approved 2026-10-01
+- site allocation and `target_id` response path: prototype verified against a disposable database; not the generic target design
 - downstream Shape Shifter support: already prepared for optional `target_id`
-- remaining work: implement and validate the authority-service response change
+- remaining development work: implement generic configuration-driven allocation, SIMS-store uniqueness, and the approved-miss-to-artifact path
+- separate operational work: existing-data migration, production validation, deployment, and cutover

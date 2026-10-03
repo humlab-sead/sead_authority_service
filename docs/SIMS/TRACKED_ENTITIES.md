@@ -1,8 +1,8 @@
-# SIMS Entity Register
+# Shape Shifter Target-Model Entity Register (SIMS Reference)
 
 > Auto-generated from SEAD Clearinghouse Extended v2.1.0
 >
-> This register reflects target-model metadata. Compare it with `config/identity_policy.yml` when reviewing current Authority Service rollout state.
+> This register reflects Shape Shifter target-model metadata. It is not the SIMS tracked-identity registry or capability configuration. SIMS uses its own validated configuration for tracked aggregate identities and allocation. Target tables, columns, keys, and entity classifications here do not prescribe SIMS implementation details.
 
 ## Summary
 
@@ -20,7 +20,7 @@
 
 ### Provider-Owned Root Entities
 
-Entities receiving fresh UUID + sequential PK allocation per submission.
+Target-model entities whose identity intent permits allocation. This does not prescribe the SIMS identity value format or allocator implementation.
 
 | Entity          | Target Table          | Role   | Business Key                 | Required | Reconciliation | Aggregate Parent | Domains |
 |-----------------|-----------------------|--------|------------------------------|----------|----------------|------------------|---------|
@@ -29,7 +29,7 @@ Entities receiving fresh UUID + sequential PK allocation per submission.
 
 ### Provider-Owned Child Entities (Value Objects)
 
-Value objects owned by an aggregate root; identity inherited from parent context.
+Target-model value objects owned by an aggregate root; this classification does not imply an independent SIMS identity.
 
 | Entity             | Target Table             | Role   | Business Key                                       | Required | Reconciliation | Aggregate Parent | Domains                              |
 |--------------------|--------------------------|--------|----------------------------------------------------|----------|----------------|------------------|--------------------------------------|
@@ -45,7 +45,7 @@ Value objects owned by an aggregate root; identity inherited from parent context
 
 ### Shared Metadata — Provider-Extensible
 
-Shared metadata matched by business key; providers may propose new entries.
+Shared reference entities with extensible target-model reconciliation intent; SIMS support is determined by its own configuration.
 
 | Entity          | Target Table        | Role   | Business Key                    | Required | Reconciliation  | Aggregate Parent | Domains                  |
 |-----------------|---------------------|--------|---------------------------------|----------|-----------------|------------------|--------------------------|
@@ -64,7 +64,7 @@ Shared metadata matched by business key; providers may propose new entries.
 
 ### Shared Metadata — SEAD-Administered
 
-Controlled vocabularies maintained by SEAD administrators; providers reference existing entries.
+Target-model vocabularies marked for controlled lookup; SIMS does not manage consumer records.
 
 | Entity                      | Target Table                     | Role       | Business Key                 | Required | Reconciliation    | Aggregate Parent | Domains                      |
 |-----------------------------|----------------------------------|------------|------------------------------|----------|-------------------|------------------|------------------------------|
@@ -94,7 +94,7 @@ Controlled vocabularies maintained by SEAD administrators; providers reference e
 
 ### Relationship Entities (Bridges)
 
-Association entities whose identity is derived from their foreign key references.
+Association entities whose target-model identity is derived from their foreign key references; they do not receive independent SIMS identities unless configured as tracked aggregates.
 
 | Entity                 | Target Table                 | Role   | Business Key                            | Required | Reconciliation | Aggregate Parent | Domains              |
 |------------------------|------------------------------|--------|-----------------------------------------|----------|----------------|------------------|----------------------|
