@@ -22,12 +22,14 @@ from src.identity.models import (
     IdentitySignal,
     ResolutionOutcome,
     ResolutionRequest,
+    ResolveBatchRecord,
+    ResolveBatchResult,
     SourceIdentity,
     SourceIdentityKey,
     SourceScope,
 )
 from src.identity.policy import EntityPolicy, IdentityPolicy
-from src.identity.service import IdentityBindingConflict, IdentityService
+from src.identity.service import IdentityBatchConflict, IdentityBindingConflict, IdentityService, _request_fingerprint
 from src.identity.types import (
     BindingMethod,
     BindingSetState,
@@ -122,6 +124,7 @@ def _make_service(
     tracked_identity_repo=None,
     binding_set_repo=None,
     binding_repo=None,
+    resolve_batch_repo=None,
     policy=None,
 ):
     from src.identity.service import IdentityService
@@ -139,6 +142,7 @@ def _make_service(
         tracked_identity_repo=tracked_identity_repo or AsyncMock(),
         binding_set_repo=binding_set_repo or AsyncMock(),
         binding_repo=binding_repo,
+        resolve_batch_repo=resolve_batch_repo or AsyncMock(),
         policy=policy or _mock_policy(),
     )
 
@@ -416,6 +420,130 @@ class TestResolveIdentity:
         outcome: ResolutionOutcome = await service.resolve_identity(SCOPE_UUID, self._request())
 
         assert outcome.entity_type == "site"
+
+
+# ---------------------------------------------------------------------------
+# resolve_batch — atomic, idempotent batch orchestration
+# ---------------------------------------------------------------------------
+
+
+class TestResolveBatch:
+    @pytest.fixture(autouse=True)
+    def _mock_transaction(self, monkeypatch) -> None:
+        @contextlib.asynccontextmanager
+        async def no_database_transaction():
+            yield None
+
+        monkeypatch.setattr("src.identity.service.get_connection", no_database_transaction)
+
+    def _requests(self) -> list[ResolutionRequest]:
+        return [
+            ResolutionRequest(
+                entity_type="site",
+                primary_signal=IdentitySignal(identity_type=IdentityType.BUSINESS_KEY, identity_value="ABC-001"),
+            )
+        ]
+
+    @pytest.mark.asyncio
+    async def test_replays_stored_result_for_same_fingerprint(self) -> None:
+        stored = ResolveBatchResult(
+            submission_uuid=SUBMISSION_UUID,
+            scope_uuid=SCOPE_UUID,
+            binding_set=BindingSetResponse(
+                binding_set_uuid=BINDING_SET_UUID,
+                submission_uuid=SUBMISSION_UUID,
+                lifecycle_state=BindingSetState.CONFIRMED,
+                change_request_name=None,
+                binding_count=1,
+                created_at=NOW,
+            ),
+            outcomes=[],
+        )
+        fingerprint = _request_fingerprint("test-batch", self._requests())
+        resolve_batch_repo = AsyncMock()
+        resolve_batch_repo.find.return_value = ResolveBatchRecord(
+            scope_name="sead://reconciliation",
+            run_id="run-001",
+            request_fingerprint=fingerprint,
+            result=stored,
+            created_at=NOW,
+        )
+
+        service: IdentityService = _make_service(resolve_batch_repo=resolve_batch_repo)
+        result = await service.resolve_batch("sead://reconciliation", "test-batch", "run-001", self._requests())
+
+        assert result == stored
+        resolve_batch_repo.create.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_changed_payload_conflicts(self) -> None:
+        resolve_batch_repo = AsyncMock()
+        resolve_batch_repo.find.return_value = ResolveBatchRecord(
+            scope_name="sead://reconciliation",
+            run_id="run-001",
+            request_fingerprint="stale-fingerprint",
+            result=ResolveBatchResult(
+                submission_uuid=SUBMISSION_UUID,
+                scope_uuid=SCOPE_UUID,
+                binding_set=BindingSetResponse(
+                    binding_set_uuid=BINDING_SET_UUID,
+                    submission_uuid=SUBMISSION_UUID,
+                    lifecycle_state=BindingSetState.CONFIRMED,
+                    change_request_name=None,
+                    binding_count=1,
+                    created_at=NOW,
+                ),
+                outcomes=[],
+            ),
+            created_at=NOW,
+        )
+
+        service: IdentityService = _make_service(resolve_batch_repo=resolve_batch_repo)
+        with pytest.raises(IdentityBatchConflict, match="different payload"):
+            await service.resolve_batch("sead://reconciliation", "test-batch", "run-001", self._requests())
+
+    @pytest.mark.asyncio
+    async def test_persists_result_after_successful_batch(self) -> None:
+        scope_repo = AsyncMock()
+        scope_repo.get_by_name.return_value = None
+        scope_repo.create.return_value = SourceScope(scope_uuid=SCOPE_UUID, scope_name="sead://reconciliation", created_at=NOW)
+        submission_repo = AsyncMock()
+        submission_repo.create.return_value = MagicMock(submission_uuid=SUBMISSION_UUID)
+
+        source_identity_repo = AsyncMock()
+        source_identity_repo.create_or_get.return_value = _make_source_identity()
+
+        binding_repo = AsyncMock()
+        binding_repo.find_confirmed_binding.return_value = None
+
+        tracked_identity_repo = AsyncMock()
+        tracked = _make_tracked_identity("allocated")
+        tracked.aggregate_id = 9001
+        tracked_identity_repo.mint.return_value = tracked
+
+        binding_set_repo = AsyncMock()
+        binding_set_repo.create.return_value = _make_binding_set("proposed")
+        binding_set_repo.transition.return_value = _make_binding_set("confirmed")
+
+        resolve_batch_repo = AsyncMock()
+        resolve_batch_repo.find.return_value = None
+
+        service: IdentityService = _make_service(
+            scope_repo=scope_repo,
+            submission_repo=submission_repo,
+            source_identity_repo=source_identity_repo,
+            tracked_identity_repo=tracked_identity_repo,
+            binding_set_repo=binding_set_repo,
+            binding_repo=binding_repo,
+            resolve_batch_repo=resolve_batch_repo,
+        )
+
+        result = await service.resolve_batch("sead://reconciliation", "test-batch", "run-001", self._requests())
+
+        resolve_batch_repo.acquire_run_lock.assert_awaited_once_with("sead://reconciliation", "run-001")
+        resolve_batch_repo.create.assert_awaited_once()
+        assert result.submission_uuid == SUBMISSION_UUID
+        assert result.outcomes[0].aggregate_id == 9001
 
 
 # ---------------------------------------------------------------------------

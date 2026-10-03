@@ -25,6 +25,7 @@ import pytest
 from src.identity.models import (
     Binding,
     BindingSet,
+    BindingSetResponse,
     SourceIdentity,
     SourceScope,
     Submission,
@@ -601,3 +602,98 @@ class TestBindingRepository:
 
         assert [state for _, state in results] == [BindingSetState.PROPOSED, BindingSetState.CONFIRMED]
         assert all(isinstance(binding, Binding) for binding, _ in results)
+
+
+# ---------------------------------------------------------------------------
+# ResolveBatchRepository
+# ---------------------------------------------------------------------------
+
+
+class TestResolveBatchRepository:
+    def _make_batch_row(self) -> dict:
+        from src.identity.models import ResolveBatchResult
+
+        result = ResolveBatchResult(
+            submission_uuid=SUBMISSION_UUID,
+            scope_uuid=SCOPE_UUID,
+            binding_set=BindingSetResponse(
+                binding_set_uuid=BINDING_SET_UUID,
+                submission_uuid=SUBMISSION_UUID,
+                lifecycle_state=BindingSetState.CONFIRMED,
+                change_request_name=None,
+                binding_count=1,
+                created_at=NOW,
+            ),
+            outcomes=[],
+        )
+        return {
+            "scope_name": "sead://reconciliation",
+            "run_id": "run-001",
+            "request_fingerprint": "abc123",
+            "result": result.model_dump(mode="json"),
+            "created_at": NOW,
+        }
+
+    @pytest.mark.asyncio
+    async def test_find_returns_record(self) -> None:
+        from src.identity.repository import ResolveBatchRepository
+
+        cursor = _make_cursor(return_row=self._make_batch_row())
+        conn = _make_conn(cursor)
+        with _patch_connection(conn):
+            record = await ResolveBatchRepository().find("sead://reconciliation", "run-001")
+
+        assert record is not None
+        assert record.run_id == "run-001"
+        assert record.result.submission_uuid == SUBMISSION_UUID
+
+    @pytest.mark.asyncio
+    async def test_find_returns_none_when_missing(self) -> None:
+        from src.identity.repository import ResolveBatchRepository
+
+        cursor = _make_cursor(return_row=None)
+        conn = _make_conn(cursor)
+        with _patch_connection(conn):
+            record = await ResolveBatchRepository().find("sead://reconciliation", "missing")
+
+        assert record is None
+
+    @pytest.mark.asyncio
+    async def test_create_inserts_result_jsonb(self) -> None:
+        from src.identity.models import ResolveBatchResult
+        from src.identity.repository import ResolveBatchRepository
+
+        result = ResolveBatchResult(
+            submission_uuid=SUBMISSION_UUID,
+            scope_uuid=SCOPE_UUID,
+            binding_set=BindingSetResponse(
+                binding_set_uuid=BINDING_SET_UUID,
+                submission_uuid=SUBMISSION_UUID,
+                lifecycle_state=BindingSetState.CONFIRMED,
+                change_request_name=None,
+                binding_count=1,
+                created_at=NOW,
+            ),
+            outcomes=[],
+        )
+        cursor = _make_cursor(return_row=self._make_batch_row())
+        conn = _make_conn(cursor)
+        with _patch_connection(conn):
+            record = await ResolveBatchRepository().create("sead://reconciliation", "run-001", "abc123", result)
+
+        assert record.run_id == "run-001"
+        executed = cursor.execute.await_args.args[1]
+        assert executed[0] == "sead://reconciliation"
+        assert executed[1] == "run-001"
+
+    @pytest.mark.asyncio
+    async def test_acquire_run_lock_uses_advisory_lock(self) -> None:
+        from src.identity.repository import ResolveBatchRepository
+
+        cursor = _make_cursor()
+        conn = _make_conn(cursor)
+        with _patch_connection(conn):
+            await ResolveBatchRepository().acquire_run_lock("sead://reconciliation", "run-001")
+
+        cursor.execute.assert_awaited_once()
+        assert "pg_advisory_xact_lock" in cursor.execute.await_args.args[0]
