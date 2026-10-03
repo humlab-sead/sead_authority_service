@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 from fastapi.testclient import TestClient
 
 from main import app
-from src.api.identity_router import get_config_dep, get_identity_service
+from src.api.identity_router import get_config_dep, get_identity_policy, get_identity_service
 from src.identity.models import (
     BindingSet,
     BindingSetResponse,
@@ -108,10 +108,20 @@ def _make_service_mock(**overrides) -> MagicMock:
     return svc
 
 
+def _make_policy_mock(*, configured: tuple[str, ...] = ("site",), supports: bool = True) -> MagicMock:
+    """Return a permissive IdentityPolicy mock for capability checks."""
+    policy = MagicMock()
+    policy.known_entity_types.return_value = list(configured)
+    policy.supports.return_value = supports
+    policy.get_capabilities.return_value = []
+    return policy
+
+
 def _make_client(svc: MagicMock) -> TestClient:
     """Build a TestClient with the given service mock injected."""
     app.dependency_overrides[get_identity_service] = lambda: svc
     app.dependency_overrides[get_config_dep] = lambda: MagicMock()
+    app.dependency_overrides[get_identity_policy] = lambda: _make_policy_mock()
     return TestClient(app)
 
 
@@ -267,6 +277,48 @@ class TestResolveEndpoint:
         body["created_by"] = "test-agent"
         client.post("/identity/resolve", json=body)
         svc.get_or_create_scope.assert_called_once_with("sead://reconciliation", created_by="test-agent")
+
+
+# ---------------------------------------------------------------------------
+# Resolve operation checks (capability enforcement)
+# ---------------------------------------------------------------------------
+
+
+class TestResolveOperationChecks:
+    def _body(self, **request_overrides) -> dict:
+        request = {
+            "entity_type": "site",
+            "primary_signal": {"identity_type": "business_key", "identity_value": "ABC-001"},
+        }
+        request.update(request_overrides)
+        return {"scope_name": "sead://reconciliation", "submission_name": "test-batch-001", "requests": [request]}
+
+    def test_unconfigured_entity_rejected_before_write(self):
+        svc = _make_service_mock()
+        client = _make_client(svc)
+        app.dependency_overrides[get_identity_policy] = lambda: _make_policy_mock(configured=())
+        response = client.post("/identity/resolve", json=self._body(entity_type="not_configured"))
+        assert response.status_code == 422
+        assert "not configured" in response.json()["detail"]
+        svc.get_or_create_scope.assert_not_called()
+
+    def test_unsupported_operation_rejected_before_write(self):
+        svc = _make_service_mock()
+        client = _make_client(svc)
+        app.dependency_overrides[get_identity_policy] = lambda: _make_policy_mock(configured=("site",), supports=False)
+        response = client.post("/identity/resolve", json=self._body())
+        assert response.status_code == 422
+        assert "allocate_new" in response.json()["detail"]
+        svc.get_or_create_scope.assert_not_called()
+
+    def test_unsupported_bind_existing_rejected(self):
+        svc = _make_service_mock()
+        client = _make_client(svc)
+        app.dependency_overrides[get_identity_policy] = lambda: _make_policy_mock(configured=("sample",), supports=False)
+        response = client.post("/identity/resolve", json=self._body(entity_type="sample", approved_aggregate_id=123))
+        assert response.status_code == 422
+        assert "bind_existing" in response.json()["detail"]
+        svc.get_or_create_scope.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
