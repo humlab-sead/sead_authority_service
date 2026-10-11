@@ -1,6 +1,6 @@
 # SIMS Diagrams
 
-> **Status:** Shows the current Phases 1–2 implementation, including legacy subtype-based policy behavior. These diagrams do not define the target architecture: SIMS must use generic allocator code driven by validated SIMS configuration, with reconciliation and consumer data changes outside SIMS. See [SIMS_TARGET_ID_CONTRACT.md](../proposals/SIMS_TARGET_ID_CONTRACT.md) for the target contract, [OPERATIONS.md](./OPERATIONS.md) for current deployment, and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
+> **Status:** Shows the current Phases 1–2 implementation, including legacy subtype-based policy behavior. These diagrams do not define the target architecture: SIMS must use generic allocator code driven by validated SIMS configuration, with reconciliation and consumer data changes outside SIMS. See [SIMS_TARGET_ID_CONTRACT.md](../proposals/SIMS_TARGET_ID_CONTRACT/SIMS_TARGET_ID_CONTRACT.md) for the target contract, [OPERATIONS.md](./OPERATIONS.md) for current deployment, and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
 
 Diagrams covering the core SIMS workflows and state machines. See [CONCEPTUAL_MODEL.md § Decision Flow](./CONCEPTUAL_MODEL.md#decision-flow) for the decision flow and [DESIGN.md](./DESIGN.md) for structural details.
 

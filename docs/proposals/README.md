@@ -10,10 +10,10 @@ Approved identity-ownership decision; generic identity allocation and the approv
 
 ## Documents
 
-- [SIMS_TARGET_ID_CONTRACT.md](./SIMS_TARGET_ID_CONTRACT.md) — Authority Service contract for the generic SIMS identity value response
+- [SIMS_TARGET_ID_CONTRACT.md](./SIMS_TARGET_ID_CONTRACT/SIMS_TARGET_ID_CONTRACT.md) — Authority Service contract for the generic SIMS identity value response
 - [Completed cross-system identity allocation phase plan](https://github.com/humlab-sead/sead_shape_shifter/blob/main/docs/proposals/CHANGE_REQUEST_INGESTER/done/SIMS_IDENTITY_ALLOCATION/SIMS_IDENTITY_ALLOCATION_PHASE_PLAN.md) — implementation and validation record for Phases 1–3
-- [SIMS_TARGET_ID_CONTRACT_ISSUE.md](./SIMS_TARGET_ID_CONTRACT_ISSUE.md) — issue draft aligned with the generic SIMS identity contract; verify API details before filing
-- [SIMS_TARGET_ID_CONTRACT_PR.md](./SIMS_TARGET_ID_CONTRACT_PR.md) — PR draft aligned with the generic SIMS identity contract; update implementation and test evidence before use
+- [SIMS_TARGET_ID_CONTRACT_ISSUE.md](./SIMS_TARGET_ID_CONTRACT/SIMS_TARGET_ID_CONTRACT_ISSUE.md) — issue draft aligned with the generic SIMS identity contract; verify API details before filing
+- [SIMS_TARGET_ID_CONTRACT_PR.md](./SIMS_TARGET_ID_CONTRACT/SIMS_TARGET_ID_CONTRACT_PR.md) — PR draft aligned with the generic SIMS identity contract; update implementation and test evidence before use
 
 ## Current Status
 
