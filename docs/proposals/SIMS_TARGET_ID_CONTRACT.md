@@ -158,7 +158,7 @@ Existing-data migration, deployment checks, competing-writer coordination, and c
 
 ## Planning Handoff
 
-- Use the [cross-system identity allocation phase plan](https://github.com/humlab-sead/sead_shape_shifter/blob/main/docs/proposals/CHANGE_REQUEST_INGESTER/SIMS_IDENTITY_ALLOCATION/SIMS_IDENTITY_ALLOCATION_PHASE_PLAN.md) for sequencing and integration acceptance.
+- Use the [completed cross-system identity allocation phase plan](https://github.com/humlab-sead/sead_shape_shifter/blob/main/docs/proposals/CHANGE_REQUEST_INGESTER/done/SIMS_IDENTITY_ALLOCATION/SIMS_IDENTITY_ALLOCATION_PHASE_PLAN.md) for sequencing and integration acceptance.
 - The Authority Service owns generic identity storage, configuration, allocation, SIMS-store uniqueness, and the response carrying the aggregate identity value.
 - Shape Shifter owns target-model interpretation, reconciliation and approval, capability preflight, and artifact generation. SEAD owns integrity of its own persisted data.
 - The current development task excludes existing-data migration, production validation, deployment, and cutover. Create a separate operational plan for adopting the trust contract with existing SEAD data.
