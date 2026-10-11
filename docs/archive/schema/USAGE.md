@@ -147,7 +147,7 @@ uv pip install PyYAML jinja2 loguru
 Ensure you're running from the project root directory:
 
 ```bash
-cd /home/roger/source/sead_authority_service
+cd /path/to/sead_authority_service
 uv run python src/scripts/generate_entity_schema.py --all
 ```
 
