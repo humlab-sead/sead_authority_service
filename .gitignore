@@ -111,6 +111,7 @@ tests/output
 **/.env
 **/.env.*
 !docker/.env.example
+!deployment/container/.env.example
 **/chat*.json
 bin
 *.pdf
