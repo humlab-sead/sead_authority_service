@@ -1,6 +1,6 @@
 """SIMS Identity Service — core operations.
 
-Orchestrates the four operations from IMPLEMENTATION_VIEW § Core Operations:
+Orchestrates the four operations from DESIGN.md § Core Operations:
 
   1. resolve_identity  — upsert Source Identity, check for existing Binding
   2. bind              — create Binding Set, mint Tracked Identities, create Bindings
@@ -29,10 +29,13 @@ Usage example::
 
 from __future__ import annotations
 
+import hashlib
+import json
 from uuid import UUID
 
 from loguru import logger
 
+from src.configuration import get_connection
 from src.identity.models import (
     Binding,
     BindingSet,
@@ -42,6 +45,8 @@ from src.identity.models import (
     IdentitySignal,
     ResolutionOutcome,
     ResolutionRequest,
+    ResolveBatchRecord,
+    ResolveBatchResult,
     SourceIdentity,
     SourceScope,
     Submission,
@@ -51,6 +56,8 @@ from src.identity.policy import EntityPolicy, IdentityPolicy
 from src.identity.repository import (
     BindingRepository,
     BindingSetRepository,
+    RepositoryError,
+    ResolveBatchRepository,
     SourceIdentityRepository,
     SourceScopeRepository,
     SubmissionRepository,
@@ -61,8 +68,15 @@ from src.identity.types import (
     BindingSetState,
     ChangeOutcome,
     IdentityType,
-    TrackedIdentityState,
 )
+
+
+class IdentityBindingConflict(ValueError):
+    """Raised when a resolution conflicts with an active identity binding."""
+
+
+class IdentityBatchConflict(ValueError):
+    """Raised when a scoped run key is reused with a different payload."""
 
 
 class IdentityService:
@@ -90,6 +104,7 @@ class IdentityService:
         tracked_identity_repo: TrackedIdentityRepository | None = None,
         binding_set_repo: BindingSetRepository | None = None,
         binding_repo: BindingRepository | None = None,
+        resolve_batch_repo: ResolveBatchRepository | None = None,
         policy: IdentityPolicy | None = None,
     ) -> None:
         self.scope_repo: SourceScopeRepository = scope_repo or SourceScopeRepository()
@@ -98,6 +113,7 @@ class IdentityService:
         self.tracked_identity_repo: TrackedIdentityRepository = tracked_identity_repo or TrackedIdentityRepository()
         self.binding_set_repo: BindingSetRepository = binding_set_repo or BindingSetRepository()
         self.binding_repo: BindingRepository = binding_repo or BindingRepository()
+        self.resolve_batch_repo: ResolveBatchRepository = resolve_batch_repo or ResolveBatchRepository()
         self.policy: IdentityPolicy = policy or IdentityPolicy()
 
     # ------------------------------------------------------------------
@@ -140,7 +156,10 @@ class IdentityService:
 
         Implements FR-12 and FR-13 (idempotency).
         """
-        ep: EntityPolicy = self.policy.get_entity_policy(request.entity_type)
+        if request.approved_aggregate_id is not None and request.entity_type not in self.policy.known_entity_types():
+            raise IdentityBindingConflict(
+                f"Approved aggregate-ID binding is not configured for entity type '{request.entity_type}'"
+            )
 
         # 1. Upsert Source Identity — pass all signals as keys
         all_signals: list[IdentitySignal] = [request.primary_signal, *request.additional_signals]
@@ -155,11 +174,28 @@ class IdentityService:
         if submission_uuid is not None:
             await self.source_identity_repo.link_to_submission(submission_uuid, source_identity.source_identity_uuid)
 
+        active_bindings = await self.binding_repo.list_active_bindings(source_identity.source_identity_uuid)
+        if any(state == BindingSetState.PROPOSED for _, state in active_bindings):
+            raise IdentityBindingConflict(
+                f"Source identity {source_identity.source_identity_uuid} has an unresolved proposed binding"
+            )
+
         # 3. Check for an existing confirmed binding
-        existing: tuple[Binding, BindingSetState] | None = await self.binding_repo.find_confirmed_binding(source_identity.source_identity_uuid)
+        existing: tuple[Binding, BindingSetState] | None = await self.binding_repo.find_confirmed_binding(
+            source_identity.source_identity_uuid
+        )
         if existing is not None:
             binding, _ = existing
             tracked_identity: TrackedIdentity | None = await self.tracked_identity_repo.get(binding.tracked_identity_uuid)
+            if request.approved_aggregate_id is not None and (
+                tracked_identity is None
+                or tracked_identity.entity_type != request.entity_type
+                or tracked_identity.aggregate_id != request.approved_aggregate_id
+            ):
+                raise IdentityBindingConflict(
+                    f"Source identity is already bound to a different {request.entity_type} identity; "
+                    f"approved aggregate ID {request.approved_aggregate_id} cannot be applied"
+                )
             logger.debug(
                 f"resolve_identity: matched existing binding "
                 f"source={source_identity.source_identity_uuid} → tracked={binding.tracked_identity_uuid}"
@@ -169,7 +205,32 @@ class IdentityService:
                 entity_type=request.entity_type,
                 outcome="matched",
                 tracked_identity_uuid=binding.tracked_identity_uuid,
-                target_id=tracked_identity.sead_internal_id if tracked_identity is not None else None,
+                aggregate_id=tracked_identity.aggregate_id if tracked_identity is not None else None,
+            )
+
+        if request.approved_aggregate_id is not None:
+            try:
+                tracked_identity = await self.tracked_identity_repo.find_by_aggregate_id(
+                    request.entity_type,
+                    request.approved_aggregate_id,
+                )
+            except RepositoryError as exc:
+                raise IdentityBindingConflict(str(exc)) from exc
+            if (
+                tracked_identity is None
+                or tracked_identity.entity_type != request.entity_type
+                or tracked_identity.aggregate_id != request.approved_aggregate_id
+            ):
+                raise IdentityBindingConflict(
+                    f"No SIMS {request.entity_type} tracked identity exists for approved aggregate ID "
+                    f"{request.approved_aggregate_id}; refusing to allocate a replacement"
+                )
+            return ResolutionOutcome(
+                source_identity_uuid=source_identity.source_identity_uuid,
+                entity_type=request.entity_type,
+                outcome="matched",
+                tracked_identity_uuid=tracked_identity.tracked_identity_uuid,
+                aggregate_id=tracked_identity.aggregate_id,
             )
 
         # 4. No existing binding — allocation deferred
@@ -181,7 +242,7 @@ class IdentityService:
             entity_type=request.entity_type,
             outcome="new",
             tracked_identity_uuid=None,
-            target_id=None,
+            aggregate_id=None,
         )
 
     # ------------------------------------------------------------------
@@ -196,9 +257,13 @@ class IdentityService:
     ) -> BindingSetResponse:
         """Create a Binding Set from resolution outcomes and apply policy.
 
+        Locks source identities and applies bindings in one transaction. A stale
+        ``new`` outcome reuses a confirmed binding; an unresolved proposed
+        binding raises IdentityBindingConflict before allocation.
+
         For each outcome:
         - ``matched``: creates a Binding to the existing Tracked Identity.
-        - ``new``: mints a new Tracked Identity if policy allows, then creates a Binding.
+        - ``new``: mints a Tracked Identity if no active binding exists and policy allows.
 
         Auto-confirms the Binding Set if *all* entity types in the batch have
         ``auto_confirm=True`` in the identity policy (D6 — provider-owned entities).
@@ -208,28 +273,68 @@ class IdentityService:
         if not outcomes:
             raise ValueError("bind() requires at least one ResolutionOutcome")
 
-        # Create the proposed Binding Set
-        binding_set: BindingSet = await self.binding_set_repo.create(submission_uuid=submission_uuid, created_by=created_by)
-        bindings: list[Binding] = []
+        async with get_connection():
+            source_ids = [outcome.source_identity_uuid for outcome in outcomes]
+            await self.source_identity_repo.lock_for_binding(source_ids)
+            await self._reuse_confirmed_bindings(outcomes)
 
+            # Keep set creation, identity allocation, binding, and confirmation atomic.
+            binding_set: BindingSet = await self.binding_set_repo.create(submission_uuid=submission_uuid, created_by=created_by)
+            bindings: list[Binding] = []
+
+            for outcome in outcomes:
+                ep: EntityPolicy = self.policy.get_entity_policy(outcome.entity_type)
+                binding: Binding | None = await self._bind_single(outcome, binding_set.binding_set_uuid, ep, created_by)
+                if binding is not None:
+                    bindings.append(binding)
+
+            should_auto_confirm = all(self.policy.get_entity_policy(o.entity_type).auto_confirm for o in outcomes)
+            if should_auto_confirm:
+                binding_set = await self.binding_set_repo.transition(
+                    binding_set.binding_set_uuid, BindingSetState.CONFIRMED
+                )  # type: ignore[assignment]
+                logger.info(f"Binding set {binding_set.binding_set_uuid} auto-confirmed ({len(bindings)} bindings)")
+            else:
+                logger.info(f"Binding set {binding_set.binding_set_uuid} remains proposed — awaiting manual confirmation")
+
+            return _to_binding_set_response(binding_set, binding_count=len(bindings))
+
+    async def _reuse_confirmed_bindings(self, outcomes: list[ResolutionOutcome]) -> None:
+        """Reject unresolved proposals and reuse confirmed identities for stale outcomes."""
+        checked: dict[UUID, list[tuple[Binding, BindingSetState]]] = {}
         for outcome in outcomes:
-            ep: EntityPolicy = self.policy.get_entity_policy(outcome.entity_type)
-            binding: Binding | None = await self._bind_single(outcome, binding_set.binding_set_uuid, ep, created_by)
-            if binding is not None:
-                bindings.append(binding)
+            if outcome.source_identity_uuid not in checked:
+                checked[outcome.source_identity_uuid] = await self.binding_repo.list_active_bindings(
+                    outcome.source_identity_uuid
+                )
+            active = checked[outcome.source_identity_uuid]
+            if any(state == BindingSetState.PROPOSED for _, state in active):
+                raise IdentityBindingConflict(
+                    f"Source identity {outcome.source_identity_uuid} has an unresolved proposed binding"
+                )
 
-        # Auto-confirm if all entity types in this batch permit it
-        should_auto_confirm = all(
-            self.policy.get_entity_policy(o.entity_type).auto_confirm for o in outcomes
-        )
+            confirmed = [binding for binding, state in active if state == BindingSetState.CONFIRMED]
+            tracked_uuids = {binding.tracked_identity_uuid for binding in confirmed}
+            if len(tracked_uuids) > 1:
+                raise IdentityBindingConflict(
+                    f"Source identity {outcome.source_identity_uuid} has conflicting confirmed bindings"
+                )
+            if not confirmed:
+                continue
 
-        if should_auto_confirm:
-            binding_set = await self.binding_set_repo.transition(binding_set.binding_set_uuid, BindingSetState.CONFIRMED)  # type: ignore[assignment]
-            logger.info(f"Binding set {binding_set.binding_set_uuid} auto-confirmed ({len(bindings)} bindings)")
-        else:
-            logger.info(f"Binding set {binding_set.binding_set_uuid} remains proposed — awaiting manual confirmation")
-
-        return _to_binding_set_response(binding_set, binding_count=len(bindings))
+            tracked_uuid = next(iter(tracked_uuids))
+            if outcome.outcome == "matched" and outcome.tracked_identity_uuid != tracked_uuid:
+                raise IdentityBindingConflict(
+                    f"Resolution for source identity {outcome.source_identity_uuid} conflicts with its confirmed binding"
+                )
+            tracked = await self.tracked_identity_repo.get(tracked_uuid)
+            if tracked is None:
+                raise IdentityBindingConflict(
+                    f"Confirmed binding for source identity {outcome.source_identity_uuid} references a missing tracked identity"
+                )
+            outcome.outcome = "matched"
+            outcome.tracked_identity_uuid = tracked_uuid
+            outcome.aggregate_id = tracked.aggregate_id
 
     async def _bind_single(
         self,
@@ -262,7 +367,7 @@ class IdentityService:
 
         tracked: TrackedIdentity = await self.tracked_identity_repo.mint(entity_type=outcome.entity_type, created_by=created_by)
         outcome.tracked_identity_uuid = tracked.tracked_identity_uuid
-        outcome.target_id = tracked.sead_internal_id
+        outcome.aggregate_id = tracked.aggregate_id
         return await self.binding_repo.create(
             binding_set_uuid=binding_set_uuid,
             source_identity_uuid=outcome.source_identity_uuid,
@@ -271,6 +376,72 @@ class IdentityService:
             provenance={"allocation_policy": ep.entity_subtype},
             created_by=created_by,
         )
+
+    # ------------------------------------------------------------------
+    # Atomic batch — resolve + bind + persist replay in one transaction
+    # ------------------------------------------------------------------
+
+    async def resolve_batch(
+        self,
+        scope_name: str,
+        submission_name: str,
+        run_id: str,
+        requests: list[ResolutionRequest],
+        created_by: str | None = None,
+    ) -> ResolveBatchResult:
+        """Resolve and bind one batch atomically, replaying an identical run.
+
+        The scoped run key is ``(scope_name, run_id)``. Within one database
+        transaction this method:
+        1. Serializes on the run key with an advisory lock.
+        2. Replays the stored result when the key and fingerprint match.
+        3. Rejects a reused key whose payload fingerprint differs.
+        4. Otherwise creates the scope, submission, source identities, one
+           Binding Set, and tracked identities, then persists the result for
+           future replay.
+
+        A failure at any step rolls back every write, including the replay record.
+        """
+        fingerprint = _request_fingerprint(submission_name, requests)
+
+        async with get_connection():
+            await self.resolve_batch_repo.acquire_run_lock(scope_name, run_id)
+            existing: ResolveBatchRecord | None = await self.resolve_batch_repo.find(scope_name, run_id)
+            if existing is not None:
+                if existing.request_fingerprint != fingerprint:
+                    raise IdentityBatchConflict(
+                        f"Run '{run_id}' for scope '{scope_name}' was already resolved with a different payload"
+                    )
+                logger.info(f"resolve_batch: replaying stored result for run '{run_id}'")
+                return existing.result
+
+            scope = await self.get_or_create_scope(scope_name, created_by=created_by)
+            submission = await self.create_submission(scope.scope_uuid, submission_name, created_by=created_by)
+
+            outcomes: list[ResolutionOutcome] = []
+            for request in requests:
+                outcome = await self.resolve_identity(
+                    scope_uuid=scope.scope_uuid,
+                    request=request,
+                    submission_uuid=submission.submission_uuid,
+                    created_by=created_by,
+                )
+                outcomes.append(outcome)
+
+            binding_set = await self.bind(
+                submission_uuid=submission.submission_uuid,
+                outcomes=outcomes,
+                created_by=created_by,
+            )
+
+            result = ResolveBatchResult(
+                submission_uuid=submission.submission_uuid,
+                scope_uuid=scope.scope_uuid,
+                binding_set=binding_set,
+                outcomes=outcomes,
+            )
+            await self.resolve_batch_repo.create(scope_name, run_id, fingerprint, result)
+            return result
 
     # ------------------------------------------------------------------
     # Submission helper
@@ -303,7 +474,9 @@ class IdentityService:
         """Shorthand for resolve_identity × N → bind."""
         outcomes: list[ResolutionOutcome] = []
         for req in requests:
-            outcome: ResolutionOutcome = await self.resolve_identity(scope_uuid, req, submission_uuid=submission_uuid, created_by=created_by)
+            outcome: ResolutionOutcome = await self.resolve_identity(
+                scope_uuid, req, submission_uuid=submission_uuid, created_by=created_by
+            )
             outcomes.append(outcome)
         return await self.bind(submission_uuid=submission_uuid, outcomes=outcomes, created_by=created_by)
 
@@ -403,6 +576,16 @@ class IdentityService:
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+def _request_fingerprint(submission_name: str, requests: list[ResolutionRequest]) -> str:
+    """Return a deterministic SHA-256 fingerprint of a batch payload."""
+    payload = {
+        "submission_name": submission_name,
+        "requests": [request.model_dump(mode="json") for request in requests],
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _infer_method_from_match(source: SourceIdentity | None) -> BindingMethod:

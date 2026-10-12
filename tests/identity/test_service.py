@@ -6,8 +6,9 @@ instances. This tests the service orchestration logic in isolation.
 
 from __future__ import annotations
 
+import contextlib
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import DEFAULT, AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -21,12 +22,14 @@ from src.identity.models import (
     IdentitySignal,
     ResolutionOutcome,
     ResolutionRequest,
+    ResolveBatchRecord,
+    ResolveBatchResult,
     SourceIdentity,
     SourceIdentityKey,
     SourceScope,
 )
 from src.identity.policy import EntityPolicy, IdentityPolicy
-from src.identity.service import IdentityService
+from src.identity.service import IdentityBatchConflict, IdentityBindingConflict, IdentityService, _request_fingerprint
 from src.identity.types import (
     BindingMethod,
     BindingSetState,
@@ -63,7 +66,7 @@ def _make_tracked_identity(state: str = "allocated") -> MagicMock:
     t.tracked_identity_uuid = TRACKED_UUID
     t.entity_type = "site"
     t.lifecycle_state = TrackedIdentityState(state)
-    t.sead_internal_id = None
+    t.aggregate_id = None
     t.content_hash = None
     return t
 
@@ -110,6 +113,7 @@ def _shared_metadata_policy(entity_type: str = "taxa") -> EntityPolicy:
 def _mock_policy(side_effect=None) -> MagicMock:
     policy = MagicMock(spec=IdentityPolicy)
     policy.get_entity_policy = MagicMock(side_effect=side_effect or (lambda et: _provider_owned_policy(et)))
+    policy.known_entity_types.return_value = ["site"]
     return policy
 
 
@@ -120,17 +124,25 @@ def _make_service(
     tracked_identity_repo=None,
     binding_set_repo=None,
     binding_repo=None,
+    resolve_batch_repo=None,
     policy=None,
 ):
     from src.identity.service import IdentityService
 
+    source_identity_repo = source_identity_repo or AsyncMock()
+    binding_repo = binding_repo or AsyncMock()
+    if source_identity_repo.lock_for_binding._mock_return_value is DEFAULT:
+        source_identity_repo.lock_for_binding.return_value = None
+    if binding_repo.list_active_bindings._mock_return_value is DEFAULT:
+        binding_repo.list_active_bindings.return_value = []
     return IdentityService(
         scope_repo=scope_repo or AsyncMock(),
         submission_repo=submission_repo or AsyncMock(),
-        source_identity_repo=source_identity_repo or AsyncMock(),
+        source_identity_repo=source_identity_repo,
         tracked_identity_repo=tracked_identity_repo or AsyncMock(),
         binding_set_repo=binding_set_repo or AsyncMock(),
-        binding_repo=binding_repo or AsyncMock(),
+        binding_repo=binding_repo,
+        resolve_batch_repo=resolve_batch_repo or AsyncMock(),
         policy=policy or _mock_policy(),
     )
 
@@ -180,6 +192,114 @@ class TestResolveIdentity:
         )
 
     @pytest.mark.asyncio
+    async def test_approved_aggregate_id_resolves_existing_identity(self) -> None:
+        source_identity_repo = AsyncMock()
+        source_identity_repo.create_or_get.return_value = _make_source_identity()
+        source_identity_repo.link_to_submission = AsyncMock()
+
+        binding_repo = AsyncMock()
+        binding_repo.find_confirmed_binding.return_value = None
+
+        tracked_identity = _make_tracked_identity("allocated")
+        tracked_identity.aggregate_id = 4321
+        tracked_identity_repo = AsyncMock()
+        tracked_identity_repo.find_by_aggregate_id.return_value = tracked_identity
+
+        service: IdentityService = _make_service(
+            source_identity_repo=source_identity_repo,
+            binding_repo=binding_repo,
+            tracked_identity_repo=tracked_identity_repo,
+        )
+        request = ResolutionRequest(
+            entity_type="site",
+            approved_aggregate_id=4321,
+            primary_signal=IdentitySignal(identity_type=IdentityType.BUSINESS_KEY, identity_value="ABC-001"),
+        )
+
+        outcome = await service.resolve_identity(SCOPE_UUID, request, submission_uuid=SUBMISSION_UUID)
+
+        assert outcome.outcome == "matched"
+        assert outcome.tracked_identity_uuid == TRACKED_UUID
+        assert outcome.aggregate_id == 4321
+        tracked_identity_repo.find_by_aggregate_id.assert_awaited_once_with("site", 4321)
+        tracked_identity_repo.mint.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_approved_aggregate_id_without_sims_identity_conflicts(self) -> None:
+        source_identity_repo = AsyncMock()
+        source_identity_repo.create_or_get.return_value = _make_source_identity()
+        source_identity_repo.link_to_submission = AsyncMock()
+        binding_repo = AsyncMock()
+        binding_repo.find_confirmed_binding.return_value = None
+        tracked_identity_repo = AsyncMock()
+        tracked_identity_repo.find_by_aggregate_id.return_value = None
+        service: IdentityService = _make_service(
+            source_identity_repo=source_identity_repo,
+            binding_repo=binding_repo,
+            tracked_identity_repo=tracked_identity_repo,
+        )
+        request = ResolutionRequest(
+            entity_type="site",
+            approved_aggregate_id=4321,
+            primary_signal=IdentitySignal(identity_type=IdentityType.BUSINESS_KEY, identity_value="ABC-001"),
+        )
+
+        with pytest.raises(IdentityBindingConflict, match="refusing to allocate"):
+            await service.resolve_identity(SCOPE_UUID, request, submission_uuid=SUBMISSION_UUID)
+
+    @pytest.mark.asyncio
+    async def test_approved_aggregate_id_for_unlisted_entity_is_rejected_before_writes(self) -> None:
+        source_identity_repo = AsyncMock()
+        binding_repo = AsyncMock()
+        tracked_identity_repo = AsyncMock()
+        policy = _mock_policy()
+        policy.known_entity_types.return_value = []
+        service: IdentityService = _make_service(
+            source_identity_repo=source_identity_repo,
+            binding_repo=binding_repo,
+            tracked_identity_repo=tracked_identity_repo,
+            policy=policy,
+        )
+        request = ResolutionRequest(
+            entity_type="unlisted_site_variant",
+            approved_aggregate_id=4321,
+            primary_signal=IdentitySignal(identity_type=IdentityType.BUSINESS_KEY, identity_value="ABC-001"),
+        )
+
+        with pytest.raises(IdentityBindingConflict, match="not configured"):
+            await service.resolve_identity(SCOPE_UUID, request, submission_uuid=SUBMISSION_UUID)
+
+        source_identity_repo.create_or_get.assert_not_awaited()
+        tracked_identity_repo.find_by_aggregate_id.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_approved_aggregate_id_conflicting_with_confirmed_binding_is_rejected(self) -> None:
+        source_identity_repo = AsyncMock()
+        source_identity_repo.create_or_get.return_value = _make_source_identity()
+        source_identity_repo.link_to_submission = AsyncMock()
+        binding_repo = AsyncMock()
+        binding_repo.find_confirmed_binding.return_value = (_make_binding(), BindingSetState.CONFIRMED)
+        tracked_identity = _make_tracked_identity("materialized")
+        tracked_identity.aggregate_id = 4321
+        tracked_identity_repo = AsyncMock()
+        tracked_identity_repo.get.return_value = tracked_identity
+        service: IdentityService = _make_service(
+            source_identity_repo=source_identity_repo,
+            binding_repo=binding_repo,
+            tracked_identity_repo=tracked_identity_repo,
+        )
+        request = ResolutionRequest(
+            entity_type="site",
+            approved_aggregate_id=9876,
+            primary_signal=IdentitySignal(identity_type=IdentityType.BUSINESS_KEY, identity_value="ABC-001"),
+        )
+
+        with pytest.raises(IdentityBindingConflict, match="already bound"):
+            await service.resolve_identity(SCOPE_UUID, request, submission_uuid=SUBMISSION_UUID)
+
+        tracked_identity_repo.find_by_aggregate_id.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_returns_new_when_no_existing_binding(self) -> None:
         source_identity_repo = AsyncMock()
         source_identity_repo.create_or_get.return_value = _make_source_identity()
@@ -193,7 +313,7 @@ class TestResolveIdentity:
 
         assert outcome.outcome == "new"
         assert outcome.tracked_identity_uuid is None
-        assert outcome.target_id is None
+        assert outcome.aggregate_id is None
         assert outcome.source_identity_uuid == SOURCE_IDENTITY_UUID
 
     @pytest.mark.asyncio
@@ -204,7 +324,7 @@ class TestResolveIdentity:
 
         existing_binding = _make_binding()
         tracked_identity = _make_tracked_identity("materialized")
-        tracked_identity.sead_internal_id = 4321
+        tracked_identity.aggregate_id = 4321
         binding_repo = AsyncMock()
         binding_repo.find_confirmed_binding.return_value = (existing_binding, "confirmed")
 
@@ -220,10 +340,29 @@ class TestResolveIdentity:
 
         assert outcome.outcome == "matched"
         assert outcome.tracked_identity_uuid == TRACKED_UUID
-        assert outcome.target_id == 4321
+        assert outcome.aggregate_id == 4321
 
     @pytest.mark.asyncio
-    async def test_returns_matched_with_null_target_id_when_tracked_identity_not_materialized(self) -> None:
+    async def test_rejects_unresolved_proposed_binding(self) -> None:
+        source_identity_repo = AsyncMock()
+        source_identity_repo.create_or_get.return_value = _make_source_identity()
+        binding_repo = AsyncMock()
+        binding_repo.list_active_bindings.return_value = [(_make_binding(), BindingSetState.PROPOSED)]
+        tracked_identity_repo = AsyncMock()
+        service = _make_service(
+            source_identity_repo=source_identity_repo,
+            binding_repo=binding_repo,
+            tracked_identity_repo=tracked_identity_repo,
+        )
+
+        with pytest.raises(IdentityBindingConflict, match="unresolved proposed binding"):
+            await service.resolve_identity(SCOPE_UUID, self._request(), submission_uuid=SUBMISSION_UUID)
+
+        binding_repo.find_confirmed_binding.assert_not_awaited()
+        tracked_identity_repo.mint.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_returns_matched_with_null_aggregate_id_when_identity_has_no_value(self) -> None:
         source_identity_repo = AsyncMock()
         source_identity_repo.create_or_get.return_value = _make_source_identity()
         source_identity_repo.link_to_submission = AsyncMock()
@@ -244,7 +383,7 @@ class TestResolveIdentity:
 
         assert outcome.outcome == "matched"
         assert outcome.tracked_identity_uuid == TRACKED_UUID
-        assert outcome.target_id is None
+        assert outcome.aggregate_id is None
 
     @pytest.mark.asyncio
     async def test_links_to_submission_when_provided(self) -> None:
@@ -284,11 +423,143 @@ class TestResolveIdentity:
 
 
 # ---------------------------------------------------------------------------
+# resolve_batch — atomic, idempotent batch orchestration
+# ---------------------------------------------------------------------------
+
+
+class TestResolveBatch:
+    @pytest.fixture(autouse=True)
+    def _mock_transaction(self, monkeypatch) -> None:
+        @contextlib.asynccontextmanager
+        async def no_database_transaction():
+            yield None
+
+        monkeypatch.setattr("src.identity.service.get_connection", no_database_transaction)
+
+    def _requests(self) -> list[ResolutionRequest]:
+        return [
+            ResolutionRequest(
+                entity_type="site",
+                primary_signal=IdentitySignal(identity_type=IdentityType.BUSINESS_KEY, identity_value="ABC-001"),
+            )
+        ]
+
+    @pytest.mark.asyncio
+    async def test_replays_stored_result_for_same_fingerprint(self) -> None:
+        stored = ResolveBatchResult(
+            submission_uuid=SUBMISSION_UUID,
+            scope_uuid=SCOPE_UUID,
+            binding_set=BindingSetResponse(
+                binding_set_uuid=BINDING_SET_UUID,
+                submission_uuid=SUBMISSION_UUID,
+                lifecycle_state=BindingSetState.CONFIRMED,
+                change_request_name=None,
+                binding_count=1,
+                created_at=NOW,
+            ),
+            outcomes=[],
+        )
+        fingerprint = _request_fingerprint("test-batch", self._requests())
+        resolve_batch_repo = AsyncMock()
+        resolve_batch_repo.find.return_value = ResolveBatchRecord(
+            scope_name="sead://reconciliation",
+            run_id="run-001",
+            request_fingerprint=fingerprint,
+            result=stored,
+            created_at=NOW,
+        )
+
+        service: IdentityService = _make_service(resolve_batch_repo=resolve_batch_repo)
+        result = await service.resolve_batch("sead://reconciliation", "test-batch", "run-001", self._requests())
+
+        assert result == stored
+        resolve_batch_repo.create.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_changed_payload_conflicts(self) -> None:
+        resolve_batch_repo = AsyncMock()
+        resolve_batch_repo.find.return_value = ResolveBatchRecord(
+            scope_name="sead://reconciliation",
+            run_id="run-001",
+            request_fingerprint="stale-fingerprint",
+            result=ResolveBatchResult(
+                submission_uuid=SUBMISSION_UUID,
+                scope_uuid=SCOPE_UUID,
+                binding_set=BindingSetResponse(
+                    binding_set_uuid=BINDING_SET_UUID,
+                    submission_uuid=SUBMISSION_UUID,
+                    lifecycle_state=BindingSetState.CONFIRMED,
+                    change_request_name=None,
+                    binding_count=1,
+                    created_at=NOW,
+                ),
+                outcomes=[],
+            ),
+            created_at=NOW,
+        )
+
+        service: IdentityService = _make_service(resolve_batch_repo=resolve_batch_repo)
+        with pytest.raises(IdentityBatchConflict, match="different payload"):
+            await service.resolve_batch("sead://reconciliation", "test-batch", "run-001", self._requests())
+
+    @pytest.mark.asyncio
+    async def test_persists_result_after_successful_batch(self) -> None:
+        scope_repo = AsyncMock()
+        scope_repo.get_by_name.return_value = None
+        scope_repo.create.return_value = SourceScope(scope_uuid=SCOPE_UUID, scope_name="sead://reconciliation", created_at=NOW)
+        submission_repo = AsyncMock()
+        submission_repo.create.return_value = MagicMock(submission_uuid=SUBMISSION_UUID)
+
+        source_identity_repo = AsyncMock()
+        source_identity_repo.create_or_get.return_value = _make_source_identity()
+
+        binding_repo = AsyncMock()
+        binding_repo.find_confirmed_binding.return_value = None
+
+        tracked_identity_repo = AsyncMock()
+        tracked = _make_tracked_identity("allocated")
+        tracked.aggregate_id = 9001
+        tracked_identity_repo.mint.return_value = tracked
+
+        binding_set_repo = AsyncMock()
+        binding_set_repo.create.return_value = _make_binding_set("proposed")
+        binding_set_repo.transition.return_value = _make_binding_set("confirmed")
+
+        resolve_batch_repo = AsyncMock()
+        resolve_batch_repo.find.return_value = None
+
+        service: IdentityService = _make_service(
+            scope_repo=scope_repo,
+            submission_repo=submission_repo,
+            source_identity_repo=source_identity_repo,
+            tracked_identity_repo=tracked_identity_repo,
+            binding_set_repo=binding_set_repo,
+            binding_repo=binding_repo,
+            resolve_batch_repo=resolve_batch_repo,
+        )
+
+        result = await service.resolve_batch("sead://reconciliation", "test-batch", "run-001", self._requests())
+
+        resolve_batch_repo.acquire_run_lock.assert_awaited_once_with("sead://reconciliation", "run-001")
+        resolve_batch_repo.create.assert_awaited_once()
+        assert result.submission_uuid == SUBMISSION_UUID
+        assert result.outcomes[0].aggregate_id == 9001
+
+
+# ---------------------------------------------------------------------------
 # bind
 # ---------------------------------------------------------------------------
 
 
 class TestBind:
+    @pytest.fixture(autouse=True)
+    def _mock_transaction(self, monkeypatch) -> None:
+        @contextlib.asynccontextmanager
+        async def no_database_transaction():
+            yield None
+
+        monkeypatch.setattr("src.identity.service.get_connection", no_database_transaction)
+
     def _new_outcome(self) -> ResolutionOutcome:
         return ResolutionOutcome(
             source_identity_uuid=SOURCE_IDENTITY_UUID,
@@ -332,13 +603,13 @@ class TestBind:
         assert isinstance(result, BindingSetResponse)
 
     @pytest.mark.asyncio
-    async def test_bind_new_outcome_populates_outcome_target_fields_from_tracked_identity(self) -> None:
+    async def test_bind_new_outcome_populates_aggregate_fields_from_tracked_identity(self) -> None:
         binding_set_repo = AsyncMock()
         binding_set_repo.create.return_value = _make_binding_set("proposed")
         binding_set_repo.transition.return_value = _make_binding_set("confirmed")
 
         tracked_identity = _make_tracked_identity("materialized")
-        tracked_identity.sead_internal_id = 4321
+        tracked_identity.aggregate_id = 4321
         tracked_identity_repo = AsyncMock()
         tracked_identity_repo.mint.return_value = tracked_identity
 
@@ -359,7 +630,7 @@ class TestBind:
         await service.bind(SUBMISSION_UUID, [outcome])
 
         assert outcome.tracked_identity_uuid == TRACKED_UUID
-        assert outcome.target_id == 4321
+        assert outcome.aggregate_id == 4321
 
     @pytest.mark.asyncio
     async def test_bind_new_outcome_auto_confirms_for_provider_owned(self) -> None:
@@ -487,6 +758,53 @@ class TestBind:
         service = _make_service()
         with pytest.raises(ValueError, match="at least one"):
             await service.bind(SUBMISSION_UUID, [])
+
+    @pytest.mark.asyncio
+    async def test_bind_reuses_confirmed_identity_for_stale_new_outcome(self) -> None:
+        binding_set_repo = AsyncMock()
+        binding_set_repo.create.return_value = _make_binding_set("proposed")
+        binding_set_repo.transition.return_value = _make_binding_set("confirmed")
+        existing_binding = _make_binding()
+        binding_repo = AsyncMock()
+        binding_repo.list_active_bindings.return_value = [(existing_binding, BindingSetState.CONFIRMED)]
+        binding_repo.create.return_value = existing_binding
+        tracked = _make_tracked_identity("allocated")
+        tracked.aggregate_id = 4321
+        tracked_identity_repo = AsyncMock()
+        tracked_identity_repo.get.return_value = tracked
+
+        outcome = self._new_outcome()
+        service = _make_service(
+            binding_repo=binding_repo,
+            binding_set_repo=binding_set_repo,
+            tracked_identity_repo=tracked_identity_repo,
+        )
+        await service.bind(SUBMISSION_UUID, [outcome])
+
+        tracked_identity_repo.mint.assert_not_awaited()
+        assert outcome.outcome == "matched"
+        assert outcome.tracked_identity_uuid == TRACKED_UUID
+        assert outcome.aggregate_id == 4321
+        assert binding_repo.create.await_args.kwargs["tracked_identity_uuid"] == TRACKED_UUID
+
+    @pytest.mark.asyncio
+    async def test_bind_rejects_proposed_binding_before_creating_set_or_allocating(self) -> None:
+        binding_set_repo = AsyncMock()
+        binding_repo = AsyncMock()
+        binding_repo.list_active_bindings.return_value = [(_make_binding(), BindingSetState.PROPOSED)]
+        tracked_identity_repo = AsyncMock()
+        service = _make_service(
+            binding_repo=binding_repo,
+            binding_set_repo=binding_set_repo,
+            tracked_identity_repo=tracked_identity_repo,
+        )
+
+        with pytest.raises(IdentityBindingConflict, match="unresolved proposed binding"):
+            await service.bind(SUBMISSION_UUID, [self._new_outcome()])
+
+        binding_set_repo.create.assert_not_awaited()
+        tracked_identity_repo.mint.assert_not_awaited()
+        binding_repo.create.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_binding_method_is_business_key_for_business_key_identity(self) -> None:

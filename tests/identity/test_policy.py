@@ -46,7 +46,7 @@ def _minimal_policy(extra_entities: str = "") -> str:
 # Import — must follow helpers so tmp_path is ready
 # ---------------------------------------------------------------------------
 
-from src.identity.policy import EntityPolicy, IdentityPolicy
+from src.identity.policy import CAPABILITY_VERSION, EntityCapability, EntityPolicy, IdentityPolicy
 
 
 # ---------------------------------------------------------------------------
@@ -286,8 +286,17 @@ class TestRealPolicyFile:
     def test_site_in_real_policy(self) -> None:
         policy = IdentityPolicy()
         ep = policy.get_entity_policy("site")
-        assert ep.is_provider_owned
+        assert ep.is_shared_metadata
         assert ep.allow_allocation is True
+        assert ep.auto_confirm is True
+
+    def test_submission_in_real_policy(self) -> None:
+        policy = IdentityPolicy()
+        ep = policy.get_entity_policy("submission")
+        assert ep.is_provider_owned
+        assert ep.accept_uuid is False
+        assert ep.allow_allocation is True
+        assert ep.auto_confirm is True
 
     def test_taxa_tree_master_in_real_policy(self) -> None:
         policy = IdentityPolicy()
@@ -302,3 +311,127 @@ class TestRealPolicyFile:
     def test_reload_does_not_raise(self) -> None:
         policy = IdentityPolicy()
         policy.reload()  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# Operations and capabilities
+# ---------------------------------------------------------------------------
+
+
+_OPERATIONS_POLICY = """
+entities:
+  site:
+    entity_subtype: shared_metadata
+    accept_uuid: false
+    auto_confirm: true
+    operations:
+      bind_existing: true
+      allocate_new: true
+  taxa:
+    entity_subtype: shared_metadata
+    accept_uuid: true
+    auto_confirm: false
+    operations:
+      bind_existing: true
+      allocate_new: false
+  sample:
+    entity_subtype: provider_owned
+    accept_uuid: false
+    auto_confirm: true
+    operations:
+      bind_existing: false
+      allocate_new: true
+defaults:
+  entity_subtype: shared_metadata
+  accept_uuid: true
+  auto_confirm: false
+  operations:
+    bind_existing: false
+    allocate_new: false
+"""
+
+
+@pytest.fixture()
+def operations_policy(tmp_path: Path) -> IdentityPolicy:
+    return IdentityPolicy(policy_path=_write_policy(tmp_path, _OPERATIONS_POLICY))
+
+
+class TestOperationSupport:
+    def test_supports_bind_existing(self, operations_policy: IdentityPolicy) -> None:
+        assert operations_policy.supports("site", "bind_existing") is True
+        assert operations_policy.supports("sample", "bind_existing") is False
+
+    def test_supports_allocate_new(self, operations_policy: IdentityPolicy) -> None:
+        assert operations_policy.supports("site", "allocate_new") is True
+        assert operations_policy.supports("taxa", "allocate_new") is False
+
+    def test_supports_returns_false_for_unconfigured(self, operations_policy: IdentityPolicy) -> None:
+        assert operations_policy.supports("unknown_xyz", "bind_existing") is False
+        assert operations_policy.supports("unknown_xyz", "allocate_new") is False
+
+    def test_allocate_new_derives_allow_allocation(self, operations_policy: IdentityPolicy) -> None:
+        assert operations_policy.get_entity_policy("sample").allow_allocation is True
+        assert operations_policy.get_entity_policy("taxa").allow_allocation is False
+
+
+class TestCapabilities:
+    def test_get_capabilities_lists_configured_types(self, operations_policy: IdentityPolicy) -> None:
+        caps = {c.entity_type: c for c in operations_policy.get_capabilities()}
+        assert set(caps) == {"site", "taxa", "sample"}
+        assert caps["site"].bind_existing is True
+        assert caps["site"].allocate_new is True
+        assert caps["sample"].bind_existing is False
+        assert caps["sample"].allocate_new is True
+
+    def test_capability_is_entity_capability_instance(self, operations_policy: IdentityPolicy) -> None:
+        caps = operations_policy.get_capabilities()
+        assert caps
+        assert all(isinstance(c, EntityCapability) for c in caps)
+
+    def test_capability_version_is_defined(self) -> None:
+        assert CAPABILITY_VERSION
+
+
+class TestOperationsValidation:
+    def test_unknown_operation_key_raises(self, tmp_path: Path) -> None:
+        bad_yaml = """
+        entities:
+          site:
+            entity_subtype: shared_metadata
+            accept_uuid: false
+            auto_confirm: true
+            operations:
+              bind_existing: true
+              allocate_new: true
+              made_up: true
+        defaults:
+          entity_subtype: shared_metadata
+          accept_uuid: true
+          auto_confirm: false
+          operations:
+            bind_existing: false
+            allocate_new: false
+        """
+        with pytest.raises(ValueError, match="unknown operation keys"):
+            IdentityPolicy(policy_path=_write_policy(tmp_path, bad_yaml))
+
+    def test_non_boolean_operation_raises(self, tmp_path: Path) -> None:
+        bad_yaml = """
+        entities:
+          site:
+            entity_subtype: shared_metadata
+            accept_uuid: false
+            auto_confirm: true
+            operations:
+              bind_existing: "yes"
+              allocate_new: true
+        defaults:
+          entity_subtype: shared_metadata
+          accept_uuid: true
+          auto_confirm: false
+          operations:
+            bind_existing: false
+            allocate_new: false
+        """
+        with pytest.raises(ValueError, match="must be a boolean"):
+            IdentityPolicy(policy_path=_write_policy(tmp_path, bad_yaml))

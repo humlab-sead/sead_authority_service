@@ -1,5 +1,6 @@
 import os
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from typing import AsyncIterator
 
 import dotenv
@@ -13,6 +14,8 @@ from .interface import ConfigLike
 from .provider import ConfigStore, get_config_provider
 
 dotenv.load_dotenv(dotenv_path=os.getenv("ENV_FILE", ".env"))
+
+_ACTIVE_CONNECTION: ContextVar[psycopg.AsyncConnection | None] = ContextVar("active_database_connection", default=None)
 
 
 async def setup_config_store(
@@ -102,7 +105,15 @@ async def get_connection() -> AsyncIterator[psycopg.AsyncConnection]:
                 await cur.execute("SELECT ...")
                 result = await cur.fetchall()
             # Transaction auto-commits on success, rolls back on exception
+
+    Nested calls reuse the active connection; only the outer context commits
+    or rolls back the transaction.
     """
+    active_connection = _ACTIVE_CONNECTION.get()
+    if active_connection is not None:
+        yield active_connection
+        return
+
     cfg: ConfigLike = get_config_provider().get_config()
     if not cfg:
         raise ValueError("Config Store is not configured")
@@ -112,6 +123,7 @@ async def get_connection() -> AsyncIterator[psycopg.AsyncConnection]:
         raise ValueError("Connection pool not initialized")
 
     async with pool.connection() as conn:
+        token = _ACTIVE_CONNECTION.set(conn)
         try:
             yield conn
             # Auto-commit on success
@@ -121,6 +133,8 @@ async def get_connection() -> AsyncIterator[psycopg.AsyncConnection]:
             await conn.rollback()
             logger.exception(f"Database transaction error, rolled back: {e}")
             raise
+        finally:
+            _ACTIVE_CONNECTION.reset(token)
 
 
 async def shutdown_connection_pool() -> None:

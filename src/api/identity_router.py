@@ -28,7 +28,8 @@ from src.identity.models import (
     ResolutionRequest,
     SourceScope,
 )
-from src.identity.service import IdentityService
+from src.identity.policy import CAPABILITY_VERSION, IdentityPolicy
+from src.identity.service import IdentityBatchConflict, IdentityBindingConflict, IdentityService
 
 identity_router = APIRouter(prefix="/identity", tags=["identity"])
 
@@ -54,6 +55,11 @@ def get_identity_service() -> IdentityService:
     return IdentityService()
 
 
+def get_identity_policy() -> IdentityPolicy:
+    """FastAPI dependency — returns a fresh policy snapshot for capability checks."""
+    return IdentityPolicy()
+
+
 # ---------------------------------------------------------------------------
 # Request / response schemas specific to the API layer
 # ---------------------------------------------------------------------------
@@ -64,6 +70,9 @@ class ResolveRequest(BaseModel):
 
     scope_name: str = Field(
         description="Source Scope name, e.g. 'sead://reconciliation' or a provider URI."
+    )
+    run_id: str = Field(
+        description="Stable idempotency key for this batch, scoped to the source scope. Reused across retries."
     )
     submission_name: str = Field(
         description="Human-readable name for this submission batch."
@@ -88,9 +97,71 @@ class AssociateChangeRequestBody(BaseModel):
     change_request_name: str = Field(description="Sqitch change name to associate with this Binding Set.")
 
 
+class EntityCapabilityResponse(BaseModel):
+    """Published capability for one configured entity type."""
+
+    entity_type: str
+    entity_subtype: str
+    bind_existing: bool
+    allocate_new: bool
+    auto_confirm: bool
+    accept_uuid: bool
+
+
+class CapabilitiesResponse(BaseModel):
+    """Response body for GET /identity/capabilities."""
+
+    version: str
+    entities: list[EntityCapabilityResponse]
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
+
+def _require_supported_operation(policy: IdentityPolicy, request: ResolutionRequest) -> None:
+    """Raise HTTP 422 when *request* targets an unconfigured or unsupported operation."""
+    operation = "bind_existing" if request.approved_aggregate_id is not None else "allocate_new"
+    if request.entity_type not in policy.known_entity_types():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Entity type '{request.entity_type}' is not configured in SIMS",
+        )
+    if not policy.supports(request.entity_type, operation):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Operation '{operation}' is not supported for entity type '{request.entity_type}'",
+        )
+
+
+@identity_router.get(
+    "/capabilities",
+    response_model=CapabilitiesResponse,
+    summary="List configured SIMS identity capabilities",
+)
+async def get_capabilities(
+    policy: IdentityPolicy = Depends(get_identity_policy),
+) -> CapabilitiesResponse:
+    """Return the supported identity operations for each configured entity type.
+
+    Capability support is derived from validated entity configuration. Unlisted
+    entity types have no capabilities and are rejected by the resolve endpoint.
+    """
+    return CapabilitiesResponse(
+        version=CAPABILITY_VERSION,
+        entities=[
+            EntityCapabilityResponse(
+                entity_type=cap.entity_type,
+                entity_subtype=cap.entity_subtype,
+                bind_existing=cap.bind_existing,
+                allocate_new=cap.allocate_new,
+                auto_confirm=cap.auto_confirm,
+                accept_uuid=cap.accept_uuid,
+            )
+            for cap in policy.get_capabilities()
+        ],
+    )
 
 
 @identity_router.post(
@@ -98,57 +169,54 @@ class AssociateChangeRequestBody(BaseModel):
     response_model=ResolveResponse,
     status_code=status.HTTP_200_OK,
     summary="Resolve and bind a batch of source identities",
+    responses={
+        status.HTTP_409_CONFLICT: {
+            "description": (
+                "Approved aggregate ID conflicts, a proposed binding is unresolved, "
+                "or the run key was reused with a different payload"
+            )
+        }
+    },
 )
 async def resolve(
     body: ResolveRequest,
     _config: ConfigLike = Depends(get_config_dep),
     service: IdentityService = Depends(get_identity_service),
+    policy: IdentityPolicy = Depends(get_identity_policy),
 ) -> ResolveResponse:
-    """Resolve and immediately bind a batch of domain entities.
+    """Resolve and bind a batch of domain entities atomically.
 
-    Steps performed atomically from the caller's perspective:
-    1. Upsert the Source Scope (creates it if unknown).
-    2. Create a Submission within that scope.
-    3. For each resolution request: upsert Source Identity, check for existing Binding.
-    4. Bind all outcomes into a single Binding Set.
-       - Provider-owned entities: auto-confirm.
-       - Shared metadata entities: set is left in ``proposed`` state.
+    The run key ``(scope_name, run_id)`` makes the batch idempotent:
+    1. Reject unconfigured entity types and unsupported operations.
+    2. Replay the stored result when the same run key and payload fingerprint recur.
+    3. Reject a reused run key whose payload differs.
+    4. Otherwise resolve and bind the batch in one transaction and persist the result.
 
-    Idempotent: submitting the same entities within the same scope always produces
-    the same Source Identity records and, if already bound, the same Tracked Identity
-    UUIDs (FR-12, FR-13).
+    Idempotent: submitting the same entities within the same scope and run always
+    produces the same Source Identity records and, if already bound, the same
+    Tracked Identity UUIDs (FR-12, FR-13).
     """
-    scope = await service.get_or_create_scope(
-        body.scope_name,
-        created_by=body.created_by,
-    )
-    submission = await service.create_submission(
-        scope_uuid=scope.scope_uuid,
-        submission_name=body.submission_name,
-        created_by=body.created_by,
-    )
-
-    outcomes: list[ResolutionOutcome] = []
     for req in body.requests:
-        outcome = await service.resolve_identity(
-            scope_uuid=scope.scope_uuid,
-            request=req,
-            submission_uuid=submission.submission_uuid,
+        _require_supported_operation(policy, req)
+
+    try:
+        result = await service.resolve_batch(
+            scope_name=body.scope_name,
+            submission_name=body.submission_name,
+            run_id=body.run_id,
+            requests=body.requests,
             created_by=body.created_by,
         )
-        outcomes.append(outcome)
-
-    binding_set = await service.bind(
-        submission_uuid=submission.submission_uuid,
-        outcomes=outcomes,
-        created_by=body.created_by,
-    )
+    except IdentityBatchConflict as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except IdentityBindingConflict as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     return ResolveResponse(
-        submission_uuid=submission.submission_uuid,
-        scope_uuid=scope.scope_uuid,
-        binding_set=binding_set,
-        outcomes=outcomes,
+        submission_uuid=result.submission_uuid,
+        scope_uuid=result.scope_uuid,
+        binding_set=result.binding_set,
+        outcomes=result.outcomes,
     )
 
 

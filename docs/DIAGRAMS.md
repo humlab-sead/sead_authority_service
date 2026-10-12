@@ -1,6 +1,6 @@
 # SEAD Authority Service - System Diagrams
 
-Diagrams describing the system's context, component structure, runtime flows, and state machines.
+Diagrams describing the system's context, component structure, and runtime flows. SIMS-specific sequence diagrams and state machines live in [SIMS/DIAGRAMS.md](SIMS/DIAGRAMS.md).
 
 ---
 
@@ -198,147 +198,7 @@ flowchart LR
 
 ---
 
-## 5. Identity Resolution Flow
-
-How the SIMS identity module resolves a batch of source identities into stable UUIDs.
-
-```mermaid
-flowchart LR
-    C([Submission Tool]) -->|POST /identity/resolve\nResolutionRequest| IR[Identity Router]
-
-    IR --> SVC[Identity Service]
-
-    SVC --> SCOPE[get_or_create_scope\nsource_system]
-    SCOPE --> SUB[create_submission]
-
-    SUB --> LOOP[for each source identity]
-
-    LOOP --> POL[policy.get_entity_policy\nentity_type]
-    POL --> LOOKUP{Existing binding\nfound?}
-
-    LOOKUP -->|yes| REUSE[Reuse tracked UUID]
-    LOOKUP -->|no| METHOD{Binding method}
-
-    METHOD -->|business key| MATCH[Reconcile via Authority Service]
-    METHOD -->|allocate| ALLOC[Allocate new UUID]
-    METHOD -->|manual| PENDING[Mark pending manual review]
-
-    REUSE --> BIND[Bind source ID → UUID]
-    MATCH --> BIND
-    ALLOC --> BIND
-    PENDING --> BIND
-
-    BIND --> POL2{Auto-confirm\npolicy?}
-
-    POL2 -->|yes| CONF[BindingSet: CONFIRMED]
-    POL2 -->|no| PROP[BindingSet: PROPOSED]
-
-    CONF --> C
-    PROP --> C
-
-    classDef io fill:#f5f5f5,stroke:#aaaaaa,color:#333333;
-    classDef svc fill:#e8f4fd,stroke:#4a90d9,color:#1a3a5c;
-    classDef decision fill:#fff7d6,stroke:#d6a300,color:#2b2b2b;
-    classDef action fill:#dff7e8,stroke:#2e9f5b,color:#1d3a29;
-    classDef state fill:#fdf3e8,stroke:#d48a2a,color:#4a2800;
-
-    class C io;
-    class IR,SVC svc;
-    class LOOKUP,METHOD,POL2 decision;
-    class SCOPE,SUB,LOOP,POL,REUSE,MATCH,ALLOC,PENDING,BIND action;
-    class CONF,PROP state;
-```
-
----
-
-## 6. Binding Set State Machine
-
-Lifecycle states of a SIMS `BindingSet` from creation to final outcome.
-
-```mermaid
-stateDiagram-v2
-    direction LR
-
-    [*] --> Proposed : Resolve request\n(manual review required)
-    [*] --> Confirmed : Resolve request\n(auto-confirm policy)
-
-    Proposed --> Confirmed : POST /binding-sets/{uuid}/confirm
-    Proposed --> Rejected : Operator rejects
-    Proposed --> Superseded : Newer binding set\nreplaces this one
-
-    Confirmed --> Invalidated : Source data\nwithdrawn
-
-    Rejected --> [*]
-    Superseded --> [*]
-    Invalidated --> [*]
-
-    note right of Proposed
-        Awaiting operator review.
-        UUID allocated; not yet
-        safe for downstream use.
-    end note
-
-    note right of Confirmed
-        UUID stable and safe
-        for downstream ingestion.
-    end note
-
-    classDef proposed fill:#fff7d6,stroke:#d6a300,color:#2b2b2b;
-    classDef confirmed fill:#dff7e8,stroke:#2e9f5b,color:#1d3a29;
-    classDef rejected fill:#ffe0e0,stroke:#d64545,color:#4a1f1f;
-    classDef terminal fill:#eeeeee,stroke:#888888,color:#333333;
-
-    class Proposed proposed;
-    class Confirmed confirmed;
-    class Rejected,Superseded,Invalidated terminal;
-```
-
----
-
-## 7. Tracked Identity State Machine
-
-Lifecycle states of a `TrackedIdentity` (a stable UUID allocated to a SEAD entity).
-
-```mermaid
-stateDiagram-v2
-    direction LR
-
-    [*] --> Allocated : UUID allocated\non first resolution
-
-    Allocated --> PendingMaterialization : Binding confirmed;\nawaiting Clearinghouse ingestion
-
-    PendingMaterialization --> Materialized : Clearinghouse\ncommit confirmed
-
-    Materialized --> Invalidated : Source data\nwithdrawn or superseded
-
-    Allocated --> Invalidated : Allocation voided\nbefore materialization
-
-    Invalidated --> [*]
-
-    note right of Allocated
-        UUID exists; not yet
-        written to SEAD.
-    end note
-
-    note right of Materialized
-        UUID is live in the
-        SEAD Clearinghouse.
-    end note
-
-    classDef allocated fill:#fff7d6,stroke:#d6a300,color:#2b2b2b;
-    classDef pending fill:#e8f4fd,stroke:#4a90d9,color:#1a3a5c;
-    classDef materialized fill:#dff7e8,stroke:#2e9f5b,color:#1d3a29;
-    classDef invalidated fill:#eeeeee,stroke:#888888,color:#333333;
-
-    class Allocated allocated;
-    class PendingMaterialization pending;
-    class Materialized materialized;
-    class Invalidated invalidated;
-```
-
----
-
-## 8. Configuration and Initialization Sequence
+## 5. Configuration and Initialization Sequence
 
 Order of initialization at service startup.
 
@@ -372,4 +232,5 @@ flowchart TB
 
 - [DESIGN.md](DESIGN.md) — architecture rationale, component responsibilities, design decisions, and known constraints
 - [DEVELOPMENT.md](DEVELOPMENT.md) — contributor workflow and development commands
-- [SIMS documentation](SIMS/) — identity module requirements, design views, and entity tracking policy
+- [SIMS documentation](SIMS/) — identity module requirements, design, and entity tracking policy
+- [SIMS/DIAGRAMS.md](SIMS/DIAGRAMS.md) — SIMS sequence diagrams and state machines

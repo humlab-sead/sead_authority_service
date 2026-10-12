@@ -102,7 +102,7 @@ All repositories use `get_connection()` — the singleton connection pool — an
 
 - **`ConfigValue`**: lazy resolver supporting colon-separated paths (`options:database:host`) and comma-separated fallback paths (`llm.ollama.model,llm.model`). All config lookups use `ConfigValue`.
 - **Connection singleton**: created once at startup in `setup.py` and stored in runtime config. Retrieved via `get_connection()`. Never instantiate connections directly.
-- **Config files**: `config.yml` (base), `entities.yml` (entity schemas, included via `@include`), `prompts.yml` (LLM prompt templates), `identity_policy.yml` (SIMS per-entity policy).
+- **Config files**: `config.yml` (base), `entities.yml` (entity schemas, included via `@include`), `prompts.yml` (LLM prompt templates), `identity_policy.yml` (current legacy SIMS policy; the target design uses generic allocation driven by validated SIMS configuration).
 - **Environment variables**: `${VAR_NAME}` placeholders in YAML are substituted from `.env` at startup.
 
 ### LLM Integration (`src/llm/`)
@@ -111,15 +111,15 @@ Provider abstraction over OpenAI, Anthropic, and Ollama. Active provider is sele
 
 ### Identity Module (`src/identity/`)
 
-Fully implemented SEAD Identity Management System (SIMS). Manages stable UUID allocation and binding lifecycle for incoming SEAD data submissions.
+SIMS is the identity service within the Authority Service. The current implementation manages identity resolution and Binding lifecycles using a legacy per-entity policy. The target contract requires generic allocation driven by validated SIMS configuration; see [SIMS documentation](./SIMS/).
 
 - **`models.py`**: Pydantic domain types — `SourceScope`, `Submission`, `SourceIdentity`, `TrackedIdentity`, `BindingSet`, `Binding`, `ResolutionOutcome`, `ChangeDetectionResult`
-- **`policy.py`**: `IdentityPolicy` loads `config/identity_policy.yml` and drives resolve/allocate/auto-confirm behaviour per entity type
+- **`policy.py`**: `IdentityPolicy` loads the current legacy `config/identity_policy.yml`; it does not define the target generic configuration contract
 - **`repository.py`**: async repositories for all six identity tables
 - **`service.py`**: `IdentityService` orchestrates the full resolution and binding lifecycle
 - **`types.py`**: `StrEnum` types for identity state, binding method, and change outcomes
 
-Per-entity identity tracking values (defined in `sead_superset_model.yml` in the Shape Shifter repo): `tracked` (UUID + PK, aggregate roots), `reconciled` (matched by business key), `derived` (composed from FK references), `child` (inherits parent identity).
+Shape Shifter's `sead_superset_model.yml` defines its target-model identity intent (`tracked`, `reconciled`, `derived`, `child`). SIMS does not consume these values as capabilities or use them to select entity-specific allocator code.
 
 ### Schema Generation (`src/scripts/`, `schema/`)
 
@@ -245,6 +245,5 @@ Loguru throughout. All modules use `from loguru import logger`. No `print()` for
 - [DEVELOPMENT.md](DEVELOPMENT.md) — local setup, contributor workflow, and common commands
 - [TESTING.md](TESTING.md) — test strategy, levels, and repository-specific testing guidance
 - [OPERATIONS.md](OPERATIONS.md) — environments, deployment, CI/CD, rollback, and observability
-- [SIMS documentation](SIMS/) — REQUIREMENTS, DESIGN_VIEW, IMPLEMENTATION_VIEW, ASSESSMENT, TRACKED_ENTITIES
+- [SIMS documentation](SIMS/) — REQUIREMENTS, CONCEPTUAL_MODEL, DESIGN, DIAGRAMS, OPERATIONS, TRACKED_ENTITIES
 - API reference: `http://localhost:8000/docs` (Swagger) or `/redoc` when running locally
-

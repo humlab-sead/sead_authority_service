@@ -1,7 +1,11 @@
 SHELL := /bin/bash
 
+-include .env
+export
+
 UVICORN_PORT := 8000
 PODMAN_DEPLOYMENT_DIR := deployment/container
+
 
 test-workflow:
 	@./scripts/test-ci.sh
@@ -122,6 +126,67 @@ test-coverage:
 dead-code:
 	@uv run vulture src tests main.py
 
+
+################################################################################
+# AI Coding Assistants recipes
+# Candidates: rtk, graphify, serena, snip, headroom
+################################################################################
+
+.PHONY: rtk rtk-setup rtk-status
+
+rtk: rtk-status
+
+rtk-setup:
+	@command -v rtk >/dev/null 2>&1 || { \
+		echo "RTK is not installed."; \
+		echo "Install with: brew install rtk-ai/tap/rtk"; \
+		exit 1; \
+	}
+	@rtk init --copilot
+	@rtk init --codex
+	@echo "✓ RTK project integrations installed"
+
+rtk-status:
+	@rtk --version
+	@rtk gain
+
+.PHONY: \
+	graphify \
+	graphify-setup \
+	graphify-create \
+	graphify-update \
+	graphify-skills \
+	graphify-cluster
+
+# Update the existing knowledge graph.
+graphify: graphify-update
+
+# One-time project setup for new developers.
+graphify-setup: graphify-skills
+	@echo "✓ Graphify setup complete"
+
+# Create/recreate the knowledge graph.
+graphify-create:
+	@echo "Creating Graphify knowledge graph..."
+	@uv run graphify extract . --project --backend openai --wiki --force
+
+# Update the existing knowledge graph.
+graphify-update:
+	@echo "Updating Graphify knowledge graph..."
+	@uv run graphify update .
+	@echo "✓ Graphify graph updated"
+
+# Install project-local agent integrations.
+graphify-skills:
+	@echo "Installing Graphify agent integrations..."
+	@uv run graphify install --project
+	@uv run graphify install --project --platform copilot
+	@uv run graphify install --project --platform codex
+	@echo "✓ Graphify agent integrations installed"
+
+graphify-cluster:
+	@uv run graphify cluster-only .
+	@uv run graphify export callflow-html
 ################################################################################
 # Git related checks
 ################################################################################
