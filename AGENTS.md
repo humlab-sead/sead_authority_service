@@ -217,7 +217,7 @@ test(loaders): add comprehensive UCanAccessSqlLoader tests
 - [docs/SIMS/](docs/SIMS/) - SIMS design documentation
 - [Makefile](Makefile) - All developer commands
 
-## Docker Deployment
+## Podman Deployment
 
 Multi-environment support:
 - **Development**: `cd docker && docker-compose up --build`

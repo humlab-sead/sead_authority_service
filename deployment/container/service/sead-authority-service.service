@@ -1,0 +1,28 @@
+[Unit]
+Description=SEAD Authority Service Podman Container Service
+Documentation=https://github.com/humlab-sead/sead_authority_service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+# Start the container through the same compose project an operator uses, so a
+# systemd start and a manual "make up" run the same definition from the same
+# deployment directory.
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=%h/container
+
+ExecStart=/usr/bin/podman-compose -f %h/container/podman-compose.yml up -d
+ExecStop=/usr/bin/podman-compose -f %h/container/podman-compose.yml down
+
+# Retry the compose invocation if it fails; the container restart policy is set
+# by podman-compose.yml (restart: always).
+Restart=on-failure
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sead-authority-service
+
+[Install]
+WantedBy=default.target

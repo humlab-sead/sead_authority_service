@@ -60,7 +60,6 @@
         "logs/**",
         "bin/**",
         "docs/**",
-        "docker/**",
         "data/**",
         "schema/**",
         "sead-tools/**",
