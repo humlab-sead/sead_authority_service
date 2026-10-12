@@ -1,0 +1,113 @@
+# Podman Containerfile for the SEAD Authority Service
+#
+# Rootless Podman image definition. The image source is the
+# selected GitHub ref, matching the contract documented by the build helper
+# (scripts/build.sh) and deployment/container/README.md: the source is cloned during the
+# build and is never replaced by files from the local build context.
+#
+# Build (rootless, from this directory):
+#   podman build -f Containerfile --format docker \
+#     --build-arg GIT_REF=main \
+#     --build-arg USER_UID=$(id -u) --build-arg USER_GID=$(id -g) \
+#     -t ghcr.io/humlab-sead/sead_authority_service:staging .
+#
+# --format docker keeps the HEALTHCHECK instruction, which Podman drops from
+# the default OCI image format.
+#
+# The build context only needs this file; no repository files are copied from
+# the context. Prefer scripts/build.sh, which derives the image tag from the
+# selected ref and target environment.
+#
+# USER_UID/USER_GID must match the rootless deployment user so that
+# "userns_mode: keep-id" in podman-compose.yml lets the container user write
+# to the bind-mounted logs directory.
+
+# Stage 1: Builder — clone the selected ref and install the application.
+FROM python:3.13-slim AS builder
+
+ARG GIT_REPO=https://github.com/humlab-sead/sead_authority_service.git
+ARG GIT_REF=main
+ARG GIT_COMMIT=
+
+WORKDIR /build
+
+# System dependencies needed to build the Python packages.
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# The selected GitHub ref or commit is the only image source. Nothing is copied
+# from the build context, so a local worktree can never overlay that source.
+RUN if [ -n "${GIT_COMMIT}" ]; then \
+        echo "Building from GitHub: ${GIT_REPO}@${GIT_COMMIT} (ref ${GIT_REF})" && \
+        git init -q . && \
+        git remote add origin "${GIT_REPO}" && \
+        git fetch --depth 1 origin "${GIT_COMMIT}" && \
+        git checkout --detach FETCH_HEAD && \
+        test "$(git rev-parse HEAD)" = "${GIT_COMMIT}"; \
+    else \
+        echo "Building from GitHub: ${GIT_REPO}@${GIT_REF}" && \
+        git clone --depth 1 --branch "${GIT_REF}" "${GIT_REPO}" .; \
+    fi && \
+    rm -rf .git
+
+# Install dependencies and the application (non-editable install).
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir .
+
+# Stage 2: Runtime
+FROM python:3.13-slim
+
+# Build arguments for runtime configuration. The deployment user's UID/GID are
+# passed at build time for rootless keep-id mounts.
+ARG APP_PORT=8000
+ARG USER_UID=1000
+ARG USER_GID=1000
+ARG GIT_COMMIT=
+
+LABEL org.opencontainers.image.revision=${GIT_COMMIT}
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    APP_HOME=/app \
+    APP_PORT=${APP_PORT}
+
+# Create the app user for security. Reuse an existing group when the GID is
+# already taken (for example www-data with GID 33).
+RUN GROUP_NAME=$(getent group ${USER_GID} | cut -d: -f1) && \
+    if [ -z "$GROUP_NAME" ]; then \
+        groupadd --gid ${USER_GID} appuser; \
+        GROUP_NAME=appuser; \
+    fi && \
+    useradd --uid ${USER_UID} -g ${GROUP_NAME} --home-dir=/app --shell=/bin/bash appuser
+
+# Runtime dependencies only.
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR ${APP_HOME}
+
+# Copy installed packages and the application code from the builder.
+COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /build/src ./src
+COPY --from=builder /build/main.py ./
+
+# Directories for mounted logs and local data, owned by the app user.
+RUN mkdir -p logs data && \
+    chown -R ${USER_UID}:${USER_GID} ${APP_HOME}
+
+# Run as the non-root deployment user.
+USER appuser
+
+EXPOSE ${APP_PORT}
+
+# Health check against the /is_alive endpoint.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${APP_PORT}/is_alive || exit 1
+
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${APP_PORT}"]

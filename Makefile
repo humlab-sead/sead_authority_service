@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
 UVICORN_PORT := 8000
-SEAD_TOOLS_DIR := /home/sead/sead-tools/sead_authority_service
+PODMAN_DEPLOYMENT_DIR := deployment/container
 
 test-workflow:
 	@./scripts/test-ci.sh
@@ -25,19 +25,18 @@ generate-schema-force:
 	@echo "✅ Schema regeneration complete!"
 	
 
-.PHONY: dev-deploy-to-sead-tools
-dev-deploy-to-sead-tools:
-	@echo "Deploying docker image using local build..." \
-	 && ./docker/build.sh \
-	 && pushd $(SEAD_TOOLS_DIR) \
-	 && sudo docker compose up -d \
-	 && popd \
-	 && docker logs `docker ps -q --filter "publish=$(UVICORN_PORT)"` --follow
-	@echo "✅ Development environment deployed!"
+.PHONY: podman-build podman-up podman-down podman-logs
+podman-build:
+	@$(MAKE) -C $(PODMAN_DEPLOYMENT_DIR) build
 
-.PHONY: logs-supersead
-logs-supersead:
-	@docker logs `docker ps -q --filter "publish=$(UVICORN_PORT)"` --follow
+podman-up:
+	@$(MAKE) -C $(PODMAN_DEPLOYMENT_DIR) up
+
+podman-down:
+	@$(MAKE) -C $(PODMAN_DEPLOYMENT_DIR) down
+
+podman-logs:
+	@$(MAKE) -C $(PODMAN_DEPLOYMENT_DIR) logs
 
 
 .PHONY: dev-serve

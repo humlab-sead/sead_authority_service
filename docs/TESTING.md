@@ -125,13 +125,19 @@ Before opening a pull request:
 
 ## CI Test Execution
 
-The `docker-build.yml` workflow runs on every push to `main` and on manual dispatch. It gates the Docker build behind a test step:
+The `.github/workflows/docker-build.yml` workflow is disabled: both its test
+and image-publication jobs have `if: false`. Its dormant build job is configured
+to use the Podman build helper, but it currently runs no tests and publishes no
+image. Its existing filename is retained for compatibility.
+
+If the workflow is explicitly re-enabled, it will run the test and lint job
+before building and publishing the selected Podman image to GHCR:
 
 ```
 Run tests (uv run pytest --verbose)
 Run linter (uv run ruff check src/ tests/)
   ↓ (only if both pass)
-Build and push Docker image to GHCR
+Build and push Podman image to GHCR
 ```
 
 Integration tests are excluded from CI automatically (via `norecursedirs` in `pyproject.toml`). Only the standard unit test suite runs in CI.

@@ -1,10 +1,14 @@
 # Quick Optimization Guide
 
+> Archived: this guide describes the former Docker build process. Use the
+> [current Podman deployment guide](../../deployment/container/README.md) for
+> image build and deployment instructions.
+
 ## TL;DR - What to Do Now
 
 ### 🚀 Quick Wins (15 minutes to implement)
 
-Apply these changes to your current `docker/Dockerfile`:
+Apply these changes to your current `Dockerfile`:
 
 ```dockerfile
 # BEFORE (Current)
@@ -90,24 +94,19 @@ Update `.github/workflows/docker-build.yml`:
 
 ```bash
 # Backup current Dockerfile
-cp docker/Dockerfile docker/Dockerfile.backup
+cp Dockerfile Dockerfile.backup
 
-# Edit docker/Dockerfile
-nano docker/Dockerfile
+# Edit Dockerfile
+nano Dockerfile
 ```
 
 Apply the changes from "Quick Wins" section above.
 
-### Step 2: Test Locally (5 minutes)
+### Step 2: Build and Test
 
-```bash
-cd docker
-./build.sh --tag test-optimized
-
-# Compare build times
-time docker build -f Dockerfile.backup -t test-old .
-time docker build -f Dockerfile -t test-new .
-```
+Use the current Podman deployment guide for image build and deployment steps.
+The former manual helper and Docker build instructions in this archive are
+no longer available.
 
 ### Step 3: Update Workflow (5 minutes)
 
@@ -121,7 +120,7 @@ Apply changes from "Medium Wins" section above.
 ### Step 4: Commit and Test (5 minutes)
 
 ```bash
-git add docker/Dockerfile .github/workflows/docker-build.yml
+git add Dockerfile .github/workflows/docker-build.yml
 git commit -m "perf(ci): optimize Docker builds for faster iteration
 
 - Separate dependency layer from code layer
@@ -141,13 +140,13 @@ We've created fully optimized versions you can use:
 
 ```bash
 # Option 1: Replace current Dockerfile
-cp docker/Dockerfile.optimized docker/Dockerfile
+cp Dockerfile.optimized Dockerfile
 
 # Option 2: Replace current workflow
 cp .github/workflows/docker-build.optimized.yml .github/workflows/docker-build.yml
 
 # Commit
-git add docker/Dockerfile .github/workflows/docker-build.yml
+git add Dockerfile .github/workflows/docker-build.yml
 git commit -m "perf(ci): implement all build optimizations"
 git push origin dev
 ```
