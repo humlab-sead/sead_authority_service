@@ -121,3 +121,18 @@ test-coverage:
 .PHONY: dead-code
 dead-code:
 	@uv run vulture src tests main.py
+
+################################################################################
+# Git related checks
+################################################################################
+
+.PHONY: branches-ahead
+branches-ahead:
+	@git for-each-ref --format='%(refname:short)' refs/heads | \
+	while IFS= read -r branch; do \
+		ahead=$$(git rev-list --count "dev..$$branch"); \
+		if [ "$$ahead" -gt 0 ]; then \
+			printf '%5s  %s\n' "$$ahead" "$$branch"; \
+		fi; \
+	done
+	@echo "✓ Branches ahead of dev listed above"
