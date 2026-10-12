@@ -36,6 +36,7 @@ async def setup_identity_config():
       SEAD_AUTHORITY_OPTIONS_DATABASE_PASSWORD → DB password
     """
     if not _RUN_INTEGRATION:
+        yield
         return
 
     database_host = os.environ.get("SEAD_AUTHORITY_OPTIONS_DATABASE_HOST")
