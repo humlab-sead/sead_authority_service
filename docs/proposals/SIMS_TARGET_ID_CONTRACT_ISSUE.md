@@ -8,7 +8,7 @@ Suggested body:
 
 ## Problem
 
-Shape Shifter's `sead_change_request` Delivery 1 flow can resolve and confirm SIMS Binding Sets, but it still cannot materialize new provider-owned rows into SQL because `POST /identity/resolve` does not return the target-facing SEAD integer ID needed in emitted PK/FK columns.
+Shape Shifter's `sead_change_request` MVP Delivery flow can resolve and confirm SIMS Binding Sets, but it still cannot materialize new provider-owned rows into SQL because `POST /identity/resolve` does not return the target-facing SEAD integer ID needed in emitted PK/FK columns.
 
 Current downstream behavior is explicit: when SIMS returns Binding Set metadata without a target-facing integer ID, Shape Shifter stops before SQL generation with `SIMS target ID allocation capability incomplete`.
 
@@ -53,4 +53,4 @@ Suggested acceptance criteria:
 - `POST /identity/resolve` may return `target_id` on each `ResolutionOutcome`
 - the field is documented as the target-facing SEAD integer ID
 - existing clients remain compatible if they ignore the field
-- Shape Shifter receives non-null `target_id` values for Delivery 1 allocatable entity types
+- Shape Shifter receives non-null `target_id` values for the MVP Delivery allocatable entity types

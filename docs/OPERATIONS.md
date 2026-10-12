@@ -1,265 +1,168 @@
 # SEAD Authority Service - Operations Guide
 
-Runbook for operators and maintainers of deployed SEAD Authority Service environments.
+Runbook for operators and maintainers of deployed SEAD Authority Service environments. The supported container deployment uses rootless Podman and the bundle in [deployment/container/README.md](../deployment/container/README.md).
 
 ---
 
 ## Environments
 
-| Environment | Purpose | Branch | Port |
-|-------------|---------|--------|------|
-| Production | Live service on `sead-tools` | `main` | 8000 |
-| Staging | Pre-release validation | `dev` or feature | 8000 |
-| Development | Local developer instances | any | 8000 |
+| Environment | Purpose                | Typical image tag                                  |
+|-------------|------------------------|----------------------------------------------------|
+| Production  | Live service           | `latest`, a version tag, or an approved pinned tag |
+| Staging     | Pre-release validation | `staging`                                          |
+| Development | Development deployment | `dev`                                              |
 
-Production and staging run on `humlabseadserv.srv.its.umu.se`. The canonical deploy directory is `docker/production/` (or `docker/staging/`).
+Set the environment, source ref, and image tag in the deployment user's `~/container/.env`. When running more than one environment on the same host, use a separate deployment account and a distinct host port for each environment. The default host port is `8024`; the application listens on port `8000` inside the container.
 
 ---
 
 ## Operational Assumptions and Invariants
 
-- **Stateless per request.** There is no in-process cache or session store. Multiple Uvicorn workers may be used.
-- **Non-root container user.** The container runs as a non-root user. Host volume mounts must be writable by that user.
-- **No built-in TLS.** TLS termination is expected upstream (reverse proxy). The container exposes plain HTTP on port 8000.
-- **SIMS co-located.** The identity module (`src/identity/`) runs inside this service; there is no separate SIMS deployment.
-- **PostgreSQL extensions required.** `pg_trgm` must be available. `pgvector` and PostGIS are needed for semantic search and geographic proximity features respectively; without them those strategy features are unavailable.
-- **LLM provider required for RAG strategies.** Strategies that use LLM validation fail at runtime without a configured and reachable provider.
+- Run the service as a dedicated Linux deployment user with rootless Podman. Do not run the deployment commands as root.
+- The container uses `userns_mode: "keep-id"`. Set `SEAD_AUTHORITY_CONTAINER_UID` and `SEAD_AUTHORITY_CONTAINER_GID` to the deployment account's numeric UID and GID so it can read private config files and write logs.
+- The service exposes plain HTTP. Terminate TLS at NGINX or another trusted reverse proxy.
+- The identity module runs inside this service; it does not need a separate deployment.
+- PostgreSQL must provide the extensions required by the enabled service features. LLM-backed strategies also need a configured, reachable provider when enabled.
 
 ---
 
 ## Configuration and Secrets
 
-### Runtime environment variables
+The Compose service reads runtime variables from `~/container/.env`. `make setup` creates this file with mode `0600` if it does not exist. Store database credentials, provider keys, and other secrets in that ignored file, or populate it from the approved host secret store. Do not commit secrets or include unredacted `make config` output in tickets or logs.
 
-All runtime settings are loaded from `.env` (or `.env.staging`) via `env_file` in `docker-compose.yml`.
+| Variable                                                        | Purpose                                                                  |
+|-----------------------------------------------------------------|--------------------------------------------------------------------------|
+| `CONFIG_FILE`                                                   | Config file path inside the container; normally `/app/config/config.yml` |
+| `SEAD_AUTHORITY_ENVIRONMENT`                                    | Deployment environment (`dev`, `staging`, or `production`)               |
+| `SEAD_AUTHORITY_GIT_REF` / `SEAD_AUTHORITY_GIT_COMMIT`          | Source ref or optional pinned commit used to build the image             |
+| `SEAD_AUTHORITY_IMAGE_TAG`                                      | GHCR image tag pulled and run by this deployment                         |
+| `SEAD_AUTHORITY_PORT`                                           | Host port mapped to container port `8000` (default `8024`)               |
+| `SEAD_AUTHORITY_CONTAINER_UID` / `SEAD_AUTHORITY_CONTAINER_GID` | Deployment account IDs used by the container process                     |
+| `SEAD_AUTHORITY_OPTIONS_DATABASE_*`                             | PostgreSQL database name, host, port, user, and password                 |
+| `LLM_PROVIDER`, `OPENAI_*`, `ANTHROPIC_*`, `OLLAMA_*`           | LLM provider selection and settings                                      |
+| `GEONAMES_USERNAME`                                             | GeoNames service account, when used                                      |
 
-| Variable | Purpose |
-|----------|---------|
-| `CONFIG_FILE` | Path to mounted config file (default `/app/config/config.yml`) |
-| `SEAD_AUTHORITY_ENVIRONMENT` | Environment name (`staging`, `production`) |
-| `SEAD_AUTHORITY_OPTIONS_DATABASE_HOST` | PostgreSQL host |
-| `SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME` | Database name |
-| `SEAD_AUTHORITY_OPTIONS_DATABASE_USER` | Database user |
-| `SEAD_AUTHORITY_OPTIONS_DATABASE_PORT` | PostgreSQL port |
-| `LLM_PROVIDER` | Active LLM provider (`openai`, `anthropic`, `ollama`) |
-| `OPENAI_API_KEY` / `OPENAI_MODEL` | OpenAI credentials and model |
-| `ANTHROPIC_API_KEY` | Anthropic credentials |
-| `OLLAMA_BASE_URL` / `OLLAMA_MODEL` | Ollama endpoint and model |
-| `GEONAMES_USERNAME` | GeoNames API credentials |
-
-Secrets (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, database password) must not be committed to version control. Use `.env` files excluded by `.gitignore`.
-
-### Configuration file
-
-`config/config.yml` is mounted read-only into the container at `/app/config/config.yml`. `entities.yml` and `prompts.yml` are included via `@include` directives in `config.yml` and must be co-located or referenced with correct paths.
+The `config/` directory is mounted read-only at `/app/config/`. `config.yml` includes the entity and prompt configuration files; keep included files together or preserve their configured paths. Compose maps `host.docker.internal` to the host gateway. Use that database hostname when PostgreSQL runs on the deployment host; use the database's normal network hostname when it runs elsewhere.
 
 ---
 
-## Data Layout
+## Runtime Data Layout
 
-Persistent data is mounted from the deploy directory on the host into `/app/` in the container:
+The deployment account owns the runtime at `~/container`:
 
-| Host path | Container path | Contents |
-|-----------|---------------|---------|
-| `./config.yml` | `/app/config/config.yml:ro` | Runtime configuration |
-| `/var/log/sead-authority/` | `/app/logs/` | Application log files |
-| `./data/` | `/app/data/:ro` | Shared reference data |
+| Host path                        | Container path      | Purpose                                              |
+|----------------------------------|---------------------|------------------------------------------------------|
+| `~/container/.env`               | Compose environment | Runtime settings and credentials                     |
+| `~/container/config/`            | `/app/config/:ro`   | Application configuration                            |
+| `~/container/logs/`              | `/app/logs/:rw`     | Application log files                                |
+| `~/container/podman-compose.yml` | Compose definition  | Image, environment, mounts, port, and restart policy |
 
-Create log directories before first startup:
-
-```bash
-sudo mkdir -p /var/log/sead-authority
-```
+The container has no persistent application-data mount. Service data is stored in PostgreSQL. Database backups are managed by the SEAD database operations team.
 
 ---
 
-## Build Artifacts
+## Image Build and Publication
 
-The build produces a single Docker image pushed to GHCR:
+Images use the GHCR repository `ghcr.io/humlab-sead/sead_authority_service:<tag>`. The supported build helper is `deployment/container/scripts/build.sh`; it builds from the selected GitHub ref or commit, not from uncommitted local source. Builds target `linux/amd64`.
 
-```
-ghcr.io/humlab-sead/sead_authority_service:<tag>
-```
-
-The `Dockerfile` is a multi-stage build:
-
-1. **Builder stage**: installs system build dependencies, optionally clones from GitHub (`FROM_GITHUB=true --build-arg GIT_TAG=...`) or uses local context.
-2. **Runtime stage**: Python slim image, non-root user, `uvicorn` entrypoint on port 8000.
-
-Build supports both local source and GitHub clone:
+Run these commands as the deployment user from the repository's `deployment/container/` directory:
 
 ```bash
-# From local source
-docker build -f docker/Dockerfile -t sead-authority-service .
-
-# From a specific GitHub tag
-docker build -f docker/Dockerfile \
-  --build-arg FROM_GITHUB=true \
-  --build-arg GIT_TAG=v1.0.0 \
-  -t sead-authority-service .
+make build  # build the configured tag locally; does not publish
+make push   # build and publish the configured tag to GHCR
+make pull   # pull the configured tag from GHCR
 ```
+
+Authenticate that user's Podman session with `podman login ghcr.io` before publishing or pulling a private package. The helper derives tags from the selected environment and source ref unless `SEAD_AUTHORITY_IMAGE_TAG` or an explicit `--tag` overrides it. For production from `main`, the default derived tag is `latest`; pin a version or approved unique tag when required.
 
 ---
 
-## Deployment Flow
+## Deployment and Updates
 
-Production deployments use the pre-built GHCR image via `docker/production/docker-compose.yml`.
-
-### Initial setup
+Run the lifecycle commands as the deployment user. First stage the bundle and runtime inputs:
 
 ```bash
-# On the deploy host
-cd docker/production
-cp .env.example .env      # fill in credentials
-chmod 600 .env
-sudo mkdir -p /var/log/sead-authority
+cd deployment/container
+make setup
+# Edit ~/container/.env and stage the approved environment config under ~/container/config/.
+chmod 600 ~/container/.env
+make pull
+make config  # Review locally; output can contain credentials.
 ```
 
-### Deploy or update
+Install and enable the user service to keep the container running and start it at host boot:
 
 ```bash
-cd docker/production
-
-# Pull latest image from GHCR
-docker compose pull
-
-# Restart with new image
-docker compose up -d --force-recreate
+make service-install
+make service-enable
+make healthcheck
+make status
 ```
 
-To deploy a specific tag:
+`make service-enable` enables systemd lingering for the deployment user and starts `sead-authority-service.service`. The unit runs the same Compose project from `~/container` as the Makefile.
+
+To deploy a new approved image tag, update `SEAD_AUTHORITY_IMAGE_TAG` in `~/container/.env`, then pull, restart, and verify:
 
 ```bash
-# Edit docker-compose.yml: image: ghcr.io/humlab-sead/sead_authority_service:v1.2.3
-docker compose up -d --force-recreate
-```
-
-### Authenticate with GHCR (if image is private)
-
-```bash
-echo $GITHUB_PAT | docker login ghcr.io -u <github-username> --password-stdin
+make pull
+make restart
+make healthcheck
+make status
 ```
 
 ---
 
-## CI Pipeline
+## CI and Release Process
 
-Defined in `.github/workflows/docker-build.yml`. Triggers on push to `main` and `workflow_dispatch`.
+Image creation and GHCR publication are manual. The GitHub Actions image workflow at `.github/workflows/docker-build.yml` remains disabled: both jobs are guarded by `if: false`. Its existing filename is retained for compatibility; its build job uses the Podman helper and Podman push command, but it does not publish images while disabled.
 
-Steps:
-1. Checkout repository.
-2. Run `uv run pytest` (full test suite) and `uv run ruff check`.
-3. Build multi-architecture Docker image (`linux/amd64`, `linux/arm64`).
-4. Push to GHCR with computed tags.
-5. Generate supply chain attestation.
-
-**The image is only pushed if tests pass.**
-
-| Trigger | Tags applied |
-|---------|-------------|
-| Push to `main` | `latest`, `main`, `main-sha-<commit>` |
-| Push tag `v1.2.3` | `v1.2.3`, `v1.2`, `v1`, `latest` |
-| `workflow_dispatch` | Based on branch |
-| Pull request | Build only, no push |
+The release workflow at `.github/workflows/release.yml` runs semantic-release on pushes to `main` or by manual dispatch. It creates source releases and tags; it does not publish a container image or deploy the service. Build and publish the matching image with the Podman helper, then deploy it using the procedure above.
 
 ---
 
-## CD Triggers and Release Process
+## Post-Deployment Verification and Logs
 
-There is no automated continuous deployment. The release process is:
-
-1. Merge PRs into `dev`, then merge `dev` → `main`.
-2. **`release.yml`** runs `semantic-release` on push to `main`: analyses conventional commits, bumps version, updates `CHANGELOG.md`, creates a GitHub Release, and tags the commit.
-3. **`docker-build.yml`** triggers on the same push, builds the image, and pushes it tagged with the new version.
-4. An operator deploys by pulling the new tag on the deploy host (see Deployment Flow).
-
----
-
-## Post-Deployment Verification
+The host health check calls `/is_alive` on `SEAD_AUTHORITY_PORT` (default `8024`):
 
 ```bash
-# Health check
-curl -sf http://localhost:8000/is_alive
-
-# Check container is running
-docker compose -f docker/production/docker-compose.yml ps
-
-# Tail recent logs
-docker compose -f docker/production/docker-compose.yml logs -f --tail 50
+make healthcheck
+curl -fsS http://localhost:8024/is_alive
+make status
+make logs
 ```
 
-Smoke-check reconciliation:
+A healthy response is `{"status":"alive"}`. Application log files are under `~/container/logs/`; `make logs` follows the container's stdout and stderr. Check the systemd user service with `systemctl --user status sead-authority-service` and its unit messages with `journalctl --user -u sead-authority-service`.
 
-```bash
-curl -s "http://localhost:8000/reconcile?queries=%7B%22q0%22%3A%7B%22query%22%3A%22test%22%7D%7D"
-```
+No alerting service is configured. Review the application logs and health endpoint during deployment and incident response.
 
 ---
 
 ## Rollback
 
-The container is stateless (all config in mounted files and env vars). To roll back:
-
-1. Identify the last known-good image tag (e.g., `v1.1.0` or `main-sha-abc123`).
-2. Update `image:` in `docker-compose.yml` to pin the previous tag.
-3. Restart:
+To return to a known-good image, set `SEAD_AUTHORITY_IMAGE_TAG` in `~/container/.env` to the previous tag, then pull and restart it:
 
 ```bash
-docker compose up -d --force-recreate
+make pull
+make restart
+make healthcheck
 ```
 
-4. Verify with the health check above.
-
----
-
-## Health Checks and Observability
-
-### Health endpoint
-
-```
-GET /is_alive
-```
-
-Returns HTTP 200 when the application is running and the DB connection pool is active.
-
-### Logs
-
-Loguru writes logs to `/app/logs/` (mounted to `/var/log/sead-authority/` on the host). The container also emits logs to stdout (captured by Docker's `json-file` driver with `max-size: 10m`, `max-file: 3`).
-
-```bash
-# Live log stream
-docker compose logs -f
-
-# Host log directory
-tail -f /var/log/sead-authority/sead_authority.log
-```
-
-Log level is controlled by `logging.level` in `config/config.yml`.
-
-### Alerting
-
-TBD — no alerting infrastructure is currently configured.
+If the health check fails, review `make logs` and the systemd user journal before choosing another image. Keep the previous known-good tag available in GHCR until the new deployment is verified.
 
 ---
 
 ## Backup and Recovery
 
-The service holds no application state beyond what is in PostgreSQL and the mounted config files. Database backups are the responsibility of the SEAD database operations team and are outside the scope of this service.
-
-Config file backup:
-
-```bash
-cp docker/production/config.yml /backup/$(date +%Y%m%d)-config.yml
-cp docker/production/.env       /backup/$(date +%Y%m%d)-.env
-```
+The service stores application data in PostgreSQL; the database operations team owns database backup and recovery. Back up the runtime `config/` and `.env` files through the host's approved backup process. The `.env` file contains credentials and must remain protected during backup and restore. Reapply the deployment user's ownership and restrictive permissions before restarting the service.
 
 ---
 
 ## References
 
-- [docker/README.md](../docker/README.md) — Docker setup, volume layout, and compose files
-- [docker/QUICKSTART.md](../docker/QUICKSTART.md) — Quick start for first-time deployment
-- [.github/workflows/docker-build.yml](../.github/workflows/docker-build.yml) — CI build and push workflow
-- [.github/workflows/release.yml](../.github/workflows/release.yml) — Semantic release workflow
-- [docs/DEVELOPMENT.md](DEVELOPMENT.md) — Local development setup and contributor workflow
-- [docs/DESIGN.md](DESIGN.md) — Architecture and system constraints
+- [deployment/container/README.md](../deployment/container/README.md) — Podman setup, image build, lifecycle, and systemd user service
+- [deployment/container/Makefile](../deployment/container/Makefile) — supported deployment commands
+- [deployment/container/podman-compose.yml](../deployment/container/podman-compose.yml) — runtime image, mounts, port, and host-gateway mapping
+- [deployment/container/service/sead-authority-service.service](../deployment/container/service/sead-authority-service.service) — systemd user unit
+- [deployment/container/scripts/build.sh](../deployment/container/scripts/build.sh) — manual image build and publication
+- [.github/workflows/docker-build.yml](../.github/workflows/docker-build.yml) — disabled Podman image workflow
+- [.github/workflows/release.yml](../.github/workflows/release.yml) — source release workflow

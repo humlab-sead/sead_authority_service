@@ -6,7 +6,7 @@ This folder contains proposal and handoff material for changes that belong in `s
 
 Current focus:
 
-- return target-facing SEAD integer IDs from `POST /identity/resolve` so downstream Shape Shifter change-request generation can complete Delivery 1 PK/FK materialization
+- return target-facing SEAD integer IDs from `POST /identity/resolve` so downstream Shape Shifter change-request generation can complete the MVP Delivery PK/FK materialization
 
 ## Documents
 

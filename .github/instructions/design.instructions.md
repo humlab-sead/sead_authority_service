@@ -53,7 +53,7 @@ Target 1000–2200 words. Stay under 3000. Move detailed subsystem material into
 - `src/identity/` — SIMS identity management subsystem
 - `schemas/` — SEAD Authority Service database schema (generation scripts and generated SQL)
 - `pyproject.toml` — declared dependencies and package boundaries
-- `docker/` — runtime service topology and build configuration
+- `deployment/container/` — rootless Podman runtime topology and build configuration
 - `AGENTS.md` — canonical architecture rules
 - `docs/DIAGRAMS.md` — authoritative visual design
 - `docs/DEVELOPMENT.md`, `docs/OPERATIONS.md` — cross-references for scope boundaries

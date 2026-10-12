@@ -1,12 +1,16 @@
 # CI/CD Build Performance Analysis
 
+> Archived: this analysis describes a former Docker build workflow. The current
+> image build uses Podman; see the
+> [deployment guide](../../deployment/container/README.md).
+
 ## Executive Summary
 
 This document provides a comprehensive analysis of the Docker build workflow performance for the SEAD Authority Service, identifying bottlenecks and providing actionable optimization recommendations.
 
-## Current Configuration
+## Historical Configuration
 
-### Workflow: `.github/workflows/docker-build.yml`
+### Workflow at the time: `.github/workflows/docker-build.yml`
 - **Platforms**: linux/amd64, linux/arm64 (multi-arch)
 - **Caching**: GitHub Actions cache (type=gha, mode=max)
 - **Dockerfile**: Multi-stage build (builder + runtime)
@@ -387,4 +391,4 @@ Monitor at: `https://github.com/humlab-sead/sead_authority_service/actions/workf
 
 ## Appendix: Optimized Dockerfile
 
-See `docker/Dockerfile.optimized` for complete optimized version implementing Priority 1 & 2 recommendations.
+See `former optimized Dockerfile` for complete optimized version implementing Priority 1 & 2 recommendations.

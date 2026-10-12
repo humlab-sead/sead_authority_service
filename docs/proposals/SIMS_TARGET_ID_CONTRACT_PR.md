@@ -10,7 +10,7 @@ Suggested description:
 
 This change extends `POST /identity/resolve` so each `ResolutionOutcome` may include optional `target_id: int | null`.
 
-The field represents the authoritative target-facing SEAD integer ID resolved or allocated for that entity. It is needed by Shape Shifter's `sead_change_request` Delivery 1 flow to materialize PK/FK values into generated SQL.
+The field represents the authoritative target-facing SEAD integer ID resolved or allocated for that entity. It is needed by Shape Shifter's `sead_change_request` MVP Delivery flow to materialize PK/FK values into generated SQL.
 
 ## Problem
 
@@ -20,7 +20,7 @@ Shape Shifter can already:
 - confirm Binding Sets
 - associate change request names with confirmed Binding Sets
 
-But it still cannot complete Delivery 1 SQL generation for newly allocated provider-owned rows when SIMS does not return the target-facing integer ID that must appear in emitted SQL columns.
+But it still cannot complete the MVP Delivery SQL generation for newly allocated provider-owned rows when SIMS does not return the target-facing integer ID that must appear in emitted SQL columns.
 
 Current downstream behavior is explicit: Shape Shifter stops before SQL generation with `SIMS target ID allocation capability incomplete` when `target_id` is missing.
 

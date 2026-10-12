@@ -217,10 +217,8 @@ test(loaders): add comprehensive UCanAccessSqlLoader tests
 - [docs/SIMS/](docs/SIMS/) - SIMS design documentation
 - [Makefile](Makefile) - All developer commands
 
-## Docker Deployment
+## Podman Deployment
 
-Multi-environment support:
-- **Development**: `cd docker && docker-compose up --build`
-- **Production**: Uses GHCR images from CI/CD (see [docker/README.md](docker/README.md))
-
-GitHub Actions builds on every push to `main`/`dev` and pushes to `ghcr.io/humlab-sead/sead_authority_service`.
+- Deployment instructions and runtime commands: [deployment/container/README.md](deployment/container/README.md)
+- Manual image build and push: `deployment/container/scripts/build.sh` (publishing requires `podman login ghcr.io`)
+- The GitHub Actions image workflow is disabled: `.github/workflows/docker-build.yml`

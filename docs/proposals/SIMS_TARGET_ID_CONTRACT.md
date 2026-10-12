@@ -1,18 +1,18 @@
-# Proposal: SIMS `target_id` Contract For Delivery 1
+# Proposal: SIMS `target_id` Contract For the MVP Delivery
 
 ## Status
 
 - Proposed change request
 - Scope: `POST /identity/resolve` response contract
-- Goal: Return target-facing SEAD integer IDs needed by Shape Shifter's `sead_change_request` Delivery 1 flow for PK/FK materialization
+- Goal: Return target-facing SEAD integer IDs needed by Shape Shifter's `sead_change_request` MVP Delivery flow for PK/FK materialization
 
 ## Summary
 
-Shape Shifter Delivery 1 is blocked on one upstream capability. The current SIMS resolve flow returns Binding Set metadata and tracked identity UUIDs, but not the target-facing integer ID that must appear in generated SQL.
+Shape Shifter's `sead_change_request` MVP Delivery flow is blocked on one upstream capability. The current SIMS resolve flow returns Binding Set metadata and tracked identity UUIDs, but not the target-facing integer ID that must appear in generated SQL.
 
 The recommended change is small: extend each `ResolutionOutcome` in `POST /identity/resolve` so it may include `target_id: int | null`. Keep the field optional for rollout safety. Populate it whenever SIMS can resolve or allocate the authoritative SEAD integer ID for the requested entity.
 
-This is the smallest change that closes the remaining Delivery 1 gap without redesigning Binding Sets, tracked identities, or the current resolve workflow.
+This is the smallest change that closes the remaining MVP Delivery gap without redesigning Binding Sets, tracked identities, or the current resolve workflow.
 
 ## Problem
 
@@ -49,7 +49,7 @@ Current downstream behavior in Shape Shifter:
 
 - `humlab-sead/sead_shape_shifter:backend/app/models/sims.py` already accepts optional `ResolutionOutcome.target_id`
 - `humlab-sead/sead_shape_shifter:backend/app/services/ingester_runtime.py` passes `target_id` through to the ingester when SIMS returns it
-- `humlab-sead/sead_shape_shifter:ingesters/sead_change_request/orchestration.py` treats missing `target_id` as a Delivery 1 hard stop for rows that require SIMS allocation
+- `humlab-sead/sead_shape_shifter:ingesters/sead_change_request/orchestration.py` treats missing `target_id` as a MVP Delivery hard stop for rows that require SIMS allocation
 
 That means Shape Shifter is already forward-compatible with the proposed upstream change.
 
@@ -70,7 +70,7 @@ Field contract:
 - name: `target_id`
 - type: integer or null
 - semantics: the authoritative target-facing SEAD integer ID resolved or allocated for this entity
-- presence: optional during rollout, expected when the entity is allocatable or resolvable to a target row for Delivery 1
+- presence: optional during rollout, expected when the entity is allocatable or resolvable to a target row for the MVP Delivery
 
 ### Behavior rules
 
@@ -82,8 +82,8 @@ Field contract:
 ### Backward compatibility
 
 - Existing clients must continue to work if they ignore `target_id`.
-- Shape Shifter will treat `target_id` as optional until the upstream service guarantees it for Delivery 1 entity types.
-- During rollout, null is acceptable for non-Delivery-1 use cases, but it remains a blocking condition for Shape Shifter change-request generation.
+- Shape Shifter will treat `target_id` as optional until the upstream service guarantees it for the MVP Delivery entity types.
+- During rollout, null is acceptable for non-MVP Delivery use cases, but it remains a blocking condition for Shape Shifter change-request generation.
 
 ## Risks And Tradeoffs
 
@@ -108,19 +108,19 @@ Validation expected in `sead_authority_service`:
 
 - `POST /identity/resolve` may return `target_id` on each `ResolutionOutcome`
 - the field is documented as the target-facing SEAD integer ID
-- Shape Shifter receives non-null `target_id` values for Delivery 1 allocatable entity types
+- Shape Shifter receives non-null `target_id` values for the MVP Delivery allocatable entity types
 - Shape Shifter no longer fails with `SIMS target ID allocation capability incomplete` for supported entity types
 - existing SIMS clients remain compatible without code changes
 
 ## Recommended Delivery Order
 
 1. Extend the authority-service response model with optional `target_id`.
-2. Populate `target_id` for one Delivery 1 entity type end to end.
+2. Populate `target_id` for one MVP Delivery entity type end to end.
 3. Validate Shape Shifter change-request generation against that entity type.
-4. Expand coverage to the remaining Delivery 1 allocatable entity types.
+4. Expand coverage to the remaining MVP Delivery allocatable entity types.
 
 ## Final Recommendation
 
 Implement the optional `ResolutionOutcome.target_id` field in `sead_authority_service` and populate it wherever SIMS can already determine the authoritative target-facing SEAD integer ID.
 
-That is the smallest upstream change that unblocks full Delivery 1 materialization in Shape Shifter.
+That is the smallest upstream change that unblocks full MVP Delivery materialization in Shape Shifter.
