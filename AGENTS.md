@@ -113,7 +113,7 @@ OpenRefine → POST /reconcile → router.py:reconcile() →
 
 The SEAD Identity Management System (SIMS) is **fully implemented** and live. It provides identity resolution, UUID allocation, and binding lifecycle management for incoming SEAD data submissions.
 
-**Design docs**: [docs/SIMS/](docs/SIMS/) — REQUIREMENTS, CONCEPTUAL_MODEL, DESIGN, DIAGRAMS, OPERATIONS, TRACKED_ENTITIES.
+**Design docs**: [docs/SIMS/](docs/SIMS/) — REQUIREMENTS, CONCEPTUAL_MODEL, DESIGN, DIAGRAMS, OPERATIONS, SHAPE_SHIFTER_TARGET_MODEL_ENTITY_REPORT.
 
 **Implemented modules**:
 - `src/identity/types.py` — `StrEnum` types: `IdentityType`, `SubmissionStatus`, `TrackedIdentityState`, `BindingSetState`, `BindingMethod`, `ChangeOutcome`

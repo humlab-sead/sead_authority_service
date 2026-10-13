@@ -127,12 +127,12 @@ The current `identity_policy.yml` was seeded from Shape Shifter's `sead_superset
 2. For each entity, check the `identity_tracking` and `reconciliation` fields.
 3. Update `config/identity_policy.yml` to reflect new or changed entity entries.
 4. Run the unit test suite to verify policy loads correctly: `uv run pytest tests/identity/test_policy.py -v`.
-5. Regenerate `docs/SIMS/TRACKED_ENTITIES.md` from Shape Shifter's superset model:
+5. Regenerate `docs/SIMS/SHAPE_SHIFTER_TARGET_MODEL_ENTITY_REPORT.md` from Shape Shifter's superset model:
 
   ```bash
   cd /path/to/sead_shape_shifter
   python scripts/generate_target_model_docs.py resources/target_models/sead_superset_model.yml --format sims --output-dir /tmp/sims-docs
-  cp /tmp/sims-docs/sead_superset_model.sims.md /path/to/sead_authority_service/docs/SIMS/TRACKED_ENTITIES.md
+  cp /tmp/sims-docs/sead_superset_model.sims.md /path/to/sead_authority_service/docs/SIMS/SHAPE_SHIFTER_TARGET_MODEL_ENTITY_REPORT.md
   ```
 
 There is no automated sync — this is intentional (D5: avoids runtime cross-repo dependency).
