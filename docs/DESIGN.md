@@ -119,7 +119,7 @@ SIMS is the identity service within the Authority Service. The current implement
 - **`service.py`**: `IdentityService` orchestrates the full resolution and binding lifecycle
 - **`types.py`**: `StrEnum` types for identity state, binding method, and change outcomes
 
-Shape Shifter's `sead_superset_model.yml` defines its target-model identity intent (`tracked`, `reconciled`, `derived`, `child`). SIMS does not consume these values as capabilities or use them to select entity-specific allocator code.
+Shape Shifter's `sead_standard_model.yml` defines its target-model identity intent (`tracked`, `reconciled`, `derived`, `child`). SIMS does not consume these values as capabilities or use them to select entity-specific allocator code.
 
 ### Schema Generation (`src/scripts/`, `schema/`)
 

@@ -46,4 +46,4 @@ SIMS owns tracked aggregate identities and their source-identity associations. I
 
 ## Source of Truth
 
-SIMS capabilities and allocation behavior come from validated SIMS configuration. Shape Shifter's `sead_superset_model.yml` describes the consumer's target model and intended artifact behavior; SIMS does not consume it to discover SEAD tables, columns, primary keys, or relationships. [SHAPE_SHIFTER_TARGET_MODEL_ENTITY_REPORT.md](./SHAPE_SHIFTER_TARGET_MODEL_ENTITY_REPORT.md) is generated from that model for read-only reference. In particular, `site_location` is an untracked bridge in Shape Shifter, not a SIMS Tracked Identity.
+SIMS capabilities and allocation behavior come from validated SIMS configuration. Shape Shifter's `sead_standard_model.yml` describes the consumer's target model and intended artifact behavior; SIMS does not consume it to discover SEAD tables, columns, primary keys, or relationships. [SHAPE_SHIFTER_TARGET_MODEL_ENTITY_REPORT.md](./SHAPE_SHIFTER_TARGET_MODEL_ENTITY_REPORT.md) is generated from that model for read-only reference. In particular, `site_location` is an untracked bridge in Shape Shifter, not a SIMS Tracked Identity.
