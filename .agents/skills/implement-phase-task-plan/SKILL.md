@@ -18,15 +18,15 @@ Determine from the user's request or current conversation:
 
 Infer details only when established by the conversation or verified repository content. Do not treat examples or placeholders as input values.
 
-An explicit target from the user or the current conversation takes precedence. Otherwise, locate the task plan beside its phase plan per the Document Naming rule in [Proposal document structure](references/proposal-document-structure.md). If the task plan path or phase is unknown, or more than one candidate matches, ask one concise clarifying question.
+An explicit target from the user or the current conversation takes precedence. Otherwise, locate the task plan beside its phase plan per the Document Naming rule in [Proposal document structure](../../../.github/instructions/proposal-document-structure.instructions.md). If the task plan path or phase is unknown, or more than one candidate matches, ask one concise clarifying question.
 
 ## References
 
 Before implementing, read:
 
-- `.github/instructions/task-plan.instructions.md`
-- [Proposal document structure](references/proposal-document-structure.md)
-- [Coding practices](references/coding-practices.md)
+- [Task plan instructions](../../../.github/instructions/task-plan.instructions.md)
+- [Proposal document structure](../../../.github/instructions/proposal-document-structure.instructions.md)
+- [Coding practices](../../../.github/instructions/coding-practices.instructions.md)
 - the task plan and its linked proposal and phase plan
 - applicable repository instruction files, including `AGENTS.md`
 
