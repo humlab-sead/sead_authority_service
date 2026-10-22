@@ -219,11 +219,13 @@ test(loaders): add comprehensive UCanAccessSqlLoader tests
 
 ## Podman Deployment
 
-Multi-environment support:
-- **Development**: `cd docker && docker-compose up --build`
-- **Production**: Uses GHCR images from CI/CD (see [docker/README.md](docker/README.md))
+Rootless Podman deployment bundle:
+- **Local build**: `cd deployment/container && make build` (see [deployment/container/README.md](deployment/container/README.md))
+- **Staging and production**: Pull published GHCR tags (`staging`, a version tag, or `latest`)
 
-GitHub Actions builds on every push to `main`/`dev` and pushes to `ghcr.io/humlab-sead/sead_authority_service`.
+Image publication:
+- Pushes to `staging` publish `ghcr.io/humlab-sead/sead_authority_service:staging`.
+- A semantic-release release on `main` publishes the release tag (for example `v1.7.0`) and `latest`.
 
 ## graphify
 

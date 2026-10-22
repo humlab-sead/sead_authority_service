@@ -114,9 +114,14 @@ make status
 
 ## CI and Release Process
 
-Image creation and GHCR publication are manual. The GitHub Actions image workflow at `.github/workflows/docker-build.yml` remains disabled: both jobs are guarded by `if: false`. Its existing filename is retained for compatibility; its build job uses the Podman helper and Podman push command, but it does not publish images while disabled.
+Container image publication runs in two paths:
 
-The release workflow at `.github/workflows/release.yml` runs semantic-release on pushes to `main` or by manual dispatch. It creates source releases and tags; it does not publish a container image or deploy the service. Build and publish the matching image with the Podman helper, then deploy it using the procedure above.
+- Pushes to `staging` publish `ghcr.io/humlab-sead/sead_authority_service:staging`.
+- Pushes to `main` run semantic-release (`.github/workflows/release.yml`). When semantic-release creates a release tag, the same run publishes that tag and `latest` from the release commit, for example `:v1.7.0` and `:latest`.
+
+Both paths run the test and lint jobs in `.github/workflows/build.yml` before publishing. They build from the selected GitHub ref and commit, never from the local worktree. The image workflow also supports manual `workflow_dispatch` runs for other tags.
+
+The image workflow publishes images only; it does not deploy the service. Deploy a published tag with the procedure above. Manual builds with `deployment/container/scripts/build.sh` remain available for local or pinned images.
 
 ---
 
@@ -164,5 +169,5 @@ The service stores application data in PostgreSQL; the database operations team 
 - [deployment/container/podman-compose.yml](../deployment/container/podman-compose.yml) — runtime image, mounts, port, and host-gateway mapping
 - [deployment/container/service/sead-authority-service.service](../deployment/container/service/sead-authority-service.service) — systemd user unit
 - [deployment/container/scripts/build.sh](../deployment/container/scripts/build.sh) — manual image build and publication
-- [.github/workflows/docker-build.yml](../.github/workflows/docker-build.yml) — disabled Podman image workflow
+- [.github/workflows/build.yml](../.github/workflows/build.yml) — Podman image build and GHCR publication workflow
 - [.github/workflows/release.yml](../.github/workflows/release.yml) — source release workflow

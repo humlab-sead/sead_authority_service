@@ -5,9 +5,11 @@ the existing runtime settings: the GHCR image and tag convention, `.env`
 inputs, the read-only `config/` mount, the writable `logs/` mount, host
 port `8024`, and the `/is_alive` health endpoint.
 
-Image publishing stays manual. The GitHub Actions image workflow
-(`.github/workflows/docker-build.yml`) remains disabled. Its existing filename
-is retained for compatibility; both jobs use Podman.
+Image publication is automated for `staging` and release tags, and manual
+builds remain available. Pushes to `staging` publish the `staging` tag; a
+semantic-release release on `main` publishes the release tag and `latest`. The
+GitHub Actions workflow (`.github/workflows/build.yml`) uses Podman for
+both jobs.
 
 ## Requirements
 
@@ -84,7 +86,7 @@ Or build with explicit options:
 ```bash
 ./scripts/build.sh --git-ref dev --target-env dev --tag dev
 ./scripts/build.sh --git-ref main --target-env staging --tag staging
-./scripts/build.sh --git-ref v1.2.0 --target-env production --tag v1.2.0 --push
+./scripts/build.sh --git-ref v1.2.0 --target-env production --tag v1.2.0 --tag latest --push
 ```
 
 If no tag is set in the environment or `.env`, the helper derives tags using
@@ -95,6 +97,9 @@ the established mapping:
 - `--target-env production` with `--git-ref main` produces `:latest`
 - `--target-env production` with a version ref such as `v1.2.0` produces that version tag
 - Other production refs produce a sanitized branch tag; `--tag` overrides
+
+Repeat `--tag` to build and push several tags from one build, for example a
+version tag plus `latest`. The helper builds once and applies every tag.
 
 Push only when requested and authenticated:
 
@@ -153,15 +158,21 @@ journalctl --user -u sead-authority-service
 The unit runs `podman-compose up -d` from `~/container`, the same project the
 Makefile controls.
 
-## GitHub Actions image workflow (disabled)
+## GitHub Actions image publication
 
-Image builds and pushes stay manual. The workflow file
-`.github/workflows/docker-build.yml` keeps its existing filename for
-compatibility. Its disabled build job uses the Podman build helper and Podman
-push command. Both workflow jobs
-remain guarded by `if: false`, so it does not build or publish images. If the
-workflow is ever re-enabled, it must stay within GitHub's free allowances.
-Limits checked on 2026-10-11:
+The workflow `.github/workflows/build.yml` runs tests and lint, then
+builds with Podman and publishes to GHCR:
+
+| Trigger | Environment | Tags |
+|---|---|---|
+| Push to `staging` | `staging` | `staging` |
+| Release on `main` | `production` | the release tag (`vX.Y.Z`) and `latest` |
+| Manual `workflow_dispatch` | chosen input | chosen comma-separated tags |
+
+The release path is a `workflow_call` from `.github/workflows/release.yml`, so
+the image is built from the exact commit that semantic-release tagged. A push
+to `main` that produces no release publishes no image. The workflow must stay
+within GitHub's free allowances. Limits checked on 2026-10-11:
 
 - Standard GitHub-hosted runners are free for public repositories; larger
   runners are billed.
@@ -171,8 +182,7 @@ Limits checked on 2026-10-11:
 
 Publish images directly to GHCR, do not store image archives as Actions
 artifacts, keep any caches and artifacts within the limits above, and set
-retention or cleanup. Recheck the current rules before enabling or changing
-the workflow:
+retention or cleanup. Recheck the current rules before changing the workflow:
 
 - [Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
 - [Actions limits](https://docs.github.com/en/actions/reference/limits)

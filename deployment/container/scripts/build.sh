@@ -1,14 +1,14 @@
 #!/bin/bash
-# Manual Podman image build/push helper for the SEAD Authority Service.
+# Podman image build/push helper for the SEAD Authority Service.
 #
 # Rootless Podman image build/push helper. Preserves the options, defaults,
 # and GHCR tag mapping of the former Docker helper, and keeps the same
 # source contract: the image is always built from the selected GitHub ref,
 # never from the local worktree (see Containerfile).
 #
-# Publishing stays manual and opt-in: the image is pushed only with --push,
-# after "podman login ghcr.io". The GitHub Actions image workflow remains
-# disabled.
+# Publishing stays opt-in: the image is pushed only with --push, after
+# "podman login ghcr.io". The GitHub Actions image workflow calls this helper
+# for automated publication and repeats --tag for a version tag plus latest.
 
 set -euo pipefail
 
@@ -56,6 +56,8 @@ git_ref="$(env_or SEAD_AUTHORITY_GIT_REF "")"
 git_commit="$(env_or SEAD_AUTHORITY_GIT_COMMIT "")"
 target_env="$(env_or SEAD_AUTHORITY_ENVIRONMENT "staging")"
 image_tag="$(env_or SEAD_AUTHORITY_IMAGE_TAG "")"
+image_tags=()
+explicit_tags=false
 push_image=false
 no_cache=false
 
@@ -67,7 +69,7 @@ print_usage() {
     cat <<EOF
 Usage: ${script_name} [OPTIONS]
 
-Build the same image artifact previously produced by the disabled GitHub Actions workflow.
+Build the image artifact used by the GitHub Actions image workflow and by manual deployments.
 This script always builds from GitHub, not from the local worktree.
 It reads SEAD_AUTHORITY_* settings from the environment, then the caller
 folder's .env, then this bundle's .env (placeholder secrets are ignored).
@@ -76,7 +78,9 @@ Options:
     --git-ref REF        Git branch or tag to build from
     --git-commit SHA     Exact 40-character Git commit to build from
     --target-env ENV     Deployment target environment: dev, staging, production
-    -t, --tag TAG        Override the derived image tag
+    -t, --tag TAG        Image tag to build and push. Repeat the option to build
+                         several tags from one build. Overrides the derived tag
+                         and SEAD_AUTHORITY_IMAGE_TAG.
     -p, --push           Push the image to GHCR after a successful build
     --no-cache           Build without using the Podman layer cache
     -h, --help           Show this help message
@@ -110,7 +114,8 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         -t|--tag)
-            image_tag="$2"
+            image_tags+=("$2")
+            explicit_tags=true
             shift 2
             ;;
         -p|--push)
@@ -150,7 +155,13 @@ case "${target_env}" in
         ;;
 esac
 
-if [[ -z "${image_tag}" ]]; then
+# Tag precedence: explicit --tag options, then SEAD_AUTHORITY_IMAGE_TAG from the
+# environment or .env, then the tag derived from the target environment and ref.
+if [[ "${explicit_tags}" == false && -n "${image_tag}" ]]; then
+    image_tags+=("${image_tag}")
+fi
+
+if [[ ${#image_tags[@]} -eq 0 ]]; then
     if [[ "${git_ref}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.].*)?$ ]]; then
         if [[ "${target_env}" == "production" ]]; then
             image_tag="${git_ref}"
@@ -174,7 +185,24 @@ if [[ -z "${image_tag}" ]]; then
                 ;;
         esac
     fi
+    image_tags+=("${image_tag}")
 fi
+
+# Drop empty and duplicate tags while preserving the given order.
+declare -A seen_tags=()
+unique_tags=()
+for tag in "${image_tags[@]}"; do
+    if [[ -z "${tag}" || -n "${seen_tags[${tag}]:-}" ]]; then
+        continue
+    fi
+    seen_tags["${tag}"]=1
+    unique_tags+=("${tag}")
+done
+
+if [[ ${#unique_tags[@]} -eq 0 ]]; then
+    print_usage "at least one non-empty image tag is required"
+fi
+image_tags=("${unique_tags[@]}")
 
 # Rootless Podman keeps the deployment user, so build with the current UID/GID.
 # podman-compose.yml uses "userns_mode: keep-id", which maps this host user to
@@ -188,13 +216,16 @@ build_cmd=(
     --platform linux/amd64
     --format docker
     --file "${bundle_dir}/Containerfile"
-    --tag "${image_ref}:${image_tag}"
     --build-arg "GIT_REF=${git_ref}"
     --build-arg "GIT_COMMIT=${git_commit}"
     --build-arg "GIT_REPO=${git_repo}"
     --build-arg "USER_UID=${user_uid}"
     --build-arg "USER_GID=${user_gid}"
 )
+
+for tag in "${image_tags[@]}"; do
+    build_cmd+=(--tag "${image_ref}:${tag}")
+done
 
 if [[ "${no_cache}" == true ]]; then
     build_cmd+=(--no-cache)
@@ -208,11 +239,15 @@ source_description="${git_repo}@${git_ref}"
 if [[ -n "${git_commit}" ]]; then
     source_description+=" (commit ${git_commit})"
 fi
-echo "info: building ${image_ref}:${image_tag} from ${source_description} for ${target_env}"
+tag_list="$(printf '%s,' "${image_tags[@]}")"
+tag_list="${tag_list%,}"
+echo "info: building ${image_ref} tags ${tag_list} from ${source_description} for ${target_env}"
 
 "${build_cmd[@]}"
 
 if [[ "${push_image}" == true ]]; then
-    echo "info: pushing ${image_ref}:${image_tag} (run 'podman login ghcr.io' first if not authenticated)"
-    podman push "${image_ref}:${image_tag}"
+    for tag in "${image_tags[@]}"; do
+        echo "info: pushing ${image_ref}:${tag} (run 'podman login ghcr.io' first if not authenticated)"
+        podman push "${image_ref}:${tag}"
+    done
 fi
