@@ -132,61 +132,50 @@ dead-code:
 # Candidates: rtk, graphify, serena, snip, headroom
 ################################################################################
 
-.PHONY: rtk rtk-setup rtk-status
+rtk-install:
+	@echo "Installing RTK and setting up global configurations..."
+	@if ! command -v rtk &> /dev/null; then \
+		echo "RTK not found, installing..."; \
+		brew install rtk; \
+	else \
+		brew upgrade rtk &> /dev/null; \
+	fi
+	@rtk init -g --copilot
+	@rtk init -g --codex
 
-rtk: rtk-status
+create-graphify:
+	@graphify extract . --project
+	@graphify cluster-only $(HOME)/source/sead_shape_shifter
+	@graphify export callflow-html
 
-rtk-setup:
-	@command -v rtk >/dev/null 2>&1 || { \
-		echo "RTK is not installed."; \
-		echo "Install with: brew install rtk-ai/tap/rtk"; \
-		exit 1; \
-	}
-	@rtk init --copilot
-	@rtk init --codex
-	@echo "✓ RTK project integrations installed"
+update-graphify:
+	@uv run graphify update $(HOME)/source/sead_shape_shifter  --force
+	@git add graphify-out
+	@if git diff --cached --quiet -- graphify-out; then \
+		echo "No changes in graphify-out"; \
+	else \
+		git commit -m "chore: updated graphify graph"; \
+	fi
 
-rtk-status:
-	@rtk --version
-	@rtk gain
+install-graphify:
+	@uv add --dev graphifyy[all]
+	@graphify hook install
+	@graphify vscode install
+	@graphify codex install
+	@echo "✓ Graphify installed and pre-commit hook set up"
 
-.PHONY: \
-	graphify \
-	graphify-setup \
-	graphify-create \
-	graphify-update \
-	graphify-skills \
-	graphify-cluster
+# 	@graphify extract . --project
+# 	@graphify cluster-only $(HOME)/source/sead_shape_shifter
+# 	@graphify export callflow-html
 
-# Update the existing knowledge graph.
-graphify: graphify-update
+commit-graphify:
+	@git add graphify-out
+	@if git diff --cached --quiet -- graphify-out; then \
+		echo "No changes in graphify-out"; \
+	else \
+		git commit -m "chore: updated graphify graph"; \
+	fi
 
-# One-time project setup for new developers.
-graphify-setup: graphify-skills
-	@echo "✓ Graphify setup complete"
-
-# Create/recreate the knowledge graph.
-graphify-create:
-	@echo "Creating Graphify knowledge graph..."
-	@uv run graphify extract . --project --backend openai --wiki --force
-
-# Update the existing knowledge graph.
-graphify-update:
-	@echo "Updating Graphify knowledge graph..."
-	@uv run graphify update .
-	@echo "✓ Graphify graph updated"
-
-# Install project-local agent integrations.
-graphify-skills:
-	@echo "Installing Graphify agent integrations..."
-	@uv run graphify install --project
-	@uv run graphify install --project --platform copilot
-	@uv run graphify install --project --platform codex
-	@echo "✓ Graphify agent integrations installed"
-
-graphify-cluster:
-	@uv run graphify cluster-only .
-	@uv run graphify export callflow-html
 ################################################################################
 # Git related checks
 ################################################################################
