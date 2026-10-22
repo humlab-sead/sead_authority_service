@@ -2,9 +2,11 @@
 
 ## Status
 
-- Proposed change
+- **Implemented** (branch `staging`; merged in [PR #28](https://github.com/humlab-sead/sead_authority_service/pull/28)).
 - Scope: single-host container deployment
 - Goal: run the Authority Service with rootless Podman while preserving its current runtime configuration and access.
+- Validation: The Podman deployment passed service health, configuration-read, log-write, and systemd user-service checks. The operator confirmed successful service startup after a host reboot.
+- Follow-up: Automated GitHub Actions image publishing was excluded from this migration and remains a separate change.
 
 ## Summary
 
@@ -50,14 +52,14 @@ Rootless Podman needs a deployment user and a systemd user service for boot star
 
 ## Testing And Validation
 
-Validate the Podman Compose configuration, build or pull the intended GHCR image, start the service, confirm `/is_alive` responds, and confirm the service reads its configuration and writes logs through the expected mounts. Check the systemd user service starts the container after reboot. Do not require Docker comparisons or crossover checks.
+Validate the Podman Compose configuration, build or pull the intended GHCR image, start the service, confirm `/is_alive` responds, and confirm the service reads its configuration and writes logs through the expected mounts. The operator reports that the service started successfully after a host reboot, confirming `P-AC-4`. Do not require Docker comparisons or crossover checks.
 
 ## Acceptance Criteria
 
 - `P-AC-1`: A documented rootless Podman setup can build or pull and start the Authority Service on the target Linux host.
 - `P-AC-2`: The deployment retains the existing GHCR image and tag convention, `.env` inputs, config and log mounts, and default port `8024`.
 - `P-AC-3`: Runtime credentials are supplied by the target host and are absent from tracked deployment files.
-- `P-AC-4`: The deployed service responds at `/is_alive` and starts on host boot through its systemd user service.
+- `P-AC-4`: The deployed service responds at `/is_alive` and starts on host boot through its systemd user service. The operator confirmed that startup after a host reboot was successful.
 - `P-AC-5`: Validation covers the Podman deployment only; Docker/Podman crossover is not required.
 - `P-AC-6`: Any GitHub Actions workflow used to build or publish the image uses only currently free runner options, publishes images directly to GHCR, and keeps artifacts and caches within current free storage allowances.
 

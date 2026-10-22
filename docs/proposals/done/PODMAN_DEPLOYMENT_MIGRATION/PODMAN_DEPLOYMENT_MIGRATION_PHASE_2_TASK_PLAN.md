@@ -24,7 +24,7 @@
 
 | Evidence | Verified finding | Planning implication |
 |---|---|---|
-| docs/proposals/PODMAN_DEPLOYMENT_MIGRATION_PHASE_PLAN.md | Phase 2 is a first deployment. If a required check fails, stop and disable the new service. | Do not add Docker backup, cutover, or restore tasks. |
+| docs/proposals/done/PODMAN_DEPLOYMENT_MIGRATION/PODMAN_DEPLOYMENT_MIGRATION_PHASE_PLAN.md | Phase 2 is a first deployment. If a required check fails, stop and disable the new service. | Do not add Docker backup, cutover, or restore tasks. |
 | secrets/deployment-secrets.yml and live host checks | Host and deployment-account fields match; the record and runtime .env both select production. The local files are gitignored and have restrictive modes. | Keep host-specific values in the ignored secrets directory and avoid printing secret values. |
 | Operator report and sudo check | Authority Service has never been deployed here; sudo -n -u authority-service.sead.se id succeeds from the tool shell. | Use the deployment user's rootless Podman and systemd manager. |
 | secrets/config/, secrets/.env, and secrets/.pgpass | The config folder contains config.yml, entities.yml, and prompts.yml. One .pgpass entry matches the .env database coordinates and has a non-empty password; the .env now contains that mapped password. The operator says the empty OpenAI key means the feature is disabled. | Stage the selected config and .env; do not mount .pgpass or require an OpenAI key. |
