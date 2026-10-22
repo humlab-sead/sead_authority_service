@@ -3,7 +3,8 @@
 #
 # Run targets from this directory. The runtime directory is ~/container for the
 # deployment user: it holds this bundle, the .env file, the mounted config/
-# directory, and the writable logs/ directory.
+# directory, and the writable logs/ directory. Image build and publication
+# targets are in Makefile.dev and are not copied to the deployment user.
 # ==============================================================================
 
 SHELL := /bin/bash
@@ -11,11 +12,13 @@ SHELL := /bin/bash
 
 BUNDLE_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 DEPLOY_DIR ?= $(HOME)/container
+ENV_TEMPLATE ?= $(BUNDLE_DIR).env.example
 COMPOSE_FILE := podman-compose.yml
 COMPOSE := podman-compose -f $(COMPOSE_FILE)
 SERVICE_NAME := sead-authority-service
 SERVICE_UNIT := service/$(SERVICE_NAME).service
 SERVICE_DIR := $(HOME)/.config/systemd/user
+RUNTIME_FILES := podman-compose.yml Makefile .env.example $(SERVICE_UNIT)
 IMAGE_REF := ghcr.io/humlab-sead/sead_authority_service
 
 # Runtime values come from the deployment .env when present.
@@ -28,8 +31,6 @@ help:
 	@echo "SEAD Authority Service - rootless Podman deployment"
 	@echo ""
 	@echo "  make setup             Create ~/container runtime dirs and .env (from the example)"
-	@echo "  make build             Build the image from the .env git ref (no push)"
-	@echo "  make push              Build and push the image to GHCR (podman login first)"
 	@echo "  make pull              Pull the image tag named by .env"
 	@echo "  make up                Start the service"
 	@echo "  make down              Stop the service"
@@ -47,21 +48,22 @@ help:
 
 .PHONY: setup
 setup:
-	@mkdir -p $(DEPLOY_DIR)/logs $(DEPLOY_DIR)/config $(DEPLOY_DIR)/scripts
-	@for f in podman-compose.yml Containerfile Makefile scripts/build.sh; do \
-		if ! cmp -s $(BUNDLE_DIR)$$f $(DEPLOY_DIR)/$$f 2>/dev/null; then \
-			cp $(BUNDLE_DIR)$$f $(DEPLOY_DIR)/$$f; \
+	@mkdir -p "$(DEPLOY_DIR)/logs" "$(DEPLOY_DIR)/config"
+	@for f in $(RUNTIME_FILES); do \
+		mkdir -p "$(DEPLOY_DIR)/$$(dirname "$$f")"; \
+		if ! cmp -s "$(BUNDLE_DIR)$$f" "$(DEPLOY_DIR)/$$f" 2>/dev/null; then \
+			cp "$(BUNDLE_DIR)$$f" "$(DEPLOY_DIR)/$$f"; \
 		fi; \
 	done
-	@if [ ! -f $(ENV_FILE) ]; then \
-		cp $(BUNDLE_DIR).env.example $(ENV_FILE); \
-		chmod 600 $(ENV_FILE); \
+	@if [ ! -f "$(ENV_FILE)" ]; then \
+		cp "$(ENV_TEMPLATE)" "$(ENV_FILE)"; \
+		chmod 600 "$(ENV_FILE)"; \
 		echo "Created $(ENV_FILE) from the example. Edit it before starting."; \
 	else \
 		echo "Keeping existing $(ENV_FILE)."; \
 	fi
-	@if [ ! -f $(DEPLOY_DIR)/config/config.yml ]; then \
-		cp $(BUNDLE_DIR)config/config.yml $(BUNDLE_DIR)config/entities.yml $(BUNDLE_DIR)config/prompts.yml $(DEPLOY_DIR)/config/; \
+	@if [ ! -f "$(DEPLOY_DIR)/config/config.yml" ]; then \
+		cp "$(BUNDLE_DIR)config/config.yml" "$(BUNDLE_DIR)config/entities.yml" "$(BUNDLE_DIR)config/prompts.yml" "$(DEPLOY_DIR)/config/"; \
 		echo "Copied config templates to $(DEPLOY_DIR)/config."; \
 	else \
 		echo "Keeping existing $(DEPLOY_DIR)/config."; \
@@ -69,16 +71,8 @@ setup:
 	@echo "Deployment directory $(DEPLOY_DIR) is ready."
 
 # ---------------------------------------------------------------------------
-# Image build and pull
+# Pull the published image
 # ---------------------------------------------------------------------------
-
-.PHONY: build
-build:
-	@cd $(DEPLOY_DIR) && $(BUNDLE_DIR)scripts/build.sh
-
-.PHONY: push
-push:
-	@cd $(DEPLOY_DIR) && $(BUNDLE_DIR)scripts/build.sh --push
 
 .PHONY: pull
 pull:

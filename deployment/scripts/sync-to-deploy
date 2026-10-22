@@ -1,0 +1,234 @@
+#!/usr/bin/env bash
+# Synchronize local Authority Service runtime files to a deployment user's home.
+set -euo pipefail
+
+g_script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+g_container_dir="$(CDPATH= cd -- "$g_script_dir/../container" && pwd)"
+g_deploy_user="${DEPLOY_USER:-authority-service.sead.se}"
+g_remote_dir="${REMOTE_DIR:-container}"
+g_dry_run=false
+g_verbose=false
+
+usage() {
+  local message="${1:-}"
+  if [[ -n "$message" ]]; then
+    echo "error: $message" >&2
+  fi
+  cat <<'EOF'
+Usage: deployment/scripts/sync-to-deploy [TARGET_USER] [--remote-dir DIR] [--dry-run] [--verbose]
+
+Synchronize runtime files from deployment/container/ to a deployment user's
+runtime directory on this host. Build files stay in the developer checkout.
+The caller must have passwordless sudo access to TARGET_USER. The target
+account does not need read access to this checkout.
+
+The sync removes obsolete runtime files, preserves the target .env, config/,
+and logs/, and creates missing .env and config/ files from the tracked
+templates. It installs the systemd user unit for the default container/
+directory and reloads the user manager when it is running. It does not restart
+or enable the service.
+
+Defaults:
+  owner: DEPLOY_USER or authority-service.sead.se
+  path: REMOTE_DIR or container (one directory under the target user's home)
+  host: current host; this script uses local sudo and does not use SSH
+
+Examples:
+  deployment/scripts/sync-to-deploy
+  deployment/scripts/sync-to-deploy authority-service.sead.se --dry-run
+  deployment/scripts/sync-to-deploy authority-service.sead.se --remote-dir container-dev
+
+Use a separate container-dev directory for isolated development. A new
+non-default directory uses .env.dev.example. Syncing it does not install or
+reload the production systemd user unit.
+
+Options:
+  --remote-dir DIR   Target directory under the deployment user's home
+  --dry-run          Show rsync changes without modifying the target
+  --verbose          Show detailed rsync output
+  -h, --help         Show this help message
+EOF
+}
+
+positionals=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --remote-dir)
+      [[ $# -ge 2 ]] || { usage "--remote-dir requires a value" >&2; exit 2; }
+      g_remote_dir="$2"
+      shift 2
+      ;;
+    --dry-run)
+      g_dry_run=true
+      shift
+      ;;
+    --verbose)
+      g_verbose=true
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -* )
+      usage "unknown option $1" >&2
+      exit 2
+      ;;
+    *)
+      positionals+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ ${#positionals[@]} -gt 1 ]]; then
+  usage "only one TARGET_USER may be specified" >&2
+  exit 2
+fi
+if [[ ${#positionals[@]} -eq 1 ]]; then
+  g_deploy_user="${positionals[0]}"
+fi
+
+if [[ ! "$g_remote_dir" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  usage "--remote-dir must be one directory name under the target user's home" >&2
+  exit 2
+fi
+
+if [[ ! -f "$g_container_dir/service/sead-authority-service.service" ]]; then
+  echo "Service unit not found: $g_container_dir/service/sead-authority-service.service" >&2
+  exit 1
+fi
+
+for command_name in getent make rsync sudo; do
+  command -v "$command_name" >/dev/null || {
+    echo "$command_name is required." >&2
+    exit 1
+  }
+done
+
+deploy_record="$(getent passwd "$g_deploy_user")"
+[[ -n "$deploy_record" ]] || { echo "Cannot resolve local user: $g_deploy_user" >&2; exit 1; }
+
+deploy_home="$(printf '%s\n' "$deploy_record" | cut -d: -f6)"
+deploy_uid="$(printf '%s\n' "$deploy_record" | cut -d: -f3)"
+[[ -n "$deploy_home" && -n "$deploy_uid" ]] || {
+  echo "Cannot read the home directory or UID for $g_deploy_user." >&2
+  exit 1
+}
+
+sudo -n -u "$g_deploy_user" true || {
+  echo "Passwordless sudo access to $g_deploy_user is required." >&2
+  exit 1
+}
+
+destination="${deploy_home}/${g_remote_dir}"
+if sudo -n -u "$g_deploy_user" test -L "$destination"; then
+  echo "Refusing to synchronize into $destination: the target is a symlink." >&2
+  exit 1
+fi
+
+if [[ "$g_verbose" == true ]]; then
+  echo "Deployment user: $g_deploy_user"
+  echo "Deployment home: $deploy_home"
+  echo "Target directory: $destination"
+  echo "Dry run: $g_dry_run"
+fi
+
+command -v mktemp >/dev/null || { echo "mktemp is required." >&2; exit 1; }
+stage_dir="$(mktemp -d "${TMPDIR:-/tmp}/authority-container-sync.XXXXXX")"
+cleanup() {
+  rm -rf -- "$stage_dir"
+}
+trap cleanup EXIT
+
+# Build a readable temporary runtime bundle so the deployment account can run
+# rsync and setup even when it cannot read the developer's checkout. Exclude
+# build tools and operator-owned files from this copy.
+stage_rsync_args=(
+  --archive
+  --no-owner
+  --no-group
+  --delete
+  --delete-delay
+  --itemize-changes
+  --human-readable
+  --exclude=/.env
+  --exclude=/.env.dev.example
+  --exclude=/Containerfile
+  --exclude=/Makefile.dev
+  --exclude=/README.md
+  --exclude=/scripts/
+  --exclude=/service-dev/
+  --exclude=/config/
+  --exclude=/logs/
+)
+rsync "${stage_rsync_args[@]}" "$g_container_dir/" "$stage_dir/"
+
+# Stage only the tracked configuration templates needed for first-time setup.
+# Never make arbitrary local config files readable to the target account.
+mkdir -p "$stage_dir/config"
+for config_file in config.yml entities.yml prompts.yml; do
+  cp -- "$g_container_dir/config/$config_file" "$stage_dir/config/$config_file"
+done
+setup_env_template="$stage_dir/.env.example"
+if [[ "$g_remote_dir" != "container" ]]; then
+  cp -- "$g_container_dir/.env.dev.example" "$stage_dir/.env.dev.example"
+  setup_env_template="$stage_dir/.env.dev.example"
+fi
+chmod -R a+rX "$stage_dir"
+
+target_rsync_args=(
+  --archive
+  --no-owner
+  --no-group
+  --delete
+  --delete-delay
+  --itemize-changes
+  --human-readable
+  --exclude=/.env
+  --exclude=/config/
+  --exclude=/logs/
+)
+if [[ "$g_verbose" == true ]]; then
+  target_rsync_args+=(--verbose)
+fi
+if [[ "$g_dry_run" == true ]]; then
+  target_rsync_args+=(--dry-run)
+fi
+
+printf 'Synchronizing %s/\n' "$g_container_dir"
+printf '     to local %s/\n' "$destination"
+
+if [[ "$g_dry_run" == true ]]; then
+  sudo -n -u "$g_deploy_user" test -d "$destination" || {
+    echo "Cannot dry-run: target directory does not exist: $destination" >&2
+    exit 1
+  }
+else
+  sudo -n -u "$g_deploy_user" -H mkdir -p -- "$destination"
+fi
+sudo -n -u "$g_deploy_user" -H rsync "${target_rsync_args[@]}" "$stage_dir/" "$destination/"
+
+if [[ "$g_dry_run" == false ]]; then
+  sudo -n -u "$g_deploy_user" -H make -C "$stage_dir" setup \
+    "DEPLOY_DIR=$destination" "ENV_TEMPLATE=$setup_env_template"
+  if [[ "$g_remote_dir" == "container" ]]; then
+    unit_dir="${deploy_home}/.config/systemd/user"
+    sudo -n -u "$g_deploy_user" -H install -d -m 700 "$unit_dir"
+    sudo -n -u "$g_deploy_user" -H install -m 644 \
+      "$stage_dir/service/sead-authority-service.service" \
+      "$unit_dir/sead-authority-service.service"
+    if [[ -S "/run/user/${deploy_uid}/bus" ]]; then
+      sudo -n -u "$g_deploy_user" -H env XDG_RUNTIME_DIR="/run/user/${deploy_uid}" \
+        systemctl --user daemon-reload
+      echo "Installed and reloaded the systemd user unit for $g_deploy_user."
+    else
+      echo "Installed the systemd user unit; the user manager is not running, so it was not reloaded."
+    fi
+  else
+    echo "Skipped systemd unit install for non-default directory $g_remote_dir."
+  fi
+  echo "Synchronized files are owned by $g_deploy_user. The service was not restarted or enabled."
+else
+  echo "Dry run complete; the target and systemd unit were not changed."
+fi

@@ -1,9 +1,8 @@
 #!/bin/bash
 # Podman image build/push helper for the SEAD Authority Service.
 #
-# Rootless Podman image build/push helper. Preserves the options, defaults,
-# and GHCR tag mapping of the former Docker helper, and keeps the same
-# source contract: the image is always built from the selected GitHub ref,
+# Rootless Podman image build/push helper for CI and developer checkouts.
+# Preserves the GHCR tag mapping and builds from the selected GitHub ref,
 # never from the local worktree (see Containerfile).
 #
 # Publishing stays opt-in: the image is pushed only with --push, after
@@ -69,7 +68,7 @@ print_usage() {
     cat <<EOF
 Usage: ${script_name} [OPTIONS]
 
-Build the image artifact used by the GitHub Actions image workflow and by manual deployments.
+Build the image used by the GitHub Actions image workflow and manual development builds.
 This script always builds from GitHub, not from the local worktree.
 It reads SEAD_AUTHORITY_* settings from the environment, then the caller
 folder's .env, then this bundle's .env (placeholder secrets are ignored).
@@ -86,11 +85,8 @@ Options:
     -h, --help           Show this help message
 
 Examples:
-    ${script_name} --git-ref dev
-    ${script_name} --git-ref dev --git-commit <commit> --tag phase2-<date>-<sha>
-    ${script_name} --git-ref main --target-env staging
-    ${script_name} --git-ref v1.2.0 --target-env production --push
-    cd ~/container && ./scripts/build.sh
+    cd deployment/container && make -f Makefile.dev build
+    cd deployment/container && make -f Makefile.dev push
 EOF
 
     if [[ -n "${1:-}" ]]; then

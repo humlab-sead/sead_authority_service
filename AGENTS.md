@@ -220,7 +220,9 @@ test(loaders): add comprehensive UCanAccessSqlLoader tests
 ## Podman Deployment
 
 Rootless Podman deployment bundle:
-- **Local build**: `cd deployment/container && make build` (see [deployment/container/README.md](deployment/container/README.md))
+- **Runtime commands**: `cd deployment/container && make help` (see [deployment/container/README.md](deployment/container/README.md))
+- **Developer image build**: `cd deployment/container && make -f Makefile.dev build`; publish dev tags with
+  `make -f Makefile.dev push`
 - **Staging and production**: Pull published GHCR tags (`staging`, a version tag, or `latest`)
 
 Image publication:
