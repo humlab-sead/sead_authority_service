@@ -47,7 +47,7 @@ sql_queries:
     limit 1
 
   fuzzy_find_sql: |
-    select * from authority.fuzzy_site(%(q)s, %(n)s);
+    select * from authority.fuzzy_site(%(q)s::text, %(n)s::int);
 
   fetch_site_distances: |
     select site_id, 

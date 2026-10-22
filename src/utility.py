@@ -2,8 +2,8 @@ import importlib
 import os
 import sys
 import unicodedata
-from datetime import datetime
 from typing import Any, Callable, Generic, Literal, TypeVar
+from urllib.parse import quote
 
 import yaml
 from loguru import logger
@@ -160,31 +160,65 @@ def env2dict(prefix: str, data: dict[str, str] | None = None, lower_key: bool = 
 
 
 def configure_logging(opts: dict[str, Any] | None = None, default_level: str = "INFO") -> None:
+    """Configure logging with file and console handlers.
 
+    Args:
+        opts: Logging options from config (folder, handlers)
+        default_level: Default log level if not specified in handlers
+    """
     logger.remove()
-    logger.add(
-        sys.stdout,
-        level=default_level,
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}",
-    )
-    if not opts:
+
+    # Get log folder path, ensure it exists
+    log_folder = opts.get("folder", "./logs") if opts else "./logs"
+    os.makedirs(log_folder, exist_ok=True)
+
+    # Add default console handler if no handlers specified
+    if not opts or not opts.get("handlers"):
+        logger.add(
+            sys.stdout,
+            level=default_level,
+            format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>",
+            backtrace=True,
+            diagnose=True,
+        )
+        # Add default file handler
+        logger.add(
+            os.path.join(log_folder, "sead_authority.log"),
+            rotation="10 MB",
+            retention="30 days",
+            level=default_level,
+            format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+            backtrace=True,
+            diagnose=True,
+        )
         return
 
+    # Process custom handlers
     if opts.get("handlers"):
-
         for handler in opts["handlers"]:
-
             if not handler.get("sink"):
                 continue
 
+            # Replace sys.stdout string with actual sys.stdout
             if handler["sink"] == "sys.stdout":
                 handler["sink"] = sys.stdout
-
+            # Handle file sinks
             elif isinstance(handler["sink"], str) and handler["sink"].endswith(".log"):
-                handler["sink"] = os.path.join(
-                    opts.get("folder", "logs"),
-                    f"{datetime.now().strftime('%Y%m%d')}_{handler['sink']}",
-                )
+                # Create log file path
+                log_filename = handler["sink"]
+                handler["sink"] = os.path.join(log_folder, log_filename)
+
+                # Add rotation and retention if not specified
+                if "rotation" not in handler:
+                    handler["rotation"] = "10 MB"
+                if "retention" not in handler:
+                    handler["retention"] = "30 days"
+
+            # Add backtrace and diagnose for better exception tracking
+            if "backtrace" not in handler:
+                handler["backtrace"] = True
+            if "diagnose" not in handler:
+                handler["diagnose"] = True
 
         logger.configure(handlers=opts["handlers"])
 
@@ -260,13 +294,21 @@ class Registry(Generic[T]):
 
 
 def create_db_uri(
-    *, host: str, port: int | str, user: str, dbname: str, password: str | None = None, driver: str = "postgresql+psycopg"
+    *,
+    host: str,
+    port: int | str,
+    user: str,
+    dbname: str,
+    password: str | None = None,
+    driver: str = "postgresql",
+    **kwargs,  # pylint: disable=unused-argument
 ) -> str:
     """
     Builds database URI from the individual config elements.
     """
     if password:
-        return f"{driver}://{user}:{password}@{host}:{port}/{dbname}"
+        quoted_password: str = quote(password, safe="")
+        return f"{driver}://{user}:{quoted_password}@{host}:{port}/{dbname}"
     return f"{driver}://{user}@{host}:{port}/{dbname}"
 
 

@@ -70,7 +70,7 @@ class MCPTools:
         # Use existing fuzzy function if available
         fuzzy_function_name = f"fuzzy_{params.entity_type}"
 
-        query = sql.SQL("SELECT * FROM authority.{func}(%(q)s, %(n)s)").format(func=sql.Identifier(fuzzy_function_name))
+        query = sql.SQL("SELECT * FROM authority.{func}(%(q)s::text, %(n)s::int)").format(func=sql.Identifier(fuzzy_function_name))
 
         async with self.connection.cursor() as cursor:
             await cursor.execute(

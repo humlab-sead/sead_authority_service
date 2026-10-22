@@ -137,7 +137,7 @@ class TestReconcileIntegration:
             rollback_called = True
             logger.info("Rollback called on connection")
 
-        test_provider.connection_mock.rollback = mock_rollback
+        test_provider.connection_mock.rollback = mock_rollback  # type: ignore
 
         # Simulate an error
         test_provider.cursor_mock.execute.side_effect = psycopg.Error("Test database error")
@@ -179,14 +179,14 @@ class TestDatabaseRepositoryTransactionHandling:
             rollback_called = True
             logger.info("Connection rolled back after error")
 
-        test_provider.connection_mock.rollback = mock_rollback
+        test_provider.connection_mock.rollback = mock_rollback  # type: ignore
 
         # Create proxy with mocked connection
         proxy = BaseRepository("site", connection=test_provider.connection_mock)
 
         # Execute query that will fail
         with pytest.raises(psycopg.errors.UndefinedFunction):
-            await proxy.fetch_all("SELECT * FROM authority.fuzzy_site(%(q)s, %(n)s)", {"q": "test", "n": 10})
+            await proxy.fetch_all("SELECT * FROM authority.fuzzy_site(%(q)s::text, %(n)s::int)", {"q": "test", "n": 10})
 
         # Verify rollback was called
         # Note: This will fail with current implementation, which is the bug
@@ -210,7 +210,7 @@ class TestDatabaseRepositoryTransactionHandling:
             nonlocal rollback_called
             rollback_called = True
 
-        test_provider.connection_mock.rollback = mock_rollback
+        test_provider.connection_mock.rollback = mock_rollback  # type: ignore
 
         proxy = BaseRepository("site", connection=test_provider.connection_mock)
 

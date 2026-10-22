@@ -26,7 +26,7 @@ class TestSiteRepository:
 
         mock_row: dict[str, Any] = {"site_id": 1, "label": "Test Site", "name_sim": 1.0, "latitude": 59.3293, "longitude": 18.0686}
         test_provider.create_connection_mock(fetchone=mock_row, execute=None)
-        cursor_mock = test_provider.connection_mock.cursor.return_value.__aenter__.return_value
+        cursor_mock = test_provider.connection_mock.cursor.return_value.__aenter__.return_value  # type: ignore
 
         proxy = SiteRepository("site", connection=test_provider.connection_mock)
 

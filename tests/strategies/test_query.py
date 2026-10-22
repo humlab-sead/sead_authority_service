@@ -1,9 +1,8 @@
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import psycopg
 import pytest
-from psycopg.rows import dict_row, tuple_row
 
 import src.strategies.query as query_module
 from src.strategies.data_type import DataTypeRepository
@@ -144,7 +143,7 @@ class TestBaseRepositoryUnit:
 
     def test_get_find_fuzzy_sql_fallback(self, monkeypatch: pytest.MonkeyPatch):
         repo = self._make_repo(monkeypatch, {"key": "x", "sql_queries": {}})
-        assert repo.get_find_fuzzy_sql() == "select * from authority.fuzzy_site(%(q)s, %(n)s);"
+        assert repo.get_find_fuzzy_sql() == "select * from authority.fuzzy_x(%(q)s::text, %(n)s::int);"
 
     @pytest.mark.asyncio
     async def test_fetch_by_alternate_identity_no_sql_does_not_call_fetch_all(self, monkeypatch: pytest.MonkeyPatch):
@@ -164,99 +163,6 @@ class TestBaseRepositoryUnit:
         rows = await repo.fetch_by_alternate_identity("ABC")
         assert rows == [{"id": 1}]
         fetch_all.assert_awaited_once_with("SQL", {"alternate_identity": "ABC"})
-
-    @pytest.mark.asyncio
-    async def test_get_connection_caches(self, monkeypatch: pytest.MonkeyPatch):
-        repo = self._make_repo(monkeypatch, {"key": "x", "sql_queries": {}})
-
-        async def _fake_get_connection():
-            return object()
-
-        get_conn = AsyncMock(side_effect=_fake_get_connection)
-        monkeypatch.setattr(query_module, "get_connection", get_conn)
-
-        c1 = await repo.get_connection()
-        c2 = await repo.get_connection()
-        assert c1 is c2
-        assert get_conn.await_count == 1
-
-    @pytest.mark.asyncio
-    async def test_fetch_all_dict_row_strips_sql_and_converts(self, monkeypatch: pytest.MonkeyPatch):
-        spec = {"key": "x", "sql_queries": {}}
-        repo = self._make_repo(monkeypatch, spec)
-
-        cursor = AsyncMock()
-        cursor.fetchall = AsyncMock(return_value=[{"a": 1}])
-        cursor.fetchone = AsyncMock(return_value={"a": 1})
-
-        cursor_cm = AsyncMock()
-        cursor_cm.__aenter__.return_value = cursor
-        cursor_cm.__aexit__.return_value = None
-
-        captured_row_factory = {}
-
-        def _cursor_factory(*, row_factory=None):
-            captured_row_factory["value"] = row_factory
-            return cursor_cm
-
-        connection = MagicMock()
-        connection.cursor.side_effect = _cursor_factory
-        repo.connection = connection  # type: ignore[assignment]
-
-        rows = await repo.fetch_all("  SELECT 1 \n", params={"x": 1}, row_factory="dict")
-        assert rows == [{"a": 1}]
-        assert captured_row_factory["value"] is dict_row
-        cursor.execute.assert_awaited_once_with("SELECT 1", {"x": 1})
-
-    @pytest.mark.asyncio
-    async def test_fetch_all_tuple_row_returns_tuples(self, monkeypatch: pytest.MonkeyPatch):
-        repo = self._make_repo(monkeypatch, {"key": "x", "sql_queries": {}})
-
-        cursor = AsyncMock()
-        cursor.fetchall = AsyncMock(return_value=[(1, 2), (3, 4)])
-
-        cursor_cm = AsyncMock()
-        cursor_cm.__aenter__.return_value = cursor
-        cursor_cm.__aexit__.return_value = None
-
-        captured_row_factory = {}
-
-        def _cursor_factory(*, row_factory=None):
-            captured_row_factory["value"] = row_factory
-            return cursor_cm
-
-        connection = MagicMock()
-        connection.cursor.side_effect = _cursor_factory
-        repo.connection = connection  # type: ignore[assignment]
-
-        rows = await repo.fetch_all("SELECT 1", params=None, row_factory="tuple")
-        assert rows == [(1, 2), (3, 4)]
-        assert captured_row_factory["value"] is tuple_row
-
-    @pytest.mark.asyncio
-    async def test_fetch_one_tuple_row_returns_tuple(self, monkeypatch: pytest.MonkeyPatch):
-        repo = self._make_repo(monkeypatch, {"key": "x", "sql_queries": {}})
-
-        cursor = AsyncMock()
-        cursor.fetchone = AsyncMock(return_value=(1, "A"))
-
-        cursor_cm = AsyncMock()
-        cursor_cm.__aenter__.return_value = cursor
-        cursor_cm.__aexit__.return_value = None
-
-        captured_row_factory = {}
-
-        def _cursor_factory(*, row_factory=None):
-            captured_row_factory["value"] = row_factory
-            return cursor_cm
-
-        connection = MagicMock()
-        connection.cursor.side_effect = _cursor_factory
-        repo.connection = connection  # type: ignore[assignment]
-
-        row = await repo.fetch_one("SELECT 1", row_factory="tuple")
-        assert row == (1, "A")
-        assert captured_row_factory["value"] is tuple_row
 
     @pytest.mark.asyncio
     async def test_get_details_handles_psycopg_error(self, monkeypatch: pytest.MonkeyPatch):

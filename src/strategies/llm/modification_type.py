@@ -69,7 +69,7 @@ class ModificationTypeRepository(BaseRepository):
 
     async def get_lookup_data(self) -> list[dict[str, Any]]:
         """Fetch all modification types for LLM lookup"""
-        return await self.fetch_all(self.specification["sql_queries"]["get_lookup_data"])
+        return await self.fetch_all(self.specification["sql_queries"]["get_lookup_data"])  # type: ignore
 
 
 @Strategies.register(key="modification_type", repository_cls=ModificationTypeRepository)

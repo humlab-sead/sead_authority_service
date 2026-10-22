@@ -303,7 +303,7 @@ class TestPropertiesEndpoint:
     @with_test_config
     def test_properties_filtered_by_description(self, client: TestClient, test_provider: MockConfigProvider):
         """Test filtering properties by description"""
-        response: Response = client.get("/reconcile/properties?query=geographic")
+        response: Response = client.get("/reconcile/properties?query=geographic")  # type: ignore
         assert response.status_code == 200
 
         data = response.json()

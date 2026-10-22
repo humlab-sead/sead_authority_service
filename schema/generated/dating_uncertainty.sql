@@ -6,20 +6,25 @@
 **        If the entity has embeddings, also install semantic-{entity}.sql to create
 **        the embeddings table and semantic search functions.
 **********************************************************************************************/
+
 drop view if exists authority.dating_uncertainty cascade;
 
-create or replace view authority.dating_uncertainty as  select
+create or replace view authority.dating_uncertainty as
+  select
     t.dating_uncertainty_id,
     t.uncertainty as label,
     authority.immutable_unaccent(lower(t.uncertainty)) as norm_label,
     t.description  from public.tbl_dating_uncertainty as t;
+
 create index if not exists tbl_dating_uncertainty_norm_trgm
   on public.tbl_dating_uncertainty
     using gin ( (authority.immutable_unaccent(lower(uncertainty))) gin_trgm_ops );
+
 /***************************************************************************************************
  ** Procedure  authority.fuzzy_dating_uncertainty
  ** What       Trigram fuzzy search function using pg_trgm similarity
- ** Usage      SELECT * FROM authority.fuzzy_dating_uncertainty('query text', 10); ****************************************************************************************************/
+ ** Usage      SELECT * FROM authority.fuzzy_dating_uncertainty('query text', 10);
+ ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_dating_uncertainty(text, integer) cascade;
 

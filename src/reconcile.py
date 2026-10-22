@@ -2,7 +2,7 @@ from typing import Any, Type
 
 from loguru import logger
 
-from src.configuration import get_config_provider, get_connection
+from src.configuration import get_config_provider
 from src.strategies.strategy import ReconciliationStrategy, Strategies
 
 
@@ -11,7 +11,6 @@ async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
     default_query_limit: int = get_config_provider().get_config().get("options:default_query_limit") or 10
 
     results: dict[str, Any] = {}
-    _ = await get_connection()
 
     logger.info(f"Processing {len(queries)} reconciliation queries")
 
@@ -46,8 +45,20 @@ async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
             limit=default_query_limit,
         )
 
-        logger.info(f"Found {len(candidate_data)} candidates for query {query_id}")
-        results[query_id] = {"result": [strategy.as_candidate(data, query.get("query", "")) for data in candidate_data]}
+        candidates = [strategy.as_candidate(data, query.get("query", "")) for data in candidate_data]
+
+        # Log summary with match counts and score ranges
+        if candidates:
+            match_count = sum(1 for c in candidates if c.get("match"))
+            scores = [c["score"] for c in candidates]
+            logger.info(
+                f"Found {len(candidates)} candidates for query {query_id}: "
+                f"{match_count} auto-matches, scores: {min(scores):.1f}%-{max(scores):.1f}%"
+            )
+        else:
+            logger.info(f"Found 0 candidates for query {query_id}")
+
+        results[query_id] = {"result": candidates}
 
     logger.info(f"Reconciliation completed with {len(results)} results")
     return results

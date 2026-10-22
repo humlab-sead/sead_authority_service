@@ -43,7 +43,7 @@ property_settings: {}
 
 sql_queries:
   fuzzy_find_sql: |
-    select * from authority.fuzzy_bibliographic_reference(%(q)s, %(n)s);
+    select * from authority.fuzzy_bibliographic_reference(%(q)s::text, %(n)s::int);
 
   details_sql: |
     select  biblio_id as "ID",

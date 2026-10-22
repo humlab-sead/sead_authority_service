@@ -58,6 +58,18 @@ Entity schemas are **generated**, not hand-written. To add a new entity:
 
 **Do not** edit generated files directly. Edit [schema/templates/](schema/templates/) or [config/entities.yml](config/entities.yml) instead.
 
+## Documentation Vocabulary
+
+- Use plain, concrete language in generated code, comments, docstrings, PR text, and documentation.
+- Prefer words that name the actual thing, action, rule, input, output, or result directly.
+- Do not treat any word as forbidden, but use abstract or overloaded terms carefully. If a technical term is necessary, define it nearby or pair it with a plain-language explanation.
+- Use these terms carefully unless they are established project vocabulary: `evidence`, `boundary`, `framing`, `canonical`, `surface`, `facing`, `slice`, `signal`.
+- Prefer explicit wording such as `data`, `result`, `source`, `check`, `validation result`, `limit`, `responsibility`, `allowed range`, `rule`, `purpose`, `reason`, `background`, `request details`, `standard`, `preferred`, `normalized`, `official`, `interface`, `page`, `endpoint`, `entry point`, `used by`, `shown to`, `exposed to`, `part`, `section`, `subset`, `step`, `indicator`, `warning`, `metric`, `status`, `input`, `output`, `error`, and `side effect`.
+- Write for a mixed audience: junior developers, maintainers, testers, data managers, researchers, and non-technical stakeholders.
+- The closer text is to code or user-visible behavior, the more concrete the vocabulary should be.
+- Comments and docstrings should explain behavior, responsibility, assumptions, inputs, outputs, and side effects. Avoid metaphorical or fashion-driven wording when a simpler phrase is equally accurate.
+- Write docstrings using concrete behavior-first wording. Prefer direct statements such as `Reads sample rows from a CSV file.`, `Returns validation errors for missing required fields.`, `Uses the site ID to find matching sample groups.`, and `Does not write changes to the database.` Avoid vague wording such as `Ingests artifacts across the import boundary.`, `Resolves canonical entities for downstream consumers.`, and `Emits signals for the review surface.`
+
 ## Development Workflows
 
 ### Running the Service
@@ -96,6 +108,34 @@ OpenRefine → POST /reconcile → router.py:reconcile() →
     Strategies.get("site") → SiteReconciliationStrategy →
       SiteRepository.search() → PostgreSQL
 ```
+
+### SIMS Identity Module (`src/identity/`)
+
+The SEAD Identity Management System (SIMS) is **fully implemented** and live. It provides identity resolution, UUID allocation, and binding lifecycle management for incoming SEAD data submissions.
+
+**Design docs**: [docs/SIMS/](docs/SIMS/) — REQUIREMENTS, CONCEPTUAL_MODEL, DESIGN, DIAGRAMS, OPERATIONS, SHAPE_SHIFTER_TARGET_MODEL_ENTITY_REPORT.
+
+**Implemented modules**:
+- `src/identity/types.py` — `StrEnum` types: `IdentityType`, `SubmissionStatus`, `TrackedIdentityState`, `BindingSetState`, `BindingMethod`, `ChangeOutcome`
+- `src/identity/models.py` — Pydantic domain models and DTOs: `SourceScope`, `Submission`, `SourceIdentity`, `TrackedIdentity`, `BindingSet`, `Binding`, `ResolutionRequest`, `ResolutionOutcome`, `BindingSetResponse`, `ChangeDetectionRequest`, `ChangeDetectionResult`
+- `src/identity/policy.py` — `IdentityPolicy` loads `config/identity_policy.yml`; exposes `get_entity_policy(entity_type)` driving resolve/allocate/auto-confirm behaviour
+- `src/identity/repository.py` — Async repositories for all six identity tables, using `get_connection()`
+- `src/identity/service.py` — `IdentityService` orchestrates: `get_or_create_scope`, `create_submission`, `resolve_identity`, `bind`, `confirm_binding_set`, `associate_change_request`, `detect_change`, `get_binding_set`, `list_scopes`
+
+**HTTP endpoints** (registered in `main.py` under prefix `/identity`):
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/identity/resolve` | Resolve + bind a batch of source identities |
+| `GET` | `/identity/binding-sets/{uuid}` | Get binding set status |
+| `POST` | `/identity/binding-sets/{uuid}/confirm` | Confirm a proposed binding set |
+| `POST` | `/identity/binding-sets/{uuid}/change-request` | Associate a Sqitch CR name |
+| `POST` | `/identity/detect-change` | Content-hash change detection |
+| `GET` | `/identity/scopes` | List all known source scopes |
+
+**Entity metadata source of truth**: `sead_standard_model.yml` in the Shape Shifter repo defines per-entity `identity_tracking` and `reconciliation` properties that drive SIMS policy decisions.
+
+**Key identity tracking values**: `tracked` (UUID + PK, aggregate roots), `reconciled` (matched by business key), `derived` (identity from FK references), `child` (inherits parent aggregate identity).
 
 ### RAG Hybrid Strategy (New Pattern)
 Phase 1 implementation uses embedded MCP server for small-prompt reconciliation:
@@ -171,13 +211,29 @@ test(loaders): add comprehensive UCanAccessSqlLoader tests
 - [src/reconcile.py](src/reconcile.py) - Core reconciliation logic
 - [src/strategies/strategy.py](src/strategies/strategy.py) - Base strategy class and registry
 - [src/configuration/](src/configuration/) - Config provider pattern
+- [src/identity/](src/identity/) - SIMS identity module (fully implemented)
+- [src/api/identity_router.py](src/api/identity_router.py) - SIMS HTTP endpoints (prefix `/identity`)
 - [config/entities.yml](config/entities.yml) - Entity definitions (source of truth)
+- [docs/SIMS/](docs/SIMS/) - SIMS design documentation
 - [Makefile](Makefile) - All developer commands
 
-## Docker Deployment
+## Podman Deployment
 
 Multi-environment support:
 - **Development**: `cd docker && docker-compose up --build`
 - **Production**: Uses GHCR images from CI/CD (see [docker/README.md](docker/README.md))
 
 GitHub Actions builds on every push to `main`/`dev` and pushes to `ghcr.io/humlab-sead/sead_authority_service`.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

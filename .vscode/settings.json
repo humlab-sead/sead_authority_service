@@ -6,12 +6,19 @@
         "activityBar.inactiveForeground": "#e7e7e799",
         "activityBarBadge.background": "#170910",
         "activityBarBadge.foreground": "#e7e7e7",
+        "activityBarTop.activeBackground": "#2b4969",
+        "activityBarTop.background": "#2b4969",
+        "activityBarTop.foreground": "#e7e7e7",
+        "activityBarTop.inactiveForeground": "#e7e7e799",
         "commandCenter.border": "#e7e7e799",
+        "commandCenter.foreground": "#e7e7e7",
         "sash.hoverBorder": "#2b4969",
         "statusBar.background": "#1c3045",
+        "statusBar.debuggingBackground": "#1c3045",
+        "statusBar.debuggingForeground": "#e7e7e7",
         "statusBar.foreground": "#e7e7e7",
         "statusBarItem.hoverBackground": "#2b4969",
-        "statusBarItem.remoteBackground": "#1c3045",
+        "statusBarItem.remoteBackground": "#9f406e",
         "statusBarItem.remoteForeground": "#e7e7e7",
         "titleBar.activeBackground": "#1c3045",
         "titleBar.activeForeground": "#e7e7e7",
@@ -26,37 +33,66 @@
     "python.testing.pytestEnabled": true,
     "pgFormatter.configFile": "${workspaceFolder}/.pg_format",
     "[sql]": {
-        "editor.defaultFormatter": "bradymholt.pgformatter"
+        "editor.defaultFormatter": "sqlfluff.vscode-sqlfluff"
     },
     "python.analysis.exclude": [
-        "bin",
-        "data",
-        "dist",
-        "**/__pycache__",
-        ".git",
-        "logs",
-        "tmp",
-        ".venv"
+        "**/.*",
+        "**/__pycache__/**",
+        "**/.pytest_cache/**",
+        "**/.ruff_cache/**",
+        "**/.mypy_cache/**",
+        "**/.git/**",
+        "**/.tox/**",
+        "**/.nox/**",
+        "**/.venv/**",
+        "**/venv/**",
+        "**/env/**",
+        "**/coverage/**",
+        "**/dist/**",
+        "**/build/**",
+        "**/node_modules/**",
+        "**/.vite/**",
+        "**/output/**",
+        "**/tmp/**",
+        "htmlcov/**",
+        "**/*.egg-info/**",
+
+        "logs/**",
+        "bin/**",
+        "docs/**",
+        "data/**",
+        "schema/**",
+        "sead-tools/**",
+        "deprecated/**",
     ],
-    "python.analysis.ignore": [
-        ".venv"
+    "python.analysis.include": [
+        "src",
+        "tests",
+        "scripts",
     ],
     "files.exclude": {
         "**/.git": true,
-        "**/.DS_Store": true
+        "**/.DS_Store": true,
+        "**/__pycache__": true,
+        "**/.ruff_cache": true,
+        "**/*.egg-info": true,
+        "**/dist": true,
+        "**/htmlcov": true,
     },
     "search.exclude": {
         "**/.venv": true,
         "**/__pycache__": true
     },
     "markdownlint.ignore": [
-        ".github/copilot-instructions.md",
-        "AGENTS.md"
+        ".github/**/*-instructions.md",
+        "**/AGENTS.md"
     ],
     "github.copilot.chat.diagnostics.ignoreFiles": [
-        ".github/copilot-instructions.md",
-        "AGENTS.md"
+        ".github/**/*-instructions.md",
+        "**/AGENTS.md"
     ],
+    "python.analysis.indexing": true,
+    "python.analysis.userFileIndexingLimit": 500,
     "python.analysis.inlayHints.functionReturnTypes": true,
     "python.analysis.inlayHints.variableTypes": true,
     "python.analysis.typeCheckingMode": "standard",
@@ -67,8 +103,5 @@
     "python.analysis.generateWithTypeAnnotation": true,
     "python.analysis.inlayHints.pytestParameters": true,
     "python.analysis.typeEvaluation.deprecateTypingAliases": true,
-    "yaml.format.printWidth": 120,
-    "yaml.schemas": {
-        "https://www.schemastore.org/yamllint.json": "file:///home/roger/source/sead_authority_service/src/resources/site.yml"
-    }
+    "yaml.format.printWidth": 120
 }

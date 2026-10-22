@@ -354,7 +354,7 @@ The semantic-release workflow integrates with the Docker build workflow:
 3. Docker images are built and pushed to GHCR with version tags
 4. Production can deploy the new versioned image
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for details on the complete CI/CD pipeline.
+See [OPERATIONS.md](OPERATIONS.md) for details on the complete CI/CD pipeline.
 
 ## References
 

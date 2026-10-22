@@ -6,9 +6,11 @@
 **        If the entity has embeddings, also install semantic-{entity}.sql to create
 **        the embeddings table and semantic search functions.
 **********************************************************************************************/
+
 drop view if exists authority.location cascade;
 
-create or replace view authority.location as  select
+create or replace view authority.location as
+  select
     t.location_id,
     t.location_name as label,
     authority.immutable_unaccent(lower(t.location_name)) as norm_label,
@@ -17,13 +19,16 @@ create or replace view authority.location as  select
     t.location_type_id,
     lt.location_type,
     st_setsrid(st_makepoint(t.default_long_dd, t.default_lat_dd), 4326) as geom  from public.tbl_locations as t  join public.tbl_location_types lt using (location_type_id);
+
 create index if not exists tbl_locations_norm_trgm
   on public.tbl_locations
     using gin ( (authority.immutable_unaccent(lower(location_name))) gin_trgm_ops );
+
 /***************************************************************************************************
  ** Procedure  authority.fuzzy_location
  ** What       Trigram fuzzy search function using pg_trgm similarity
- ** Usage      SELECT * FROM authority.fuzzy_location('query text', 10); ** Params     location_type_ids: Filter by location type IDs ****************************************************************************************************/
+ ** Usage      SELECT * FROM authority.fuzzy_location('query text', 10); ** Params     location_type_ids: Filter by location type IDs
+ ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_location(text, integer, integer[]) cascade;
 

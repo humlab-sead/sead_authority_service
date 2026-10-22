@@ -1,9 +1,47 @@
 SHELL := /bin/bash
 
+-include .env
+export
+
 UVICORN_PORT := 8000
+PODMAN_DEPLOYMENT_DIR := deployment/container
+
 
 test-workflow:
 	@./scripts/test-ci.sh
+
+fetch-openrefine-manifest:
+	@curl -s http://localhost:8000/reconcile
+
+fetch-openrefine-manifest-types:
+	@curl -s http://localhost:8000/reconcile | jq -r '.defaultTypes[].id'
+
+.PHONY: generate-schema
+generate-schema:
+	@echo "Generating entity schema files from templates..."
+	@uv run python src/scripts/generate_entity_schema.py --all
+	@echo "✅ Schema generation complete!"
+
+.PHONY: generate-schema-force
+generate-schema-force:
+	@echo "Regenerating all entity schema files..."
+	@uv run python src/scripts/generate_entity_schema.py --all --force
+	@echo "✅ Schema regeneration complete!"
+	
+
+.PHONY: podman-build podman-up podman-down podman-logs
+podman-build:
+	@$(MAKE) -C $(PODMAN_DEPLOYMENT_DIR) build
+
+podman-up:
+	@$(MAKE) -C $(PODMAN_DEPLOYMENT_DIR) up
+
+podman-down:
+	@$(MAKE) -C $(PODMAN_DEPLOYMENT_DIR) down
+
+podman-logs:
+	@$(MAKE) -C $(PODMAN_DEPLOYMENT_DIR) logs
+
 
 .PHONY: dev-serve
 dev-serve: dev-kill
@@ -88,27 +126,78 @@ test-coverage:
 dead-code:
 	@uv run vulture src tests main.py
 
-.PHONY: generate-schema
-generate-schema:
-	@echo "Generating entity schema files from templates..."
-	@uv run python src/scripts/generate_entity_schema.py --all
-	@echo "✅ Schema generation complete!"
 
-.PHONY: generate-schema-force
-generate-schema-force:
-	@echo "Regenerating all entity schema files..."
-	@uv run python src/scripts/generate_entity_schema.py --all --force
-	@echo "✅ Schema regeneration complete!"
-	
+################################################################################
+# AI Coding Assistants recipes
+# Candidates: rtk, graphify, serena, snip, headroom
+################################################################################
 
-SCHEMA_OPTS = --no-drop-table --not-null --default-values --no-not_empty --comments --indexes --relations
-BACKEND = postgres
+.PHONY: rtk rtk-setup rtk-status
 
-arbodat-data-schema:
-	@mdb-schema $(SCHEMA_OPTS) src/arbodat/input/ArchBotDaten.mdb $(BACKEND) > src/arbodat/input/ArchBotDaten_$(BACKEND)_schema.sql 
+rtk: rtk-status
 
-arbodat-lookup-schema:
-	@mdb-schema $(SCHEMA_OPTS) src/arbodat/input/ArchBotStrukDat.mdb $(BACKEND) > src/arbodat/input/ArchBotStrukDat_$(BACKEND)_schema.sql 
+rtk-setup:
+	@command -v rtk >/dev/null 2>&1 || { \
+		echo "RTK is not installed."; \
+		echo "Install with: brew install rtk-ai/tap/rtk"; \
+		exit 1; \
+	}
+	@rtk init --copilot
+	@rtk init --codex
+	@echo "✓ RTK project integrations installed"
 
-arbodat-schema: arbodat-data-schema arbodat-lookup-schema
-	@echo "✅ Schema extraction complete!"
+rtk-status:
+	@rtk --version
+	@rtk gain
+
+.PHONY: \
+	graphify \
+	graphify-setup \
+	graphify-create \
+	graphify-update \
+	graphify-skills \
+	graphify-cluster
+
+# Update the existing knowledge graph.
+graphify: graphify-update
+
+# One-time project setup for new developers.
+graphify-setup: graphify-skills
+	@echo "✓ Graphify setup complete"
+
+# Create/recreate the knowledge graph.
+graphify-create:
+	@echo "Creating Graphify knowledge graph..."
+	@uv run graphify extract . --project --backend openai --wiki --force
+
+# Update the existing knowledge graph.
+graphify-update:
+	@echo "Updating Graphify knowledge graph..."
+	@uv run graphify update .
+	@echo "✓ Graphify graph updated"
+
+# Install project-local agent integrations.
+graphify-skills:
+	@echo "Installing Graphify agent integrations..."
+	@uv run graphify install --project
+	@uv run graphify install --project --platform copilot
+	@uv run graphify install --project --platform codex
+	@echo "✓ Graphify agent integrations installed"
+
+graphify-cluster:
+	@uv run graphify cluster-only .
+	@uv run graphify export callflow-html
+################################################################################
+# Git related checks
+################################################################################
+
+.PHONY: branches-ahead
+branches-ahead:
+	@git for-each-ref --format='%(refname:short)' refs/heads | \
+	while IFS= read -r branch; do \
+		ahead=$$(git rev-list --count "dev..$$branch"); \
+		if [ "$$ahead" -gt 0 ]; then \
+			printf '%5s  %s\n' "$$ahead" "$$branch"; \
+		fi; \
+	done
+	@echo "✓ Branches ahead of dev listed above"

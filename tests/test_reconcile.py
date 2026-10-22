@@ -24,7 +24,14 @@ class _RecordingStrategy:
         return list(self.candidates)
 
     def as_candidate(self, data: dict[str, Any], query: str) -> dict[str, Any]:
-        return {"id": data.get("id"), "name": data.get("name"), "query": query}
+        return {
+            "id": data.get("id"),
+            "name": data.get("name"),
+            "score": data.get("score", 85.0),
+            "match": data.get("match", False),
+            "type": data.get("type", []),
+            "query": query,
+        }
 
 
 @pytest.mark.asyncio
@@ -32,7 +39,6 @@ async def test_reconcile_queries_empty_query_short_circuits(monkeypatch: pytest.
     async def _fake_get_connection():
         return object()
 
-    monkeypatch.setattr(reconcile_module, "get_connection", _fake_get_connection)
     monkeypatch.setattr(reconcile_module, "get_config_provider", lambda: _ConfigProvider({"options:default_query_limit": 10}))
     monkeypatch.setattr(reconcile_module.Strategies, "items", {"site": _RecordingStrategy}, raising=False)
 
@@ -47,7 +53,6 @@ async def test_reconcile_queries_missing_type_raises(monkeypatch: pytest.MonkeyP
     async def _fake_get_connection():
         return object()
 
-    monkeypatch.setattr(reconcile_module, "get_connection", _fake_get_connection)
     monkeypatch.setattr(reconcile_module, "get_config_provider", lambda: _ConfigProvider({}))
     monkeypatch.setattr(reconcile_module.Strategies, "items", {"site": _RecordingStrategy}, raising=False)
 
@@ -60,7 +65,6 @@ async def test_reconcile_queries_unknown_type_raises(monkeypatch: pytest.MonkeyP
     async def _fake_get_connection():
         return object()
 
-    monkeypatch.setattr(reconcile_module, "get_connection", _fake_get_connection)
     monkeypatch.setattr(reconcile_module, "get_config_provider", lambda: _ConfigProvider({}))
     monkeypatch.setattr(reconcile_module.Strategies, "items", {"site": _RecordingStrategy}, raising=False)
 
@@ -73,7 +77,6 @@ async def test_reconcile_queries_builds_properties_and_candidates(monkeypatch: p
     async def _fake_get_connection():
         return object()
 
-    monkeypatch.setattr(reconcile_module, "get_connection", _fake_get_connection)
     monkeypatch.setattr(reconcile_module, "get_config_provider", lambda: _ConfigProvider({"options:default_query_limit": 7}))
     monkeypatch.setattr(reconcile_module.Strategies, "items", {"site": _RecordingStrategy}, raising=False)
 
@@ -94,8 +97,8 @@ async def test_reconcile_queries_builds_properties_and_candidates(monkeypatch: p
 
     results = await reconcile_module.reconcile_queries(queries)
     assert results["q0"]["result"] == [
-        {"id": "1", "name": "Site A", "query": "upp"},
-        {"id": "2", "name": "Site B", "query": "upp"},
+        {"id": "1", "name": "Site A", "score": 85.0, "match": False, "type": [], "query": "upp"},
+        {"id": "2", "name": "Site B", "score": 85.0, "match": False, "type": [], "query": "upp"},
     ]
     assert _RecordingStrategy.calls == [{"query": "upp", "properties": {"country": "Sweden"}, "limit": 7}]
 
@@ -105,7 +108,6 @@ async def test_reconcile_queries_fallback_default_limit(monkeypatch: pytest.Monk
     async def _fake_get_connection():
         return object()
 
-    monkeypatch.setattr(reconcile_module, "get_connection", _fake_get_connection)
     monkeypatch.setattr(reconcile_module, "get_config_provider", lambda: _ConfigProvider({}))
     monkeypatch.setattr(reconcile_module.Strategies, "items", {"site": _RecordingStrategy}, raising=False)
 
@@ -134,7 +136,6 @@ async def test_reconcile_queries_covers_strategy_cls_none_branch(monkeypatch: py
     async def _fake_get_connection():
         return object()
 
-    monkeypatch.setattr(reconcile_module, "get_connection", _fake_get_connection)
     monkeypatch.setattr(reconcile_module, "get_config_provider", lambda: _ConfigProvider({}))
     monkeypatch.setattr(reconcile_module.Strategies, "items", _FlakyItems(), raising=False)
 

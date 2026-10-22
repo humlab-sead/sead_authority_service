@@ -15,7 +15,7 @@ property_settings: {}
 sql_queries:
   fuzzy_find_sql: |
     select *
-    from authority.method(%(q)s, %(n)s)
+    from authority.fuzzy_method(%(q)s::text, %(n)s::int)
 
   details_sql: |
     select 

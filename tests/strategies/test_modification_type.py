@@ -52,7 +52,7 @@ class TestModificationTypeReconciliationStrategy:
         assert config.exists("runtime")
         assert not config.exists("connection_factory")
 
-        _: AsyncConnection[tuple[Any, ...]] = await get_connection()
+        _: AsyncConnection[tuple[Any, ...]] = await get_connection()  # type: ignore
 
         assert config.exists("runtime:connection")
 

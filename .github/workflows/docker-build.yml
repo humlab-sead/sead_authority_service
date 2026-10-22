@@ -1,19 +1,31 @@
-name: Build and Push Docker Image
+name: Build and Publish Podman Image
+
+# This workflow is intentionally disabled. Keep image publication manual until
+# automated GHCR publishing is explicitly approved.
 
 on:
   push:
     branches:
       - main
   workflow_dispatch:
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+    inputs:
+      target_environment:
+        description: Deployment environment used to select the image tag
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+      image_tag:
+        description: GHCR image tag to publish
+        required: true
+        type: string
 
 jobs:
-  # Job 1: Run tests before building
   test:
-    runs-on: ubuntu-latest
+    if: ${{ false }}
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,79 +41,70 @@ jobs:
           python-version: '3.13'
 
       - name: Install dependencies
-        run: |
-          uv sync --dev
+        run: uv sync --dev
 
       - name: Run tests
-        run: |
-          uv run pytest --verbose
+        run: uv run pytest --verbose
 
       - name: Run linter
-        run: |
-          uv run ruff check src/ tests/
+        run: uv run ruff check src/ tests/
 
-  # Job 2: Build and push Docker image
   build-and-push:
-    runs-on: ubuntu-latest
-    needs: test  # Only build if tests pass
+    if: ${{ false }}
+    runs-on: ubuntu-24.04
+    needs: test
     permissions:
       contents: read
       packages: write
       id-token: write
       attestations: write
+    env:
+      IMAGE_NAME: ghcr.io/humlab-sead/sead_authority_service
+      TARGET_ENVIRONMENT: ${{ github.event_name == 'push' && 'production' || github.event.inputs.target_environment }}
+      IMAGE_TAG: ${{ github.event_name == 'push' && 'latest' || github.event.inputs.image_tag }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Check Podman
+        run: podman --version
 
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | podman login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
 
-      - name: Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Build image with Podman
+        run: |
+          ./deployment/container/scripts/build.sh \
+            --git-ref "$GITHUB_REF_NAME" \
+            --git-commit "$GITHUB_SHA" \
+            --target-env "$TARGET_ENVIRONMENT" \
+            --tag "$IMAGE_TAG"
 
-      - name: Build and push Docker image
-        id: build
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: docker/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64
-          build-args: |
-            USE_UV=true
+      - name: Push image with Podman
+        id: push
+        run: |
+          image="$IMAGE_NAME:$IMAGE_TAG"
+          podman push --digestfile "$RUNNER_TEMP/image.digest" "$image"
+          digest="$(cat "$RUNNER_TEMP/image.digest")"
+          printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
 
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest@v4
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
-      - name: Report build metrics
+      - name: Report build details
         if: always()
         run: |
-          echo "### Build Metrics 📊" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Platform**: linux/amd64" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image Digest**: ${{ steps.build.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image Tags**:" >> $GITHUB_STEP_SUMMARY
-          echo "${{ steps.meta.outputs.tags }}" | sed 's/^/  - /' >> $GITHUB_STEP_SUMMARY
+          {
+            echo "### Podman image build"
+            echo
+            echo "- Environment: $TARGET_ENVIRONMENT"
+            echo "- Image: $IMAGE_NAME:$IMAGE_TAG"
+            echo "- Digest: ${{ steps.push.outputs.digest }}"
+          } >> "$GITHUB_STEP_SUMMARY"

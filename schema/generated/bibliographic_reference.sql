@@ -6,9 +6,11 @@
 **        If the entity has embeddings, also install semantic-{entity}.sql to create
 **        the embeddings table and semantic search functions.
 **********************************************************************************************/
+
 drop view if exists authority.bibliographic_reference cascade;
 
-create or replace view authority.bibliographic_reference as  select
+create or replace view authority.bibliographic_reference as
+  select
     t.biblio_id,
     t.full_reference as label,
     authority.immutable_unaccent(lower(t.full_reference)) as norm_label,
@@ -23,13 +25,16 @@ create or replace view authority.bibliographic_reference as  select
     authority.immutable_unaccent(lower(t.bugs_reference)) as norm_bugs_reference,
     authority.immutable_unaccent(lower(t.title)) as norm_title,
     authority.immutable_unaccent(lower(t.authors)) as norm_authors  from public.tbl_biblio as t;
+
 create index if not exists tbl_biblio_norm_trgm
   on public.tbl_biblio
     using gin ( (authority.immutable_unaccent(lower(full_reference))) gin_trgm_ops );
+
 /***************************************************************************************************
  ** Procedure  authority.fuzzy_bibliographic_reference
  ** What       Trigram fuzzy search function using pg_trgm similarity
- ** Usage      SELECT * FROM authority.fuzzy_bibliographic_reference('query text', 10); ****************************************************************************************************/
+ ** Usage      SELECT * FROM authority.fuzzy_bibliographic_reference('query text', 10);
+ ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_bibliographic_reference(text, integer) cascade;
 

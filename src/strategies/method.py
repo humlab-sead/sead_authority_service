@@ -1,6 +1,5 @@
 # from src.utility import load_resource_yaml
 from .query import BaseRepository
-from .rag_hybrid.rag_hybrid_strategy import RAGHybridReconciliationStrategy
 from .strategy import ReconciliationStrategy, Strategies, StrategySpecification
 
 RAG_SPECIFICATION: StrategySpecification = {
@@ -29,8 +28,8 @@ class MethodReconciliationStrategy(ReconciliationStrategy):
         super().__init__(specification=specification, repository_or_cls=repository_or_cls)
 
 
-@Strategies.register(key="rag_methods", repository_cls=MethodRepository)
-class RAGMethodsReconciliationStrategy(RAGHybridReconciliationStrategy):
+# @Strategies.register(key="rag_methods", repository_cls=MethodRepository)
+# class RAGMethodsReconciliationStrategy(RAGHybridReconciliationStrategy):
 
-    def __init__(self):
-        super().__init__(specification=RAG_SPECIFICATION, repository_or_cls=self.repository_cls)
+#     def __init__(self):
+#         super().__init__(specification=RAG_SPECIFICATION, repository_or_cls=self.repository_cls)

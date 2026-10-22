@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Literal, Mapping, Sequence, Tuple, TypeAlias, Union, overload
+from typing import Any, Literal, Mapping, Sequence, TypeAlias, Union, overload
 
 import psycopg
 from loguru import logger
@@ -52,7 +52,7 @@ class AbstractRepository(ABC):
         """Return the SQL query for fuzzy finding entities"""
         sql: str = self.get_sql_queries().get("fuzzy_find_sql", "")
         if not sql:
-            sql = "select * from authority.fuzzy_site(%(q)s, %(n)s);"
+            sql = f"select * from authority.fuzzy_{self.key}(%(q)s::text, %(n)s::int);"
         return sql
 
 
@@ -76,11 +76,6 @@ class BaseRepository(AbstractRepository):
     #         await self.connection.close()
     #         self.connection = None
 
-    async def get_connection(self) -> psycopg.AsyncConnection:
-        if not self.connection:
-            self.connection = await get_connection()
-        return self.connection
-
     @overload
     async def fetch_all(self, sql: str, params: Params | None = None, *, row_factory: Literal["dict"] = "dict") -> list[DictRow]: ...
 
@@ -90,13 +85,13 @@ class BaseRepository(AbstractRepository):
     async def fetch_all(
         self, sql: str, params: Params | None = None, *, row_factory: Literal["dict", "tuple"] = "dict"
     ) -> list[DictRow] | list[TupleRow]:
-        connection: psycopg.AsyncConnection[Tuple[Any, ...]] = await self.get_connection()
-        async with connection.cursor(row_factory=self.row_factories[row_factory]) as cursor:
-            await cursor.execute(sql.strip(), params)  # type: ignore
-            rows: list[Any] = await cursor.fetchall()
-            if row_factory == "tuple":
-                return list(rows)
-            return [d if isinstance(d, dict) else dict(d) for d in rows]
+        async with get_connection() as connection:
+            async with connection.cursor(row_factory=self.row_factories[row_factory]) as cursor:
+                await cursor.execute(sql.strip(), params)  # type: ignore
+                rows: list[Any] = await cursor.fetchall()
+                if row_factory == "tuple":
+                    return list(rows)
+                return [d if isinstance(d, dict) else dict(d) for d in rows]
 
     @overload
     async def fetch_one(self, sql: str, params: Params | None = None, *, row_factory: Literal["dict"] = "dict") -> DictRow | None: ...
@@ -107,15 +102,15 @@ class BaseRepository(AbstractRepository):
     async def fetch_one(
         self, sql: str, params: Params | None = None, *, row_factory: Literal["dict", "tuple"] = "dict"
     ) -> DictRow | TupleRow | None:
-        connection: psycopg.AsyncConnection[Tuple[Any, ...]] = await self.get_connection()
-        async with connection.cursor(row_factory=self.row_factories[row_factory]) as cursor:
-            await cursor.execute(sql.strip(), params)  # type: ignore
-            row: Any = await cursor.fetchone()
-            if not row:
-                return None
-            if row_factory == "tuple":
-                return row
-            return row if isinstance(row, dict) else dict(row)
+        async with get_connection() as connection:
+            async with connection.cursor(row_factory=self.row_factories[row_factory]) as cursor:
+                await cursor.execute(sql.strip(), params)  # type: ignore
+                row: Any = await cursor.fetchone()
+                if not row:
+                    return None
+                if row_factory == "tuple":
+                    return row
+                return row if isinstance(row, dict) else dict(row)
 
     def get_details_sql(self) -> str:
         """Return the SQL query for fetching detailed information for a given entity ID."""
@@ -126,7 +121,7 @@ class BaseRepository(AbstractRepository):
         try:
             return await self.fetch_one(self.get_details_sql(), {"id": int(entity_id)})
         except (ValueError, psycopg.Error) as e:
-            logger.error(f"Error fetching details for entity_id {entity_id}: {e}")
+            logger.exception(f"Error fetching details for entity_id {entity_id}: {e}")
             return None
 
     async def find(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:  # pylint: disable=unused-argument

@@ -137,7 +137,8 @@ def generate_semantic_sql(entity_key: str, entity: dict[str, Any], env: Environm
 
 @click.command()
 @click.option("--entities", type=str, help="Comma-separated list of entity keys to generate (e.g., method,site,location)")
-@click.option("--all", "generate_all", is_flag=True, help="Generate schema for all entities")
+@click.option("--all-entities", "all_entities", is_flag=True, help="Generate schema for all entities")
+@click.option("--skip-embeddings/--no-skip-embeddings", default=True, is_flag=True, help="Skip generating semantic search schemas")
 @click.option("--force", is_flag=True, help="Force regeneration even if output files exist")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
 @click.option(
@@ -150,7 +151,16 @@ def generate_semantic_sql(entity_key: str, entity: dict[str, Any], env: Environm
     "--template-dir", type=click.Path(exists=True, path_type=Path), default=Path("schema/templates"), help="Path to templates directory"
 )
 @click.option("--output-dir", type=click.Path(path_type=Path), default=Path("schema/generated"), help="Path to output directory")
-def main(entities: str | None, generate_all: bool, force: bool, verbose: bool, config: Path, template_dir: Path, output_dir: Path) -> None:
+def main(
+    entities: str | None,
+    all_entities: bool,
+    force: bool,
+    verbose: bool,
+    skip_embeddings: bool,
+    config: Path,
+    template_dir: Path,
+    output_dir: Path,
+) -> None:
     """
     Generate entity-specific SQL schema files from Jinja2 templates.
 
@@ -177,7 +187,7 @@ def main(entities: str | None, generate_all: bool, force: bool, verbose: bool, c
     setup_logging(verbose)
 
     # Validate inputs
-    if not generate_all and not entities:
+    if not all_entities and not entities:
         raise click.UsageError("Either --all or --entities must be specified")
 
     # Create output directory
@@ -185,16 +195,16 @@ def main(entities: str | None, generate_all: bool, force: bool, verbose: bool, c
     logger.info(f"Output directory: {output_dir}")
 
     # Load entities configuration
-    entities_config = load_entities_config(config)
+    entities_config: dict[str, Any] = load_entities_config(config)
 
     # Separate entities with and without embeddings
-    entities_with_embeddings = filter_entities_with_embeddings(entities_config)
+    entities_with_embeddings: dict[str, Any] = {} if skip_embeddings else filter_entities_with_embeddings(entities_config)
 
     logger.info(f"Total entities: {len(entities_config)}")
     logger.info(f"Entities with embedding_config: {len(entities_with_embeddings)}")
 
     # Determine which entities to generate
-    if generate_all:
+    if all_entities:
         # Generate trigram for ALL entities
         trigram_entities = entities_config
         # Generate semantic only for entities with embeddings
@@ -242,7 +252,7 @@ def main(entities: str | None, generate_all: bool, force: bool, verbose: bool, c
             error_count += 1
 
     # Generate semantic SQL only for entities with embeddings
-    if semantic_entities:
+    if not skip_embeddings and semantic_entities:
         logger.info("")
         logger.info("Generating semantic search SQL files...")
         logger.info("-" * 60)
@@ -260,9 +270,13 @@ def main(entities: str | None, generate_all: bool, force: bool, verbose: bool, c
     logger.info("")
     logger.info("=" * 60)
     logger.success(f"Generated {trigram_success} trigram SQL files")
-    logger.success(f"Generated {semantic_success} semantic SQL files")
+
+    if not skip_embeddings:
+        logger.success(f"Generated {semantic_success} semantic SQL files")
+
     if error_count > 0:
         logger.error(f"Failed to generate {error_count} files")
+
     logger.info(f"Output directory: {output_dir.absolute()}")
     logger.info("=" * 60)
 

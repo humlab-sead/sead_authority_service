@@ -108,12 +108,33 @@ logs
 update
 csv_files
 tests/output
-**/.env*
+**/.env
+**/.env.*
+!deployment/container/.env.example
 **/chat*.json
 bin
 *.pdf
 *.pid
 *.out
-deprecated
+**/deprecated
 output*.xlsx
 **/*.mdb
+sead-tools
+chat-transcripts
+
+graphify-out/cost.json
+graphify-out/cache/
+graphify-out/memory/
+graphify-out/reflections/
+graphify-out/.graphify_*
+graphify-out/*-*-*
+graphify-out/manifest.json 
+
+**/TLDR.md
+
+/.chats/
+
+# graphify-out
+# Optional: commit cache for speed, skip to keep repo small.
+graphify-out/cache/
+secrets

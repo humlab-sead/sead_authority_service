@@ -6,19 +6,24 @@
 **        If the entity has embeddings, also install semantic-{entity}.sql to create
 **        the embeddings table and semantic search functions.
 **********************************************************************************************/
+
 drop view if exists authority.taxonomy_note cascade;
 
-create or replace view authority.taxonomy_note as  select
+create or replace view authority.taxonomy_note as
+  select
     t.taxonomy_notes_id,
     t.taxonomy_notes as label,
     authority.immutable_unaccent(lower(t.taxonomy_notes)) as norm_label  from public.tbl_taxonomy_notes as t;
+
 create index if not exists tbl_taxonomy_notes_norm_trgm
   on public.tbl_taxonomy_notes
     using gin ( (authority.immutable_unaccent(lower(taxonomy_notes))) gin_trgm_ops );
+
 /***************************************************************************************************
  ** Procedure  authority.fuzzy_taxonomy_note
  ** What       Trigram fuzzy search function using pg_trgm similarity
- ** Usage      SELECT * FROM authority.fuzzy_taxonomy_note('query text', 10); ****************************************************************************************************/
+ ** Usage      SELECT * FROM authority.fuzzy_taxonomy_note('query text', 10);
+ ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_taxonomy_note(text, integer) cascade;
 
