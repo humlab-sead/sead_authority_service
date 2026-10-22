@@ -79,7 +79,7 @@ class IdentityBatchConflict(ValueError):
     """Raised when a scoped run key is reused with a different payload."""
 
 
-class IdentityService:
+class IdentityService:  # pylint: disable=too-many-instance-attributes
     """Core SIMS service.
 
     All arguments are optional: if omitted, fresh repository/policy instances
@@ -157,9 +157,7 @@ class IdentityService:
         Implements FR-12 and FR-13 (idempotency).
         """
         if request.approved_aggregate_id is not None and request.entity_type not in self.policy.known_entity_types():
-            raise IdentityBindingConflict(
-                f"Approved aggregate-ID binding is not configured for entity type '{request.entity_type}'"
-            )
+            raise IdentityBindingConflict(f"Approved aggregate-ID binding is not configured for entity type '{request.entity_type}'")
 
         # 1. Upsert Source Identity — pass all signals as keys
         all_signals: list[IdentitySignal] = [request.primary_signal, *request.additional_signals]
@@ -176,9 +174,7 @@ class IdentityService:
 
         active_bindings = await self.binding_repo.list_active_bindings(source_identity.source_identity_uuid)
         if any(state == BindingSetState.PROPOSED for _, state in active_bindings):
-            raise IdentityBindingConflict(
-                f"Source identity {source_identity.source_identity_uuid} has an unresolved proposed binding"
-            )
+            raise IdentityBindingConflict(f"Source identity {source_identity.source_identity_uuid} has an unresolved proposed binding")
 
         # 3. Check for an existing confirmed binding
         existing: tuple[Binding, BindingSetState] | None = await self.binding_repo.find_confirmed_binding(
@@ -234,9 +230,7 @@ class IdentityService:
             )
 
         # 4. No existing binding — allocation deferred
-        logger.debug(
-            f"resolve_identity: no existing binding for source={source_identity.source_identity_uuid}, outcome=new"
-        )
+        logger.debug(f"resolve_identity: no existing binding for source={source_identity.source_identity_uuid}, outcome=new")
         return ResolutionOutcome(
             source_identity_uuid=source_identity.source_identity_uuid,
             entity_type=request.entity_type,
@@ -304,21 +298,15 @@ class IdentityService:
         checked: dict[UUID, list[tuple[Binding, BindingSetState]]] = {}
         for outcome in outcomes:
             if outcome.source_identity_uuid not in checked:
-                checked[outcome.source_identity_uuid] = await self.binding_repo.list_active_bindings(
-                    outcome.source_identity_uuid
-                )
+                checked[outcome.source_identity_uuid] = await self.binding_repo.list_active_bindings(outcome.source_identity_uuid)
             active = checked[outcome.source_identity_uuid]
             if any(state == BindingSetState.PROPOSED for _, state in active):
-                raise IdentityBindingConflict(
-                    f"Source identity {outcome.source_identity_uuid} has an unresolved proposed binding"
-                )
+                raise IdentityBindingConflict(f"Source identity {outcome.source_identity_uuid} has an unresolved proposed binding")
 
             confirmed = [binding for binding, state in active if state == BindingSetState.CONFIRMED]
             tracked_uuids = {binding.tracked_identity_uuid for binding in confirmed}
             if len(tracked_uuids) > 1:
-                raise IdentityBindingConflict(
-                    f"Source identity {outcome.source_identity_uuid} has conflicting confirmed bindings"
-                )
+                raise IdentityBindingConflict(f"Source identity {outcome.source_identity_uuid} has conflicting confirmed bindings")
             if not confirmed:
                 continue
 
@@ -360,8 +348,7 @@ class IdentityService:
         # outcome == "new"
         if not ep.allow_allocation:
             logger.warning(
-                f"bind: allocation blocked by policy for entity_type={outcome.entity_type} "
-                f"(source={outcome.source_identity_uuid})"
+                f"bind: allocation blocked by policy for entity_type={outcome.entity_type} " f"(source={outcome.source_identity_uuid})"
             )
             return None
 
@@ -409,9 +396,7 @@ class IdentityService:
             existing: ResolveBatchRecord | None = await self.resolve_batch_repo.find(scope_name, run_id)
             if existing is not None:
                 if existing.request_fingerprint != fingerprint:
-                    raise IdentityBatchConflict(
-                        f"Run '{run_id}' for scope '{scope_name}' was already resolved with a different payload"
-                    )
+                    raise IdentityBatchConflict(f"Run '{run_id}' for scope '{scope_name}' was already resolved with a different payload")
                 logger.info(f"resolve_batch: replaying stored result for run '{run_id}'")
                 return existing.result
 
@@ -509,9 +494,7 @@ class IdentityService:
         if result:
             logger.info(f"Binding set {binding_set_uuid} associated with change request '{cr_name}'")
         else:
-            logger.warning(
-                f"associate_change_request: binding set {binding_set_uuid} not found or not confirmed"
-            )
+            logger.warning(f"associate_change_request: binding set {binding_set_uuid} not found or not confirmed")
         return result
 
     # ------------------------------------------------------------------

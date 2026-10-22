@@ -17,9 +17,9 @@ from src.identity.policy import CAPABILITY_VERSION, IdentityPolicy
 
 
 def _make_client() -> TestClient:
-    app.dependency_overrides[get_identity_service] = lambda: MagicMock()
-    app.dependency_overrides[get_config_dep] = lambda: MagicMock()
-    app.dependency_overrides[get_identity_policy] = lambda: IdentityPolicy()
+    app.dependency_overrides[get_identity_service] = MagicMock
+    app.dependency_overrides[get_config_dep] = MagicMock
+    app.dependency_overrides[get_identity_policy] = IdentityPolicy
     return TestClient(app)
 
 

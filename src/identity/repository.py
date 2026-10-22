@@ -274,10 +274,7 @@ class SourceIdentityRepository(BaseRepository[SourceIdentity]):
         """Return an existing identity or create one while holding its key locks."""
         async with get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
             lock_keys = sorted(
-                {
-                    json.dumps([str(scope_uuid), entity_type, key_type, key_value], separators=(",", ":"))
-                    for key_type, key_value in keys
-                }
+                {json.dumps([str(scope_uuid), entity_type, key_type, key_value], separators=(",", ":")) for key_type, key_value in keys}
             )
             for lock_key in lock_keys:
                 await cur.execute(
@@ -388,9 +385,7 @@ class TrackedIdentityRepository(BaseRepository[TrackedIdentity]):
             (entity_type, aggregate_id),
         )
         if len(rows) > 1:
-            raise RepositoryError(
-                f"Multiple tracked identities exist for {entity_type} aggregate ID {aggregate_id}"
-            )
+            raise RepositoryError(f"Multiple tracked identities exist for {entity_type} aggregate ID {aggregate_id}")
         return self._to_model(rows[0] if rows else None)
 
     async def mint(
@@ -607,14 +602,14 @@ class BindingRepository(BaseRepository[Binding]):
     table_name = "sead_identity.bindings"
     pk_column = "binding_uuid"
 
-    async def create(
+    async def create(  # pylint: disable=too-many-positional-arguments
         self,
         binding_set_uuid: UUID,
         source_identity_uuid: UUID,
         tracked_identity_uuid: UUID,
         method: BindingMethod,
         provenance: dict[str, Any] | None = None,
-        created_by: str | None = None,
+        created_by: str | None = None,  # pylint: disable=unused-argument
     ) -> Binding:
         row = await self._fetchone(
             """

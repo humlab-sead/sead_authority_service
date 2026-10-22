@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from src.identity.policy import _resolve_policy_path
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -46,21 +47,27 @@ def _minimal_policy(extra_entities: str = "") -> str:
 # Import — must follow helpers so tmp_path is ready
 # ---------------------------------------------------------------------------
 
-from src.identity.policy import CAPABILITY_VERSION, EntityCapability, EntityPolicy, IdentityPolicy
+# pylint: disable=wrong-import-position
 
+from src.identity.policy import (  # noqa: E402
+    CAPABILITY_VERSION,
+    EntityCapability,
+    EntityPolicy,
+    IdentityPolicy,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
-def minimal_policy_file(tmp_path: Path) -> Path:
+@pytest.fixture(name="minimal_policy_file")
+def _minimal_policy_file(tmp_path: Path) -> Path:
     return _write_policy(tmp_path, _minimal_policy())
 
 
-@pytest.fixture()
-def loaded_policy(minimal_policy_file: Path) -> IdentityPolicy:
+@pytest.fixture(name="loaded_policy")
+def _loaded_policy(minimal_policy_file: Path) -> IdentityPolicy:
     return IdentityPolicy(policy_path=minimal_policy_file)
 
 
@@ -87,7 +94,6 @@ class TestPolicyConstruction:
     def test_env_var_override(self, monkeypatch: pytest.MonkeyPatch, minimal_policy_file: Path) -> None:
         monkeypatch.setenv("IDENTITY_POLICY_FILE", str(minimal_policy_file))
         # Need to re-import _resolve_policy_path after env var is set
-        from src.identity.policy import _resolve_policy_path
 
         resolved = _resolve_policy_path()
         assert resolved == minimal_policy_file
@@ -351,8 +357,8 @@ defaults:
 """
 
 
-@pytest.fixture()
-def operations_policy(tmp_path: Path) -> IdentityPolicy:
+@pytest.fixture(name="operations_policy")
+def _operations_policy(tmp_path: Path) -> IdentityPolicy:
     return IdentityPolicy(policy_path=_write_policy(tmp_path, _OPERATIONS_POLICY))
 
 

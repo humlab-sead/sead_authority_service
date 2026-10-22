@@ -21,7 +21,6 @@ from src.identity.types import (
     TrackedIdentityState,
 )
 
-
 # ---------------------------------------------------------------------------
 # Storage models — mirror the database tables
 # ---------------------------------------------------------------------------
@@ -63,7 +62,9 @@ class SourceIdentity(BaseModel):
     entity_type: str = Field(description="SEAD entity type, e.g. 'site', 'sample_group', 'taxa_tree_master'.")
     created_at: datetime
     created_by: str | None = None
-    keys: list["SourceIdentityKey"] = Field(default_factory=list, description="Identity evidence keys; empty for bare header lookups, populated by repository joins.")
+    keys: list["SourceIdentityKey"] = Field(
+        default_factory=list, description="Identity evidence keys; empty for bare header lookups, populated by repository joins."
+    )
 
 
 class SourceIdentityKey(BaseModel):
@@ -94,7 +95,9 @@ class TrackedIdentity(BaseModel):
         description="SIMS-minted, entity-scoped aggregate ID. Consumers interpret this value using their own data model.",
     )
     content_hash: str | None = Field(default=None, description="Deterministic aggregate content hash for change detection (FR-24).")
-    lifecycle_state: TrackedIdentityState = Field(default=TrackedIdentityState.ALLOCATED, description="ALLOCATED → MATERIALIZED → RETIRED lifecycle.")
+    lifecycle_state: TrackedIdentityState = Field(
+        default=TrackedIdentityState.ALLOCATED, description="ALLOCATED → MATERIALIZED → RETIRED lifecycle."
+    )
     created_at: datetime
     created_by: str | None = None
     materialized_at: datetime | None = Field(default=None, description="Timestamp when the consumer first applied the aggregate data.")
@@ -108,8 +111,12 @@ class BindingSet(BaseModel):
 
     binding_set_uuid: UUID
     submission_uuid: UUID | None = None
-    lifecycle_state: BindingSetState = Field(default=BindingSetState.PROPOSED, description="PROPOSED → CONFIRMED governance lifecycle (FR-26).")
-    change_request_name: str | None = Field(default=None, description="Sqitch change request name linking this set to a schema migration (FR-25).")
+    lifecycle_state: BindingSetState = Field(
+        default=BindingSetState.PROPOSED, description="PROPOSED → CONFIRMED governance lifecycle (FR-26)."
+    )
+    change_request_name: str | None = Field(
+        default=None, description="Sqitch change request name linking this set to a schema migration (FR-25)."
+    )
     created_at: datetime
     created_by: str | None = None
     confirmed_at: datetime | None = Field(default=None, description="Timestamp of lifecycle transition to CONFIRMED.")
@@ -122,7 +129,9 @@ class Binding(BaseModel):
     binding_set_uuid: UUID
     source_identity_uuid: UUID
     tracked_identity_uuid: UUID
-    method: BindingMethod = Field(description="How the correspondence was established: UUID match, business key, exact match, or allocation.")
+    method: BindingMethod = Field(
+        description="How the correspondence was established: UUID match, business key, exact match, or allocation."
+    )
     provenance: dict | None = Field(default=None, description="Audit evidence: match score, matched field, applied policy, etc.")
 
 
@@ -152,7 +161,10 @@ class ResolutionRequest(BaseModel):
 
     entity_type: str = Field(description="Configured tracked aggregate type, e.g. 'site' or 'taxa_tree_master'.")
     primary_signal: IdentitySignal = Field(description="The main identity key used for idempotency lookup (FR-12).")
-    additional_signals: list[IdentitySignal] = Field(default_factory=list, description="Optional supplementary keys that are also stored, e.g. an authority UUID alongside a business key.")
+    additional_signals: list[IdentitySignal] = Field(
+        default_factory=list,
+        description="Optional supplementary keys that are also stored, e.g. an authority UUID alongside a business key.",
+    )
     approved_aggregate_id: int | None = Field(
         default=None,
         gt=0,
@@ -181,7 +193,9 @@ class BindRequest(BaseModel):
     """Input to the Bind operation: resolution outcomes to package into a Binding Set."""
 
     submission_uuid: UUID
-    resolution_outcomes: list[ResolutionOutcome] = Field(description="Outcomes from resolve_identity calls to package into a single Binding Set.")
+    resolution_outcomes: list[ResolutionOutcome] = Field(
+        description="Outcomes from resolve_identity calls to package into a single Binding Set."
+    )
 
 
 class BindingSetResponse(BaseModel):
