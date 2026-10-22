@@ -1,6 +1,6 @@
 ---
 description: "Use for OPERATIONS.md, deployment/runbook docs, environments, runtime configuration, CI/CD, observability, rollback, and incident-readiness documentation."
-applyTo: "docs/OPERATIONS.md"
+applyTo: "docs/OPERATIONS.md,docs/SIMS/OPERATIONS.md"
 ---
 # Operations Docs
 
@@ -39,6 +39,7 @@ Those topics belong in developer-facing documentation, design/architecture docum
 ## Scope boundaries
 
 - `docs/OPERATIONS.md`: runtime environments, release flow, deployment, verification, recovery, and operational dependencies
+- `docs/SIMS/OPERATIONS.md`: SIMS identity module — deployment, configuration, troubleshooting (subsystem runbook)
 - `docs/DEVELOPMENT.md`: contributor workflow, commit conventions, local commands, development and testing practices
 - `README.md`: short overview and entry-point links, not the full runbook
 - `docs/archive/`: historical reference only; do not treat archived docs as the source of truth for current operations
@@ -69,8 +70,11 @@ Those topics belong in developer-facing documentation, design/architecture docum
 
 ## Sources to trust
 
-- FIXME: add references to workflow files, Docker config, and runtime configuration as the primary source of truth for operational procedures and runtime behavior. Remove references to design docs and development docs as they are not the source of truth for operations.
-- `AGENTS.md` — canonical architecture and operational rules
-- `docs/DEVELOPMENT.md` — scope boundary for local vs runtime configuration
+- `.github/workflows/` — CI/CD stages, triggers, and release automation
+- `container/` — container build, runtime topology, deployment configuration, and example environment settings
+- `Makefile` and deployment scripts — supported operational commands and automation
+- `config/` — service configuration and runtime defaults
+- `AGENTS.md` — architecture and operational constraints
+- `docs/DEVELOPMENT.md` — scope boundary for local versus runtime configuration
 
-Verify operational claims against current workflow files, Docker config, and runtime configuration before documenting them.
+Verify operational claims against current workflow files, the Podman bundle, and runtime configuration before documenting them.

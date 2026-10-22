@@ -11,9 +11,8 @@ Complete after Phase 1 is deployed to staging.
 - [x] Add a `> **Status: Frozen (2026-04-06)**` notice to the top of each system reference doc:
   - `docs/SIMS/REQUIREMENTS.md`
   - `docs/SIMS/CONCEPTUAL_MODEL.md`
-  - `docs/SIMS/DESIGN_VIEW.md`
   - `docs/SIMS/IMPLEMENTATION_VIEW.md`
-  - `docs/SIMS/SEQUENCE_DIAGRAMS.md`
+  - `docs/SIMS/DIAGRAMS.md`
   - `docs/SIMS/archived/ASSESSMENT.md`
 - [x] Moved `IMPLEMENTATION_PLAN.md` to `docs/SIMS/archived/` (2026-08-20) once Phase 2 planning began.
 

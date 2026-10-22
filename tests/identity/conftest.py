@@ -11,27 +11,50 @@ import os
 
 import pytest
 
+from src.configuration import get_config_provider
 from src.configuration.setup import setup_config_store
 
 _RUN_INTEGRATION = os.environ.get("SIMS_INTEGRATION_DB", "0") == "1"
 
+_DISPOSABLE_DB = ("127.0.0.1", "55432", "sead_staging")
+
 
 @pytest.fixture(scope="session", autouse=True)
 async def setup_identity_config():
-    """Initialize ConfigStore with a real DB connection for integration tests.
+    """Point the session at the helper-owned disposable database for integration tests.
 
     When ``SIMS_INTEGRATION_DB`` is not set the fixture is a quick no-op so
     unit tests continue to work without a database.
 
-    Environment variables expected (via ``ENV_FILE=tests/.env``):
-      CONFIG_FILE                              → tests/config/config.yml
-      SEAD_AUTHORITY_OPTIONS_DATABASE_HOST     → live DB host
-      SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME   → live DB name
-      SEAD_AUTHORITY_OPTIONS_DATABASE_USER     → DB user
-      SEAD_AUTHORITY_OPTIONS_DATABASE_PORT     → DB port
+    Integration tests run only against the helper-owned loopback database, so
+    the suite never connects to an intended deployment. Environment variables
+    expected:
+      SEAD_AUTHORITY_OPTIONS_DATABASE_HOST     → 127.0.0.1
+      SEAD_AUTHORITY_OPTIONS_DATABASE_PORT     → 55432
+      SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME   → sead_staging
+      SEAD_AUTHORITY_OPTIONS_DATABASE_USER     → postgres
+      SEAD_AUTHORITY_OPTIONS_DATABASE_PASSWORD → DB password
     """
     if not _RUN_INTEGRATION:
+        yield
         return
 
-    config_file = os.environ.get("CONFIG_FILE", "./tests/config/config.yml")
-    await setup_config_store(filename=config_file, force=True)
+    database_host = os.environ.get("SEAD_AUTHORITY_OPTIONS_DATABASE_HOST")
+    database_port = os.environ.get("SEAD_AUTHORITY_OPTIONS_DATABASE_PORT")
+    database_name = os.environ.get("SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME")
+    if (database_host, database_port, database_name) != _DISPOSABLE_DB:
+        pytest.skip(
+            "Integration tests require the helper-owned 127.0.0.1:55432/sead_staging database"
+        )
+
+    await setup_config_store(
+        filename="config/config.yml",
+        force=True,
+        env_filename="",
+        env_prefix="SEAD_AUTHORITY",
+    )
+    yield
+
+    pool = get_config_provider().get_config().get("runtime:connection_pool")
+    if pool is not None:
+        await pool.close()

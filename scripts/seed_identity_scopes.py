@@ -50,8 +50,7 @@ WELL_KNOWN_SCOPES: list[dict] = [
 
 async def _seed(dry_run: bool, verify: bool) -> int:
     """Return exit code: 0 = OK, 1 = error or missing scopes (verify mode)."""
-    from src.configuration import setup_config_store
-    from src.configuration import get_connection
+    from src.configuration import get_connection, setup_config_store
 
     await setup_config_store()
 

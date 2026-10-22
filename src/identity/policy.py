@@ -31,6 +31,10 @@ from loguru import logger
 _DEFAULT_POLICY_PATH = Path(__file__).parent.parent.parent / "config" / "identity_policy.yml"
 
 EntitySubtype = Literal["provider_owned", "shared_metadata", "relationship"]
+EntityOperation = Literal["bind_existing", "allocate_new"]
+
+# Version of the GET /identity/capabilities response schema.
+CAPABILITY_VERSION = "1.0"
 
 
 @dataclass(frozen=True)
@@ -42,6 +46,8 @@ class EntityPolicy:
     accept_uuid: bool
     allow_allocation: bool
     auto_confirm: bool
+    bind_existing: bool = False
+    allocate_new: bool = False
 
     @property
     def is_provider_owned(self) -> bool:
@@ -87,17 +93,54 @@ class IdentityPolicy:
         """Return the policy for *entity_type*, falling back to defaults."""
         base = dict(self._defaults)
         base.update(self._entities.get(entity_type, {}))
+        operations = base.get("operations", {}) or {}
+        allocate_new = bool(operations.get("allocate_new", base.get("allow_allocation", False)))
+        bind_existing = bool(operations.get("bind_existing", False))
         return EntityPolicy(
             entity_type=entity_type,
             entity_subtype=base["entity_subtype"],
             accept_uuid=bool(base["accept_uuid"]),
-            allow_allocation=bool(base["allow_allocation"]),
+            allow_allocation=allocate_new,
             auto_confirm=bool(base["auto_confirm"]),
+            bind_existing=bind_existing,
+            allocate_new=allocate_new,
         )
 
     def known_entity_types(self) -> list[str]:
         """Return entity types explicitly listed in the policy file."""
         return list(self._entities.keys())
+
+    def is_configured(self, entity_type: str) -> bool:
+        """Return True when *entity_type* is explicitly listed in the policy."""
+        return entity_type in self._entities
+
+    def supports(self, entity_type: str, operation: EntityOperation) -> bool:
+        """Return True when *entity_type* is configured and permits *operation*."""
+        if not self.is_configured(entity_type):
+            return False
+        ep = self.get_entity_policy(entity_type)
+        if operation == "bind_existing":
+            return ep.bind_existing
+        if operation == "allocate_new":
+            return ep.allocate_new
+        return False
+
+    def get_capabilities(self) -> list[EntityCapability]:
+        """Return a capability snapshot for each configured entity type."""
+        capabilities: list[EntityCapability] = []
+        for name in sorted(self._entities):
+            ep = self.get_entity_policy(name)
+            capabilities.append(
+                EntityCapability(
+                    entity_type=name,
+                    entity_subtype=ep.entity_subtype,
+                    bind_existing=ep.bind_existing,
+                    allocate_new=ep.allocate_new,
+                    auto_confirm=ep.auto_confirm,
+                    accept_uuid=ep.accept_uuid,
+                )
+            )
+        return capabilities
 
     def reload(self) -> None:
         """Re-read the YAML file (useful after hot-reloading config)."""
@@ -128,8 +171,21 @@ def _resolve_policy_path() -> Path:
 
 
 # Required fields every entity entry and the defaults block must supply.
-_REQUIRED_FIELDS: frozenset[str] = frozenset({"entity_subtype", "accept_uuid", "allow_allocation", "auto_confirm"})
+_REQUIRED_FIELDS: frozenset[str] = frozenset({"entity_subtype", "accept_uuid", "auto_confirm"})
 _VALID_SUBTYPES: frozenset[str] = frozenset({"provider_owned", "shared_metadata", "relationship"})
+_OPERATION_KEYS: frozenset[str] = frozenset({"bind_existing", "allocate_new"})
+
+
+@dataclass(frozen=True)
+class EntityCapability:
+    """Published capability snapshot for one configured entity type."""
+
+    entity_type: str
+    entity_subtype: EntitySubtype
+    bind_existing: bool
+    allocate_new: bool
+    auto_confirm: bool
+    accept_uuid: bool
 
 
 def _validate_policy(entities: dict, defaults: dict) -> None:
@@ -140,6 +196,7 @@ def _validate_policy(entities: dict, defaults: dict) -> None:
 
     if defaults.get("entity_subtype") not in _VALID_SUBTYPES:
         raise ValueError(f"Invalid entity_subtype in defaults: {defaults.get('entity_subtype')!r}")
+    _validate_operations(defaults.get("operations"), "defaults")
 
     for name, cfg in entities.items():
         # Merge with defaults so partial entries are valid
@@ -149,3 +206,18 @@ def _validate_policy(entities: dict, defaults: dict) -> None:
             raise ValueError(f"Entity policy for '{name}' is missing fields: {missing}")
         if merged.get("entity_subtype") not in _VALID_SUBTYPES:
             raise ValueError(f"Invalid entity_subtype for '{name}': {merged.get('entity_subtype')!r}")
+        _validate_operations(merged.get("operations"), name)
+
+
+def _validate_operations(operations: object, context: str) -> None:
+    """Raise ValueError when *operations* is not a valid bind/allocate mapping."""
+    if operations is None:
+        return
+    if not isinstance(operations, dict):
+        raise ValueError(f"Identity policy '{context}' operations must be a mapping")
+    unknown = set(operations) - _OPERATION_KEYS
+    if unknown:
+        raise ValueError(f"Identity policy '{context}' has unknown operation keys: {sorted(unknown)}")
+    for key in _OPERATION_KEYS:
+        if key in operations and not isinstance(operations[key], bool):
+            raise ValueError(f"Identity policy '{context}' operation '{key}' must be a boolean")

@@ -1,7 +1,7 @@
 # SIMS Operations Guide
 
 Operational reference for the SEAD Identity Management System (`src/identity/`).  
-For design context see the frozen system reference docs in `docs/SIMS/`. For the module API see `src/identity/README.md`.
+For design context see the system reference docs in `docs/SIMS/` (reflect Phases 1–2 implementation). For the module API see `src/identity/README.md`.
 
 ---
 
@@ -90,14 +90,14 @@ SIMS_INTEGRATION_DB=1 ENV_FILE=tests/.env uv run pytest tests/identity/test_serv
 
 ### `config/identity_policy.yml`
 
-Loaded once at startup by `src.identity.policy.IdentityPolicy`. Controls per-entity-type behaviour.
+Loaded once at startup by `src.identity.policy.IdentityPolicy`. This describes the current legacy implementation, which uses per-entity subtype defaults. It is not the target SIMS identity contract: the target uses generic allocator code with independently validated SIMS configuration and does not consume Shape Shifter's target model.
 
 **Fields per entity entry:**
 
 | Field              | Values                                                  | Meaning                                                                    |
 |--------------------|---------------------------------------------------------|----------------------------------------------------------------------------|
 | `entity_subtype`   | `provider_owned` \| `shared_metadata` \| `relationship` | Classification driving default behaviour                                   |
-| `accept_uuid`      | `true` / `false`                                        | Whether a caller-supplied UUID is accepted as the Tracked Identity (FR-11) |
+| `accept_uuid`      | `true` / `false`                                        | Legacy behavior: whether a caller-supplied UUID is accepted as the Tracked Identity; the target contract retains it as a source key and SIMS mints its own tracked UUID |
 | `allow_allocation` | `true` / `false`                                        | Whether the service may mint a new Tracked Identity when no match is found |
 | `auto_confirm`     | `true` / `false`                                        | Whether Binding Sets are auto-confirmed without manual review (D6)         |
 
@@ -119,20 +119,20 @@ Entities not listed in the file fall back to the `defaults:` block (currently `s
 | `taxa_tree_master`, `feature_type`, `method`, `data_type`, `unit` | `shared_metadata` | Phase 3 (planned) |
 | `sample_dimension`, `abundance`                                   | `relationship`    | Phase 3 (planned) |
 
-### Refreshing the Policy from Shape Shifter
+### Refreshing the Legacy Policy from Shape Shifter
 
-`identity_policy.yml` is seeded from Shape Shifter's `sead_superset_model.yml`. After a Shape Shifter release:
+The current `identity_policy.yml` was seeded from Shape Shifter's `sead_standard_model.yml`. Until the generic SIMS configuration replaces this legacy process:
 
-1. Open `sead_superset_model.yml` in the Shape Shifter repo (`resources/target_models/`).
+1. Open `sead_standard_model.yml` in the Shape Shifter repo (`resources/target_models/`).
 2. For each entity, check the `identity_tracking` and `reconciliation` fields.
 3. Update `config/identity_policy.yml` to reflect new or changed entity entries.
 4. Run the unit test suite to verify policy loads correctly: `uv run pytest tests/identity/test_policy.py -v`.
-5. Regenerate `docs/SIMS/TRACKED_ENTITIES.md` from Shape Shifter's superset model:
+5. Regenerate `docs/SIMS/SHAPE_SHIFTER_TARGET_MODEL_ENTITY_REPORT.md` from Shape Shifter's superset model:
 
   ```bash
   cd /path/to/sead_shape_shifter
-  python scripts/generate_target_model_docs.py resources/target_models/sead_superset_model.yml --format sims --output-dir /tmp/sims-docs
-  cp /tmp/sims-docs/sead_superset_model.sims.md /path/to/sead_authority_service/docs/SIMS/TRACKED_ENTITIES.md
+  python scripts/generate_target_model_docs.py resources/target_models/sead_standard_model.yml --format sims --output-dir /tmp/sims-docs
+  cp /tmp/sims-docs/sead_standard_model.sims.md /path/to/sead_authority_service/docs/SIMS/SHAPE_SHIFTER_TARGET_MODEL_ENTITY_REPORT.md
   ```
 
 There is no automated sync — this is intentional (D5: avoids runtime cross-repo dependency).

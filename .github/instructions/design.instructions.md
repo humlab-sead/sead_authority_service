@@ -1,12 +1,14 @@
 ---
 description: "Use for DESIGN.md and other architecture-focused documentation, including system structure, component boundaries, runtime flows, technical constraints, and major design decisions."
-applyTo: "docs/DESIGN.md"
+applyTo: "docs/DESIGN.md,docs/SIMS/DESIGN.md,docs/SIMS/CONCEPTUAL_MODEL.md"
 ---
 # Design Docs
 
 ## Purpose
 
 Keep `docs/DESIGN.md` focused on how the system is structured, how its major components interact, and which design decisions shape the codebase. Write for developers who need to understand architecture — not operators, not new contributors learning workflow.
+
+The same architecture focus applies, scoped to the SIMS identity subsystem, to `docs/SIMS/CONCEPTUAL_MODEL.md` (conceptual/domain model) and `docs/SIMS/DESIGN.md` (implementation/storage design).
 
 When editing an existing document, preserve its structure unless reorganization is explicitly requested.
 
@@ -24,6 +26,8 @@ When editing an existing document, preserve its structure unless reorganization 
 ## Scope boundaries
 
 - `docs/DESIGN.md` — architecture, component responsibilities, key flows, cross-cutting concerns, constraints, decisions
+- `docs/SIMS/CONCEPTUAL_MODEL.md` — SIMS conceptual/domain model: core concepts, design rules, decision flow, lifecycles, use cases
+- `docs/SIMS/DESIGN.md` — SIMS implementation/storage design: concept-to-structure mapping, table design, core operations
 - `docs/DIAGRAMS.md` — visual diagrams of the active runtime; historical diagrams in `docs/archive/`
 - `docs/DEVELOPMENT.md` — contributor workflow, local setup, common commands
 - `docs/TESTING.md` — test strategy, test levels, quality expectations
@@ -53,7 +57,7 @@ Target 1000–2200 words. Stay under 3000. Move detailed subsystem material into
 - `src/identity/` — SIMS identity management subsystem
 - `schemas/` — SEAD Authority Service database schema (generation scripts and generated SQL)
 - `pyproject.toml` — declared dependencies and package boundaries
-- `docker/` — runtime service topology and build configuration
+- `deployment/container/` — rootless Podman runtime topology and build configuration
 - `AGENTS.md` — canonical architecture rules
 - `docs/DIAGRAMS.md` — authoritative visual design
 - `docs/DEVELOPMENT.md`, `docs/OPERATIONS.md` — cross-references for scope boundaries

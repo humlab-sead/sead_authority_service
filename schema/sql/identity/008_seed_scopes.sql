@@ -1,6 +1,6 @@
 -- SIMS: well-known internal source scopes
 -- Represents SEAD-internal origins that use the same Source Scope / Submission model
--- as external providers (per IMPLEMENTATION_VIEW § Internal Origins).
+-- as external providers (per DESIGN § Internal Origins).
 
 insert into sead_identity.source_scopes (scope_name, description)
 values

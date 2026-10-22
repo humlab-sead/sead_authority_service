@@ -1,0 +1,51 @@
+# ==============================================================================
+# Podman Compose configuration for the SEAD Authority Service
+#
+# Rootless Podman service configuration.
+# Works with podman-compose and Podman's compose provider.
+#
+# The runtime directory (~/container for the deployment user) holds this file,
+# the .env file, the mounted config/ directory, and the writable logs/
+# directory. Run commands from that directory, or use the Makefile.
+#
+# Usage:
+#   podman-compose -f podman-compose.yml up -d
+#   podman-compose -f podman-compose.yml logs -f
+#   podman-compose -f podman-compose.yml down
+# ==============================================================================
+
+# podman-compose creates a pod for the project by default. Podman refuses to
+# combine a pod with "userns_mode: keep-id", so run the service as a plain
+# container that publishes its own port.
+x-podman:
+  in_pod: false
+
+services:
+  sead-authority-service:
+    # GHCR image and tag convention preserved from the Docker deployment.
+    # SEAD_AUTHORITY_IMAGE_TAG comes from .env (default: latest).
+    image: ghcr.io/humlab-sead/sead_authority_service:${SEAD_AUTHORITY_IMAGE_TAG:-latest}
+    platform: linux/amd64
+    restart: always
+
+    # Rootless Podman maps the deployment user's host UID/GID into the
+    # container. Run the process with those same numeric IDs so it can read
+    # private config files and write to the deployment user's logs directory.
+    userns_mode: "keep-id"
+    user: "${SEAD_AUTHORITY_CONTAINER_UID:-1000}:${SEAD_AUTHORITY_CONTAINER_GID:-1000}"
+
+    env_file:
+      - ./.env
+
+    # Reach database services running on the deployment host from rootless Podman.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      # Read-only runtime configuration and writable logs, beside this file.
+      - ./config:/app/config:ro
+      - ./logs:/app/logs:rw
+
+    ports:
+      # Host port from SEAD_AUTHORITY_PORT (default 8024) to container port 8000.
+      - "${SEAD_AUTHORITY_PORT:-8024}:8000"

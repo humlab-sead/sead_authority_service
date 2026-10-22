@@ -1,4 +1,4 @@
-# Docker configuration for SEAD Authority Service
+# Runtime configuration for SEAD Authority Service
 # This config file is mounted into the container
 # It contains production-safe defaults with environment variable substitution
 

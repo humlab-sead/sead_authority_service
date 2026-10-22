@@ -1,7 +1,11 @@
 SHELL := /bin/bash
 
+-include .env
+export
+
 UVICORN_PORT := 8000
-SEAD_TOOLS_DIR := /home/sead/sead-tools/sead_authority_service
+PODMAN_DEPLOYMENT_DIR := deployment/container
+
 
 test-workflow:
 	@./scripts/test-ci.sh
@@ -25,19 +29,18 @@ generate-schema-force:
 	@echo "✅ Schema regeneration complete!"
 	
 
-.PHONY: dev-deploy-to-sead-tools
-dev-deploy-to-sead-tools:
-	@echo "Deploying docker image using local build..." \
-	 && ./docker/build.sh \
-	 && pushd $(SEAD_TOOLS_DIR) \
-	 && sudo docker compose up -d \
-	 && popd \
-	 && docker logs `docker ps -q --filter "publish=$(UVICORN_PORT)"` --follow
-	@echo "✅ Development environment deployed!"
+.PHONY: podman-build podman-up podman-down podman-logs
+podman-build:
+	@$(MAKE) -C $(PODMAN_DEPLOYMENT_DIR) build
 
-.PHONY: logs-supersead
-logs-supersead:
-	@docker logs `docker ps -q --filter "publish=$(UVICORN_PORT)"` --follow
+podman-up:
+	@$(MAKE) -C $(PODMAN_DEPLOYMENT_DIR) up
+
+podman-down:
+	@$(MAKE) -C $(PODMAN_DEPLOYMENT_DIR) down
+
+podman-logs:
+	@$(MAKE) -C $(PODMAN_DEPLOYMENT_DIR) logs
 
 
 .PHONY: dev-serve
@@ -122,3 +125,79 @@ test-coverage:
 .PHONY: dead-code
 dead-code:
 	@uv run vulture src tests main.py
+
+
+################################################################################
+# AI Coding Assistants recipes
+# Candidates: rtk, graphify, serena, snip, headroom
+################################################################################
+
+.PHONY: rtk rtk-setup rtk-status
+
+rtk: rtk-status
+
+rtk-setup:
+	@command -v rtk >/dev/null 2>&1 || { \
+		echo "RTK is not installed."; \
+		echo "Install with: brew install rtk-ai/tap/rtk"; \
+		exit 1; \
+	}
+	@rtk init --copilot
+	@rtk init --codex
+	@echo "✓ RTK project integrations installed"
+
+rtk-status:
+	@rtk --version
+	@rtk gain
+
+.PHONY: \
+	graphify \
+	graphify-setup \
+	graphify-create \
+	graphify-update \
+	graphify-skills \
+	graphify-cluster
+
+# Update the existing knowledge graph.
+graphify: graphify-update
+
+# One-time project setup for new developers.
+graphify-setup: graphify-skills
+	@echo "✓ Graphify setup complete"
+
+# Create/recreate the knowledge graph.
+graphify-create:
+	@echo "Creating Graphify knowledge graph..."
+	@uv run graphify extract . --project --backend openai --wiki --force
+
+# Update the existing knowledge graph.
+graphify-update:
+	@echo "Updating Graphify knowledge graph..."
+	@uv run graphify update .
+	@echo "✓ Graphify graph updated"
+
+# Install project-local agent integrations.
+graphify-skills:
+	@echo "Installing Graphify agent integrations..."
+	@uv run graphify install --project
+	@uv run graphify install --project --platform copilot
+	@uv run graphify install --project --platform codex
+	@echo "✓ Graphify agent integrations installed"
+
+graphify-cluster:
+	@uv run graphify cluster-only .
+	@uv run graphify export callflow-html
+################################################################################
+# Git related checks
+################################################################################
+
+.PHONY: branches-ahead
+branches-ahead:
+	@git for-each-ref --format='%(refname:short)' refs/heads | \
+	while IFS= read -r branch; do \
+		ahead=$$(git rev-list --count "dev..$$branch"); \
+		if [ "$$ahead" -gt 0 ]; then \
+			printf '%5s  %s\n' "$$ahead" "$$branch"; \
+		fi; \
+	done
+	@echo "✓ Branches ahead of dev listed above"

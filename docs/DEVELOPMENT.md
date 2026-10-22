@@ -60,7 +60,7 @@ export CONFIG_FILE=./tests/config/config.yml
 
 For PostgreSQL passwords, prefer `~/.pgpass` over environment variables.
 
-See `config/config.yml` and `docker/production/.env` for a full list of supported variables. For production/deployment configuration see [OPERATIONS.md](OPERATIONS.md).
+See `config/config.yml` and `deployment/container/.env.example` for supported variables. For production deployment configuration see [OPERATIONS.md](OPERATIONS.md).
 
 ---
 
@@ -90,7 +90,7 @@ sead_authority_service/
 │   ├── templates/           # Jinja2 templates for SQL generation
 │   └── generated/           # Generated SQL (do not edit directly)
 ├── tests/                   # pytest suite
-├── docker/                  # Container definitions and deployment configs
+├── deployment/container/    # Podman container definition and deployment files
 ├── scripts/                 # Developer and admin scripts
 ├── pyproject.toml           # Dependencies and tool configuration
 └── Makefile                 # All supported development commands

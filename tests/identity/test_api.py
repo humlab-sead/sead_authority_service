@@ -13,14 +13,16 @@ from uuid import UUID, uuid4
 from fastapi.testclient import TestClient
 
 from main import app
-from src.api.identity_router import get_config_dep, get_identity_service
+from src.api.identity_router import get_config_dep, get_identity_policy, get_identity_service
 from src.identity.models import (
     BindingSet,
     BindingSetResponse,
     ChangeDetectionResult,
     ResolutionOutcome,
+    ResolveBatchResult,
     SourceScope,
 )
+from src.identity.service import IdentityBatchConflict, IdentityBindingConflict
 from src.identity.types import BindingSetState, ChangeOutcome
 
 NOW = datetime(2026, 4, 4, 12, 0, 0, tzinfo=timezone.utc)
@@ -74,23 +76,29 @@ def _make_submission() -> MagicMock:
     return sub
 
 
-def _make_outcome(outcome: str = "new", *, target_id: int | None = None) -> ResolutionOutcome:
+def _make_outcome(outcome: str = "new", *, aggregate_id: int | None = None) -> ResolutionOutcome:
     return ResolutionOutcome(
         source_identity_uuid=uuid4(),
         entity_type="site",
         outcome=outcome,
         tracked_identity_uuid=TRACKED_UUID if outcome == "matched" else None,
-        target_id=target_id,
+        aggregate_id=aggregate_id,
+    )
+
+
+def _make_batch_result(*, aggregate_id: int | None = None, outcome: str = "new") -> ResolveBatchResult:
+    return ResolveBatchResult(
+        submission_uuid=SUBMISSION_UUID,
+        scope_uuid=SCOPE_UUID,
+        binding_set=_make_binding_set_response(),
+        outcomes=[_make_outcome(outcome, aggregate_id=aggregate_id)],
     )
 
 
 def _make_service_mock(**overrides) -> MagicMock:
     """Return a MagicMock IdentityService with sensible async return values."""
     svc = MagicMock()
-    svc.get_or_create_scope = AsyncMock(return_value=_make_source_scope())
-    svc.create_submission = AsyncMock(return_value=_make_submission())
-    svc.resolve_identity = AsyncMock(return_value=_make_outcome())
-    svc.bind = AsyncMock(return_value=_make_binding_set_response())
+    svc.resolve_batch = AsyncMock(return_value=_make_batch_result())
     svc.get_binding_set = AsyncMock(return_value=_make_binding_set_response())
     svc.confirm_binding_set = AsyncMock(return_value=_make_binding_set("confirmed"))
     svc.associate_change_request = AsyncMock(return_value=_make_binding_set("confirmed"))
@@ -107,10 +115,20 @@ def _make_service_mock(**overrides) -> MagicMock:
     return svc
 
 
+def _make_policy_mock(*, configured: tuple[str, ...] = ("site",), supports: bool = True) -> MagicMock:
+    """Return a permissive IdentityPolicy mock for capability checks."""
+    policy = MagicMock()
+    policy.known_entity_types.return_value = list(configured)
+    policy.supports.return_value = supports
+    policy.get_capabilities.return_value = []
+    return policy
+
+
 def _make_client(svc: MagicMock) -> TestClient:
     """Build a TestClient with the given service mock injected."""
     app.dependency_overrides[get_identity_service] = lambda: svc
     app.dependency_overrides[get_config_dep] = lambda: MagicMock()
+    app.dependency_overrides[get_identity_policy] = lambda: _make_policy_mock()
     return TestClient(app)
 
 
@@ -122,6 +140,7 @@ def _make_client(svc: MagicMock) -> TestClient:
 class TestResolveEndpoint:
     VALID_BODY = {
         "scope_name": "sead://reconciliation",
+        "run_id": "run-001",
         "submission_name": "test-batch-001",
         "requests": [
             {
@@ -151,40 +170,98 @@ class TestResolveEndpoint:
         assert "outcomes" in data
 
     def test_resolve_response_includes_target_id_when_present(self):
-        svc = _make_service_mock(resolve_identity=AsyncMock(return_value=_make_outcome("matched", target_id=4321)))
+        svc = _make_service_mock(resolve_batch=AsyncMock(return_value=_make_batch_result(aggregate_id=4321, outcome="matched")))
         client = _make_client(svc)
 
         response = client.post("/identity/resolve", json=self.VALID_BODY)
 
         data = response.json()
         assert data["outcomes"][0]["target_id"] == 4321
+        assert "aggregate_id" not in data["outcomes"][0]
 
-    def test_resolve_calls_get_or_create_scope(self):
+    def test_resolve_passes_run_id_and_approved_aggregate_id(self):
         svc = _make_service_mock()
         client = _make_client(svc)
-        client.post("/identity/resolve", json=self.VALID_BODY)
-        svc.get_or_create_scope.assert_called_once_with(
-            "sead://reconciliation", created_by=None
+        body = {
+            **self.VALID_BODY,
+            "requests": [{**self.VALID_BODY["requests"][0], "approved_aggregate_id": 4321}],
+        }
+
+        response = client.post("/identity/resolve", json=body)
+
+        assert response.status_code == 200
+        kwargs = svc.resolve_batch.await_args.kwargs
+        assert kwargs["run_id"] == "run-001"
+        assert kwargs["scope_name"] == "sead://reconciliation"
+        assert kwargs["requests"][0].approved_aggregate_id == 4321
+
+    def test_resolve_returns_409_for_approved_aggregate_conflict(self):
+        svc = _make_service_mock(
+            resolve_batch=AsyncMock(side_effect=IdentityBindingConflict("approved aggregate ID conflicts"))
         )
+        client = _make_client(svc)
+        body = {
+            **self.VALID_BODY,
+            "requests": [{**self.VALID_BODY["requests"][0], "approved_aggregate_id": 9876}],
+        }
 
-    def test_resolve_calls_create_submission(self):
+        response = client.post("/identity/resolve", json=body)
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == "approved aggregate ID conflicts"
+
+    def test_resolve_returns_409_for_binding_phase_conflict(self):
+        svc = _make_service_mock(resolve_batch=AsyncMock(side_effect=IdentityBindingConflict("unresolved proposed binding")))
+        client = _make_client(svc)
+
+        response = client.post("/identity/resolve", json=self.VALID_BODY)
+
+        assert response.status_code == 409
+        assert response.json()["detail"] == "unresolved proposed binding"
+
+    def test_resolve_returns_409_for_reused_run_with_changed_payload(self):
+        svc = _make_service_mock(resolve_batch=AsyncMock(side_effect=IdentityBatchConflict("different payload")))
+        client = _make_client(svc)
+
+        response = client.post("/identity/resolve", json=self.VALID_BODY)
+
+        assert response.status_code == 409
+        assert "different payload" in response.json()["detail"]
+
+    def test_resolve_rejects_nonpositive_approved_aggregate_id(self):
         svc = _make_service_mock()
         client = _make_client(svc)
-        client.post("/identity/resolve", json=self.VALID_BODY)
-        svc.create_submission.assert_called_once()
+        body = {
+            **self.VALID_BODY,
+            "requests": [{**self.VALID_BODY["requests"][0], "approved_aggregate_id": 0}],
+        }
 
-    def test_resolve_calls_resolve_identity_once_per_request(self):
+        response = client.post("/identity/resolve", json=body)
+
+        assert response.status_code == 422
+        svc.resolve_batch.assert_not_called()
+
+    def test_resolve_rejects_legacy_approved_target_id(self):
         svc = _make_service_mock()
         client = _make_client(svc)
-        client.post("/identity/resolve", json=self.VALID_BODY)
-        # One request in body → one resolve_identity call
-        assert svc.resolve_identity.call_count == 1
+        body = {
+            **self.VALID_BODY,
+            "requests": [{**self.VALID_BODY["requests"][0], "approved_target_id": 77}],
+        }
 
-    def test_resolve_calls_bind(self):
+        response = client.post("/identity/resolve", json=body)
+
+        assert response.status_code == 422
+        svc.resolve_batch.assert_not_called()
+
+    def test_resolve_missing_run_id_returns_422(self):
         svc = _make_service_mock()
         client = _make_client(svc)
-        client.post("/identity/resolve", json=self.VALID_BODY)
-        svc.bind.assert_called_once()
+        body = dict(self.VALID_BODY)
+        del body["run_id"]
+        response = client.post("/identity/resolve", json=body)
+        assert response.status_code == 422
+        svc.resolve_batch.assert_not_called()
 
     def test_resolve_empty_requests_returns_422(self):
         svc = _make_service_mock()
@@ -200,7 +277,49 @@ class TestResolveEndpoint:
         body = dict(self.VALID_BODY)
         body["created_by"] = "test-agent"
         client.post("/identity/resolve", json=body)
-        svc.get_or_create_scope.assert_called_once_with("sead://reconciliation", created_by="test-agent")
+        assert svc.resolve_batch.await_args.kwargs["created_by"] == "test-agent"
+
+
+# ---------------------------------------------------------------------------
+# Resolve operation checks (capability enforcement)
+# ---------------------------------------------------------------------------
+
+
+class TestResolveOperationChecks:
+    def _body(self, **request_overrides) -> dict:
+        request = {
+            "entity_type": "site",
+            "primary_signal": {"identity_type": "business_key", "identity_value": "ABC-001"},
+        }
+        request.update(request_overrides)
+        return {"scope_name": "sead://reconciliation", "run_id": "run-001", "submission_name": "test-batch-001", "requests": [request]}
+
+    def test_unconfigured_entity_rejected_before_write(self):
+        svc = _make_service_mock()
+        client = _make_client(svc)
+        app.dependency_overrides[get_identity_policy] = lambda: _make_policy_mock(configured=())
+        response = client.post("/identity/resolve", json=self._body(entity_type="not_configured"))
+        assert response.status_code == 422
+        assert "not configured" in response.json()["detail"]
+        svc.resolve_batch.assert_not_called()
+
+    def test_unsupported_operation_rejected_before_write(self):
+        svc = _make_service_mock()
+        client = _make_client(svc)
+        app.dependency_overrides[get_identity_policy] = lambda: _make_policy_mock(configured=("site",), supports=False)
+        response = client.post("/identity/resolve", json=self._body())
+        assert response.status_code == 422
+        assert "allocate_new" in response.json()["detail"]
+        svc.resolve_batch.assert_not_called()
+
+    def test_unsupported_bind_existing_rejected(self):
+        svc = _make_service_mock()
+        client = _make_client(svc)
+        app.dependency_overrides[get_identity_policy] = lambda: _make_policy_mock(configured=("sample",), supports=False)
+        response = client.post("/identity/resolve", json=self._body(entity_type="sample", approved_aggregate_id=123))
+        assert response.status_code == 422
+        assert "bind_existing" in response.json()["detail"]
+        svc.resolve_batch.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
