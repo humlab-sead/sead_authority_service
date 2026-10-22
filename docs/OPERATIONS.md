@@ -34,7 +34,6 @@ The Compose service reads runtime variables from `~/container/.env`. `make setup
 |-----------------------------------------------------------------|--------------------------------------------------------------------------|
 | `CONFIG_FILE`                                                   | Config file path inside the container; normally `/app/config/config.yml` |
 | `SEAD_AUTHORITY_ENVIRONMENT`                                    | Deployment environment (`dev`, `staging`, or `production`)               |
-| `SEAD_AUTHORITY_GIT_REF` / `SEAD_AUTHORITY_GIT_COMMIT`          | Source ref or optional pinned commit used to build the image             |
 | `SEAD_AUTHORITY_IMAGE_TAG`                                      | GHCR image tag pulled and run by this deployment                         |
 | `SEAD_AUTHORITY_PORT`                                           | Host port mapped to container port `8000` (default `8024`)               |
 | `SEAD_AUTHORITY_CONTAINER_UID` / `SEAD_AUTHORITY_CONTAINER_GID` | Deployment account IDs used by the container process                     |
@@ -63,34 +62,78 @@ The container has no persistent application-data mount. Service data is stored i
 
 ## Image Build and Publication
 
-Images use the GHCR repository `ghcr.io/humlab-sead/sead_authority_service:<tag>`. The supported build helper is `deployment/container/scripts/build.sh`; it builds from the selected GitHub ref or commit, not from uncommitted local source. Builds target `linux/amd64`.
+Images use the GHCR repository
+`ghcr.io/humlab-sead/sead_authority_service:<tag>`. GitHub Actions builds and
+publishes staging and release images. Manual development builds use
+`deployment/container/Makefile.dev` and `scripts/build.sh` from a developer
+checkout; they build from the selected GitHub ref, not uncommitted local
+source. Builds target `linux/amd64`.
 
-Run these commands as the deployment user from the repository's `deployment/container/` directory:
+Run these commands from a developer checkout to create a local development runtime and build or publish a dev image:
 
 ```bash
-make build  # build the configured tag locally; does not publish
-make push   # build and publish the configured tag to GHCR
-make pull   # pull the configured tag from GHCR
+cd deployment/container
+make -f Makefile.dev setup
+# Edit ~/container-dev/.env with development database and provider settings.
+# Set container UID/GID to the developer account's IDs.
+make -f Makefile.dev build
+podman login ghcr.io -u USERNAME
+make -f Makefile.dev push
 ```
 
-Authenticate that user's Podman session with `podman login ghcr.io` before publishing or pulling a private package. The helper derives tags from the selected environment and source ref unless `SEAD_AUTHORITY_IMAGE_TAG` or an explicit `--tag` overrides it. For production from `main`, the default derived tag is `latest`; pin a version or approved unique tag when required.
+The developer Makefile defaults to the `dev` Git ref and `dev` image tag. It
+only builds or publishes tags prefixed with `dev`. The runtime Makefile has no
+build or push targets; deployment users only pull published images.
 
 ---
 
 ## Deployment and Updates
 
-Run the lifecycle commands as the deployment user. First stage the bundle and runtime inputs:
+For initial setup or an update, a developer account on the deployment host can
+sync runtime files from the checkout root with passwordless `sudo` access to
+the deployment account. On first setup, run the sync without `--dry-run` because
+the target directory does not exist yet:
 
 ```bash
-cd deployment/container
-make setup
-# Edit ~/container/.env and stage the approved environment config under ~/container/config/.
-chmod 600 ~/container/.env
+deployment/scripts/sync-to-deploy authority-service.sead.se
+```
+
+For an existing deployment, preview the file changes first:
+
+```bash
+deployment/scripts/sync-to-deploy authority-service.sead.se --dry-run
+deployment/scripts/sync-to-deploy authority-service.sead.se
+```
+
+The helper syncs runtime files to the deployment user's `~/container`, removes
+obsolete bundle files, and preserves `.env`, `config/`, and `logs/`. On first
+sync it creates missing `.env` and `config/` from templates. It installs the
+systemd user unit for the default `container` directory and reloads the user
+manager when it is running, but does not enable or restart the service or pull
+an image. It uses local `sudo` and does not connect over SSH.
+
+After syncing, run these commands as the deployment user. Edit `.env` and
+stage the approved environment config before pulling the image:
+
+```bash
+cd ~/container
+chmod 600 .env
 make pull
 make config  # Review locally; output can contain credentials.
 ```
 
-Install and enable the user service to keep the container running and start it at host boot:
+For an isolated directory, pass `--remote-dir container-dev`; the helper skips
+the systemd unit install and reload. It preserves that directory's own `.env`,
+`config/`, and `logs/` too. On first sync, it creates `.env` with development
+defaults from `.env.dev.example`. Pass `DEPLOY_DIR=~/container-dev` to runtime
+Makefile commands for this directory, for example:
+
+```bash
+make pull DEPLOY_DIR=~/container-dev
+```
+
+Install and enable the user service to keep the container running and start it
+at host boot:
 
 ```bash
 make service-install
@@ -99,9 +142,12 @@ make healthcheck
 make status
 ```
 
-`make service-enable` enables systemd lingering for the deployment user and starts `sead-authority-service.service`. The unit runs the same Compose project from `~/container` as the Makefile.
+`make service-enable` enables systemd lingering for the deployment user and
+starts `sead-authority-service.service`. The unit runs the same Compose project
+from `~/container` as the Makefile.
 
-To deploy a new approved image tag, update `SEAD_AUTHORITY_IMAGE_TAG` in `~/container/.env`, then pull, restart, and verify:
+To deploy a new approved image tag, update `SEAD_AUTHORITY_IMAGE_TAG` in
+`~/container/.env`, then pull, restart, and verify:
 
 ```bash
 make pull
@@ -114,9 +160,16 @@ make status
 
 ## CI and Release Process
 
-Image creation and GHCR publication are manual. The GitHub Actions image workflow at `.github/workflows/docker-build.yml` remains disabled: both jobs are guarded by `if: false`. Its existing filename is retained for compatibility; its build job uses the Podman helper and Podman push command, but it does not publish images while disabled.
+Container image publication runs in two paths:
 
-The release workflow at `.github/workflows/release.yml` runs semantic-release on pushes to `main` or by manual dispatch. It creates source releases and tags; it does not publish a container image or deploy the service. Build and publish the matching image with the Podman helper, then deploy it using the procedure above.
+- Pushes to `staging` publish `ghcr.io/humlab-sead/sead_authority_service:staging`.
+- Pushes to `main` run semantic-release (`.github/workflows/release.yml`). When semantic-release creates a release tag, the same run publishes that tag and `latest` from the release commit, for example `:v1.7.0` and `:latest`.
+
+Both paths run the test and lint jobs in `.github/workflows/build.yml` before publishing. They build from the selected GitHub ref and commit, never from the local worktree. The image workflow also supports manual `workflow_dispatch` runs for other tags.
+
+The image workflow publishes images only; it does not deploy the service.
+Deploy a published tag with the procedure above. Manual development builds use
+`deployment/container/Makefile.dev` from the checkout.
 
 ---
 
@@ -160,9 +213,11 @@ The service stores application data in PostgreSQL; the database operations team 
 ## References
 
 - [deployment/container/README.md](../deployment/container/README.md) — Podman setup, image build, lifecycle, and systemd user service
+- [deployment/scripts/sync-to-deploy](../deployment/scripts/sync-to-deploy) — sync the bundle from a development checkout on the deployment host
 - [deployment/container/Makefile](../deployment/container/Makefile) — supported deployment commands
+- [deployment/container/Makefile.dev](../deployment/container/Makefile.dev) — developer image build and publication commands
 - [deployment/container/podman-compose.yml](../deployment/container/podman-compose.yml) — runtime image, mounts, port, and host-gateway mapping
 - [deployment/container/service/sead-authority-service.service](../deployment/container/service/sead-authority-service.service) — systemd user unit
-- [deployment/container/scripts/build.sh](../deployment/container/scripts/build.sh) — manual image build and publication
-- [.github/workflows/docker-build.yml](../.github/workflows/docker-build.yml) — disabled Podman image workflow
+- [deployment/container/scripts/build.sh](../deployment/container/scripts/build.sh) — image build helper used by CI and the developer Makefile
+- [.github/workflows/build.yml](../.github/workflows/build.yml) — Podman image build and GHCR publication workflow
 - [.github/workflows/release.yml](../.github/workflows/release.yml) — source release workflow

@@ -6,9 +6,17 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      commit: ${{ steps.version.outputs.commit }}
 
     steps:
       
@@ -35,3 +43,29 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: semantic-release
+
+      - name: Read released version
+        id: version
+        run: |
+          tag="$(git tag --points-at HEAD --sort=-v:refname | awk '/^v[0-9]+\.[0-9]+\.[0-9]+/ && !found { print; found=1 }')"
+          if [[ -z "${tag}" ]]; then
+            echo "No release tag was created for this commit; the image build will be skipped."
+            exit 0
+          fi
+          printf 'tag=%s\n' "${tag}" >> "${GITHUB_OUTPUT}"
+          printf 'commit=%s\n' "$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+
+  build-and-push:
+    needs: release
+    if: needs.release.outputs.tag != ''
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/build.yml
+    with:
+      target_environment: production
+      image_tags: ${{ needs.release.outputs.tag }},latest
+      git_ref: ${{ needs.release.outputs.tag }}
+      git_commit: ${{ needs.release.outputs.commit }}

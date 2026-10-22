@@ -1,0 +1,185 @@
+name: Build and Publish Podman Image
+
+# Builds the Podman image from a GitHub ref or commit and publishes it to GHCR.
+# The image source is always the selected GitHub ref or commit, never the local
+# worktree, because deployment/container/Containerfile clones it during the
+# build.
+#
+# Triggers:
+# - push to staging: publishes the "staging" tag.
+# - workflow_call from release.yml: publishes the release tag plus "latest",
+#   built from the commit that semantic-release tagged. Pushes to main are
+#   handled by the Release workflow so the image can carry the new version.
+# - workflow_dispatch: manual build with explicit inputs.
+
+on:
+  push:
+    branches:
+      - staging
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: Deployment environment used to select the image tag
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+        default: staging
+      image_tags:
+        description: Image tags to publish, comma-separated
+        required: true
+        type: string
+      git_ref:
+        description: Git ref to build; defaults to the selected ref
+        required: false
+        type: string
+      git_commit:
+        description: Exact 40-character Git commit to build
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      target_environment:
+        description: Deployment environment used to select the image tag
+        required: true
+        type: string
+      image_tags:
+        description: Image tags to publish, comma-separated
+        required: true
+        type: string
+      git_ref:
+        description: Git ref to build
+        required: true
+        type: string
+      git_commit:
+        description: Exact 40-character Git commit to build
+        required: true
+        type: string
+
+concurrency:
+  group: podman-image-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_commit || inputs.git_ref || github.sha }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Run tests
+        run: uv run pytest --verbose
+
+      - name: Run linter
+        run: uv run ruff check src/ tests/
+
+  build-and-push:
+    runs-on: ubuntu-24.04
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      IMAGE_NAME: ghcr.io/humlab-sead/sead_authority_service
+      TARGET_ENVIRONMENT: ${{ inputs.target_environment || 'staging' }}
+      IMAGE_TAGS: ${{ inputs.image_tags || 'staging' }}
+      GIT_REF: ${{ inputs.git_ref || github.ref_name }}
+      GIT_COMMIT: ${{ inputs.git_commit || (github.event_name == 'push' && github.sha) || '' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_commit || inputs.git_ref || github.sha }}
+
+      - name: Check Podman
+        run: podman --version
+
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GHCR_TOKEN" | podman login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Resolve image tags
+        run: |
+          IFS=',' read -r -a raw_tags <<< "${IMAGE_TAGS}"
+          resolved=()
+          for tag in "${raw_tags[@]}"; do
+            tag="$(printf '%s' "${tag}" | tr -d '[:space:]')"
+            if [[ -n "${tag}" ]]; then
+              resolved+=("${tag}")
+            fi
+          done
+          if [[ ${#resolved[@]} -eq 0 ]]; then
+            echo "No image tags resolved from IMAGE_TAGS='${IMAGE_TAGS}'." >&2
+            exit 1
+          fi
+          joined="$(printf '%s,' "${resolved[@]}")"
+          joined="${joined%,}"
+          printf 'IMAGE_TAGS=%s\n' "${joined}" >> "${GITHUB_ENV}"
+          echo "Resolved image tags: ${joined}"
+
+      - name: Build image with Podman
+        run: |
+          args=(
+            --git-ref "${GIT_REF}"
+            --target-env "${TARGET_ENVIRONMENT}"
+          )
+          if [[ -n "${GIT_COMMIT}" ]]; then
+            args+=(--git-commit "${GIT_COMMIT}")
+          fi
+          IFS=',' read -r -a tags <<< "${IMAGE_TAGS}"
+          for tag in "${tags[@]}"; do
+            args+=(--tag "${tag}")
+          done
+          ./deployment/container/scripts/build.sh "${args[@]}"
+
+      - name: Push images with Podman
+        id: push
+        run: |
+          IFS=',' read -r -a tags <<< "${IMAGE_TAGS}"
+          digest_file="${RUNNER_TEMP}/image.digest"
+          podman push --digestfile "${digest_file}" "${IMAGE_NAME}:${tags[0]}"
+          for tag in "${tags[@]:1}"; do
+            podman push "${IMAGE_NAME}:${tag}"
+          done
+          digest="$(cat "${digest_file}")"
+          printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Generate artifact attestation
+        uses: actions/attest@v4
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Report build details
+        if: always()
+        run: |
+          {
+            echo "### Podman image build"
+            echo
+            echo "- Environment: $TARGET_ENVIRONMENT"
+            echo "- Source: $GIT_REF ($GIT_COMMIT)"
+            echo "- Tags: $IMAGE_TAGS"
+            echo "- Digest: ${{ steps.push.outputs.digest }}"
+          } >> "$GITHUB_STEP_SUMMARY"

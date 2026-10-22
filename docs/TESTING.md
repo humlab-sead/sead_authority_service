@@ -125,13 +125,8 @@ Before opening a pull request:
 
 ## CI Test Execution
 
-The `.github/workflows/docker-build.yml` workflow is disabled: both its test
-and image-publication jobs have `if: false`. Its dormant build job is configured
-to use the Podman build helper, but it currently runs no tests and publishes no
-image. Its existing filename is retained for compatibility.
-
-If the workflow is explicitly re-enabled, it will run the test and lint job
-before building and publishing the selected Podman image to GHCR:
+The `.github/workflows/build.yml` workflow runs the test and lint job
+before building and publishing a Podman image to GHCR:
 
 ```
 Run tests (uv run pytest --verbose)
@@ -140,9 +135,16 @@ Run linter (uv run ruff check src/ tests/)
 Build and push Podman image to GHCR
 ```
 
-Integration tests are excluded from CI automatically (via `norecursedirs` in `pyproject.toml`). Only the standard unit test suite runs in CI.
+It publishes `staging` on pushes to `staging`, and the release tag plus
+`latest` when `.github/workflows/release.yml` calls it after a successful
+semantic-release run on `main`. Integration tests are excluded from CI
+automatically (via `norecursedirs` in `pyproject.toml`). Only the standard unit
+test suite runs in CI.
 
-The `release.yml` workflow runs semantic-release on `main` pushes independently — it does not run tests and does not gate releases on test results. Passing tests before merge is therefore the contributor's responsibility.
+The `release.yml` workflow runs semantic-release on `main` pushes. A failed
+test or lint job stops image publication for that release, but it does not undo
+the source release or tag. Passing tests before merge therefore remains the
+contributor's responsibility.
 
 ---
 
