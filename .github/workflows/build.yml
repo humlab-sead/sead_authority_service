@@ -167,6 +167,10 @@ jobs:
 
       - name: Generate artifact attestation
         uses: actions/attest@v4
+        env:
+          # The action pushes the attestation bundle to ghcr.io itself and
+          # authenticates with GH_TOKEN; it does not reuse the podman login.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           subject-name: ${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.push.outputs.digest }}
