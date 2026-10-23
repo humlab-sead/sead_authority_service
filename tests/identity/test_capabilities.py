@@ -19,7 +19,9 @@ from src.identity.policy import CAPABILITY_VERSION, IdentityPolicy
 def _make_client() -> TestClient:
     app.dependency_overrides[get_identity_service] = MagicMock
     app.dependency_overrides[get_config_dep] = MagicMock
-    app.dependency_overrides[get_identity_policy] = IdentityPolicy
+    # Pass a zero-arg factory, not the class: FastAPI would otherwise analyze
+    # IdentityPolicy.__init__ and treat policy_path as a required query param.
+    app.dependency_overrides[get_identity_policy] = lambda: IdentityPolicy()  # pylint: disable=unnecessary-lambda
     return TestClient(app)
 
 

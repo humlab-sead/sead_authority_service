@@ -127,8 +127,8 @@ def _make_policy_mock(*, configured: tuple[str, ...] = ("site",), supports: bool
 def _make_client(svc: MagicMock) -> TestClient:
     """Build a TestClient with the given service mock injected."""
     app.dependency_overrides[get_identity_service] = lambda: svc
-    app.dependency_overrides[get_config_dep] = MagicMock
-    app.dependency_overrides[get_identity_policy] = _make_policy_mock
+    app.dependency_overrides[get_config_dep] = lambda: MagicMock()  # pylint: disable=unnecessary-lambda
+    app.dependency_overrides[get_identity_policy] = lambda: _make_policy_mock()  # pylint: disable=unnecessary-lambda
     return TestClient(app)
 
 
