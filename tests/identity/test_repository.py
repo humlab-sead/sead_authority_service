@@ -26,10 +26,21 @@ from src.identity.models import (
     Binding,
     BindingSet,
     BindingSetResponse,
+    ResolveBatchResult,
     SourceIdentity,
     SourceScope,
     Submission,
     TrackedIdentity,
+)
+from src.identity.repository import (
+    BindingRepository,
+    BindingSetRepository,
+    RepositoryError,
+    ResolveBatchRepository,
+    SourceIdentityRepository,
+    SourceScopeRepository,
+    SubmissionRepository,
+    TrackedIdentityRepository,
 )
 from src.identity.types import (
     BindingMethod,
@@ -91,7 +102,6 @@ def _patch_connection(conn: MagicMock):
 class TestSourceScopeRepository:
     @pytest.mark.asyncio
     async def test_get_returns_none_when_not_found(self) -> None:
-        from src.identity.repository import SourceScopeRepository
 
         cursor = _make_cursor(return_row=None)
         conn = _make_conn(cursor)
@@ -102,7 +112,6 @@ class TestSourceScopeRepository:
 
     @pytest.mark.asyncio
     async def test_get_returns_scope_when_found(self) -> None:
-        from src.identity.repository import SourceScopeRepository
 
         row = {
             "scope_uuid": SCOPE_UUID,
@@ -122,7 +131,6 @@ class TestSourceScopeRepository:
 
     @pytest.mark.asyncio
     async def test_get_by_name_returns_none(self) -> None:
-        from src.identity.repository import SourceScopeRepository
 
         cursor = _make_cursor(return_row=None)
         conn = _make_conn(cursor)
@@ -133,7 +141,6 @@ class TestSourceScopeRepository:
 
     @pytest.mark.asyncio
     async def test_get_by_name_returns_scope(self) -> None:
-        from src.identity.repository import SourceScopeRepository
 
         row = {
             "scope_uuid": SCOPE_UUID,
@@ -153,7 +160,6 @@ class TestSourceScopeRepository:
 
     @pytest.mark.asyncio
     async def test_list_all_returns_list(self) -> None:
-        from src.identity.repository import SourceScopeRepository
 
         rows = [
             {
@@ -175,7 +181,6 @@ class TestSourceScopeRepository:
 
     @pytest.mark.asyncio
     async def test_create_returns_scope(self) -> None:
-        from src.identity.repository import SourceScopeRepository
 
         row = {
             "scope_uuid": SCOPE_UUID,
@@ -213,7 +218,6 @@ class TestSubmissionRepository:
 
     @pytest.mark.asyncio
     async def test_create_sets_status_pending(self) -> None:
-        from src.identity.repository import SubmissionRepository
 
         row = self._make_submission_row("pending")
         cursor = _make_cursor(return_row=row)
@@ -226,7 +230,6 @@ class TestSubmissionRepository:
 
     @pytest.mark.asyncio
     async def test_update_status_to_completed(self) -> None:
-        from src.identity.repository import SubmissionRepository
 
         row = self._make_submission_row("completed")
         cursor = _make_cursor(return_row=row)
@@ -239,7 +242,6 @@ class TestSubmissionRepository:
 
     @pytest.mark.asyncio
     async def test_update_status_returns_none_when_not_found(self) -> None:
-        from src.identity.repository import SubmissionRepository
 
         cursor = _make_cursor(return_row=None)
         conn = _make_conn(cursor)
@@ -250,7 +252,6 @@ class TestSubmissionRepository:
 
     @pytest.mark.asyncio
     async def test_get_returns_none_when_missing(self) -> None:
-        from src.identity.repository import SubmissionRepository
 
         cursor = _make_cursor(return_row=None)
         conn = _make_conn(cursor)
@@ -276,19 +277,15 @@ class TestSourceIdentityRepository:
 
     @pytest.mark.asyncio
     async def test_find_by_key_returns_none(self) -> None:
-        from src.identity.repository import SourceIdentityRepository
 
         cursor = _make_cursor(return_row=None)
         conn = _make_conn(cursor)
         with _patch_connection(conn):
-            result = await SourceIdentityRepository().find_by_key(
-                SCOPE_UUID, "site", "business_key", "MISSING"
-            )
+            result = await SourceIdentityRepository().find_by_key(SCOPE_UUID, "site", "business_key", "MISSING")
         assert result is None
 
     @pytest.mark.asyncio
     async def test_create_or_get_returns_identity(self) -> None:
-        from src.identity.repository import SourceIdentityRepository
 
         row = self._make_identity_row()
         cursor = _make_cursor()
@@ -308,7 +305,6 @@ class TestSourceIdentityRepository:
     @pytest.mark.asyncio
     async def test_create_or_get_sql_uses_on_conflict(self) -> None:
         """Confirm the key-insert SQL contains ON CONFLICT clause."""
-        from src.identity.repository import SourceIdentityRepository
 
         row = self._make_identity_row()
         cursor = _make_cursor()
@@ -345,7 +341,6 @@ class TestTrackedIdentityRepository:
 
     @pytest.mark.asyncio
     async def test_mint_returns_allocated_identity(self) -> None:
-        from src.identity.repository import TrackedIdentityRepository
 
         row = {**self._make_tracked_row("allocated"), "aggregate_id": 6487}
         cursor = _make_cursor(return_row=row)
@@ -362,7 +357,6 @@ class TestTrackedIdentityRepository:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("entity_type", ["sample_group", "sample", "dataset", "analysis_entity"])
     async def test_mint_entity_returns_allocated_identity(self, entity_type: str) -> None:
-        from src.identity.repository import TrackedIdentityRepository
 
         row = {
             **self._make_tracked_row("allocated"),
@@ -385,7 +379,6 @@ class TestTrackedIdentityRepository:
 
     @pytest.mark.asyncio
     async def test_mint_site_fails_when_allocator_is_not_initialized(self) -> None:
-        from src.identity.repository import RepositoryError, TrackedIdentityRepository
 
         cursor = _make_cursor(return_row=None)
         conn = _make_conn(cursor)
@@ -395,19 +388,15 @@ class TestTrackedIdentityRepository:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("entity_type", ["sample_group", "sample", "dataset", "analysis_entity"])
     async def test_mint_entity_fails_when_allocator_is_not_initialized(self, entity_type: str) -> None:
-        from src.identity.repository import RepositoryError, TrackedIdentityRepository
 
         cursor = _make_cursor(return_row=None)
         conn = _make_conn(cursor)
-        with _patch_connection(conn), pytest.raises(
-            RepositoryError, match=f"SIMS {entity_type} ID allocator is not initialized"
-        ):
+        with _patch_connection(conn), pytest.raises(RepositoryError, match=f"SIMS {entity_type} ID allocator is not initialized"):
             await TrackedIdentityRepository().mint(entity_type)
 
     @pytest.mark.asyncio
     @pytest.mark.asyncio
     async def test_update_content_hash_returns_updated(self) -> None:
-        from src.identity.repository import TrackedIdentityRepository
 
         row = {**self._make_tracked_row(), "content_hash": "abc123"}
         cursor = _make_cursor(return_row=row)
@@ -419,21 +408,17 @@ class TestTrackedIdentityRepository:
 
     @pytest.mark.asyncio
     async def test_update_lifecycle_state_returns_updated(self) -> None:
-        from src.identity.repository import TrackedIdentityRepository
 
         row = self._make_tracked_row("materialized")
         cursor = _make_cursor(return_row=row)
         conn = _make_conn(cursor)
         with _patch_connection(conn):
-            result = await TrackedIdentityRepository().update_lifecycle_state(
-                TRACKED_UUID, TrackedIdentityState.MATERIALIZED
-            )
+            result = await TrackedIdentityRepository().update_lifecycle_state(TRACKED_UUID, TrackedIdentityState.MATERIALIZED)
         assert result is not None
         assert result.lifecycle_state == TrackedIdentityState.MATERIALIZED
 
     @pytest.mark.asyncio
     async def test_get_returns_none_when_missing(self) -> None:
-        from src.identity.repository import TrackedIdentityRepository
 
         cursor = _make_cursor(return_row=None)
         conn = _make_conn(cursor)
@@ -443,7 +428,6 @@ class TestTrackedIdentityRepository:
 
     @pytest.mark.asyncio
     async def test_find_by_aggregate_id_rejects_duplicate_values(self) -> None:
-        from src.identity.repository import RepositoryError, TrackedIdentityRepository
 
         first = {**self._make_tracked_row("materialized"), "aggregate_id": 4321}
         second = {**first, "tracked_identity_uuid": uuid4()}
@@ -476,7 +460,6 @@ class TestBindingSetRepository:
 
     @pytest.mark.asyncio
     async def test_create_returns_proposed_set(self) -> None:
-        from src.identity.repository import BindingSetRepository
 
         row = self._make_set_row("proposed")
         cursor = _make_cursor(return_row=row)
@@ -488,7 +471,6 @@ class TestBindingSetRepository:
 
     @pytest.mark.asyncio
     async def test_transition_to_confirmed(self) -> None:
-        from src.identity.repository import BindingSetRepository
 
         row = self._make_set_row("confirmed")
         cursor = _make_cursor(return_row=row)
@@ -500,7 +482,6 @@ class TestBindingSetRepository:
 
     @pytest.mark.asyncio
     async def test_transition_returns_none_when_not_found(self) -> None:
-        from src.identity.repository import BindingSetRepository
 
         cursor = _make_cursor(return_row=None)
         conn = _make_conn(cursor)
@@ -528,7 +509,6 @@ class TestBindingRepository:
 
     @pytest.mark.asyncio
     async def test_create_returns_binding(self) -> None:
-        from src.identity.repository import BindingRepository
 
         row = self._make_binding_row()
         cursor = _make_cursor(return_row=row)
@@ -545,7 +525,6 @@ class TestBindingRepository:
 
     @pytest.mark.asyncio
     async def test_list_by_set_returns_list(self) -> None:
-        from src.identity.repository import BindingRepository
 
         rows = [self._make_binding_row()]
         cursor = _make_cursor(return_rows=rows)
@@ -557,7 +536,6 @@ class TestBindingRepository:
 
     @pytest.mark.asyncio
     async def test_get_returns_none_when_missing(self) -> None:
-        from src.identity.repository import BindingRepository
 
         cursor = _make_cursor(return_row=None)
         conn = _make_conn(cursor)
@@ -567,7 +545,6 @@ class TestBindingRepository:
 
     @pytest.mark.asyncio
     async def test_find_confirmed_binding_returns_none_when_missing(self) -> None:
-        from src.identity.repository import BindingRepository
 
         cursor = _make_cursor(return_row=None)
         conn = _make_conn(cursor)
@@ -577,7 +554,6 @@ class TestBindingRepository:
 
     @pytest.mark.asyncio
     async def test_find_confirmed_binding_returns_tuple(self) -> None:
-        from src.identity.repository import BindingRepository
 
         row = {**self._make_binding_row(), "set_state": "confirmed"}
         cursor = _make_cursor(return_row=row)
@@ -591,7 +567,6 @@ class TestBindingRepository:
 
     @pytest.mark.asyncio
     async def test_list_active_bindings_returns_proposed_and_confirmed(self) -> None:
-        from src.identity.repository import BindingRepository
 
         proposed_row = {**self._make_binding_row(), "set_state": "proposed"}
         confirmed_row = {**self._make_binding_row(), "binding_uuid": uuid4(), "set_state": "confirmed"}
@@ -611,7 +586,6 @@ class TestBindingRepository:
 
 class TestResolveBatchRepository:
     def _make_batch_row(self) -> dict:
-        from src.identity.models import ResolveBatchResult
 
         result = ResolveBatchResult(
             submission_uuid=SUBMISSION_UUID,
@@ -636,7 +610,6 @@ class TestResolveBatchRepository:
 
     @pytest.mark.asyncio
     async def test_find_returns_record(self) -> None:
-        from src.identity.repository import ResolveBatchRepository
 
         cursor = _make_cursor(return_row=self._make_batch_row())
         conn = _make_conn(cursor)
@@ -649,7 +622,6 @@ class TestResolveBatchRepository:
 
     @pytest.mark.asyncio
     async def test_find_returns_none_when_missing(self) -> None:
-        from src.identity.repository import ResolveBatchRepository
 
         cursor = _make_cursor(return_row=None)
         conn = _make_conn(cursor)
@@ -660,8 +632,6 @@ class TestResolveBatchRepository:
 
     @pytest.mark.asyncio
     async def test_create_inserts_result_jsonb(self) -> None:
-        from src.identity.models import ResolveBatchResult
-        from src.identity.repository import ResolveBatchRepository
 
         result = ResolveBatchResult(
             submission_uuid=SUBMISSION_UUID,
@@ -688,7 +658,6 @@ class TestResolveBatchRepository:
 
     @pytest.mark.asyncio
     async def test_acquire_run_lock_uses_advisory_lock(self) -> None:
-        from src.identity.repository import ResolveBatchRepository
 
         cursor = _make_cursor()
         conn = _make_conn(cursor)

@@ -77,7 +77,7 @@ def _make_binding(method: str = "business_key") -> Binding:
         binding_set_uuid=BINDING_SET_UUID,
         source_identity_uuid=SOURCE_IDENTITY_UUID,
         tracked_identity_uuid=TRACKED_UUID,
-        method=BindingMethod(method)
+        method=BindingMethod(method),
     )
 
 
@@ -112,7 +112,7 @@ def _shared_metadata_policy(entity_type: str = "taxa") -> EntityPolicy:
 
 def _mock_policy(side_effect=None) -> MagicMock:
     policy = MagicMock(spec=IdentityPolicy)
-    policy.get_entity_policy = MagicMock(side_effect=side_effect or (lambda et: _provider_owned_policy(et)))
+    policy.get_entity_policy = MagicMock(side_effect=side_effect or _provider_owned_policy)
     policy.known_entity_types.return_value = ["site"]
     return policy
 
@@ -127,13 +127,12 @@ def _make_service(
     resolve_batch_repo=None,
     policy=None,
 ):
-    from src.identity.service import IdentityService
 
     source_identity_repo = source_identity_repo or AsyncMock()
     binding_repo = binding_repo or AsyncMock()
-    if source_identity_repo.lock_for_binding._mock_return_value is DEFAULT:
+    if source_identity_repo.lock_for_binding._mock_return_value is DEFAULT:  # type: ignore ; pylint: disable=protected-access
         source_identity_repo.lock_for_binding.return_value = None
-    if binding_repo.list_active_bindings._mock_return_value is DEFAULT:
+    if binding_repo.list_active_bindings._mock_return_value is DEFAULT:  # type: ignore ; pylint: disable=protected-access
         binding_repo.list_active_bindings.return_value = []
     return IdentityService(
         scope_repo=scope_repo or AsyncMock(),
@@ -660,7 +659,7 @@ class TestBind:
 
     @pytest.mark.asyncio
     async def test_bind_does_not_auto_confirm_for_shared_metadata(self) -> None:
-        policy = _mock_policy(side_effect=lambda et: _shared_metadata_policy(et))
+        policy = _mock_policy(side_effect=_shared_metadata_policy)
         outcome = ResolutionOutcome(
             source_identity_uuid=SOURCE_IDENTITY_UUID,
             entity_type="taxa",
@@ -914,9 +913,7 @@ class TestAssociateChangeRequest:
     @pytest.mark.asyncio
     async def test_associates_cr_name(self) -> None:
         updated_set = _make_binding_set("confirmed")
-        updated_set = BindingSet(
-            **{**updated_set.model_dump(), "change_request_name": "2026-04-04-add-site"}
-        )
+        updated_set = BindingSet(**{**updated_set.model_dump(), "change_request_name": "2026-04-04-add-site"})
         binding_set_repo = AsyncMock()
         binding_set_repo.associate_change_request.return_value = updated_set
 

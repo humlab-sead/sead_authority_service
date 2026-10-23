@@ -62,6 +62,14 @@ class EntityPolicy:
         return self.entity_subtype == "relationship"
 
 
+def _resolve_policy_path() -> Path:
+    """Return the policy file path, honouring the IDENTITY_POLICY_FILE env var."""
+    env_override: str | None = os.environ.get("IDENTITY_POLICY_FILE")
+    if env_override:
+        return Path(env_override)
+    return _DEFAULT_POLICY_PATH
+
+
 @dataclass
 class IdentityPolicy:
     """Loaded identity policy. Instantiate once and re-use.
@@ -75,7 +83,7 @@ class IdentityPolicy:
         environment variable.
     """
 
-    policy_path: Path = field(default_factory=lambda: _resolve_policy_path())
+    policy_path: Path = field(default_factory=_resolve_policy_path)
 
     # Populated during __post_init__
     _raw: dict = field(init=False, repr=False, default_factory=dict)
@@ -160,14 +168,6 @@ class IdentityPolicy:
         self._defaults = self._raw.get("defaults", {})
         _validate_policy(self._entities, self._defaults)
         logger.debug(f"Identity policy loaded from {path} ({len(self._entities)} entities)")
-
-
-def _resolve_policy_path() -> Path:
-    """Return the policy file path, honouring the IDENTITY_POLICY_FILE env var."""
-    env_override: str | None = os.environ.get("IDENTITY_POLICY_FILE")
-    if env_override:
-        return Path(env_override)
-    return _DEFAULT_POLICY_PATH
 
 
 # Required fields every entity entry and the defaults block must supply.

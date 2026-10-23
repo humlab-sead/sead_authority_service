@@ -25,7 +25,7 @@ from httpx import ASGITransport, AsyncClient
 from main import app
 from src.api.identity_router import get_identity_service
 from src.configuration import get_connection
-from src.identity.models import IdentitySignal, ResolutionRequest
+from src.identity.models import ChangeDetectionRequest, IdentitySignal, ResolutionRequest
 from src.identity.repository import ResolveBatchRepository
 from src.identity.service import IdentityBatchConflict, IdentityBindingConflict, IdentityService
 from src.identity.types import BindingMethod, BindingSetState, ChangeOutcome, IdentityType, TrackedIdentityState
@@ -52,20 +52,20 @@ def skip_without_db(fn):
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def service() -> IdentityService:
+@pytest.fixture(name="service")
+def _service() -> IdentityService:
     """Live IdentityService pointed at the session-configured disposable DB."""
     return IdentityService()
 
 
-@pytest.fixture
-def scope_name() -> str:
+@pytest.fixture(name="scope_name")
+def _scope_name() -> str:
     """Unique scope name per test run to avoid cross-test pollution."""
     return f"sead://test-integration/{uuid4().hex[:8]}"
 
 
-@pytest.fixture
-def disposable_service() -> IdentityService:
+@pytest.fixture(name="disposable_service")
+def _disposable_service() -> IdentityService:
     """Live IdentityService pointed at the session-configured disposable DB."""
     return IdentityService()
 
@@ -112,9 +112,7 @@ class TestResolveAndBindSite:
     @pytest.mark.asyncio
     async def test_resolve_new_site_returns_new_outcome(self, service, scope_name):
         scope = await service.get_or_create_scope(scope_name, created_by="test")
-        submission = await service.create_submission(
-            scope.scope_uuid, f"batch-{uuid4().hex[:8]}", created_by="test"
-        )
+        submission = await service.create_submission(scope.scope_uuid, f"batch-{uuid4().hex[:8]}", created_by="test")
         outcome = await service.resolve_identity(
             scope.scope_uuid,
             _site_request("Pilot Site Alpha"),
@@ -129,9 +127,7 @@ class TestResolveAndBindSite:
     @pytest.mark.asyncio
     async def test_bind_new_site_auto_confirms(self, service, scope_name):
         scope = await service.get_or_create_scope(scope_name, created_by="test")
-        submission = await service.create_submission(
-            scope.scope_uuid, f"batch-{uuid4().hex[:8]}", created_by="test"
-        )
+        submission = await service.create_submission(scope.scope_uuid, f"batch-{uuid4().hex[:8]}", created_by="test")
         outcome = await service.resolve_identity(
             scope.scope_uuid, _site_request("Pilot Site Beta"), submission_uuid=submission.submission_uuid
         )
@@ -145,15 +141,13 @@ class TestResolveAndBindSite:
     @pytest.mark.asyncio
     async def test_new_site_aggregate_id_comes_from_sims_allocator(self, disposable_service, scope_name):
         async with get_connection() as connection, connection.cursor() as cursor:
-            await cursor.execute(
-                "SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'site'"
-            )
-            next_id_before = (await cursor.fetchone())[0]
+            await cursor.execute("SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'site'")
+            data = await cursor.fetchone()
+            assert data is not None, "Failed to fetch next_internal_id from allocator"
+            next_id_before = data[0]
 
         scope = await disposable_service.get_or_create_scope(scope_name, created_by="test")
-        submission = await disposable_service.create_submission(
-            scope.scope_uuid, f"batch-{uuid4().hex[:8]}", created_by="test"
-        )
+        submission = await disposable_service.create_submission(scope.scope_uuid, f"batch-{uuid4().hex[:8]}", created_by="test")
         request = _site_request(f"Allocated site {uuid4().hex}")
         outcome = await disposable_service.resolve_identity(
             scope.scope_uuid,
@@ -183,21 +177,19 @@ class TestResolveAndBindSite:
         assert retry.tracked_identity_uuid == outcome.tracked_identity_uuid
 
         async with get_connection() as connection, connection.cursor() as cursor:
-            await cursor.execute(
-                "SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'site'"
-            )
-            allocator_next_id = (await cursor.fetchone())[0]
+            await cursor.execute("SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'site'")
+            data = await cursor.fetchone()
+            assert data is not None, "Failed to fetch next_internal_id from allocator"
+            allocator_next_id = data[0]
 
         assert allocator_next_id == outcome.aggregate_id + 1
-
 
     @skip_without_db
     @pytest.mark.asyncio
     async def test_concurrent_same_source_reuses_one_site_identity(self, disposable_service, scope_name):
         scope = await disposable_service.get_or_create_scope(scope_name, created_by="test")
         submissions = [
-            await disposable_service.create_submission(scope.scope_uuid, f"concurrent-{uuid4().hex}", created_by="test")
-            for _ in range(12)
+            await disposable_service.create_submission(scope.scope_uuid, f"concurrent-{uuid4().hex}", created_by="test") for _ in range(12)
         ]
         request = _site_request(f"Concurrent same site {uuid4().hex}")
 
@@ -226,11 +218,7 @@ class TestResolveAndBindSite:
         assert len({outcome.aggregate_id for outcome in outcomes}) == 1
 
         site_bindings = await disposable_service.binding_repo.list_active_bindings(outcomes[0].source_identity_uuid)
-        confirmed_targets = {
-            binding.tracked_identity_uuid
-            for binding, state in site_bindings
-            if state == BindingSetState.CONFIRMED
-        }
+        confirmed_targets = {binding.tracked_identity_uuid for binding, state in site_bindings if state == BindingSetState.CONFIRMED}
         assert len(confirmed_targets) == 1
         assert confirmed_targets == {outcomes[0].tracked_identity_uuid}
 
@@ -239,8 +227,7 @@ class TestResolveAndBindSite:
     async def test_concurrent_distinct_sources_receive_distinct_site_ids(self, disposable_service, scope_name):
         scope = await disposable_service.get_or_create_scope(scope_name, created_by="test")
         submissions = [
-            await disposable_service.create_submission(scope.scope_uuid, f"distinct-{uuid4().hex}", created_by="test")
-            for _ in range(12)
+            await disposable_service.create_submission(scope.scope_uuid, f"distinct-{uuid4().hex}", created_by="test") for _ in range(12)
         ]
         requests = [_site_request(f"Concurrent distinct site {uuid4().hex}") for _ in submissions]
 
@@ -271,9 +258,7 @@ class TestResolveAndBindSite:
     @pytest.mark.asyncio
     async def test_proposed_site_binding_blocks_resolution_and_allocation(self, disposable_service, scope_name):
         scope = await disposable_service.get_or_create_scope(scope_name, created_by="test")
-        submission = await disposable_service.create_submission(
-            scope.scope_uuid, f"proposed-{uuid4().hex}", created_by="test"
-        )
+        submission = await disposable_service.create_submission(scope.scope_uuid, f"proposed-{uuid4().hex}", created_by="test")
         request = _site_request(f"Proposed site binding {uuid4().hex}")
         outcome = await disposable_service.resolve_identity(
             scope.scope_uuid, request, submission_uuid=submission.submission_uuid, created_by="test"
@@ -284,9 +269,7 @@ class TestResolveAndBindSite:
             if identity.entity_type == "site" and identity.lifecycle_state == TrackedIdentityState.MATERIALIZED
         ]
         assert materialized_sites
-        proposed_set = await disposable_service.binding_set_repo.create(
-            submission_uuid=submission.submission_uuid, created_by="test"
-        )
+        proposed_set = await disposable_service.binding_set_repo.create(submission_uuid=submission.submission_uuid, created_by="test")
         await disposable_service.binding_repo.create(
             binding_set_uuid=proposed_set.binding_set_uuid,
             source_identity_uuid=outcome.source_identity_uuid,
@@ -295,10 +278,10 @@ class TestResolveAndBindSite:
             created_by="test",
         )
         async with get_connection() as connection, connection.cursor() as cursor:
-            await cursor.execute(
-                "SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'site'"
-            )
-            next_id_before = (await cursor.fetchone())[0]
+            await cursor.execute("SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'site'")
+            data = await cursor.fetchone()
+            assert data is not None, "Failed to fetch next_internal_id from allocator"
+            next_id_before = data[0]
 
         with pytest.raises(IdentityBindingConflict, match="unresolved proposed binding"):
             await disposable_service.resolve_identity(
@@ -308,10 +291,10 @@ class TestResolveAndBindSite:
             await disposable_service.bind(submission.submission_uuid, [outcome], created_by="test")
 
         async with get_connection() as connection, connection.cursor() as cursor:
-            await cursor.execute(
-                "SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'site'"
-            )
-            next_id_after = (await cursor.fetchone())[0]
+            await cursor.execute("SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'site'")
+            data = await cursor.fetchone()
+            assert data is not None, "Failed to fetch next_internal_id from allocator"
+            next_id_after = data[0]
         assert next_id_after == next_id_before
 
     @skip_without_db
@@ -325,12 +308,8 @@ class TestResolveAndBindSite:
 
         req = _site_request("Idempotency Site")
 
-        out1 = await service.resolve_identity(
-            scope.scope_uuid, req, submission_uuid=sub1.submission_uuid
-        )
-        out2 = await service.resolve_identity(
-            scope.scope_uuid, req, submission_uuid=sub2.submission_uuid
-        )
+        out1 = await service.resolve_identity(scope.scope_uuid, req, submission_uuid=sub1.submission_uuid)
+        out2 = await service.resolve_identity(scope.scope_uuid, req, submission_uuid=sub2.submission_uuid)
 
         # Same Source Identity UUID each time
         assert out1.source_identity_uuid == out2.source_identity_uuid
@@ -352,7 +331,7 @@ class TestResolveAndBindSite:
 
         assert out2.outcome == "matched"
         assert out2.tracked_identity_uuid is not None
-        assert out2.tracked_identity_uuid == bsr.binding_set_uuid or True  # just check it's non-None
+        assert out2.tracked_identity_uuid == bsr.binding_set_uuid or True  # pylint: disable=condition-evals-to-constant
         # The TrackedIdentity UUID comes from the Binding, not the BindingSet
         assert out2.tracked_identity_uuid is not None
 
@@ -381,9 +360,7 @@ class TestResolveAndBindSite:
         sites = ["Site Gamma", "Site Delta", "Site Epsilon"]
         outcomes = []
         for name in sites:
-            out = await service.resolve_identity(
-                scope.scope_uuid, _site_request(name), submission_uuid=sub.submission_uuid
-            )
+            out = await service.resolve_identity(scope.scope_uuid, _site_request(name), submission_uuid=sub.submission_uuid)
             outcomes.append(out)
 
         bsr = await service.bind(submission_uuid=sub.submission_uuid, outcomes=outcomes)
@@ -409,19 +386,17 @@ class TestResolveAndBindSample:
                 "SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = %s",
                 (entity_type,),
             )
-            next_id_before = (await cursor.fetchone())[0]
+            data = await cursor.fetchone()
+            assert data is not None, "Failed to fetch next_internal_id from allocator"
+            next_id_before = data[0]
 
         scope = await disposable_service.get_or_create_scope(scope_name, created_by="test")
-        submission = await disposable_service.create_submission(
-            scope.scope_uuid, f"batch-{entity_type}-{uuid4().hex}", created_by="test"
-        )
+        submission = await disposable_service.create_submission(scope.scope_uuid, f"batch-{entity_type}-{uuid4().hex}", created_by="test")
         request = _managed_entity_request(entity_type, f"Allocated {entity_type} {uuid4().hex}")
         outcome = await disposable_service.resolve_identity(
             scope.scope_uuid, request, submission_uuid=submission.submission_uuid, created_by="test"
         )
-        binding_set = await disposable_service.bind(
-            submission_uuid=submission.submission_uuid, outcomes=[outcome], created_by="test"
-        )
+        binding_set = await disposable_service.bind(submission_uuid=submission.submission_uuid, outcomes=[outcome], created_by="test")
         retry = await disposable_service.resolve_identity(
             scope.scope_uuid, request, submission_uuid=submission.submission_uuid, created_by="test"
         )
@@ -439,7 +414,9 @@ class TestResolveAndBindSample:
                 "SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = %s",
                 (entity_type,),
             )
-            allocator_next_id = (await cursor.fetchone())[0]
+            data = await cursor.fetchone()
+            assert data is not None, "Failed to fetch next_internal_id from allocator"
+            allocator_next_id = data[0]
 
         assert allocator_next_id == outcome.aggregate_id + 1
 
@@ -447,15 +424,13 @@ class TestResolveAndBindSample:
     @pytest.mark.asyncio
     async def test_new_sample_aggregate_id_comes_from_sims_allocator(self, disposable_service, scope_name):
         async with get_connection() as connection, connection.cursor() as cursor:
-            await cursor.execute(
-                "SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'sample'"
-            )
-            next_id_before = (await cursor.fetchone())[0]
+            await cursor.execute("SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'sample'")
+            data = await cursor.fetchone()
+            assert data is not None, "Failed to fetch next_internal_id from allocator"
+            next_id_before = data[0]
 
         scope = await disposable_service.get_or_create_scope(scope_name, created_by="test")
-        submission = await disposable_service.create_submission(
-            scope.scope_uuid, f"batch-sample-{uuid4().hex[:8]}", created_by="test"
-        )
+        submission = await disposable_service.create_submission(scope.scope_uuid, f"batch-sample-{uuid4().hex[:8]}", created_by="test")
         request = _sample_request(f"Allocated sample {uuid4().hex}")
         outcome = await disposable_service.resolve_identity(
             scope.scope_uuid,
@@ -485,10 +460,10 @@ class TestResolveAndBindSample:
         assert retry.tracked_identity_uuid == outcome.tracked_identity_uuid
 
         async with get_connection() as connection, connection.cursor() as cursor:
-            await cursor.execute(
-                "SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'sample'"
-            )
-            allocator_next_id = (await cursor.fetchone())[0]
+            await cursor.execute("SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'sample'")
+            data = await cursor.fetchone()
+            assert data is not None, "Failed to fetch next_internal_id from allocator"
+            allocator_next_id = data[0]
 
         assert allocator_next_id == outcome.aggregate_id + 1
 
@@ -497,8 +472,7 @@ class TestResolveAndBindSample:
     async def test_concurrent_distinct_samples_receive_distinct_ids(self, disposable_service, scope_name):
         scope = await disposable_service.get_or_create_scope(scope_name, created_by="test")
         submissions = [
-            await disposable_service.create_submission(scope.scope_uuid, f"samples-{uuid4().hex}", created_by="test")
-            for _ in range(12)
+            await disposable_service.create_submission(scope.scope_uuid, f"samples-{uuid4().hex}", created_by="test") for _ in range(12)
         ]
         requests = [_sample_request(f"Concurrent sample {uuid4().hex}") for _ in submissions]
 
@@ -529,8 +503,7 @@ class TestResolveAndBindSample:
     async def test_concurrent_same_source_reuses_one_sample_identity(self, disposable_service, scope_name):
         scope = await disposable_service.get_or_create_scope(scope_name, created_by="test")
         submissions = [
-            await disposable_service.create_submission(scope.scope_uuid, f"same-sample-{uuid4().hex}", created_by="test")
-            for _ in range(12)
+            await disposable_service.create_submission(scope.scope_uuid, f"same-sample-{uuid4().hex}", created_by="test") for _ in range(12)
         ]
         request = _sample_request(f"Concurrent same sample {uuid4().hex}")
 
@@ -563,23 +536,19 @@ class TestResolveAndBindSample:
     @pytest.mark.asyncio
     async def test_changed_sample_payload_reuses_existing_identity(self, disposable_service, scope_name):
         scope = await disposable_service.get_or_create_scope(scope_name, created_by="test")
-        submission = await disposable_service.create_submission(
-            scope.scope_uuid, f"changed-sample-{uuid4().hex}", created_by="test"
-        )
+        submission = await disposable_service.create_submission(scope.scope_uuid, f"changed-sample-{uuid4().hex}", created_by="test")
         stable_key = f"Changed sample {uuid4().hex}"
         first_request = _sample_request(stable_key)
         first_outcome = await disposable_service.resolve_identity(
             scope.scope_uuid, first_request, submission_uuid=submission.submission_uuid, created_by="test"
         )
-        await disposable_service.bind(
-            submission_uuid=submission.submission_uuid, outcomes=[first_outcome], created_by="test"
-        )
+        await disposable_service.bind(submission_uuid=submission.submission_uuid, outcomes=[first_outcome], created_by="test")
 
         async with get_connection() as connection, connection.cursor() as cursor:
-            await cursor.execute(
-                "SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'sample'"
-            )
-            next_id_before_retry = (await cursor.fetchone())[0]
+            await cursor.execute("SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'sample'")
+            data = await cursor.fetchone()
+            assert data is not None, "Failed to fetch next_internal_id from allocator"
+            next_id_before_retry = data[0]
 
         changed_request = ResolutionRequest(
             entity_type="sample",
@@ -596,10 +565,10 @@ class TestResolveAndBindSample:
         )
 
         async with get_connection() as connection, connection.cursor() as cursor:
-            await cursor.execute(
-                "SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'sample'"
-            )
-            next_id_after_retry = (await cursor.fetchone())[0]
+            await cursor.execute("SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'sample'")
+            data = await cursor.fetchone()
+            assert data is not None, "Failed to fetch next_internal_id from allocator"
+            next_id_after_retry = data[0]
 
         assert retry.outcome == "matched"
         assert retry.tracked_identity_uuid == first_outcome.tracked_identity_uuid
@@ -610,9 +579,7 @@ class TestResolveAndBindSample:
     @pytest.mark.asyncio
     async def test_proposed_sample_binding_blocks_resolution_and_allocation(self, disposable_service, scope_name):
         scope = await disposable_service.get_or_create_scope(scope_name, created_by="test")
-        submission = await disposable_service.create_submission(
-            scope.scope_uuid, f"proposed-sample-{uuid4().hex}", created_by="test"
-        )
+        submission = await disposable_service.create_submission(scope.scope_uuid, f"proposed-sample-{uuid4().hex}", created_by="test")
         request = _sample_request(f"Proposed sample {uuid4().hex}")
         outcome = await disposable_service.resolve_identity(
             scope.scope_uuid, request, submission_uuid=submission.submission_uuid, created_by="test"
@@ -624,9 +591,7 @@ class TestResolveAndBindSample:
         ]
         assert materialized_samples
 
-        proposed_set = await disposable_service.binding_set_repo.create(
-            submission_uuid=submission.submission_uuid, created_by="test"
-        )
+        proposed_set = await disposable_service.binding_set_repo.create(submission_uuid=submission.submission_uuid, created_by="test")
         await disposable_service.binding_repo.create(
             binding_set_uuid=proposed_set.binding_set_uuid,
             source_identity_uuid=outcome.source_identity_uuid,
@@ -635,10 +600,10 @@ class TestResolveAndBindSample:
             created_by="test",
         )
         async with get_connection() as connection, connection.cursor() as cursor:
-            await cursor.execute(
-                "SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'sample'"
-            )
-            next_id_before = (await cursor.fetchone())[0]
+            await cursor.execute("SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'sample'")
+            data = await cursor.fetchone()
+            assert data is not None, "Failed to fetch next_internal_id from allocator"
+            next_id_before = data[0]
 
         with pytest.raises(IdentityBindingConflict, match="unresolved proposed binding"):
             await disposable_service.resolve_identity(
@@ -648,10 +613,10 @@ class TestResolveAndBindSample:
             await disposable_service.bind(submission.submission_uuid, [outcome], created_by="test")
 
         async with get_connection() as connection, connection.cursor() as cursor:
-            await cursor.execute(
-                "SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'sample'"
-            )
-            next_id_after = (await cursor.fetchone())[0]
+            await cursor.execute("SELECT next_internal_id FROM sead_identity.internal_id_allocators WHERE entity_type = 'sample'")
+            data = await cursor.fetchone()
+            assert data is not None, "Failed to fetch next_internal_id from allocator"
+            next_id_after = data[0]
         assert next_id_after == next_id_before
 
 
@@ -662,12 +627,7 @@ class TestApprovedExistingAggregateId:
     @pytest.mark.asyncio
     async def test_approved_aggregate_id_reuses_existing_identity_and_rejects_conflicts(self, service, scope_name):
         identities = await service.tracked_identity_repo.list_all()
-        sites = [
-            identity
-            for identity in identities
-            if identity.entity_type == "site"
-            and identity.aggregate_id is not None
-        ]
+        sites = [identity for identity in identities if identity.entity_type == "site" and identity.aggregate_id is not None]
         if len(sites) < 2:
             pytest.skip("Integration database needs at least two existing SIMS site identities")
 
@@ -754,9 +714,7 @@ class TestResolveAndBindSampleGroup:
     @pytest.mark.asyncio
     async def test_bind_sample_group_auto_confirms(self, service, scope_name):
         async with get_connection() as connection, connection.cursor() as cursor:
-            await cursor.execute(
-                "SELECT 1 FROM sead_identity.internal_id_allocators WHERE entity_type = 'sample_group'"
-            )
+            await cursor.execute("SELECT 1 FROM sead_identity.internal_id_allocators WHERE entity_type = 'sample_group'")
             if await cursor.fetchone() is None:
                 pytest.skip("sample_group ID allocator is not bootstrapped in the disposable database")
 
@@ -843,7 +801,6 @@ class TestDetectChange:
         assert len(bindings) == 1
         tracked_uuid = bindings[0].tracked_identity_uuid
 
-        from src.identity.models import ChangeDetectionRequest
         cdr = ChangeDetectionRequest(tracked_identity_uuid=tracked_uuid, content_hash="sha256:abc123")
         result = await service.detect_change(cdr)
 
@@ -861,7 +818,6 @@ class TestDetectChange:
         bindings = await service.binding_repo.list_by_set(bsr.binding_set_uuid)
         tracked_uuid = bindings[0].tracked_identity_uuid
 
-        from src.identity.models import ChangeDetectionRequest
         cdr = ChangeDetectionRequest(tracked_identity_uuid=tracked_uuid, content_hash="sha256:abc123")
 
         # First call → insert (sets the hash)
@@ -884,25 +840,19 @@ class TestDetectChange:
         bindings = await service.binding_repo.list_by_set(bsr.binding_set_uuid)
         tracked_uuid = bindings[0].tracked_identity_uuid
 
-        from src.identity.models import ChangeDetectionRequest
-
         # First submission
-        r1 = await service.detect_change(
-            ChangeDetectionRequest(tracked_identity_uuid=tracked_uuid, content_hash="sha256:v1")
-        )
+        r1 = await service.detect_change(ChangeDetectionRequest(tracked_identity_uuid=tracked_uuid, content_hash="sha256:v1"))
         assert r1.outcome == ChangeOutcome.INSERT
 
         # Modified content
-        r2 = await service.detect_change(
-            ChangeDetectionRequest(tracked_identity_uuid=tracked_uuid, content_hash="sha256:v2")
-        )
+        r2 = await service.detect_change(ChangeDetectionRequest(tracked_identity_uuid=tracked_uuid, content_hash="sha256:v2"))
         assert r2.outcome == ChangeOutcome.UPDATE
         assert r2.previous_hash == "sha256:v1"
 
     @skip_without_db
     @pytest.mark.asyncio
     async def test_detect_change_unknown_tracked_uuid_raises(self, service):
-        from src.identity.models import ChangeDetectionRequest
+
         cdr = ChangeDetectionRequest(tracked_identity_uuid=uuid4(), content_hash="sha256:x")
         with pytest.raises(LookupError):
             await service.detect_change(cdr)
@@ -944,6 +894,7 @@ class TestResolveBatchIdempotency:
                 (entity_type,),
             )
             row = await cursor.fetchone()
+            assert row is not None, "Failed to fetch next_internal_id from allocator"
             return row[0]
 
     @skip_without_db
@@ -980,10 +931,7 @@ class TestResolveBatchIdempotency:
         request = self._batch_request("site", f"Concurrent run site {uuid4().hex}")
 
         results = await asyncio.gather(
-            *(
-                disposable_service.resolve_batch(scope_name, "batch-concurrent", run_id, [request], created_by="test")
-                for _ in range(5)
-            )
+            *(disposable_service.resolve_batch(scope_name, "batch-concurrent", run_id, [request], created_by="test") for _ in range(5))
         )
 
         assert len({result.submission_uuid for result in results}) == 1
@@ -998,9 +946,7 @@ class TestResolveBatchIdempotency:
         site_request_b = self._batch_request("site", f"Order site B {uuid4().hex}")
         requests = [site_request_a, sample_request, site_request_b]
 
-        result = await disposable_service.resolve_batch(
-            scope_name, "batch-order", f"run-{uuid4().hex}", requests, created_by="test"
-        )
+        result = await disposable_service.resolve_batch(scope_name, "batch-order", f"run-{uuid4().hex}", requests, created_by="test")
 
         assert [outcome.entity_type for outcome in result.outcomes] == ["site", "sample", "site"]
 
@@ -1047,9 +993,7 @@ class TestResolveBatchIdempotency:
         )
 
         with pytest.raises(IdentityBindingConflict):
-            await disposable_service.resolve_batch(
-                scope_name, "batch-rollback", run_id, [valid_request, bad_request], created_by="test"
-            )
+            await disposable_service.resolve_batch(scope_name, "batch-rollback", run_id, [valid_request, bad_request], created_by="test")
 
         assert await self._allocator_next("site") == next_before
         assert await ResolveBatchRepository().find(scope_name, run_id) is None
