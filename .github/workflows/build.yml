@@ -98,6 +98,7 @@ jobs:
       packages: write
       id-token: write
       attestations: write
+      artifact-metadata: write
     env:
       IMAGE_NAME: ghcr.io/humlab-sead/sead_authority_service
       TARGET_ENVIRONMENT: ${{ inputs.target_environment || 'staging' }}
@@ -114,10 +115,17 @@ jobs:
       - name: Check Podman
         run: podman --version
 
+      # docker/login-action writes ~/.docker/config.json, which both Podman
+      # (as a credential fallback) and actions/attest read when pushing the
+      # attestation bundle. A plain "podman login" stores credentials only in
+      # Podman's own auth file, so the attest push fails with "No credentials
+      # found for registry ghcr.io".
       - name: Log in to GHCR
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: printf '%s' "$GHCR_TOKEN" | podman login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Resolve image tags
         run: |
@@ -167,10 +175,6 @@ jobs:
 
       - name: Generate artifact attestation
         uses: actions/attest@v4
-        env:
-          # The action pushes the attestation bundle to ghcr.io itself and
-          # authenticates with GH_TOKEN; it does not reuse the podman login.
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           subject-name: ${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.push.outputs.digest }}
