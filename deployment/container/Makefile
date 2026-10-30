@@ -109,6 +109,7 @@ config:
 .PHONY: healthcheck
 healthcheck:
 	curl -fsS http://localhost:$(if $(SEAD_AUTHORITY_PORT),$(SEAD_AUTHORITY_PORT),8024)/is_alive
+	@echo "Health check completed."
 
 # ---------------------------------------------------------------------------
 # Systemd user service (boot startup; requires loginctl enable-linger)

@@ -143,13 +143,17 @@ rtk-install:
 	@rtk init -g --copilot
 	@rtk init -g --codex
 
+# graphify comes from brew (~/.local/bin), not the project .venv.
 create-graphify:
 	@graphify extract . --project
-	@graphify cluster-only $(HOME)/source/sead_shape_shifter
+	@graphify cluster-only $(HOME)/source/sead_authority_service
 	@graphify export callflow-html
 
+# GRAPHIFY_VIZ_NODE_LIMIT=0 blocks graph.html generation and removes any stale
+# file (the HTML is unused). graphify reads this limit only from the
+# environment, not from .graphifyrc.
 update-graphify:
-	@uv run graphify update $(HOME)/source/sead_shape_shifter  --force
+	@GRAPHIFY_VIZ_NODE_LIMIT=0 graphify update $(HOME)/source/sead_authority_service --force
 	@git add graphify-out
 	@if git diff --cached --quiet -- graphify-out; then \
 		echo "No changes in graphify-out"; \
@@ -158,14 +162,14 @@ update-graphify:
 	fi
 
 install-graphify:
-	@uv add --dev graphifyy[all]
+	@uv tool install "graphifyy[all]" --force
 	@graphify hook install
 	@graphify vscode install
 	@graphify codex install
 	@echo "✓ Graphify installed and pre-commit hook set up"
 
-# 	@graphify extract . --project
-# 	@graphify cluster-only $(HOME)/source/sead_shape_shifter
+#	@graphify extract . --project
+#	@graphify cluster-only $(HOME)/source/sead_authority_service
 # 	@graphify export callflow-html
 
 commit-graphify:
