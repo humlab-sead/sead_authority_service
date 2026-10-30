@@ -12,8 +12,8 @@
     "semantic_hash": "6d640299eeeea40c9aa97a696af6a7f5"
   },
   "pyproject.toml": {
-    "mtime": 1792784576.0957522,
-    "seen": 1792784605.0026188,
+    "mtime": 1792789921.3345878,
+    "seen": 1793303403.878678,
     "ast_hash": "a4619c39e6dc99170bbef8279366da17",
     "semantic_hash": ""
   },
@@ -450,10 +450,10 @@
     "semantic_hash": "02161ceaa5e155cb8ec05605dcdaa73c"
   },
   "src/llm/providers/openai.py": {
-    "mtime": 1790138077.6999283,
-    "seen": 1790924815.3088462,
-    "ast_hash": "49c024381ee01efd61fda26fb3ce77d5",
-    "semantic_hash": "49c024381ee01efd61fda26fb3ce77d5"
+    "mtime": 1793303163.949695,
+    "seen": 1793303403.878772,
+    "ast_hash": "4dd12c58a472e52d776f668f8011a13e",
+    "semantic_hash": ""
   },
   "src/llm/providers/provider.py": {
     "mtime": 1790138077.6999283,
@@ -1032,8 +1032,8 @@
     "semantic_hash": "1e75ed8aa84cb0495480cdd68c94a84d"
   },
   ".github/copilot-instructions.md": {
-    "mtime": 1792784568.9507182,
-    "seen": 1792784605.0028555,
+    "mtime": 1792789914.013673,
+    "seen": 1793303403.8789337,
     "ast_hash": "4844b4f4191d12f32790e29a725dfaf3",
     "semantic_hash": ""
   },
@@ -1068,9 +1068,9 @@
     "semantic_hash": ""
   },
   "config/config.yml": {
-    "mtime": 1792677050.5068085,
-    "seen": 1792686192.6791008,
-    "ast_hash": "314f04589a90bfc415df263675e1c3d0",
+    "mtime": 1793303219.0278676,
+    "seen": 1793303403.8786554,
+    "ast_hash": "0bdb4f8feff1bcfd892bfca9f868936c",
     "semantic_hash": ""
   },
   "config/entities.yml": {
@@ -1719,6 +1719,12 @@
     "mtime": 1790138077.699038,
     "seen": 1792784605.0029263,
     "ast_hash": "0331659ad45667bc9c6c0eaa81a39206",
+    "semantic_hash": ""
+  },
+  "tests/llm/providers/test_openai.py": {
+    "mtime": 1793303250.8713052,
+    "seen": 1793303403.8788877,
+    "ast_hash": "f4e604a7ebc5afbaf834567ad05e0276",
     "semantic_hash": ""
   }
 }
