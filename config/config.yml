@@ -80,7 +80,7 @@ llm:
   translation_target_lang: "en"
   semantic_batch_size: 50
   openai:
-    model: "${OPENAI_MODEL:-gpt-4o-mini}"
+    model: "${OPENAI_MODEL}"
     provider_id: "openapi"
     base_url: "${OPENAI_BASE_URL}"
     api_key: "${OPENAI_API_KEY}"
@@ -149,5 +149,4 @@ logging:
       compression: "zip"
       backtrace: true
       diagnose: true
-
 
