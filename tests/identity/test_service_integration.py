@@ -627,7 +627,13 @@ class TestApprovedExistingAggregateId:
     @pytest.mark.asyncio
     async def test_approved_aggregate_id_reuses_existing_identity_and_rejects_conflicts(self, service, scope_name):
         identities = await service.tracked_identity_repo.list_all()
-        sites = [identity for identity in identities if identity.entity_type == "site" and identity.aggregate_id is not None]
+        sites = [
+            identity
+            for identity in identities
+            if identity.entity_type == "site"
+            and identity.aggregate_id is not None
+            and identity.lifecycle_state == TrackedIdentityState.MATERIALIZED
+        ]
         if len(sites) < 2:
             pytest.skip("Integration database needs at least two existing SIMS site identities")
 

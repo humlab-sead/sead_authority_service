@@ -40,8 +40,11 @@ Marked `integration` and excluded from the standard test run. These require a li
 Currently covers:
 - `test_reconcile_integration.py` — end-to-end reconciliation against a real SEAD database
 - `tests/identity/test_service_integration.py` — SIMS service against a live database
+- `tests/identity/test_reconciliation_contract_integration.py` — site match/readiness, candidate verification, and approved-ID binding lifecycle checks
 
-Run explicitly when testing against a real database or validating query performance.
+Run database integration tests only against the helper-owned disposable database. The identity test fixture rejects any target other than `127.0.0.1:55432/sead_staging`; never point these tests at staging or production. The reconciliation contract tests check the installed `authority.fuzzy_site(text,integer)` function and use a transaction savepoint to test readiness when that function is temporarily renamed.
+
+Create the source dump and local Podman database with the procedure in [DEVELOPMENT.md](DEVELOPMENT.md#disposable-database-for-integration-tests).
 
 ### Manual testing
 
@@ -54,7 +57,7 @@ Tests requiring specific external setup (OpenRefine running, specific seed data)
 - Python tests: run via `uv run` to use the project `.venv/`. No database needed unless the test is marked `integration`.
 - `asyncio_mode = "auto"` is set in `pyproject.toml` — `@pytest.mark.asyncio` is accepted but not required on individual async tests.
 - The directories `tests/integration/` and `tests/manual/` are excluded from pytest's default discovery via `norecursedirs` in `pyproject.toml`. Integration tests must be invoked explicitly.
-- For integration tests: provide DB credentials via `.env` (see [DEVELOPMENT.md](DEVELOPMENT.md)) and ensure the target database has `pg_trgm` installed.
+- For integration tests: set `SIMS_INTEGRATION_DB=1`, configure the database variables for the fixture's loopback target, and provide credentials through the local environment. The helper database must have the SIMS schema, `pg_trgm`, and the generated `authority.fuzzy_site(text,integer)` function installed.
 
 ### pytest markers
 
@@ -91,6 +94,10 @@ uv run pytest tests/strategies/test_registry.py::test_name -v
 
 # Integration tests only (requires DB)
 uv run pytest -m integration
+
+# Reconciliation contract checks (helper-owned disposable DB only)
+SIMS_INTEGRATION_DB=1 uv run pytest -o addopts='' -q tests/identity/test_reconciliation_contract_integration.py -k 'site_match or candidate or readiness'
+SIMS_INTEGRATION_DB=1 uv run pytest -o addopts='' -q tests/identity/test_reconciliation_contract_integration.py tests/identity/test_service_integration.py -k 'approved or binding_state or materialized'
 
 # Skip all external tests explicitly
 uv run pytest tests -v -m "not integration and not manual and not debug"

@@ -62,6 +62,57 @@ For PostgreSQL passwords, prefer `~/.pgpass` over environment variables.
 
 See `config/config.yml` and `deployment/container/.env.example` for supported variables. For production deployment configuration see [OPERATIONS.md](OPERATIONS.md).
 
+### Disposable database for integration tests
+
+The identity integration tests need a local SEAD database with the current
+`authority` and `sead_identity` schemas. The helper is
+`scripts/verify_sims_identity_candidates.sh` in this repository.
+
+From the Authority Service repository, configure the source connection and
+create the local archive and Podman database:
+
+```bash
+export SIMS_VERIFY_SOURCE_HOST=<SEAD database host>
+export SIMS_VERIFY_SOURCE_PORT=<SEAD database port>
+export SIMS_VERIFY_SOURCE_DATABASE=<SEAD database name>
+export SIMS_VERIFY_SOURCE_USER=<database user with dump/read access>
+
+scripts/verify_sims_identity_candidates.sh dump --yes
+# Or load the source connection variables from a private shell environment file:
+scripts/verify_sims_identity_candidates.sh dump --yes --env-file ./tmp/.env.sims.verify
+scripts/verify_sims_identity_candidates.sh setup
+scripts/verify_sims_identity_candidates.sh bootstrap site
+scripts/verify_sims_identity_candidates.sh credentials
+```
+
+`pg_dump` reads the source password from the local libpq password file
+(`~/.pgpass` or `PGPASSFILE`). It excludes existing `authority` and
+`sead_identity` schemas. Setup restores the remaining SEAD database in a
+loopback-only Podman container, installs `authority` using
+`schema/create_schema.sh --no-generate --deploy`, then applies the numbered
+SQL files through `011_resolve_batch_idempotency.sql` in
+`schema/sql/identity/`. Because PostgreSQL roles are not included in the
+database archive, setup creates `humlab_admin` as a local `NOLOGIN` role for
+Authority schema object ownership. It also installs the `unaccent` and
+`pg_trgm` extensions required by the Authority schema when they are absent.
+The role has no password and exists only inside the disposable container.
+The `--env-file` option sources the selected file for that dump command; keep
+it out of Git and restrict it to owner-only access. `bootstrap site` creates
+materialized SIMS identities for existing SEAD site rows and initializes the
+site ID allocator in the disposable database. The default archive is stored under
+`$XDG_CACHE_HOME/sead-authority-service/`, or `~/.cache/sead-authority-service/` when
+`XDG_CACHE_HOME` is unset. It can contain sensitive database rows, so only
+create it from a source you are authorized to copy and remove it when no
+longer needed.
+
+For integration tests, set `SIMS_INTEGRATION_DB=1` and the
+`SEAD_AUTHORITY_OPTIONS_DATABASE_*` variables to the helper's exact target:
+host `127.0.0.1`, port `55432`, database `sead_staging`, and user `postgres`.
+Use the password printed by `credentials` only in your local shell or a
+matching password file. The fixture skips tests if the host, port, or database
+does not match this disposable target. See [TESTING.md](TESTING.md) for the
+integration test commands.
+
 ---
 
 ## Project Structure

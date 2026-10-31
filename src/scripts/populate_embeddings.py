@@ -37,13 +37,13 @@ import psycopg
 from dotenv import load_dotenv
 from loguru import logger
 
-from configuration.interface import ConfigLike
-from configuration.provider import ConfigStore, get_config_provider
-from configuration.resolve import ConfigValue
-from utility import configure_logging, create_db_uri
+# Preserve direct execution while keeping project imports under the `src` package.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+from src.configuration.interface import ConfigLike  # noqa: E402
+from src.configuration.provider import ConfigStore, get_config_provider  # noqa: E402
+from src.configuration.resolve import ConfigValue  # noqa: E402
+from src.utility import configure_logging, create_db_uri  # noqa: E402
 
 
 class EmbeddingPopulator:

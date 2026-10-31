@@ -5,23 +5,33 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
 from starlette.datastructures import UploadFile
+from starlette.exceptions import HTTPException
 
 from src import suggest
 
 # Not used: ReconBatchRequest, ReconBatchRequestHandler, ReconQueryRequest
 from src.api.model import (
     ReconBatchResponse,
+    ReconcileReadinessResponse,
     ReconQuery,
     ReconServiceManifest,
     SuggestEntityResponse,
     SuggestPropertyResponse,
     SuggestTypeResponse,
+    VerifyCandidatesRequest,
+    VerifyCandidatesResponse,
+)
+from src.candidate_verification import (
+    DATABASE_ERRORS,
+    UnsupportedReadinessType,
+    get_reconciliation_readiness,
+    verify_candidate_batch,
 )
 from src.configuration import Config, ConfigValue, get_config_provider, setup_config_store
 from src.configuration.interface import ConfigLike
 from src.metadata import get_reconcile_properties, get_reconciliation_metadata
 from src.preview import render_preview
-from src.reconcile import reconcile_queries
+from src.reconcile import UnsupportedReconciliationTypeError, reconcile_queries
 from src.strategies.strategy import Strategies
 
 # pylint: disable=unused-argument, redefined-builtin, too-many-locals, too-many-return-statements, too-many-branches
@@ -67,6 +77,35 @@ async def meta(request: Request, config: Config = Depends(get_config_dependency)
     metadata: dict[str, Any] = get_reconciliation_metadata(Strategies, host=str(request.base_url))
     manifest: ReconServiceManifest = ReconServiceManifest(**metadata)
     return ReconServiceManifest.model_validate(manifest)
+
+
+@router.post(
+    "/reconcile/verify-candidates",
+    response_model=VerifyCandidatesResponse,
+    response_model_exclude_none=True,
+)
+async def verify_candidates(
+    body: VerifyCandidatesRequest,
+    config: Config = Depends(get_config_dependency),
+) -> VerifyCandidatesResponse:
+    """Check candidate site IDs against SEAD without writing SIMS identity data."""
+    try:
+        return VerifyCandidatesResponse(results=await verify_candidate_batch(body.items))
+    except DATABASE_ERRORS as exc:
+        logger.exception("Candidate verification failed because the SEAD database is unavailable: {}", exc)
+        raise HTTPException(status_code=503, detail="SEAD database is unavailable") from exc
+
+
+@router.get("/reconcile/readiness", response_model=ReconcileReadinessResponse)
+async def reconciliation_readiness(
+    type: str,
+    config: Config = Depends(get_config_dependency),
+) -> ReconcileReadinessResponse:
+    """Check whether a reconciliation type can run its database-backed match query."""
+    try:
+        return await get_reconciliation_readiness(type)
+    except UnsupportedReadinessType as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("/reconcile", response_model=ReconBatchResponse, response_model_exclude_none=True)
@@ -230,6 +269,9 @@ async def reconcile(request: Request, config: Config = Depends(get_config_depend
         response = ReconBatchResponse(root=results)
         return response
 
+    except UnsupportedReconciliationTypeError as exc:
+        logger.info("Unsupported reconciliation type: {}", exc)
+        return JSONResponse({"error": str(exc)}, status_code=422)
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception(f"Exception in reconcile endpoint: {e}", exc_info=True)
         return JSONResponse({"error": f"Server error: {str(e)}"}, status_code=500)

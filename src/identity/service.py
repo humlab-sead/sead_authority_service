@@ -68,6 +68,7 @@ from src.identity.types import (
     BindingSetState,
     ChangeOutcome,
     IdentityType,
+    TrackedIdentityState,
 )
 
 
@@ -248,6 +249,7 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
         submission_uuid: UUID | None,
         outcomes: list[ResolutionOutcome],
         created_by: str | None = None,
+        approved_aggregate_ids: list[int | None] | None = None,
     ) -> BindingSetResponse:
         """Create a Binding Set from resolution outcomes and apply policy.
 
@@ -266,10 +268,20 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
         """
         if not outcomes:
             raise ValueError("bind() requires at least one ResolutionOutcome")
+        if approved_aggregate_ids is not None and len(approved_aggregate_ids) != len(outcomes):
+            raise ValueError("approved_aggregate_ids must correspond to each resolution outcome")
 
         async with get_connection():
             source_ids = [outcome.source_identity_uuid for outcome in outcomes]
             await self.source_identity_repo.lock_for_binding(source_ids)
+            if approved_aggregate_ids is not None:
+                for outcome, approved_aggregate_id in zip(outcomes, approved_aggregate_ids):
+                    if approved_aggregate_id is not None:
+                        await self._lock_materialized_approved_identity(
+                            outcome.entity_type,
+                            approved_aggregate_id,
+                            outcome.tracked_identity_uuid,
+                        )
             await self._reuse_confirmed_bindings(outcomes)
 
             # Keep set creation, identity allocation, binding, and confirmation atomic.
@@ -292,6 +304,36 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
                 logger.info(f"Binding set {binding_set.binding_set_uuid} remains proposed — awaiting manual confirmation")
 
             return _to_binding_set_response(binding_set, binding_count=len(bindings))
+
+    async def _lock_materialized_approved_identity(
+        self,
+        entity_type: str,
+        aggregate_id: int,
+        tracked_identity_uuid: UUID | None = None,
+    ) -> TrackedIdentity:
+        """Require and lock a materialized approved identity in the current transaction."""
+        if tracked_identity_uuid is None:
+            try:
+                identity = await self.tracked_identity_repo.find_by_aggregate_id(entity_type, aggregate_id)
+            except RepositoryError as exc:
+                raise IdentityBindingConflict(str(exc)) from exc
+            if identity is None:
+                raise IdentityBindingConflict(f"No SIMS {entity_type} tracked identity exists for approved aggregate ID {aggregate_id}")
+            tracked_identity_uuid = identity.tracked_identity_uuid
+
+        try:
+            identity = await self.tracked_identity_repo.lock_for_binding(tracked_identity_uuid, entity_type, aggregate_id)
+        except RepositoryError as exc:
+            raise IdentityBindingConflict(str(exc)) from exc
+
+        if identity is None:
+            raise IdentityBindingConflict(f"No SIMS {entity_type} tracked identity exists for approved aggregate ID {aggregate_id}")
+        if identity.lifecycle_state != TrackedIdentityState.MATERIALIZED:
+            raise IdentityBindingConflict(
+                f"Approved {entity_type} aggregate ID {aggregate_id} must be materialized before it can be bound "
+                f"(current state: {identity.lifecycle_state.value})"
+            )
+        return identity
 
     async def _reuse_confirmed_bindings(self, outcomes: list[ResolutionOutcome]) -> None:
         """Reject unresolved proposals and reuse confirmed identities for stale outcomes."""
@@ -397,6 +439,9 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
             if existing is not None:
                 if existing.request_fingerprint != fingerprint:
                     raise IdentityBatchConflict(f"Run '{run_id}' for scope '{scope_name}' was already resolved with a different payload")
+                for request in requests:
+                    if request.approved_aggregate_id is not None:
+                        await self._lock_materialized_approved_identity(request.entity_type, request.approved_aggregate_id)
                 logger.info(f"resolve_batch: replaying stored result for run '{run_id}'")
                 return existing.result
 
@@ -417,6 +462,7 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
                 submission_uuid=submission.submission_uuid,
                 outcomes=outcomes,
                 created_by=created_by,
+                approved_aggregate_ids=[request.approved_aggregate_id for request in requests],
             )
 
             result = ResolveBatchResult(
@@ -457,13 +503,19 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
         created_by: str | None = None,
     ) -> BindingSetResponse:
         """Shorthand for resolve_identity × N → bind."""
-        outcomes: list[ResolutionOutcome] = []
-        for req in requests:
-            outcome: ResolutionOutcome = await self.resolve_identity(
-                scope_uuid, req, submission_uuid=submission_uuid, created_by=created_by
+        async with get_connection():
+            outcomes: list[ResolutionOutcome] = []
+            for req in requests:
+                outcome: ResolutionOutcome = await self.resolve_identity(
+                    scope_uuid, req, submission_uuid=submission_uuid, created_by=created_by
+                )
+                outcomes.append(outcome)
+            return await self.bind(
+                submission_uuid=submission_uuid,
+                outcomes=outcomes,
+                created_by=created_by,
+                approved_aggregate_ids=[request.approved_aggregate_id for request in requests],
             )
-            outcomes.append(outcome)
-        return await self.bind(submission_uuid=submission_uuid, outcomes=outcomes, created_by=created_by)
 
     # ------------------------------------------------------------------
     # Operation 3 — Confirm Binding Set

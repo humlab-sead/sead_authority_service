@@ -20,6 +20,27 @@ class TestSiteRepository:
 
     @pytest.mark.asyncio
     @with_test_config
+    async def test_site_exists_uses_parameterized_lookup(self, test_provider: ExtendedMockConfigProvider):
+        test_provider.create_connection_mock(fetchone={"site_id": 123}, execute=None)
+        repository = SiteRepository("site")
+
+        assert await repository.site_exists(123)
+
+        expected_sql = repository.get_sql_query("candidate_exists_sql").strip()
+        cursor = test_provider.cursor_mock
+        cursor.execute.assert_called_once_with(expected_sql, {"site_id": 123})
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_site_exists_propagates_database_errors(self, test_provider: ExtendedMockConfigProvider):
+        repository = SiteRepository("site")
+        repository.fetch_one = AsyncMock(side_effect=psycopg.OperationalError("database unavailable"))
+
+        with pytest.raises(psycopg.OperationalError, match="database unavailable"):
+            await repository.site_exists(123)
+
+    @pytest.mark.asyncio
+    @with_test_config
     async def test_fetch_site_by_national_id_found(self, test_provider: ExtendedMockConfigProvider):
         """Test fetching site by national ID when site exists."""
         # Mock data returned from database

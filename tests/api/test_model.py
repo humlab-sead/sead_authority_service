@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from src.api.model import (
     APIResponse,
+    CandidateVerificationResult,
     ExtCell,
     ExtendDescriptor,
     ExtendRequest,
@@ -30,8 +31,33 @@ from src.api.model import (
     SuggestTypeItem,
     SuggestTypeResponse,
     TypeRef,
+    VerifyCandidatesRequest,
     ViewTemplate,
 )
+
+
+class TestCandidateVerificationModels:
+    def test_batch_requires_between_one_and_one_hundred_items(self):
+        item = {"type": "site", "id": "https://w3id.org/sead/id/site/123"}
+
+        assert len(VerifyCandidatesRequest(items=[item]).items) == 1
+        assert len(VerifyCandidatesRequest(items=[item] * 100).items) == 100
+
+        with pytest.raises(ValidationError):
+            VerifyCandidatesRequest(items=[])
+        with pytest.raises(ValidationError):
+            VerifyCandidatesRequest(items=[item] * 101)
+
+    def test_candidate_request_rejects_missing_and_extra_fields(self):
+        with pytest.raises(ValidationError):
+            VerifyCandidatesRequest(items=[{"type": "site"}])
+        with pytest.raises(ValidationError):
+            VerifyCandidatesRequest(items=[{"type": "site", "id": "x", "extra": "value"}])
+
+    def test_nonexistent_result_omits_site_identity_fields(self):
+        result = CandidateVerificationResult(type="site", id="candidate", outcome="not_found")
+
+        assert result.model_dump(exclude_none=True) == {"type": "site", "id": "candidate", "outcome": "not_found"}
 
 
 class TestTypeRef:

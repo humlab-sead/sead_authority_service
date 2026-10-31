@@ -8,6 +8,11 @@ from .strategy import ReconciliationStrategy, Strategies
 
 class SiteRepository(BaseRepository):
 
+    async def site_exists(self, site_id: int) -> bool:
+        """Return whether the SEAD site row exists without hiding database errors."""
+        sql: str = self.get_sql_query("candidate_exists_sql")
+        return await self.fetch_one(sql, {"site_id": site_id}) is not None
+
     async def fetch_site_by_national_id(self, national_id: str) -> list[dict[str, Any]]:
         """Exact match by national site identifier"""
         sql: str = self.get_sql_queries().get("fetch_site_by_national_id", "")

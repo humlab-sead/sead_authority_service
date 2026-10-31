@@ -372,6 +372,23 @@ class TrackedIdentityRepository(BaseRepository[TrackedIdentity]):
     table_name = "sead_identity.tracked_identities"
     pk_column = "tracked_identity_uuid"
 
+    async def lock_for_binding(
+        self,
+        tracked_identity_uuid: UUID,
+        entity_type: str,
+        aggregate_id: int,
+    ) -> TrackedIdentity | None:
+        """Lock and return the matching tracked identity in the current transaction."""
+        row = await self._fetchone(
+            """
+            SELECT * FROM sead_identity.tracked_identities
+            WHERE tracked_identity_uuid = %s AND entity_type = %s AND aggregate_id = %s
+            FOR UPDATE
+            """,
+            (tracked_identity_uuid, entity_type, aggregate_id),
+        )
+        return self._to_model(row)
+
     async def find_by_aggregate_id(
         self,
         entity_type: str,
