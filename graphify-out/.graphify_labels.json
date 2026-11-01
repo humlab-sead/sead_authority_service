@@ -4,7 +4,6 @@
   "8": "GeoNamesProxy",
   "11": "test_suggest.py",
   "12": "_patch_connection",
-  "13": "with_test_config",
   "15": "FeatureTypeReconciliationStrategy",
   "18": "ResolutionRequest",
   "20": "ReconQuery",
