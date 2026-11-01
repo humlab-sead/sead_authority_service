@@ -13,7 +13,6 @@ from src.api.model import (
 )
 from src.configuration import ConfigValue
 from src.identity.policy import IdentityPolicy
-from src.strategies.query import BaseRepository
 from src.strategies.site import SiteRepository
 from src.strategies.strategy import ReconciliationStrategy, Strategies
 
@@ -80,11 +79,13 @@ async def verify_candidate_batch(items: list[CandidateVerificationItem]) -> list
     """Return one ordered, read-only SEAD existence result for each candidate."""
     policy = IdentityPolicy()
     id_base = _configured_id_base()
+    site_strategy_cls = _site_strategy("site", policy) if any(item.type == "site" for item in items) else None
+    site_repository: SiteRepository | None = None
+    site_repository_checked = False
     results: list[CandidateVerificationResult] = []
 
     for item in items:
-        strategy_cls = _site_strategy(item.type, policy)
-        if strategy_cls is None:
+        if item.type != "site" or site_strategy_cls is None:
             results.append(CandidateVerificationResult(type=item.type, id=item.id, outcome="unsupported_type"))
             continue
 
@@ -93,12 +94,16 @@ async def verify_candidate_batch(items: list[CandidateVerificationItem]) -> list
             results.append(CandidateVerificationResult(type=item.type, id=item.id, outcome="invalid_candidate"))
             continue
 
-        repository: BaseRepository = strategy_cls().get_repository()
-        if not isinstance(repository, SiteRepository):
+        if not site_repository_checked:
+            repository = site_strategy_cls().get_repository()
+            site_repository = repository if isinstance(repository, SiteRepository) else None
+            site_repository_checked = True
+
+        if site_repository is None:
             results.append(CandidateVerificationResult(type=item.type, id=item.id, outcome="unsupported_type"))
             continue
 
-        if await repository.site_exists(site_id):
+        if await site_repository.site_exists(site_id):
             results.append(
                 CandidateVerificationResult(
                     type=item.type,

@@ -53,3 +53,19 @@ def test_ignores_import_text_in_comments_and_docstrings(tmp_path: Path) -> None:
     )
 
     assert find_import_inconsistencies(tmp_path) == []
+
+
+def test_ignores_non_source_and_scratch_directories(tmp_path: Path) -> None:
+    _write_python_file(tmp_path, "graphify-out/broken.py", "def broken(:\n")
+
+    for relative_path in (
+        "data/broken.py",
+        "tmp/broken.py",
+        "secrets/broken.py",
+        "authority_service.egg-info/broken.py",
+    ):
+        source_file = tmp_path / relative_path
+        source_file.parent.mkdir(parents=True, exist_ok=True)
+        source_file.write_bytes(b"\xff")
+
+    assert find_import_inconsistencies(tmp_path) == []

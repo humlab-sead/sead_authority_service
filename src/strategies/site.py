@@ -6,11 +6,17 @@ from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies
 
 
+class MissingCandidateExistsQueryError(ValueError):
+    """Raised when the site-existence query is missing from strategy configuration."""
+
+
 class SiteRepository(BaseRepository):
 
     async def site_exists(self, site_id: int) -> bool:
         """Return whether the SEAD site row exists without hiding database errors."""
         sql: str = self.get_sql_query("candidate_exists_sql")
+        if not sql.strip():
+            raise MissingCandidateExistsQueryError("Missing required SQL query 'candidate_exists_sql' for site verification.")
         return await self.fetch_one(sql, {"site_id": site_id}) is not None
 
     async def fetch_site_by_national_id(self, national_id: str) -> list[dict[str, Any]]:

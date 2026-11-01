@@ -6,7 +6,19 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-IGNORED_DIRECTORIES = {".git", ".venv", "__pycache__", "build", "dist", "node_modules", "venv"}
+IGNORED_DIRECTORIES = {
+    ".git",
+    ".venv",
+    "__pycache__",
+    "build",
+    "data",
+    "dist",
+    "graphify-out",
+    "node_modules",
+    "secrets",
+    "tmp",
+    "venv",
+}
 
 
 def _module_name_for_file(source_file: Path, project_root: Path) -> str:
@@ -113,7 +125,8 @@ def find_import_inconsistencies(project_root: str | Path) -> list[tuple[str, dic
     module_imports: defaultdict[Path, defaultdict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
 
     for source_file in root.rglob("*.py"):
-        if IGNORED_DIRECTORIES.intersection(source_file.relative_to(root).parts):
+        path_parts = source_file.relative_to(root).parts
+        if IGNORED_DIRECTORIES.intersection(path_parts) or any(part.endswith(".egg-info") for part in path_parts):
             continue
 
         syntax_tree = ast.parse(source_file.read_text(encoding="utf-8"), filename=str(source_file))

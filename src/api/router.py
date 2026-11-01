@@ -8,6 +8,12 @@ from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException
 
 from src import suggest
+from src.api.candidate_verification import (
+    DATABASE_ERRORS,
+    UnsupportedReadinessType,
+    get_reconciliation_readiness,
+    verify_candidate_batch,
+)
 
 # Not used: ReconBatchRequest, ReconBatchRequestHandler, ReconQueryRequest
 from src.api.model import (
@@ -21,17 +27,12 @@ from src.api.model import (
     VerifyCandidatesRequest,
     VerifyCandidatesResponse,
 )
-from src.candidate_verification import (
-    DATABASE_ERRORS,
-    UnsupportedReadinessType,
-    get_reconciliation_readiness,
-    verify_candidate_batch,
-)
 from src.configuration import Config, ConfigValue, get_config_provider, setup_config_store
 from src.configuration.interface import ConfigLike
 from src.metadata import get_reconcile_properties, get_reconciliation_metadata
 from src.preview import render_preview
 from src.reconcile import UnsupportedReconciliationTypeError, reconcile_queries
+from src.strategies.site import MissingCandidateExistsQueryError
 from src.strategies.strategy import Strategies
 
 # pylint: disable=unused-argument, redefined-builtin, too-many-locals, too-many-return-statements, too-many-branches
@@ -91,6 +92,9 @@ async def verify_candidates(
     """Check candidate site IDs against SEAD without writing SIMS identity data."""
     try:
         return VerifyCandidatesResponse(results=await verify_candidate_batch(body.items))
+    except MissingCandidateExistsQueryError as exc:
+        logger.exception("Candidate verification is misconfigured: {}", exc)
+        raise HTTPException(status_code=500, detail="Candidate verification is misconfigured") from exc
     except DATABASE_ERRORS as exc:
         logger.exception("Candidate verification failed because the SEAD database is unavailable: {}", exc)
         raise HTTPException(status_code=503, detail="SEAD database is unavailable") from exc

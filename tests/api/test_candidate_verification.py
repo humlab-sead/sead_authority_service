@@ -5,10 +5,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import src.candidate_verification as candidate_verification
+import src.api.candidate_verification as candidate_verification
 from src.api.model import CandidateVerificationItem
 from src.api.router import router
-from src.strategies.site import SiteRepository
+from src.strategies.site import MissingCandidateExistsQueryError, SiteReconciliationStrategy, SiteRepository
 from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
@@ -51,10 +51,18 @@ def test_positive_candidate_uri_returns_integer_id() -> None:
 async def test_batch_preserves_order_and_classifies_candidates(monkeypatch, test_provider) -> None:
     looked_up: list[int] = []
 
+    class CountingSiteStrategy(SiteReconciliationStrategy):
+        instances = 0
+
+        def __init__(self) -> None:
+            type(self).instances += 1
+            super().__init__()
+
     async def site_exists(self, site_id: int) -> bool:
         looked_up.append(site_id)
         return site_id == 1
 
+    monkeypatch.setattr(candidate_verification.Strategies, "items", {"site": CountingSiteStrategy})
     monkeypatch.setattr(SiteRepository, "site_exists", site_exists)
     results = await candidate_verification.verify_candidate_batch(
         [
@@ -75,6 +83,7 @@ async def test_batch_preserves_order_and_classifies_candidates(monkeypatch, test
     ]
     assert [result.aggregate_id for result in results] == [1, None, None, None, 1]
     assert looked_up == [1, 2, 1]
+    assert CountingSiteStrategy.instances == 1
 
 
 @pytest.mark.asyncio
@@ -126,6 +135,18 @@ def test_database_failure_returns_503_without_partial_results(monkeypatch, clien
     assert response.status_code == 503
     assert response.json() == {"detail": "SEAD database is unavailable"}
     assert lookups == [1, 2]
+
+
+@with_test_config
+def test_missing_candidate_query_returns_configuration_error(monkeypatch, client, test_provider) -> None:
+    async def site_exists(self, site_id: int) -> bool:
+        raise MissingCandidateExistsQueryError("missing candidate_exists_sql")
+
+    monkeypatch.setattr(SiteRepository, "site_exists", site_exists)
+    response = client.post("/reconcile/verify-candidates", json={"items": [{"type": "site", "id": f"{ID_BASE}site/123"}]})
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Candidate verification is misconfigured"}
 
 
 @with_test_config

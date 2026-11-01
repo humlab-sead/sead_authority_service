@@ -3,9 +3,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import src.candidate_verification as candidate_verification
+import src.api.candidate_verification as candidate_verification
+from src.api.candidate_verification import UnsupportedReadinessType
 from src.api.router import router
-from src.candidate_verification import UnsupportedReadinessType
 from src.strategies.strategy import Strategies
 from tests.decorators import with_test_config
 

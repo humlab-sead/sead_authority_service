@@ -11,9 +11,9 @@ from httpx import ASGITransport, AsyncClient, Response
 from psycopg import sql
 
 from main import app
+from src.api.candidate_verification import _configured_id_base, get_reconciliation_readiness, verify_candidate_batch
 from src.api.identity_router import get_identity_service
 from src.api.model import CandidateVerificationItem
-from src.candidate_verification import _configured_id_base, get_reconciliation_readiness, verify_candidate_batch
 from src.configuration import get_connection
 from src.identity.models import IdentitySignal, ResolutionRequest, TrackedIdentity
 from src.identity.repository import ResolveBatchRepository
