@@ -15,47 +15,61 @@ For design context see the system reference docs in `docs/SIMS/` (reflect Phases
 | `sead_authority_service` running | Module wires in at startup via `main.py`                     |
 | Python deps                      | `psycopg`, `psycopg-pool` — already in `pyproject.toml`      |
 
-### Applying the Schema
+### Applying Both Schemas
 
-SQL files live in `schema/sql/identity/`. Apply them in order against the target database:
-
-```bash
-PGPASSWORD=<password> psql -h <host> -p <port> -U <user> -d <dbname> \
-  -f schema/sql/identity/000_schema.sql \
-  -f schema/sql/identity/001_source_scopes.sql \
-  -f schema/sql/identity/002_submissions.sql \
-  -f schema/sql/identity/003_source_identities.sql \
-  -f schema/sql/identity/003b_source_identity_keys.sql \
-  -f schema/sql/identity/004_submission_source_identities.sql \
-  -f schema/sql/identity/005_tracked_identities.sql \
-  -f schema/sql/identity/006_binding_sets.sql \
-  -f schema/sql/identity/007_bindings.sql \
-  -f schema/sql/identity/008_seed_scopes.sql
-```
-
-Or use the merged file for a single-shot deploy:
+Start with a SEAD database that contains the public tables used by the
+reconciliation strategies. From the Authority Service repository, generate
+and apply its `authority` schema:
 
 ```bash
-psql ... -f schema/sql/identity/__merged.sql
+schema/create_schema.sh --deploy \
+  --database "$DB_NAME" \
+  --host "$DB_HOST" \
+  --port "$DB_PORT" \
+  --user "$DB_USER"
 ```
 
-`__merged.sql` is checked in and reflects the full schema. Regenerate it after any DDL change:
+This generates `schema/__deploy__.sql` and deploys it. The generated SQL drops
+and recreates `authority` with `CASCADE`, creates the required extensions, and
+builds the configured reconciliation views and functions. Use it only when
+that schema replacement is appropriate for the target database. Store
+credentials in `~/.pgpass` or `PGPASSFILE`, not in command arguments.
+
+Then apply the numbered `sead_identity` SQL files in lexical order. On a
+fresh database with no `sead_identity` schema, apply every file once. On an
+existing database, do not replay already-applied migrations:
 
 ```bash
-cat schema/sql/identity/0*.sql > schema/sql/identity/__merged.sql
+for schema_file in schema/sql/identity/[0-9]*.sql; do
+  psql -X -v ON_ERROR_STOP=1 \
+    -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+    -f "$schema_file" || exit 1
+done
 ```
+
+The current sequence ends with `010_aggregate_identity_value.sql` and
+`011_resolve_batch_idempotency.sql`. These migrations rename
+`sead_internal_id` to `aggregate_id` and add the `resolve_batches` table.
 
 ### Verify After Deployment
 
 ```sql
--- Schema and extension
+-- Both schemas and required extensions
 SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'sead_identity';
+SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'authority';
 SELECT extname FROM pg_extension WHERE extname = 'pgcrypto';
+SELECT to_regprocedure('authority.fuzzy_site(text,integer)');
 
--- All seven tables exist
+-- All ten SIMS tables exist
 SELECT table_name FROM information_schema.tables
 WHERE table_schema = 'sead_identity'
 ORDER BY table_name;
+
+-- Current identity column and batch table exist
+SELECT column_name FROM information_schema.columns
+WHERE table_schema = 'sead_identity'
+  AND table_name = 'tracked_identities';
+SELECT to_regclass('sead_identity.resolve_batches');
 
 -- Well-known scopes seeded
 SELECT scope_name FROM sead_identity.source_scopes ORDER BY scope_name;
@@ -79,10 +93,13 @@ The identity module uses the shared connection pool set up by `setup_config_stor
 ### Running Integration Tests
 
 ```bash
-SIMS_INTEGRATION_DB=1 ENV_FILE=tests/.env uv run pytest tests/identity/test_service_integration.py -v
+SIMS_INTEGRATION_DB=1 uv run pytest -o addopts='' -q tests/identity/test_service_integration.py
 ```
 
-`tests/.env` must contain the DB credentials above. The integration tests create isolated scopes (unique per run) and do not pollute persistent data.
+Run these tests only against the helper-owned disposable database. See
+[DEVELOPMENT.md](../DEVELOPMENT.md#disposable-database-for-integration-tests)
+for its Podman setup, source dump, and connection settings. The test fixture
+rejects targets other than `127.0.0.1:55432/sead_staging`.
 
 ---
 

@@ -427,6 +427,34 @@ class TestTrackedIdentityRepository:
         assert result is None
 
     @pytest.mark.asyncio
+    async def test_lock_for_binding_uses_identity_type_and_aggregate_id(self) -> None:
+        row = {**self._make_tracked_row("materialized"), "aggregate_id": 4321}
+        cursor = _make_cursor(return_row=row)
+        conn = _make_conn(cursor)
+
+        with _patch_connection(conn):
+            result = await TrackedIdentityRepository().lock_for_binding(TRACKED_UUID, "site", 4321)
+
+        assert isinstance(result, TrackedIdentity)
+        assert result.lifecycle_state == TrackedIdentityState.MATERIALIZED
+        sql = cursor.execute.call_args[0][0].as_string()
+        assert "tracked_identity_uuid = %s" in sql
+        assert "entity_type = %s" in sql
+        assert "aggregate_id = %s" in sql
+        assert "FOR UPDATE" in sql
+        assert cursor.execute.call_args[0][1] == (TRACKED_UUID, "site", 4321)
+
+    @pytest.mark.asyncio
+    async def test_lock_for_binding_returns_none_when_row_does_not_match(self) -> None:
+        cursor = _make_cursor(return_row=None)
+        conn = _make_conn(cursor)
+
+        with _patch_connection(conn):
+            result = await TrackedIdentityRepository().lock_for_binding(TRACKED_UUID, "site", 4321)
+
+        assert result is None
+
+    @pytest.mark.asyncio
     async def test_find_by_aggregate_id_rejects_duplicate_values(self) -> None:
 
         first = {**self._make_tracked_row("materialized"), "aggregate_id": 4321}

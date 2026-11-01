@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import psycopg
 import pytest
 
-from src.strategies.site import SiteReconciliationStrategy, SiteRepository
+from src.strategies.site import MissingCandidateExistsQueryError, SiteReconciliationStrategy, SiteRepository
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 
@@ -17,6 +17,36 @@ from tests.decorators import with_test_config
 
 class TestSiteRepository:
     """Tests for SiteRepository class."""
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_site_exists_uses_parameterized_lookup(self, test_provider: ExtendedMockConfigProvider):
+        test_provider.create_connection_mock(fetchone={"site_id": 123}, execute=None)
+        repository = SiteRepository("site")
+
+        assert await repository.site_exists(123)
+
+        expected_sql = repository.get_sql_query("candidate_exists_sql").strip()
+        cursor = test_provider.cursor_mock
+        cursor.execute.assert_called_once_with(expected_sql, {"site_id": 123})
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_site_exists_propagates_database_errors(self, test_provider: ExtendedMockConfigProvider):
+        repository = SiteRepository("site")
+        repository.fetch_one = AsyncMock(side_effect=psycopg.OperationalError("database unavailable"))
+
+        with pytest.raises(psycopg.OperationalError, match="database unavailable"):
+            await repository.site_exists(123)
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_site_exists_rejects_missing_query(self, monkeypatch, test_provider: ExtendedMockConfigProvider):
+        repository = SiteRepository("site")
+        monkeypatch.setattr(repository, "get_sql_query", lambda key: "")
+
+        with pytest.raises(MissingCandidateExistsQueryError, match="candidate_exists_sql"):
+            await repository.site_exists(123)
 
     @pytest.mark.asyncio
     @with_test_config

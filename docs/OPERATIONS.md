@@ -188,6 +188,14 @@ A healthy response is `{"status":"alive"}`. Application log files are under `~/c
 
 No alerting service is configured. Review the application logs and health endpoint during deployment and incident response.
 
+## Reconciliation Readiness and Candidate Verification
+
+`GET /reconcile` returns the OpenRefine manifest; it does not verify that the database-backed match query works. Use `GET /reconcile/readiness?type=site` to run the registered site strategy with a bounded query. An empty result is ready when the query succeeds. A missing or invalid `options:id_base`, database failure, or missing match function returns `ready: false` with a reason.
+
+The site strategy requires `authority.fuzzy_site(text, integer)` and the `authority.site` view. Check the function with `SELECT to_regprocedure('authority.fuzzy_site(text,integer)')`. If it is missing, generate or review the SQL from the current schema source with `make generate-schema`, then deploy the generated [`schema/generated/site.sql`](../schema/generated/site.sql) through the approved database deployment process. Do not edit generated SQL directly.
+
+`POST /reconcile/verify-candidates` performs a read-only existence check against `authority.site`. It accepts full candidate IDs under `options:id_base` and currently supports `site` only when the strategy is registered and SIMS allows `bind_existing`. Results distinguish `exists`, `not_found`, `invalid_candidate`, and `unsupported_type`. A database or pool failure returns HTTP 503; do not treat it as a missing site. This check does not create SIMS identities or bindings and does not adopt an existing SEAD site into SIMS.
+
 ---
 
 ## Rollback

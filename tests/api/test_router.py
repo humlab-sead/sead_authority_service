@@ -206,6 +206,13 @@ class TestReconcileEndpoint:
         assert "No queries provided" in response.json()["error"]
 
     @with_test_config
+    def test_reconcile_unsupported_type_returns_client_error(self, client: TestClient, test_provider: MockConfigProvider):
+        response = client.post("/reconcile", json={"queries": {"q0": {"query": "site", "type": "not-registered"}}})
+
+        assert response.status_code == 422
+        assert "Unknown query type" in response.json()["error"]
+
+    @with_test_config
     def test_reconcile_invalid_json(self, client: TestClient, test_provider: MockConfigProvider):
         """Test error when request contains invalid JSON"""
         response = client.post("/reconcile", data="invalid json", headers={"Content-Type": "application/json"})  # type: ignore
