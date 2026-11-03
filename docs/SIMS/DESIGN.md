@@ -1,6 +1,6 @@
 # Design
 
-> **Status:** Describes the current Phases 1–2 implementation and its disposable site-allocation prototype. The target architecture is a generic, entity-configured allocator owned by SIMS; it is not yet implemented. Production adoption, existing-data migration, and cutover are outside the current development task. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
+> **Status:** Describes the current Phases 1–2 implementation, its disposable site-allocation prototype, and the approved-ID bind-time lifecycle check. The target architecture is a generic, entity-configured allocator owned by SIMS; it is not yet implemented. Production adoption, existing-data migration, and cutover are outside the current development task. See [OPERATIONS.md](./OPERATIONS.md) for deployment and [src/identity/README.md](../../src/identity/README.md) for the module entry point.
 
 ## Purpose
 
@@ -196,6 +196,8 @@ Implements step 2 of the decision flow: **Binding**.
 
 - Evaluate source-key semantics and permitted identity operations from validated SIMS entity configuration (FR-11).
 - Evaluate whether the requested identity operation is permitted by validated SIMS configuration.
+
+For a caller-supplied approved aggregate ID, the service locks the matching Tracked Identity by UUID, entity type, and aggregate ID in the binding transaction. It creates a Binding only when the current lifecycle state is `materialized`. The same check applies when reusing a confirmed Binding or replaying a stored batch; a missing or non-materialized identity returns HTTP 409. The service does not change the identity's lifecycle state, query SEAD, or alter allocation for requests without an approved ID. The row lock makes concurrent lifecycle updates wait until the binding transaction finishes.
 
 **Design decision:** Identity operation configuration (FR-11) is stored in SIMS. Shared service code validates and applies it for configured entity types; adding an entity type must not require a type-specific allocator branch.
 

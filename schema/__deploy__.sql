@@ -42,7 +42,7 @@ $$;
 create or replace function authority.immutable_unaccent(p_value text)
 returns text language sql immutable parallel safe
 as $$
-  select unaccent('public.unaccent'::regdictionary, p_value)
+  select public.unaccent('public.unaccent'::regdictionary, p_value)
 $$;
 
 

@@ -94,6 +94,40 @@ class ReconBatchResponse(RootModel[Mapping[str, ReconQueryResult]]):
     root: Mapping[str, ReconQueryResult]
 
 
+# ---------- Candidate verification and reconciliation readiness ----------
+
+
+class CandidateVerificationItem(BaseModel):
+    type: str = Field(..., min_length=1)
+    id: str = Field(..., min_length=1)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class VerifyCandidatesRequest(BaseModel):
+    items: List[CandidateVerificationItem] = Field(..., min_length=1, max_length=100)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CandidateVerificationResult(BaseModel):
+    type: str
+    id: str
+    outcome: Literal["exists", "not_found", "invalid_candidate", "unsupported_type"]
+    entity_type: str | None = None
+    aggregate_id: int | None = Field(default=None, gt=0)
+
+
+class VerifyCandidatesResponse(BaseModel):
+    results: List[CandidateVerificationResult]
+
+
+class ReconcileReadinessResponse(BaseModel):
+    type: str
+    ready: bool
+    reason: str | None = None
+
+
 # ---------- /reconcile (service manifest, GET with no params) ----------
 
 

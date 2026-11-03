@@ -40,6 +40,11 @@ property_settings:
     precision: 6
 
 sql_queries:
+  candidate_exists_sql: |
+    select 1
+    from authority.site
+    where site_id = %(site_id)s
+
   fetch_site_by_national_id: |
     select site_id, label, 1.0 as name_sim, latitude_dd as latitude, longitude_dd as longitude
     from authority.site
