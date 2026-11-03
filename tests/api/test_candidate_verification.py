@@ -5,7 +5,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import src.api.candidate_verification as candidate_verification
+from src.api import candidate_verification
 from src.api.model import CandidateVerificationItem
 from src.api.router import router
 from src.strategies.site import MissingCandidateExistsQueryError, SiteReconciliationStrategy, SiteRepository
@@ -13,9 +13,11 @@ from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
 
+# pylint: disable=protected-access, unused-argument
 
-@pytest.fixture
-def client() -> TestClient:
+
+@pytest.fixture(name="client")
+def _client() -> TestClient:
     app = FastAPI()
     app.include_router(router)
     return TestClient(app)
@@ -38,7 +40,14 @@ def client() -> TestClient:
     ],
 )
 def test_invalid_candidate_uris_are_rejected(candidate_id: str) -> None:
-    assert candidate_verification._site_id_from_candidate(candidate_id, "site", ID_BASE) is None
+    assert (
+        candidate_verification._site_id_from_candidate(
+            candidate_id,
+            "site",
+            ID_BASE,
+        )
+        is None
+    )
 
 
 def test_positive_candidate_uri_returns_integer_id() -> None:
