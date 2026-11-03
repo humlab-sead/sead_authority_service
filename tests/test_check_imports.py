@@ -39,7 +39,7 @@ def test_does_not_report_different_modules_with_the_same_leaf_name(tmp_path: Pat
     _write_python_file(
         tmp_path,
         "tests/test_models.py",
-        "from src.identity import models as identity_models\n" "from src.mcp import models as mcp_models\n",
+        "from src.identity import models as identity_models\nfrom src.mcp import models as mcp_models\n",
     )
 
     assert find_import_inconsistencies(tmp_path) == []
@@ -49,7 +49,7 @@ def test_ignores_import_text_in_comments_and_docstrings(tmp_path: Path) -> None:
     _write_python_file(
         tmp_path,
         "src/example.py",
-        '"""from configuration.interface import ConfigLike"""\n' "# from src.configuration.interface import ConfigLike\n",
+        '"""from configuration.interface import ConfigLike"""\n# from src.configuration.interface import ConfigLike\n',
     )
 
     assert find_import_inconsistencies(tmp_path) == []

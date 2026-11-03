@@ -54,7 +54,7 @@ def _site_id_from_candidate(candidate_id: str, entity_type: str, id_base: str | 
     except ValueError:
         return None
     if (
-        not candidate.scheme
+        not candidate.scheme  # pylint: disable=too-many-boolean-expressions
         or not candidate.netloc
         or candidate.scheme.casefold() != base.scheme.casefold()
         or candidate.netloc.casefold() != base.netloc.casefold()

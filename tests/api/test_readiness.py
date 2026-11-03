@@ -3,11 +3,13 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import src.api.candidate_verification as candidate_verification
+from src.api import candidate_verification
 from src.api.candidate_verification import UnsupportedReadinessType
 from src.api.router import router
 from src.strategies.strategy import Strategies
 from tests.decorators import with_test_config
+
+# pylint: disable=protected-access, unused-argument
 
 
 class _ReadyStrategy:
@@ -17,12 +19,12 @@ class _ReadyStrategy:
     async def find_candidates(self, *, query: str, properties: dict, limit: int) -> list[dict]:
         self.calls.append({"query": query, "properties": properties, "limit": limit})
         if self.error:
-            raise self.error
+            raise self.error  # pylint: disable=raising-bad-type
         return []
 
 
-@pytest.fixture
-def client() -> TestClient:
+@pytest.fixture(name="client")
+def _client() -> TestClient:
     app = FastAPI()
     app.include_router(router)
     return TestClient(app)
@@ -52,7 +54,7 @@ async def test_readiness_reports_missing_id_base_without_running_query(monkeypat
 
     assert result.ready is False
     assert "options:id_base" in result.reason
-    assert _ReadyStrategy.calls == []
+    assert not _ReadyStrategy.calls
 
 
 @pytest.mark.asyncio
