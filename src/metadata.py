@@ -3,6 +3,27 @@ from typing import Any
 from src.configuration import ConfigValue
 from src.strategies.strategy import ReconciliationStrategy, StrategyRegistry
 
+# Reconciliation types whose candidate matching is implemented and reviewed.
+#
+# Registration alone does not establish support. Excluded on purpose:
+#   * `taxon` is registered but its matcher always returns an empty list.
+#   * `geonames` matches through the external GeoNames web service.
+#   * `modification_type` requires a configured LLM provider.
+# Add an ID only after checking the strategy's candidate path and its resource
+# SQL against the deployed schema.
+SUPPORTED_RECONCILIATION_TYPES: tuple[str, ...] = (
+    "administrative_region",
+    "bibliographic_reference",
+    "country",
+    "data_type",
+    "dimension",
+    "feature_type",
+    "location",
+    "method",
+    "sampling_context",
+    "site",
+)
+
 
 def get_reconcile_properties(
     strategies: StrategyRegistry, query: str | None = None, entity_type: str | None = None
@@ -108,6 +129,21 @@ def _get_default_types(strategies: StrategyRegistry) -> list[dict[str, str]]:
     return default_types
 
 
+def _get_supported_types(default_types: list[dict[str, str]]) -> list[str]:
+    """Returns the declared reconciliation-supported type IDs.
+
+    Raises ValueError when a declared ID has no matching `defaultTypes` entry, so
+    a stale declaration fails the manifest request instead of publishing an ID
+    that resolves to no OpenRefine type.
+    """
+    known_ids: set[str] = {entry["id"] for entry in default_types}
+    declared_ids: list[str] = list(SUPPORTED_RECONCILIATION_TYPES)
+    unresolved: list[str] = [type_id for type_id in declared_ids if type_id not in known_ids]
+    if unresolved:
+        raise ValueError(f"Declared supported reconciliation types are not registered: {', '.join(unresolved)}")
+    return declared_ids
+
+
 def get_reconciliation_metadata(strategies: StrategyRegistry, host: str) -> dict[str, Any]:
     """
     Collects reconciliation metadata from all registered strategies.
@@ -126,6 +162,7 @@ def get_reconciliation_metadata(strategies: StrategyRegistry, host: str) -> dict
         "identifierSpace": f"{id_base}",
         "schemaSpace": "http://www.w3.org/2004/02/skos/core#",
         "defaultTypes": default_types,
+        "reconciliation": {"supportedTypes": _get_supported_types(default_types)},
         "view": {"url": f"{base_url_clean}/reconcile/preview?id={{{{id}}}}"},
         "preview": {"url": f"{base_url_clean}/reconcile/preview?id={{{{id}}}}", "width": 400, "height": 300},
         "suggest": {

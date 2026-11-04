@@ -196,6 +196,26 @@ The site strategy requires `authority.fuzzy_site(text, integer)` and the `author
 
 `POST /reconcile/verify-candidates` performs a read-only existence check against `authority.site`. It accepts full candidate IDs under `options:id_base` and currently supports `site` only when the strategy is registered and SIMS allows `bind_existing`. Results distinguish `exists`, `not_found`, `invalid_candidate`, and `unsupported_type`. A database or pool failure returns HTTP 503; do not treat it as a missing site. This check does not create SIMS identities or bindings and does not adopt an existing SEAD site into SIMS.
 
+### Reconciliation manifest and schema access
+
+`GET /reconcile` publishes `reconciliation.supportedTypes`, the type IDs that have an implemented matcher. The manifest is built from the strategy registry and does not query the database, so a healthy manifest does not prove that matching works. Verify each type you rely on with a real `POST /reconcile` request.
+
+`extend.property_settings` lists each property with the `entity_types` it serves. A supported type with no property entries, such as `feature_type`, is valid and matches by label only.
+
+`schema/sql/grants.sql` gives every database role `USAGE` on `authority`, `SELECT` on its tables and views, and `EXECUTE` on its routines. The generator writes it after the schema objects, because the schema is recreated on deployment. Check the deployed privileges as the service role named by `SEAD_AUTHORITY_OPTIONS_DATABASE_USER`:
+
+```sql
+select has_schema_privilege(current_user, 'authority', 'usage');
+select has_function_privilege(current_user, 'authority.fuzzy_feature_type(text,integer)', 'execute');
+select has_function_privilege(current_user, 'authority.fuzzy_location(text,integer,integer[])', 'execute');
+select has_table_privilege(current_user, 'authority.feature_type', 'select');
+select has_table_privilege(current_user, 'authority.location', 'select');
+```
+
+A `false` result or `permission denied for schema authority` means the grants are missing. Regenerate and redeploy the schema through the approved database process.
+
+`authority.fuzzy_location` is `SECURITY INVOKER` and also reads `public.tbl_location_types` to filter by location type. A role that has only the `authority` grants can execute the function but receives `permission denied for table tbl_location_types`. Grant `SELECT` on that table through the database's normal role policy; `schema/sql/grants.sql` covers the `authority` schema only. `authority.fuzzy_feature_type` reads only `authority` objects.
+
 ---
 
 ## Rollback

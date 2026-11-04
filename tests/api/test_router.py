@@ -13,6 +13,7 @@ from httpx import Response
 
 from src.api.router import router
 from src.configuration import MockConfigProvider
+from src.metadata import SUPPORTED_RECONCILIATION_TYPES
 from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
@@ -49,7 +50,10 @@ class MockStrategies:
     """Mock Strategies class for testing"""
 
     def __init__(self):
-        self.items: dict[str, type[MockStrategy]] = {"site": MockStrategy, "taxon": MockStrategy}
+        # Declared supported types plus registered types without a matcher, so
+        # the manifest can distinguish the two lists.
+        type_ids = (*SUPPORTED_RECONCILIATION_TYPES, "taxon", "geonames", "modification_type")
+        self.items: dict[str, type[MockStrategy]] = {type_id: MockStrategy for type_id in type_ids}
 
 
 @pytest.fixture
@@ -103,10 +107,18 @@ class TestMetaEndpoint:
         assert "defaultTypes" in data
 
         # Check entity types
-        assert len(data["defaultTypes"]) == 2
+        assert len(data["defaultTypes"]) == len(MockStrategies().items)
         type_ids = [t["id"] for t in data["defaultTypes"]]
         assert "site" in type_ids
         assert "taxon" in type_ids
+
+        # Check the reconciliation-specific supported types
+        assert "reconciliation" in data
+        supported = data["reconciliation"]["supportedTypes"]
+        assert supported == list(SUPPORTED_RECONCILIATION_TYPES)
+        assert len(supported) == len(set(supported))
+        assert set(supported) <= set(type_ids)
+        assert "taxon" not in supported
 
     @patch("src.api.router.Strategies", MockStrategies())
     @with_test_config
