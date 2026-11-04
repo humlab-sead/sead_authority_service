@@ -1,5 +1,7 @@
 """Comprehensive tests for API models (Pydantic schemas)."""
 
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 
@@ -18,6 +20,7 @@ from src.api.model import (
     ReconBatchRequestHandler,
     ReconBatchResponse,
     ReconCandidate,
+    ReconciliationDescriptor,
     ReconPropertyConstraint,
     ReconQuery,
     ReconQueryResult,
@@ -476,6 +479,23 @@ class TestPropertySetting:
 
         assert setting.settings == {"autocomplete": True, "max_length": 100}
 
+    def test_property_setting_requires_entity_types(self):
+        """An entry that serves no type is not usable property metadata."""
+        with pytest.raises(ValidationError, match="entity_types"):
+            PropertySetting(name="place_name", label="Place Name", type="string", help_text="Place", entity_types=[])
+
+    def test_property_setting_rejects_blank_ids(self):
+        """Blank property names and blank type IDs are malformed metadata."""
+        with pytest.raises(ValidationError, match="blank"):
+            PropertySetting(name="  ", label="Place Name", type="string", help_text="Place", entity_types=["location"])
+        with pytest.raises(ValidationError, match="non-blank"):
+            PropertySetting(name="place_name", label="Place Name", type="string", help_text="Place", entity_types=["  "])
+
+    def test_property_setting_requires_name(self):
+        """A property entry without a name is malformed metadata."""
+        with pytest.raises(ValidationError):
+            PropertySetting(label="Place Name", type="string", help_text="Place", entity_types=["location"])  # type: ignore[call-arg]
+
 
 class TestExtendDescriptor:
     """Test ExtendDescriptor model."""
@@ -496,35 +516,141 @@ class TestExtendDescriptor:
 class TestReconServiceManifest:
     """Test ReconServiceManifest model."""
 
+    @staticmethod
+    def required_fields(**overrides: Any) -> dict[str, Any]:
+        """Return the required manifest fields with a minimal valid contract."""
+        fields: dict[str, Any] = {
+            "name": "SEAD Authority Service",
+            "identifierSpace": "https://w3id.org/sead/id/",
+            "schemaSpace": "https://w3id.org/sead/schema/",
+            "defaultTypes": [TypeRef(id="site", name="Site")],
+            "reconciliation": ReconciliationDescriptor(supportedTypes=["site"]),
+            "extend": ExtendDescriptor(
+                propose_properties=ProposePropertiesDescriptor(service_url="https://api.example.org/reconcile", service_path="/properties"),
+                property_settings=[],
+            ),
+        }
+        fields.update(overrides)
+        return fields
+
     def test_minimal_manifest(self):
-        """Test minimal service manifest."""
-        manifest = ReconServiceManifest(
-            name="SEAD Authority Service", identifierSpace="https://w3id.org/sead/id/", schemaSpace="https://w3id.org/sead/schema/"
-        )
+        """Test the required manifest fields, including an empty property list."""
+        manifest = ReconServiceManifest(**self.required_fields())
 
         assert manifest.name == "SEAD Authority Service"
         assert manifest.identifierSpace == "https://w3id.org/sead/id/"
         assert manifest.schemaSpace == "https://w3id.org/sead/schema/"
+        assert [type_ref.id for type_ref in manifest.defaultTypes] == ["site"]
+        assert manifest.reconciliation.supportedTypes == ["site"]
+        assert manifest.extend.property_settings == []
 
     def test_full_manifest(self):
         """Test full service manifest with all optional fields."""
         manifest = ReconServiceManifest(
-            name="SEAD Authority Service",
-            identifierSpace="https://w3id.org/sead/id/",
-            schemaSpace="https://w3id.org/sead/schema/",
-            defaultTypes=[TypeRef(id="site", name="Site")],
-            view=ViewTemplate(url="https://example.org/{{id}}"),
-            preview=PreviewTemplate(url="https://example.org/preview?id={{id}}"),  # type: ignore
-            suggest=SuggestDescriptor(entity=SuggestSubservice(service_url="https://api.example.org", service_path="/suggest/entity")),
-            versions=["0.2", "0.3"],
-            homepage="https://example.org",
-            logo="https://example.org/logo.png",
+            **self.required_fields(
+                view=ViewTemplate(url="https://example.org/{{id}}"),
+                preview=PreviewTemplate(url="https://example.org/preview?id={{id}}"),  # type: ignore
+                suggest=SuggestDescriptor(entity=SuggestSubservice(service_url="https://api.example.org", service_path="/suggest/entity")),
+                versions=["0.2", "0.3"],
+                homepage="https://example.org",
+                logo="https://example.org/logo.png",
+            )
         )
 
         assert len(manifest.defaultTypes) == 1
         assert manifest.view is not None
         assert manifest.preview is not None
         assert manifest.suggest is not None
+
+    def test_missing_default_types_rejected(self):
+        """`defaultTypes` is required OpenRefine metadata."""
+        fields = self.required_fields()
+        del fields["defaultTypes"]
+
+        with pytest.raises(ValidationError, match="defaultTypes"):
+            ReconServiceManifest(**fields)
+
+    def test_missing_reconciliation_rejected(self):
+        """A manifest without the supported-type declaration is a contract error."""
+        fields = self.required_fields()
+        del fields["reconciliation"]
+
+        with pytest.raises(ValidationError, match="reconciliation"):
+            ReconServiceManifest(**fields)
+
+    def test_missing_extend_rejected(self):
+        """`extend.property_settings` is required metadata."""
+        fields = self.required_fields()
+        del fields["extend"]
+
+        with pytest.raises(ValidationError, match="extend"):
+            ReconServiceManifest(**fields)
+
+    def test_missing_property_settings_rejected(self):
+        """A missing property-settings array is not an empty property list."""
+        with pytest.raises(ValidationError, match="property_settings"):
+            ExtendDescriptor(
+                propose_properties=ProposePropertiesDescriptor(service_url="https://api.example.org/reconcile", service_path="/properties")
+            )  # type: ignore[call-arg]
+
+    def test_empty_supported_types_is_valid(self):
+        """No implemented type is a valid declaration."""
+        manifest = ReconServiceManifest(**self.required_fields(reconciliation=ReconciliationDescriptor(supportedTypes=[])))
+
+        assert manifest.reconciliation.supportedTypes == []
+
+    def test_supported_type_without_properties_is_valid(self):
+        """A supported type that serves no properties is valid, unlike malformed metadata."""
+        manifest = ReconServiceManifest(
+            **self.required_fields(
+                defaultTypes=[TypeRef(id="feature_type", name="Feature Types")],
+                reconciliation=ReconciliationDescriptor(supportedTypes=["feature_type"]),
+            )
+        )
+
+        assert manifest.reconciliation.supportedTypes == ["feature_type"]
+        assert manifest.extend.property_settings == []
+
+    def test_duplicate_default_type_ids_rejected(self):
+        """Every published OpenRefine ID must be unique."""
+        with pytest.raises(ValidationError, match="unique"):
+            ReconServiceManifest(**self.required_fields(defaultTypes=[TypeRef(id="site", name="Site"), TypeRef(id="site", name="Sites")]))
+
+    def test_blank_default_type_id_rejected(self):
+        """A blank OpenRefine type ID is malformed metadata."""
+        with pytest.raises(ValidationError, match="non-blank"):
+            ReconServiceManifest(**self.required_fields(defaultTypes=[TypeRef(id="  ", name="Site")]))
+
+    def test_duplicate_supported_types_rejected(self):
+        """A supported ID may be published only once."""
+        with pytest.raises(ValidationError, match="unique"):
+            ReconServiceManifest(**self.required_fields(reconciliation=ReconciliationDescriptor(supportedTypes=["site", "site"])))
+
+    def test_blank_supported_type_rejected(self):
+        """A blank supported type ID is malformed metadata."""
+        with pytest.raises(ValidationError, match="non-blank"):
+            ReconServiceManifest(**self.required_fields(reconciliation=ReconciliationDescriptor(supportedTypes=[" "])))
+
+    def test_supported_type_must_be_in_default_types(self):
+        """Every supported ID must resolve to exactly one published type."""
+        with pytest.raises(ValidationError, match="not in defaultTypes"):
+            ReconServiceManifest(**self.required_fields(reconciliation=ReconciliationDescriptor(supportedTypes=["taxon"])))
+
+    def test_invalid_property_entry_rejected(self):
+        """Malformed property metadata fails manifest validation."""
+        with pytest.raises(ValidationError, match="entity_types"):
+            ReconServiceManifest(
+                **self.required_fields(
+                    extend=ExtendDescriptor(
+                        propose_properties=ProposePropertiesDescriptor(
+                            service_url="https://api.example.org/reconcile", service_path="/properties"
+                        ),
+                        property_settings=[
+                            PropertySetting(name="place_name", label="Place Name", type="string", help_text="Place", entity_types=[])
+                        ],
+                    )
+                )
+            )
 
 
 class TestSuggestEntityItem:
@@ -866,7 +992,7 @@ class TestModelSerialization:
 
     def test_recon_service_manifest_config(self):
         """Test ReconServiceManifest has proper config."""
-        manifest = ReconServiceManifest(name="Test", identifierSpace="https://example.org/id/", schemaSpace="https://example.org/schema/")
+        manifest = ReconServiceManifest(**TestReconServiceManifest.required_fields())
 
         # Check model_config is set
         assert manifest.model_config is not None

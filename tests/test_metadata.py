@@ -1,6 +1,16 @@
 import pytest
 
-from src.metadata import _compile_property_settings, get_reconcile_properties
+from src.metadata import (
+    SUPPORTED_RECONCILIATION_TYPES,
+    _compile_property_settings,
+    _get_default_types,
+    _get_supported_types,
+    get_reconcile_properties,
+    get_reconciliation_metadata,
+)
+from src.strategies.feature_type import FeatureTypeReconciliationStrategy
+from src.strategies.location import LocationReconciliationStrategy
+from tests.decorators import with_test_config
 
 # pylint: disable=redefined-outer-name, redefined-builtin
 
@@ -21,6 +31,9 @@ class FakeSiteStrategy:
     def get_id_path(self):
         return "site"
 
+    def get_display_name(self):
+        return "Sites"
+
 
 class FakeTaxonStrategy:
     def __init__(self):
@@ -37,6 +50,9 @@ class FakeTaxonStrategy:
 
     def get_id_path(self):
         return "taxon"
+
+    def get_display_name(self):
+        return "Taxa"
 
 
 class DummyRegistry:
@@ -87,3 +103,68 @@ def test_compile_property_settings_dedup_and_entity_types(strategies):
     lat = next((p for p in compiled if p["name"] == "latitude"), None)
     assert lat is not None
     assert lat["settings"] == {"min": -90.0, "max": 90.0, "precision": 6}
+
+
+def _registered_strategies(**overrides) -> DummyRegistry:
+    """Build a registry containing every declared supported type."""
+    items: dict[str, type] = {type_id: FakeSiteStrategy for type_id in SUPPORTED_RECONCILIATION_TYPES}
+    items.update(overrides)
+    return DummyRegistry(items)
+
+
+def test_supported_types_are_declared_once_and_published():
+    registry = _registered_strategies(taxon=FakeTaxonStrategy)
+    default_types = _get_default_types(registry)
+
+    supported = _get_supported_types(default_types)
+
+    assert supported == list(SUPPORTED_RECONCILIATION_TYPES)
+    assert len(supported) == len(set(supported))
+    published_ids = {entry["id"] for entry in default_types}
+    assert set(supported) <= published_ids
+
+
+def test_registered_placeholder_type_stays_openrefine_only():
+    registry = _registered_strategies(taxon=FakeTaxonStrategy)
+    default_types = _get_default_types(registry)
+
+    published_ids = {entry["id"] for entry in default_types}
+    supported = _get_supported_types(default_types)
+
+    assert "taxon" in published_ids
+    assert "taxon" not in supported
+
+
+def test_declared_supported_type_must_be_registered():
+    items: dict[str, type] = {type_id: FakeSiteStrategy for type_id in SUPPORTED_RECONCILIATION_TYPES if type_id != "location"}
+    default_types = _get_default_types(DummyRegistry(items))
+
+    with pytest.raises(ValueError, match="location"):
+        _get_supported_types(default_types)
+
+
+@with_test_config
+def test_reconciliation_metadata_adds_supported_types_only(test_provider):
+    registry = _registered_strategies(taxon=FakeTaxonStrategy)
+
+    metadata = get_reconciliation_metadata(registry, "http://testserver/")
+
+    assert metadata["reconciliation"]["supportedTypes"] == list(SUPPORTED_RECONCILIATION_TYPES)
+    assert [entry["id"] for entry in metadata["defaultTypes"]].count("taxon") == 1
+    # Existing OpenRefine fields stay available.
+    assert metadata["view"]["url"] == "http://testserver/reconcile/preview?id={{id}}"
+    assert metadata["preview"]["url"] == "http://testserver/reconcile/preview?id={{id}}"
+    assert metadata["suggest"]["entity"]["service_path"] == "/suggest/entity"
+    assert metadata["extend"]["propose_properties"]["service_path"] == "/properties"
+    compiled_names = {entry["name"] for entry in metadata["extend"]["property_settings"]}
+    assert {"place_name", "latitude", "scientific_name"} <= compiled_names
+
+
+@with_test_config
+def test_real_strategies_declare_their_own_properties(test_provider):
+    registry = DummyRegistry({"feature_type": FeatureTypeReconciliationStrategy, "location": LocationReconciliationStrategy})
+
+    assert get_reconcile_properties(registry, entity_type="feature_type") == []
+    assert [prop["id"] for prop in get_reconcile_properties(registry, entity_type="location")] == ["place_name"]
+    compiled = _compile_property_settings(registry)
+    assert [(entry["name"], entry["entity_types"]) for entry in compiled] == [("place_name", ["location"])]
