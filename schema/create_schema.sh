@@ -254,6 +254,15 @@ function generate_deploy_sql() {
         log_info "Skipping semantic search schemas (use --deploy-semantic to include)"
     fi
 
+    # Grants must be last: authority.sql drops and recreates the schema, and
+    # GRANT ... ON ALL ... IN SCHEMA only covers objects that exist when it runs.
+    if [[ "$g_single_sql" == "NO" ]]; then
+        echo "\i schema/sql/grants.sql"                       >> "${g_deploy_sql_filename}"
+    else
+        cat schema/sql/grants.sql                             >> "${g_deploy_sql_filename}"
+        echo ""                                               >> "${g_deploy_sql_filename}"
+    fi
+
     echo "commit;"                                            >> "${g_deploy_sql_filename}"
 
     log_info "Deployment SQL file created with $file_count schema files"
