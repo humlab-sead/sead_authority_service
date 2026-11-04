@@ -2,7 +2,7 @@
 from collections.abc import Mapping
 from typing import Annotated, Any, Dict, ForwardRef, Generic, List, Optional, TypeVar, Union
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, RootModel, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, RootModel, field_validator, model_validator
 from typing_extensions import Literal
 
 # ---------- Common ----------
@@ -173,14 +173,34 @@ class ProposePropertiesDescriptor(BaseModel):
 
 
 class PropertySetting(BaseModel):
-    """Property setting for OpenRefine."""
+    """Property setting for OpenRefine.
 
-    name: str
+    Each entry declares the type IDs it serves, so a client can select properties
+    for a type without a hard-coded per-type map.
+    """
+
+    name: str = Field(..., min_length=1, description="Property ID")
     label: str
     type: str
     help_text: str
-    entity_types: List[str]
+    entity_types: List[str] = Field(..., description="Type IDs that serve this property")
     settings: Optional[Dict[str, Any]] = None
+
+    @field_validator("name", "label", "type")
+    @classmethod
+    def validate_non_blank_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value
+
+    @field_validator("entity_types")
+    @classmethod
+    def validate_entity_types(cls, value: List[str]) -> List[str]:
+        if not value:
+            raise ValueError("entity_types must declare at least one type ID")
+        if any(not isinstance(type_id, str) or not type_id.strip() for type_id in value):
+            raise ValueError("entity_types entries must be non-blank type IDs")
+        return value
 
 
 class ExtendDescriptor(BaseModel):
@@ -190,18 +210,38 @@ class ExtendDescriptor(BaseModel):
     property_settings: List[PropertySetting]
 
 
+class ReconciliationDescriptor(BaseModel):
+    """Declares the OpenRefine types this service implements for matching.
+
+    `defaultTypes` is the OpenRefine type list and may contain types without a
+    matcher. `supportedTypes` lists only implemented matching behavior; an empty
+    array is valid and means no type is implemented.
+    """
+
+    supportedTypes: List[str]
+
+    @field_validator("supportedTypes")
+    @classmethod
+    def validate_supported_types(cls, value: List[str]) -> List[str]:
+        if any(not isinstance(type_id, str) or not type_id.strip() for type_id in value):
+            raise ValueError("supportedTypes entries must be non-blank type IDs")
+        if len(set(value)) != len(value):
+            raise ValueError("supportedTypes entries must be unique")
+        return value
+
+
 class ReconServiceManifest(BaseModel):
     """Service manifest with proper caching hints"""
 
     name: str
     identifierSpace: str  # Changed from HttpUrl to str to handle the format from metadata
     schemaSpace: str  # Changed from HttpUrl to str
-    defaultTypes: List[TypeRef] = Field(default_factory=list)
-
+    defaultTypes: List[TypeRef]
+    reconciliation: ReconciliationDescriptor
     view: Optional[ViewTemplate] = None
     preview: Optional[PreviewTemplate] = None
     suggest: Optional[SuggestDescriptor] = None
-    extend: Optional[ExtendDescriptor] = None
+    extend: ExtendDescriptor
 
     # Optional extras:
     versions: Optional[List[str]] = None  # e.g., ["0.2", "0.3"]
@@ -216,6 +256,25 @@ class ReconServiceManifest(BaseModel):
         # Add caching hints for FastAPI
         json_schema_extra={"cache_control": "public, max-age=3600"},
     )
+
+    @field_validator("defaultTypes")
+    @classmethod
+    def validate_default_types(cls, value: List[TypeRef]) -> List[TypeRef]:
+        ids: List[str] = [type_ref.id for type_ref in value]
+        if any(not isinstance(type_id, str) or not type_id.strip() for type_id in ids):
+            raise ValueError("defaultTypes ids must be non-blank type IDs")
+        if len(set(ids)) != len(ids):
+            raise ValueError("defaultTypes ids must be unique")
+        return value
+
+    @model_validator(mode="after")
+    def validate_supported_types_reference_default_types(self) -> "ReconServiceManifest":
+        """Require every supported type ID to resolve to exactly one default type."""
+        known_ids: set[str] = {type_ref.id for type_ref in self.defaultTypes}
+        unresolved: List[str] = [type_id for type_id in self.reconciliation.supportedTypes if type_id not in known_ids]
+        if unresolved:
+            raise ValueError(f"supportedTypes entries are not in defaultTypes: {', '.join(unresolved)}")
+        return self
 
 
 # ---------- /suggest/* (entity/property/type) ----------
