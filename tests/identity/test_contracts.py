@@ -32,8 +32,8 @@ from src.identity.models import EntityContractConflict, EntityContractDeclaratio
 CALLER = ContractCaller(name="shape-shifter", token="s3cret", scope_prefixes=("provider://",))
 
 
-@pytest.fixture
-def configured_provider(request) -> Iterator[MockConfigProvider]:
+@pytest.fixture(name="configured_provider")
+def _configured_provider(request) -> Iterator[MockConfigProvider]:
     """Install a mock provider for one config payload and restore the default after."""
     payload = getattr(request, "param", {})
     provider = MockConfigProvider(ConfigFactory().load(source=payload))
@@ -150,17 +150,23 @@ class TestContractRegistrationPolicy:
         ],
         indirect=True,
     )
-    def test_from_config_keeps_only_usable_callers(self, configured_provider: MockConfigProvider) -> None:
+    def test_from_config_keeps_only_usable_callers(
+        self,
+        configured_provider: MockConfigProvider,  # pylint: disable=unused-argument
+    ) -> None:
         policy = ContractRegistrationPolicy.from_config()
 
         assert [caller.name for caller in policy.callers] == ["shape-shifter"]
         assert policy.authorize("shape-shifter", "s3cret", "provider://gbif/occurrence") == "shape-shifter"
 
     @pytest.mark.parametrize("configured_provider", [{}], indirect=True)
-    def test_from_config_without_callers_keeps_registration_closed(self, configured_provider: MockConfigProvider) -> None:
+    def test_from_config_without_callers_keeps_registration_closed(
+        self,
+        configured_provider: MockConfigProvider,  # pylint: disable=unused-argument
+    ) -> None:
         policy = ContractRegistrationPolicy.from_config()
 
-        assert policy.callers == ()
+        assert not policy.callers
         with pytest.raises(ContractAuthorizationError, match="No contract registration callers"):
             policy.authorize("shape-shifter", "s3cret", "provider://gbif/occurrence")
 
@@ -172,7 +178,7 @@ class TestContractRegistrationPolicy:
         finally:
             set_config_provider(previous)
 
-        assert policy.callers == ()
+        assert not policy.callers
 
 
 # ---------------------------------------------------------------------------

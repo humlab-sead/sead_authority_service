@@ -40,7 +40,10 @@ async def _fake_get_connection():
 
 
 def _patch_connection():
-    return patch("src.identity.service.get_connection", side_effect=lambda: _fake_get_connection())
+    return patch(
+        "src.identity.service.get_connection",
+        side_effect=lambda: _fake_get_connection(),  # pylint: disable=unnecessary-lambda
+    )
 
 
 def _make_contract(entity_type: str, business_keys: list[str]) -> EntityKeyContract:
