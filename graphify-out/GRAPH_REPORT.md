@@ -1,17 +1,17 @@
 # Graph Report - sead_authority_service  (2026-11-05)
 
 ## Corpus Check
-- 303 files · ~232,948 words
+- 303 files · ~233,066 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 17 file(s) not represented in the graph (top: (none) 9, .example 2, .service 2)
 
 ## Summary
-- 7189 nodes · 14326 edges · 409 communities (314 shown, 95 thin omitted)
-- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 1310 edges (avg confidence: 0.9)
+- 7191 nodes · 14345 edges · 422 communities (318 shown, 104 thin omitted)
+- Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 1315 edges (avg confidence: 0.9)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `785aa04d`
+- Built from commit: `465b581d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -26,8 +26,8 @@
 - MockConfigProvider
 - GeoNamesProxy
 - configuration/config.py
-- ConfigLike
-- test_suggest.py
+- ConfigStore
+- FastAPI
 - _patch_connection
 - SiteReconciliationStrategy
 - IdentityPolicy
@@ -44,19 +44,19 @@
 - TestListOperations
 - _make_service_mock
 - _parse_list_expression
-- SEADMCPServer
+- test_mcp.py
 - .fetch_all
 - BaseRepository
 - .get_config
 - render_preview
 - Verify Reconciliation Candidates and Match Readiness — Phase 4 Task Plan
 - TestReplaceReferences
-- MCPTools
+- .create_connection_mock
 - SEAD MCP Server - Embedded Implementation
 - TestReconServiceManifest
-- test_mcp.py
+- identity/models.py
 - TranslationService
-- public.tbl_analysis_entities
+- public.tbl_datasets
 - __deploy__.sql
 - EntityKeyContract
 - Path
@@ -101,11 +101,11 @@
 - location
 - modification_type
 - router.py
-- src/configuration/__init__.py
+- ConfigValue
 - reconcile_queries
 - Dimension Details SQL
 - test_translation_cache.py
-- TestTranslationCacheEdgeCases
+- .get_instance
 - public.tbl_locations
 - sql_queries
 - TestExtCell
@@ -114,7 +114,7 @@
 - test_model.py
 - recursive_filter_dict
 - TestModelSerialization
-- MCPResources
+- BindingSetState
 - taxa_tree_master
 - env2dict
 - FastAPI Application
@@ -122,7 +122,7 @@
 - ReconPropertyConstraint
 - AbstractRepository
 - authority.get_embedding_status
-- test_reconciliation_contract_integration.py
+- test_suggest.py
 - RAGHybridReconciliationStrategy
 - retrieval
 - analyze
@@ -130,7 +130,7 @@
 - TestAPIResponse
 - TestEdgeCases
 - TestReplaceReferencesPublicAPI
-- service.py
+- IdentityService
 - Proposal: Move Authority Service Deployment from Docker to Podman
 - SEAD Authority Service - AI Coding Instructions
 - Phase 2 Task Plan: First Deployment to the Target Host
@@ -141,14 +141,14 @@
 - Design
 - TestReplaceReferences
 - configuration/test_utility.py
-- TestMCPModels
+- Submission
 - test_policy.py
 - taxa_tree_order
 - Podman Deployment Migration Phase Plan
 - config-template.yml
 - analyze
 - git_commit
-- create_db_uri
+- ConfigLike
 - Proposal Document Structure Instructions
 - analyze
 - AGENTS.md - AI Coding Agent Instructions
@@ -159,16 +159,16 @@
 - PreviewTemplate
 - ConfigValue
 - SEAD Authority Service — Rootless Podman Deployment
-- Implementation Phases
+- .rerank
 - test_metadata.py
 - data_type
 - .create_connection_mock
 - feature_type
 - test_capabilities.py
 - public.tbl_taxa_tree_genera
-- BibliographicReferenceReconciliationStrategy
+- dotexpand
 - dimension.yml
-- pathlib
+- OpenAIProvider
 - public.tbl_record_types
 - utility.sql
 - options
@@ -176,11 +176,11 @@
 - container/config/entities.yml
 - llm
 - tests/config/entities.yml
-- SuggestPropertyItem
+- TestInjectConfig
 - sead-authority-service
 - ContractRegistrationPolicy
 - public.tbl_data_types
-- StrategyRegistry
+- TestStrategyRegistry
 - public.tbl_relative_ages
 - public.tbl_features
 - modification_type
@@ -193,7 +193,7 @@
 - database
 - mcp
 - foreign_key_column
-- policy.py
+- ._load
 - public.tbl_sample_types
 - llm
 - .supports
@@ -215,7 +215,7 @@
 - record_type
 - site
 - taxa_tree_author
-- TestConfigStoreClassMethods
+- __init__
 - callers
 - check_imports.py
 - config/entities.yml
@@ -235,10 +235,10 @@
 - recursive_update
 - authority-service
 - location.yml
-- public.tbl_taxa_tree_authors
+- TestTranslationCacheIntegration
 - GeoNames Places Resource
 - Taxon Resource (Empty)
-- public.tbl_sample_location_types
+- StrategyRegistry
 - data_type.yml
 - Create a Phase Task Plan
 - feature_type.yml
@@ -246,11 +246,12 @@
 - Implement a Phase Task Plan
 - Requirements Docs
 - Review the AI coding model strategy
+- bibliographic_reference
 - Create a Phase Plan
 - anthropic
 - taxa_synonym
 - Create a Phase Task Plan
-- taxonomic_order_system
+- config/entities.yml
 - taxa_tree_family
 - taxa_tree_genus
 - taxa_tree_master
@@ -265,11 +266,11 @@
 - Move a Proposal
 - Review a Proposal
 - Clarify Technical Docs
-- method_rag.yml
+- taxonomy_note
 - build.sh
-- Any
-- public.tbl_taxonomic_order_systems
-- config/entities.yml
+- public.tbl_sample_description_types
+- .resolve_references
+- dating_uncertainty
 - handlers
 - ViewTemplate
 - config/config.yml
@@ -286,12 +287,12 @@
 - steps
 - Domain Concepts
 - Config
-- Work Breakdown
+- sample_location_type
 - TestConfigFactoryEdgeCases
 - SIMS Diagrams
 - administrative_region.yml
 - country.yml
-- .test_reconciliation_strategy
+- with_test_config
 - policy
 - bibliographic_reference
 - data_type
@@ -303,7 +304,7 @@
 - taxa_tree_author
 - taxonomic_order_system
 - taxonomy_note
-- _StubConfigValue
+- sampling_context
 - defaults
 - database
 - options
@@ -311,8 +312,8 @@
 - geonames.yml
 - options
 - handlers
-- .__init__
-- seed_identity_scopes.py
+- .test_is_alive
+- Implementation Phases
 - sample_description_type
 - sample_group_description_type
 - src/utility.py
@@ -385,14 +386,27 @@
 - FakeTaxonStrategy
 - .test_whoami_returns_host_and_port
 - prompts
-- app
+- test_get_connection_from_pool
 - src/utility.py
 - SIMS Identity Module
 - Canonical Use Cases
-- authority.location
-- UnsupportedReconciliationTypeError
+- test_config
+- fix_imports.py
 - IdentityService
 - configured_provider
+- Getting Started (5 Minutes)
+- MockStrategy
+- Proposed Design
+- Proposed Design
+- Troubleshooting
+- Any
+- mock_results
+- MCP Tools
+- Usage
+- ResponseModel
+- .test_registry_items_isolated
+- .test_registry_hook_preserves_class
+- .test_register_strategy_without_explicit_key
 
 ## God Nodes (most connected - your core abstractions)
 1. `with_test_config()` - 335 edges
@@ -415,7 +429,7 @@
   docs/proposals/SIMS_TARGET_ID_CONTRACT/SIMS_TARGET_ID_CONTRACT.md → src/identity/models.py
 - `Area 1: Confirm the site match path and add read-only verification` --references--> `get_connection()`  [INFERRED]
   docs/proposals/RECONCILIATION_IDENTITY_CONTRACT/RECONCILIATION_IDENTITY_CONTRACT_PHASE_4_TASK_PLAN.md → src/configuration/setup.py
-- `Area 3: Enforce materialized approved identities at binding` --references--> `get_connection()`  [INFERRED]
+- `Repository Findings` --references--> `get_connection()`  [INFERRED]
   docs/proposals/RECONCILIATION_IDENTITY_CONTRACT/RECONCILIATION_IDENTITY_CONTRACT_PHASE_4_TASK_PLAN.md → src/configuration/setup.py
 
 ## Import Cycles
@@ -437,66 +451,66 @@
 - **Fuzzy Search SQL Queries** — src_resources_country_fuzzy_find_sql, src_resources_data_type_fuzzy_find_sql, src_resources_dimension_fuzzy_find_sql, src_resources_feature_type_fuzzy_find_sql [INFERRED 0.75]
 - **Resource Definitions** — src_resources_country_country, src_resources_data_type_data_type, src_resources_dimension_dimension, src_resources_feature_type_feature_type, src_resources_geonames_geonames [INFERRED 0.80]
 
-## Communities (409 total, 95 thin omitted)
+## Communities (422 total, 104 thin omitted)
 
 ### Community 0 - "01_tables.sql"
 Cohesion: 0.01
 Nodes (136): tbl_abundance_elements, tbl_abundance_ident_levels, tbl_abundance_modifications, tbl_abundance_properties, tbl_abundances, tbl_activity_types, tbl_age_types, tbl_alt_ref_types (+128 more)
 
 ### Community 1 - "test_scope_contracts_api.py"
-Cohesion: 0.07
-Nodes (18): get_contract_registration_policy(), get_identity_policy(), ContractAuthorizationError, IdentityContractConflict, IdentityContractRequired, is_provider_scope(), require_provider_scope(), EntityContractConflict (+10 more)
+Cohesion: 0.06
+Nodes (21): ContractAuthorizationError, IdentityContractConflict, IdentityContractRequired, is_provider_scope(), require_provider_scope(), BindRequest, EntityContractConflict, EntityContractState (+13 more)
 
 ### Community 2 - "SEAD Identity System Requirements"
 Cohesion: 0.12
 Nodes (17): API non-goals at this stage, API-visible concepts, Goals, High Level API Behaviour, Out Of Scope For This Document, Problem boundaries, Problem Statement, Purpose (+9 more)
 
 ### Community 3 - "BaseRepository"
-Cohesion: 0.09
-Nodes (12): DataTypeRepository, DimensionReconciliationStrategy, DimensionRepository, FeatureTypeRepository, LocationReconciliationStrategy, LocationRepository, MethodRepository, BaseRepository (+4 more)
+Cohesion: 0.04
+Nodes (16): DataTypeReconciliationStrategy, DataTypeRepository, DimensionReconciliationStrategy, DimensionRepository, FeatureTypeRepository, LocationReconciliationStrategy, LocationRepository, MethodReconciliationStrategy (+8 more)
 
 ### Community 4 - "TestClient"
-Cohesion: 0.05
-Nodes (9): MockConfigProvider, TestConfigDependency, TestContentTypeHandling, TestFlyoutEntityEndpoint, TestReconcileEndpointExtended, TestResponseModels, TestSuggestEntityEndpoint, TestSuggestPropertyEndpoint (+1 more)
+Cohesion: 0.04
+Nodes (8): TestConfigDependency, TestContentTypeHandling, TestFlyoutEntityEndpoint, TestReconcileEndpointExtended, TestResponseModels, TestSuggestEntityEndpoint, TestSuggestPropertyEndpoint, TestSuggestTypeEndpoint
 
 ### Community 5 - "ExtendedMockConfigProvider"
 Cohesion: 0.04
-Nodes (11): AdministrativeRegionReconciliationStrategy, CountryReconciliationStrategy, ExtendedMockConfigProvider, TestAdministrativeRegionBasics, TestAdministrativeRegionDistinctionFromCountry, TestAdministrativeRegionEdgeCases, TestAdministrativeRegionIntegration, TestAdministrativeRegionMethods (+3 more)
+Nodes (10): AdministrativeRegionReconciliationStrategy, CountryReconciliationStrategy, ExtendedMockConfigProvider, TestAdministrativeRegionBasics, TestAdministrativeRegionDistinctionFromCountry, TestAdministrativeRegionEdgeCases, TestAdministrativeRegionIntegration, TestAdministrativeRegionMethods (+2 more)
 
 ### Community 6 - "IdentityService"
-Cohesion: 0.08
-Nodes (16): associate_change_request(), AssociateChangeRequestBody, CapabilitiesResponse, confirm_binding_set(), detect_change(), EntityCapabilityResponse, get_binding_set(), get_capabilities() (+8 more)
+Cohesion: 0.07
+Nodes (19): associate_change_request(), AssociateChangeRequestBody, CapabilitiesResponse, confirm_binding_set(), detect_change(), EntityCapabilityResponse, get_binding_set(), get_capabilities() (+11 more)
 
 ### Community 7 - "MockConfigProvider"
 Cohesion: 0.04
 Nodes (4): GeoNamesReconciliationStrategy, TestGeoNamesEdgeCases, TestGeoNamesIntegration, TestGeoNamesReconciliationStrategy
 
 ### Community 8 - "GeoNamesProxy"
-Cohesion: 0.05
+Cohesion: 0.06
 Nodes (5): GeoNamesProxy, NotSupportedError, TestGeoNamesProxy, TestGeoNamesProxyEdgeCases, TestGeoNamesProxyIntegration
 
 ### Community 9 - "configuration/config.py"
-Cohesion: 0.04
-Nodes (6): dotexists(), dotexpand(), dotget(), dotset(), TestDotNotationEdgeCases, TestDotNotationUtilities
-
-### Community 10 - "ConfigLike"
-Cohesion: 0.05
-Nodes (11): get_config_dependency(), ConfigFactoryLike, ConfigLike, ConfigStore, setup_config_store(), _setup_connection_pool(), setup_config_store2(), TestConfigStoreConfigureContext (+3 more)
-
-### Community 11 - "test_suggest.py"
 Cohesion: 0.06
-Nodes (31): render_flyout_preview(), suggest_entities(), suggest_properties(), suggest_types(), mock_results(), _SuggestStrategyBase, test_app(), test_flyout_entity_invalid_id() (+23 more)
+Nodes (4): dget(), dotexists(), dotget(), TestDotNotationUtilities
+
+### Community 10 - "ConfigStore"
+Cohesion: 0.07
+Nodes (4): ConfigStore, TestConfigStoreClassMethods, TestConfigStoreDirectoryOperations, test_consolidate_merges_with_existing_config()
+
+### Community 11 - "FastAPI"
+Cohesion: 0.10
+Nodes (10): _SuggestStrategyBase, test_flyout_entity_invalid_id(), test_flyout_entity_missing_id(), test_flyout_entity_valid(), test_suggest_entity_with_prefix(), test_suggest_entity_with_type_filter(), test_suggest_property_by_type(), test_suggest_property_with_prefix() (+2 more)
 
 ### Community 12 - "_patch_connection"
-Cohesion: 0.10
-Nodes (17): BindingRepository, BindingSetRepository, ResolveBatchRepository, SourceIdentityRepository, SourceScopeRepository, TrackedIdentityRepository, _fake_get_connection(), _make_conn() (+9 more)
+Cohesion: 0.09
+Nodes (19): ResolveBatchResult, BindingRepository, BindingSetRepository, ResolveBatchRepository, SourceIdentityRepository, SourceScopeRepository, SubmissionRepository, TrackedIdentityRepository (+11 more)
 
 ### Community 13 - "SiteReconciliationStrategy"
-Cohesion: 0.06
+Cohesion: 0.05
 Nodes (4): SiteReconciliationStrategy, TestSiteReconciliationStrategy, TestSiteStrategyEdgeCases, TestSiteStrategyIntegration
 
 ### Community 14 - "IdentityPolicy"
-Cohesion: 0.17
+Cohesion: 0.21
 Nodes (4): IdentityPolicy, TestDefaultFallback, TestKnownEntityPolicies, TestRealPolicyFile
 
 ### Community 15 - "FeatureTypeReconciliationStrategy"
@@ -504,28 +518,28 @@ Cohesion: 0.05
 Nodes (4): FeatureTypeReconciliationStrategy, create_connection_mock(), MockRow, TestFeatureTypeReconciliationStrategy
 
 ### Community 16 - "ResolveBatchResult"
-Cohesion: 0.10
-Nodes (6): Area 3: Enforce materialized approved identities at binding, ResolveBatchRecord, ResolveBatchResult, _request_fingerprint(), TestResolveBatch, no_database_transaction()
+Cohesion: 0.13
+Nodes (5): ResolveBatchRecord, IdentityBatchConflict, _request_fingerprint(), TestResolveBatch, no_database_transaction()
 
 ### Community 17 - "router.py"
-Cohesion: 0.06
-Nodes (31): _configured_id_base(), get_reconciliation_readiness(), _site_id_from_candidate(), _site_strategy(), UnsupportedReadinessType, _valid_id_base(), verify_candidate_batch(), CandidateVerificationItem (+23 more)
+Cohesion: 0.07
+Nodes (26): _configured_id_base(), get_reconciliation_readiness(), _site_id_from_candidate(), _site_strategy(), UnsupportedReadinessType, _valid_id_base(), verify_candidate_batch(), CandidateVerificationItem (+18 more)
 
 ### Community 18 - "ResolutionRequest"
-Cohesion: 0.06
-Nodes (23): get_connection(), ChangeDetectionRequest, IdentitySignal, ResolutionRequest, IdentityBatchConflict, IdentityBindingConflict, TestResolutionRequest, TestResolveBatchContractEnforcement (+15 more)
+Cohesion: 0.09
+Nodes (9): ChangeDetectionRequest, _sample_request(), _site_request(), skip_without_db(), TestDetectChange, TestGetBindingSetLookup, TestResolveAndBindSample, TestResolveAndBindSite (+1 more)
 
 ### Community 19 - "LLMModificationTypeReconciliationStrategy"
 Cohesion: 0.11
-Nodes (3): LLMModificationTypeReconciliationStrategy, ModificationTypeRepository, TestModificationTypeReconciliationStrategy
+Nodes (5): Candidate, ReconciliationResponse, ReconciliationResult, LLMModificationTypeReconciliationStrategy, TestModificationTypeReconciliationStrategy
 
 ### Community 20 - "ReconQuery"
-Cohesion: 0.07
+Cohesion: 0.06
 Nodes (6): ReconBatchRequest, ReconBatchRequestHandler, ReconQuery, TestReconBatchRequest, TestReconBatchRequestHandler, TestReconQuery
 
 ### Community 21 - "_make_service"
 Cohesion: 0.08
-Nodes (26): Files, Issue Draft: Add `ResolutionOutcome.target_id` to `POST /identity/resolve`, Problem, Solution, Files, PR Draft: Add `ResolutionOutcome.target_id` to `POST /identity/resolve`, Problem, Solution (+18 more)
+Nodes (27): Files, Issue Draft: Add `ResolutionOutcome.target_id` to `POST /identity/resolve`, Problem, Solution, Files, PR Draft: Add `ResolutionOutcome.target_id` to `POST /identity/resolve`, Problem, Solution (+19 more)
 
 ### Community 22 - "SuggestSubservice"
 Cohesion: 0.19
@@ -539,65 +553,53 @@ Nodes (18): Acceptance Criteria, Capability discovery, Confirmation behavior, En
 Cohesion: 0.10
 Nodes (10): _make_client(), _make_policy_mock(), _make_service_mock(), TestAssociateChangeRequest, TestConfirmBindingSet, TestDetectChange, TestGetBindingSet, TestListScopes (+2 more)
 
-### Community 27 - "_parse_list_expression"
-Cohesion: 0.08
-Nodes (3): _parse_list_expression(), _replace_references(), TestParseListExpression
-
-### Community 28 - "SEADMCPServer"
-Cohesion: 0.08
-Nodes (4): GetByIdParams, SEADMCPServer, test_search_lookup_integration(), TestMCPServer
+### Community 28 - "test_mcp.py"
+Cohesion: 0.03
+Nodes (18): Candidate, GetByIdParams, GetByIdResult, LookupTable, MCPError, RawScores, RerankParams, RerankResult (+10 more)
 
 ### Community 29 - ".fetch_all"
-Cohesion: 0.17
-Nodes (4): BibliographicReferenceRepository, DictRow, Params, TupleRow
+Cohesion: 0.07
+Nodes (9): BibliographicReferenceReconciliationStrategy, BibliographicReferenceRepository, ModificationTypeRepository, DictRow, Params, TupleRow, _FakeBiblioRepo, TestBibliographicReferenceReconciliationStrategy (+1 more)
 
 ### Community 31 - ".get_config"
 Cohesion: 0.11
 Nodes (3): OllamaProvider, TestOllamaProvider, test_openai_provider_uses_configured_endpoint()
 
-### Community 32 - "render_preview"
-Cohesion: 0.10
-Nodes (3): render_preview(), mock_strategy_with_get_details(), TestRenderPreview
-
 ### Community 33 - "Verify Reconciliation Candidates and Match Readiness — Phase 4 Task Plan"
 Cohesion: 0.10
-Nodes (21): Acceptance-Criteria Coverage, Area 1: Confirm the site match path and add read-only verification, Area 2: Report database-backed match readiness, Definition Of Done, Deliverables, Execution Results, Phase Summary, Progress Tracker (+13 more)
+Nodes (22): Acceptance-Criteria Coverage, Area 1: Confirm the site match path and add read-only verification, Area 2: Report database-backed match readiness, Area 4: Preserve OpenRefine compatibility and document deployment checks, Definition Of Done, Deliverables, Execution Results, Phase Summary (+14 more)
 
-### Community 35 - "MCPTools"
-Cohesion: 0.13
-Nodes (3): SearchLookupParams, MCPTools, TestMCPTools
+### Community 35 - ".create_connection_mock"
+Cohesion: 0.06
+Nodes (7): create_connection_cm(), TestDatabaseRepositoryTransactionHandling, TestReconcileIntegration, execute_side_effect(), mock_rollback(), TestReconcileWithDebugger, TestMCPTools
 
 ### Community 36 - "SEAD MCP Server - Embedded Implementation"
-Cohesion: 0.11
-Nodes (18): Architecture, Basic Example, Configuration, Contact, Future Enhancements, `get_by_id`, In a Reconciliation Strategy, `list_lookup_tables` (+10 more)
+Cohesion: 0.18
+Nodes (11): Architecture, Configuration, Contact, Future Enhancements, Module Structure, Observability, Overview, Performance Targets (Phase 5 SLOs) (+3 more)
 
 ### Community 37 - "TestReconServiceManifest"
-Cohesion: 0.09
-Nodes (3): ReconciliationDescriptor, ReconServiceManifest, TestReconServiceManifest
+Cohesion: 0.07
+Nodes (7): ExtendDescriptor, ProposePropertiesDescriptor, ReconciliationDescriptor, ReconServiceManifest, TestExtendDescriptor, TestProposePropertiesDescriptor, TestReconServiceManifest
 
-### Community 38 - "test_mcp.py"
-Cohesion: 0.16
-Nodes (6): Candidate, GetByIdResult, LookupTable, RerankParams, RerankResult, SearchLookupResult
+### Community 38 - "identity/models.py"
+Cohesion: 0.08
+Nodes (19): IdentitySignal, RejectDiagnostics, ResolutionRequest, SourceIdentity, SourceIdentityKey, SourceScope, IdentityType, _make_source_scope() (+11 more)
 
 ### Community 39 - "TranslationService"
-Cohesion: 0.20
-Nodes (5): LanguageDetection, TranslationService, TestTranslationServiceDetectLanguage, TestTranslationServiceHeuristics, TestTranslationServiceTranslate
+Cohesion: 0.14
+Nodes (6): LLMProvider, LanguageDetection, TranslationService, TestTranslationServiceDetectLanguage, TestTranslationServiceHeuristics, TestTranslationServiceTranslate
 
-### Community 40 - "public.tbl_analysis_entities"
-Cohesion: 0.16
-Nodes (17): public.master_set_reference, public.typed_analysis_values, public.view_bibliography_references, public.view_chronometric_ages, public.view_identified_by, public.view_occurrence_ids, public.view_physical_abundances, public.view_physical_ages (+9 more)
+### Community 40 - "public.tbl_datasets"
+Cohesion: 0.06
+Nodes (24): public.master_set_reference, public.typed_analysis_values, public.view_bibliography_references, public.view_chronometric_ages, public.view_identified_by, public.view_occurrence_ids, public.view_physical_abundances, public.view_physical_ages (+16 more)
 
 ### Community 41 - "__deploy__.sql"
 Cohesion: 0.05
 Nodes (56): authority.data_type, authority.data_type_group, authority.dating_uncertainty, authority.feature, authority.feature_type, authority.fuzzy_data_type(), authority.fuzzy_data_type_group(), authority.fuzzy_dating_uncertainty() (+48 more)
 
 ### Community 42 - "EntityKeyContract"
-Cohesion: 0.10
-Nodes (11): list_scope_contracts(), EntityKeyContract, RepositoryError, ScopeEntityContractRepository, _unique_declarations(), _fake_get_connection(), _make_conn(), _make_cursor() (+3 more)
-
-### Community 44 - "ReconCandidate"
-Cohesion: 0.09
-Nodes (6): ReconBatchResponse, ReconCandidate, ReconQueryResult, TestReconBatchResponse, TestReconCandidate, TestReconQueryResult
+Cohesion: 0.16
+Nodes (9): list_scope_contracts(), EntityKeyContract, ScopeEntityContractRepository, _fake_get_connection(), _make_conn(), _make_cursor(), _patch_connection(), _row() (+1 more)
 
 ### Community 46 - "resolve_arguments"
 Cohesion: 0.14
@@ -608,16 +610,16 @@ Cohesion: 0.12
 Nodes (6): ExtendRequest, ExtendRequestProperty, ExtendResponse, TestExtendRequest, TestExtendRequestProperty, TestExtendResponse
 
 ### Community 48 - "Proposal: SIMS `target_id` Contract For Delivery 1"
-Cohesion: 0.11
-Nodes (18): Acceptance Criteria, API change, Approved Identity-Allocation Decision, Backward compatibility, Behavior rules, Current Behavior, Final Recommendation, Identity ownership (+10 more)
+Cohesion: 0.15
+Nodes (13): Acceptance Criteria, Approved Identity-Allocation Decision, Current Behavior, Final Recommendation, Non-Goals, Planning Handoff, Problem, Proposal: SIMS `target_id` Contract For Delivery 1 (+5 more)
 
 ### Community 50 - "public.tbl_sample_group_sampling_contexts"
 Cohesion: 0.10
-Nodes (15): tbl_sample_description_types_norm_trgm, tbl_sample_group_description_types_norm_trgm, tbl_sample_group_sampling_contexts_norm_trgm, tbl_sample_description_types_norm_trgm, tbl_sample_group_description_types_norm_trgm, tbl_sample_group_sampling_contexts_norm_trgm, authority.fuzzy_sample_description_type(), authority.sample_description_type (+7 more)
+Nodes (15): tbl_sample_group_description_types_norm_trgm, tbl_sample_group_sampling_contexts_norm_trgm, tbl_sample_location_types_norm_trgm, tbl_sample_group_description_types_norm_trgm, tbl_sample_group_sampling_contexts_norm_trgm, tbl_sample_location_types_norm_trgm, authority.fuzzy_sample_group_description_type(), authority.sample_group_description_type (+7 more)
 
 ### Community 51 - "TestUtilityFunctions"
-Cohesion: 0.11
-Nodes (4): _has_non_scalar(), _is_scalar(), _resolve_format(), TestUtilityFunctions
+Cohesion: 0.09
+Nodes (5): _has_non_scalar(), _is_scalar(), _resolve_format(), _total_chars(), TestUtilityFunctions
 
 ### Community 52 - "TypeRef"
 Cohesion: 0.11
@@ -625,7 +627,7 @@ Nodes (6): SuggestEntityItem, SuggestEntityResponse, TypeRef, TestSuggestEntityI
 
 ### Community 54 - "format_rows_for_llm"
 Cohesion: 0.08
-Nodes (3): format_rows_for_llm(), TestEdgeCases, TestFormatRowsForLLM
+Nodes (4): format_rows_for_llm(), RowFormatter, TestEdgeCases, TestFormatRowsForLLM
 
 ### Community 57 - "strategies/test_strategy.py"
 Cohesion: 0.15
@@ -633,15 +635,15 @@ Nodes (13): _DummyRepoInstance, _FakeRepository, _NoRepoStrategy, _StubConfigVal
 
 ### Community 59 - "public.tbl_taxa_tree_master"
 Cohesion: 0.06
-Nodes (17): idx_taxa_tree_master_author_id, idx_taxa_tree_master_genus_id, tbl_biblio_norm_trgm, tbl_taxa_tree_master_norm_trgm, tbl_taxonomy_notes_norm_trgm, authority.fuzzy_bibliographic_reference(), tbl_taxa_tree_master_norm_trgm, tbl_taxonomy_notes_norm_trgm (+9 more)
+Nodes (29): public.taxon_view, idx_taxa_tree_authors_name, idx_taxa_tree_master_author_id, idx_taxa_tree_master_genus_id, tbl_biblio_norm_trgm, tbl_taxa_synonyms_norm_trgm, tbl_taxa_tree_authors_norm_trgm, tbl_taxa_tree_master_norm_trgm (+21 more)
 
 ### Community 60 - "EntityContractDeclaration"
-Cohesion: 0.10
-Nodes (9): EntityContractDeclaration, TestEntityContractDeclaration, _declaration(), _provider_scope(), _service(), _site_request(), skip_without_db(), TestContractRegistration (+1 more)
+Cohesion: 0.13
+Nodes (6): EntityContractDeclaration, TestEntityContractDeclaration, _declaration(), skip_without_db(), TestContractRegistration, TestResolveContractEnforcement
 
 ### Community 61 - "Phase 1 Task Plan: Prepare the Podman Deployment Bundle"
-Cohesion: 0.13
-Nodes (15): Acceptance-Criteria Coverage, Area 1: Build and describe the Podman container, Area 2: Add simple operator setup and safeguards, Definition Of Done, Deliverables, Phase 1 Task Plan: Prepare the Podman Deployment Bundle, Phase Acceptance Criteria, Phase Summary (+7 more)
+Cohesion: 0.14
+Nodes (14): Acceptance-Criteria Coverage, Area 1: Build and describe the Podman container, Area 2: Add simple operator setup and safeguards, Definition Of Done, Deliverables, Phase 1 Task Plan: Prepare the Podman Deployment Bundle, Phase Acceptance Criteria, Phase Summary (+6 more)
 
 ### Community 62 - "site"
 Cohesion: 0.11
@@ -649,27 +651,23 @@ Nodes (18): display_name, id_field, key, label_field, max, min, precision, max (
 
 ### Community 63 - "TestRegistry"
 Cohesion: 0.11
-Nodes (3): __init__(), registered_class_hook(), TestRegistry
-
-### Community 64 - "EmbeddingPopulator"
-Cohesion: 0.11
-Nodes (3): EmbeddingPopulator, process_with_semaphore(), main()
+Nodes (5): ProviderRegistry, _ensure_key_property(), Registry, decorator(), TestRegistry
 
 ### Community 65 - "main"
-Cohesion: 0.14
+Cohesion: 0.15
 Nodes (7): filter_entities_with_embeddings(), generate_semantic_sql(), generate_trigram_sql(), get_trigram_config(), load_entities_config(), main(), setup_logging()
 
 ### Community 66 - "MCP Embedded Server - Quick Start Guide"
-Cohesion: 0.12
-Nodes (15): 1. Enable the Feature Flag, 2. Test the MCP Server, 3. Try It in Python REPL, 4. Integrate into a Strategy, 5. Enable and Test via OpenRefine, Connection errors, Feature flag not working, Getting Started (5 Minutes) (+7 more)
+Cohesion: 0.33
+Nodes (4): MCP Embedded Server - Quick Start Guide, Next Steps, Resources, What's Working Now (Phase 1)
 
 ### Community 68 - "llm"
 Cohesion: 0.09
 Nodes (25): api_key, model, options, provider_id, llm, anthropic, enable_semantic_matching, enable_translation (+17 more)
 
 ### Community 69 - "method"
-Cohesion: 0.06
-Nodes (32): method, alternate_identity_column, description_column, embedding_config, extra_columns, method_group, alternate_identity_column, description_column (+24 more)
+Cohesion: 0.05
+Nodes (39): method, alternate_identity_column, description_column, extra_columns, method_group, alternate_identity_column, description_column, id_column (+31 more)
 
 ### Community 70 - "TestMCPConfig"
 Cohesion: 0.15
@@ -689,7 +687,7 @@ Nodes (19): Acceptance Criteria, Alternatives Considered, API, Current Behavior,
 
 ### Community 77 - "configuration/config.py"
 Cohesion: 0.04
-Nodes (18): BaseResolver, is_config_path(), is_path_to_existing_file(), LoadResolver, SafeLoaderIgnoreUnknown, SubConfigResolver, yaml_path_join(), yaml_str_join() (+10 more)
+Nodes (15): BaseResolver, is_config_path(), is_path_to_existing_file(), LoadResolver, SafeLoaderIgnoreUnknown, SubConfigResolver, yaml_path_join(), yaml_str_join() (+7 more)
 
 ### Community 80 - "SIMS Conceptual Model and Systems Design"
 Cohesion: 0.10
@@ -705,23 +703,27 @@ Nodes (24): description, id, label, context, description_field, entity_type_desc
 
 ### Community 84 - "router.py"
 Cohesion: 0.09
-Nodes (14): Area 4: Preserve OpenRefine compatibility and document deployment checks, flyout_entity(), is_alive(), meta(), preview(), reconcile(), reconciliation_readiness(), suggest_entity() (+6 more)
+Nodes (13): list_scopes(), flyout_entity(), meta(), reconcile(), suggest_entity(), suggest_properties(), suggest_property(), suggest_type() (+5 more)
 
-### Community 85 - "src/configuration/__init__.py"
-Cohesion: 0.07
-Nodes (8): Candidate, ReconciliationResponse, ReconciliationResult, setup_test_logging(), test_config(), test_provider(), setup_identity_config(), ResponseModel
+### Community 85 - "ConfigValue"
+Cohesion: 0.06
+Nodes (8): preview(), ConfigValue, _import_submodules(), app(), client(), app(), client(), mock_strategy_with_get_details()
 
 ### Community 86 - "reconcile_queries"
-Cohesion: 0.15
-Nodes (10): reconcile_queries(), _ConfigProvider, _RecordingStrategy, test_reconcile_queries_builds_properties_and_candidates(), test_reconcile_queries_covers_strategy_cls_none_branch(), test_reconcile_queries_empty_query_short_circuits(), test_reconcile_queries_fallback_default_limit(), test_reconcile_queries_missing_type_raises() (+2 more)
+Cohesion: 0.18
+Nodes (9): reconcile_queries(), _ConfigProvider, test_reconcile_queries_builds_properties_and_candidates(), test_reconcile_queries_covers_strategy_cls_none_branch(), test_reconcile_queries_empty_query_short_circuits(), test_reconcile_queries_fallback_default_limit(), test_reconcile_queries_missing_type_raises(), test_reconcile_queries_unknown_type_raises() (+1 more)
 
 ### Community 87 - "Dimension Details SQL"
 Cohesion: 0.14
 Nodes (15): authority.data_type, authority.immutable_unaccent, Data Types Resource, Data Type Details SQL, Data Type Fuzzy Find SQL, tbl_data_type_groups, tbl_data_types, Dimension Alternate Identity SQL (+7 more)
 
+### Community 89 - ".get_instance"
+Cohesion: 0.07
+Nodes (6): SingletonConfigProvider, TestConfigStoreConfigureContext, TestConfigStoreConsolidateErrors, TestConfigStoreSetConfig, TestSingletonConfigProvider, test_configure_context_loads_file()
+
 ### Community 90 - "public.tbl_locations"
-Cohesion: 0.10
-Nodes (13): idx_locations_location_type_id, idx_site_locations_location_id, idx_site_locations_site_id, tbl_location_types_norm_trgm, tbl_locations_norm_trgm, tbl_location_types_norm_trgm, tbl_locations_norm_trgm, authority.fuzzy_location() (+5 more)
+Cohesion: 0.13
+Nodes (14): tbl_location_types, idx_locations_location_type_id, tbl_location_types_norm_trgm, tbl_locations_norm_trgm, authority.fuzzy_location(), authority.location, tbl_location_types_norm_trgm, tbl_locations_norm_trgm (+6 more)
 
 ### Community 91 - "sql_queries"
 Cohesion: 0.09
@@ -736,16 +738,16 @@ Cohesion: 0.06
 Nodes (11): idx_measured_values_analysis_entity_id, tbl_method_groups_norm_trgm, tbl_methods_norm_trgm, tbl_method_groups_norm_trgm, tbl_methods_norm_trgm, authority.fuzzy_method(), authority.method, authority.fuzzy_method_group() (+3 more)
 
 ### Community 95 - "test_model.py"
-Cohesion: 0.09
-Nodes (16): APIResponse, CandidateVerificationResult, ExtCell, ExtendDescriptor, ProposePropertiesDescriptor, ReconcileReadinessResponse, SuggestPropertyResponse, SuggestTypeItem (+8 more)
+Cohesion: 0.07
+Nodes (19): APIResponse, CandidateVerificationResult, ExtCell, ReconBatchResponse, ReconQueryResult, SuggestPropertyItem, SuggestPropertyResponse, SuggestTypeItem (+11 more)
 
-### Community 98 - "MCPResources"
-Cohesion: 0.12
-Nodes (3): ServerInfo, MCPResources, TestMCPResources
+### Community 98 - "BindingSetState"
+Cohesion: 0.10
+Nodes (10): Binding, BindingSet, _uuid(), BindingSetState, _make_batch_result(), _make_binding_set(), _make_binding_set_response(), _make_outcome() (+2 more)
 
 ### Community 99 - "taxa_tree_master"
-Cohesion: 0.09
-Nodes (22): taxa_synonym, alternate_identity_column, description_column, embedding_config, extra_columns, id_column, joins, label_column (+14 more)
+Cohesion: 0.10
+Nodes (20): taxa_synonym, alternate_identity_column, description_column, extra_columns, id_column, joins, label_column, materialized (+12 more)
 
 ### Community 101 - "FastAPI Application"
 Cohesion: 0.15
@@ -755,9 +757,9 @@ Nodes (13): FastAPI Application, IdentityPolicy, Identity Router, IdentityServic
 Cohesion: 0.10
 Nodes (20): taxa_tree_family, alternate_identity_column, description_column, extra_columns, id_column, joins, label_column, materialized (+12 more)
 
-### Community 106 - "test_reconciliation_contract_integration.py"
-Cohesion: 0.22
-Nodes (10): get_identity_service(), _approved_request(), _create_materialized_site(), _resolve_via_api(), _sims_row_counts(), test_approved_id_states_replay_and_confirmed_binding(), test_approved_state_change_between_resolution_and_binding_is_rejected(), test_binding_state_row_lock_serializes_lifecycle_update() (+2 more)
+### Community 106 - "test_suggest.py"
+Cohesion: 0.16
+Nodes (17): render_flyout_preview(), suggest_entities(), test_metadata_includes_suggest_config(), test_render_flyout_preview_invalid_id_format(), test_render_flyout_preview_invalid_id_path(), test_render_flyout_preview_missing_entity(), test_render_flyout_preview_success_compact_html(), test_render_flyout_preview_unknown_entity_type() (+9 more)
 
 ### Community 107 - "RAGHybridReconciliationStrategy"
 Cohesion: 0.08
@@ -768,16 +770,16 @@ Cohesion: 0.18
 Nodes (14): sem_weight, trgm_weight, language, retrieval, enabled, k, model, retrieval (+6 more)
 
 ### Community 109 - "analyze"
-Cohesion: 0.07
-Nodes (39): bibliographic_reference, alternate_identity_column, description_column, embedding_config, extra_columns, id_column, label_column, materialized (+31 more)
+Cohesion: 0.28
+Nodes (19): embedding_config, embedding_config, analyze, dimension, ivfflat_lists, embedding_config, embedding_config, embedding_config (+11 more)
 
 ### Community 110 - "Review a GitHub pull request"
 Cohesion: 0.17
 Nodes (9): PR review criteria, Draft review JSON format, 1. Identify the exact PR and commit, 2. Validate possible findings, 3. Preview — stop here by default, 4. Publish only after explicit user approval, Integration notes, Non-negotiable boundaries (+1 more)
 
-### Community 114 - "service.py"
-Cohesion: 0.04
-Nodes (37): Binding, BindingSet, BindRequest, ChangeDetectionResult, EntityContractState, RegisterScopeContractsRequest, RejectDiagnostics, ScopeContractRegistration (+29 more)
+### Community 114 - "IdentityService"
+Cohesion: 0.05
+Nodes (26): Area 3: Enforce materialized approved identities at binding, get_identity_service(), get_connection(), TrackedIdentity, _now(), RepositoryError, IdentityBindingConflict, IdentityService (+18 more)
 
 ### Community 115 - "Proposal: Move Authority Service Deployment from Docker to Podman"
 Cohesion: 0.17
@@ -788,8 +790,8 @@ Cohesion: 0.67
 Nodes (9): SEAD Authority Service - AI Coding Instructions, Design Docs Instructions, Development Docs Instructions, Mermaid Diagram Style Instructions, GitHub Workflow Instructions, Operations Docs Instructions, README Instructions, Testing Docs Instructions (+1 more)
 
 ### Community 117 - "Phase 2 Task Plan: First Deployment to the Target Host"
-Cohesion: 0.17
-Nodes (12): Acceptance-Criteria Coverage, Acceptance-Criteria Results, Definition Of Done, Deliverables, Phase 2 Task Plan: First Deployment to the Target Host, Phase Acceptance Criteria, Phase Summary, Progress Tracker (+4 more)
+Cohesion: 0.13
+Nodes (15): Acceptance-Criteria Coverage, Acceptance-Criteria Results, Area 1: Confirm target and prepare first deployment, Area 2: Start and verify the first Podman deployment, Definition Of Done, Deliverables, Phase 2 Task Plan: First Deployment to the Target Host, Phase Acceptance Criteria (+7 more)
 
 ### Community 118 - "Entity Register"
 Cohesion: 0.17
@@ -800,8 +802,8 @@ Cohesion: 0.29
 Nodes (8): LLM Providers (OpenAI, Anthropic, Ollama), Hybrid RAG + MCP Flow, RAG vs MCP Comparison, MCP Server Phase, get_by_id Tool, SEAD MCP Server (sead.pg), RAG Pipeline (MCP-based), rerank Tool
 
 ### Community 121 - "configuration/provider.py"
-Cohesion: 0.04
-Nodes (23): shutdown(), startup(), ConfigProvider, get_config_provider(), reset_config_provider(), set_config_provider(), SingletonConfigProvider, Configurable (+15 more)
+Cohesion: 0.06
+Nodes (15): ConfigProvider, set_config_provider(), Configurable, inject_config(), patch_config_provider(), test_set_config_provider_swaps_and_restores(), setup_provider(), mock_provider() (+7 more)
 
 ### Community 122 - "Design"
 Cohesion: 0.10
@@ -811,17 +813,17 @@ Nodes (20): 1. Resolve Identity, 2. Bind, 3. Record external reference (current 
 Cohesion: 0.25
 Nodes (3): test_replace_references_ignores_nested_list_expression(), test_replace_references_list_operations(), test_replace_references_simple_include()
 
-### Community 125 - "TestMCPModels"
-Cohesion: 0.08
-Nodes (3): MCPError, RawScores, TestMCPModels
+### Community 125 - "Submission"
+Cohesion: 0.14
+Nodes (4): Submission, SubmissionStatus, TestSubmission, TestTypes
 
 ### Community 126 - "test_policy.py"
 Cohesion: 0.24
 Nodes (7): _loaded_policy(), _minimal_policy(), _minimal_policy_file(), _operations_policy(), TestOperationsValidation, TestValidationErrors, _write_policy()
 
 ### Community 127 - "taxa_tree_order"
-Cohesion: 0.10
-Nodes (20): record_type, alternate_identity_column, description_column, embedding_config, extra_columns, id_column, label_column, materialized (+12 more)
+Cohesion: 0.11
+Nodes (19): record_type, alternate_identity_column, description_column, extra_columns, id_column, label_column, materialized, name (+11 more)
 
 ### Community 128 - "Podman Deployment Migration Phase Plan"
 Cohesion: 0.18
@@ -839,6 +841,10 @@ Nodes (19): embedding_config, analyze, dimension, ivfflat_lists, feature_type, a
 Cohesion: 0.12
 Nodes (19): description, required, type, description, required, type, description, required (+11 more)
 
+### Community 132 - "ConfigLike"
+Cohesion: 0.05
+Nodes (16): shutdown(), startup(), main(), _seed(), get_config_dependency(), ConfigFactoryLike, ConfigLike, get_config_provider() (+8 more)
+
 ### Community 133 - "Proposal Document Structure Instructions"
 Cohesion: 0.31
 Nodes (8): Phase Plan Instructions, Proposal Document Structure Instructions, Proposal Writing Guide, Task Plan Instructions, Writing Style Instructions, Proposal and Planning Document Family, SIMS Proposals Directory, Proposal Template
@@ -848,8 +854,8 @@ Cohesion: 0.28
 Nodes (19): embedding_config, embedding_config, analyze, dimension, ivfflat_lists, embedding_config, embedding_config, embedding_config (+11 more)
 
 ### Community 135 - "AGENTS.md - AI Coding Agent Instructions"
-Cohesion: 0.14
-Nodes (18): AGENTS.md - AI Coding Agent Instructions, ConfigValue, Database Connection Singleton, OpenRefine Reconciliation API, RAG Hybrid Strategy, SIMS Identity Module, Output, Review Authority Service Configuration (+10 more)
+Cohesion: 0.15
+Nodes (17): AGENTS.md - AI Coding Agent Instructions, ConfigValue, Database Connection Singleton, OpenRefine Reconciliation API, RAG Hybrid Strategy, SIMS Identity Module, Output, Review Authority Service Configuration (+9 more)
 
 ### Community 136 - "location"
 Cohesion: 0.11
@@ -864,64 +870,56 @@ Cohesion: 0.11
 Nodes (18): cte_definition, default, description, join_clause, name, type, where_clause, location (+10 more)
 
 ### Community 139 - "TestFormatterRegistry"
-Cohesion: 0.18
+Cohesion: 0.16
 Nodes (5): CSVFormatter, FormatterRegistry, JSONFormatter, MarkdownFormatter, TestFormatterRegistry
 
 ### Community 141 - "ConfigValue"
-Cohesion: 0.06
-Nodes (8): ConfigValue, TestConfigProvider, TestConfigurable, __init__(), TestConfigValueEdgeCases, test_config_value_resolves_and_applies_after(), test_config_value_supports_class_key(), test_inject_config_resolves_defaults()
+Cohesion: 0.07
+Nodes (3): TestConfigProvider, TestConfigValueEdgeCases, test_config_value_supports_class_key()
 
 ### Community 142 - "SEAD Authority Service — Rootless Podman Deployment"
 Cohesion: 0.17
 Nodes (12): Build or publish a development image from the checkout, First-time setup, GitHub Actions image publication, Layout, Lifecycle, Pull a published image on the deployment account, Pull or build the image, Requirements (+4 more)
 
-### Community 143 - "Implementation Phases"
-Cohesion: 0.12
-Nodes (12): Phase 2: Embedding Ingestion, Phase 3: Hybrid Search, Phase 4: Optional Reranking, What's Coming Next, Implementation Phases, ✅ Phase 0: Setup (Current), 🔄 Phase 1: Database Prep (In Progress), 📋 Phase 2: Embedding Ingestion (+4 more)
+### Community 143 - ".rerank"
+Cohesion: 0.25
+Nodes (5): Phase 2: Embedding Ingestion, Phase 3: Hybrid Search, Phase 4: Optional Reranking, What's Coming Next, 📋 Phase 4: Optional Reranking
 
 ### Community 144 - "test_metadata.py"
-Cohesion: 0.12
-Nodes (20): _compile_property_settings(), _get_default_types(), _get_properties(), get_reconcile_properties(), get_reconciliation_metadata(), _get_supported_types(), StrategyRegistry, DummyRegistry (+12 more)
+Cohesion: 0.15
+Nodes (16): _get_properties(), get_reconcile_properties(), _get_supported_types(), DummyRegistry, _registered_strategies(), strategies(), test_compile_property_settings_dedup_and_entity_types(), test_declared_supported_type_must_be_registered() (+8 more)
 
 ### Community 145 - "data_type"
 Cohesion: 0.12
 Nodes (16): data_type, alternate_identity_column, description_column, extra_columns, data_type_group, alternate_identity_column, description_column, id_column (+8 more)
 
 ### Community 146 - ".create_connection_mock"
-Cohesion: 0.05
-Nodes (9): SiteRepository, create_connection_cm(), TestDatabaseRepositoryTransactionHandling, TestReconcileIntegration, execute_side_effect(), mock_rollback(), TestReconcileWithDebugger, TestSiteReconciliationStrategyErrorHandling (+1 more)
+Cohesion: 0.10
+Nodes (3): SiteRepository, TestSiteReconciliationStrategyErrorHandling, TestSiteRepository
 
 ### Community 147 - "feature_type"
 Cohesion: 0.12
-Nodes (17): feature, alternate_identity_column, description_column, id_column, label_column, name, table_name, feature_type (+9 more)
+Nodes (16): feature, alternate_identity_column, description_column, id_column, label_column, name, table_name, feature_type (+8 more)
 
 ### Community 148 - "test_capabilities.py"
-Cohesion: 0.16
-Nodes (7): get_config_dep(), EntityCapability, _make_client(), test_capability_endpoint_returns_versioned_list(), test_real_policy_exposes_expected_capabilities(), test_unconfigured_entity_is_absent_from_capabilities(), TestCapabilities
+Cohesion: 0.24
+Nodes (4): EntityCapability, test_real_policy_exposes_expected_capabilities(), test_unconfigured_entity_is_absent_from_capabilities(), TestCapabilities
 
 ### Community 149 - "public.tbl_taxa_tree_genera"
-Cohesion: 0.10
-Nodes (20): public.view_taxa_alphabetically, idx_taxa_tree_families_name, idx_taxa_tree_families_order_id, idx_taxa_tree_genera_family_id, idx_taxa_tree_genera_name, tbl_taxa_synonyms_norm_trgm, tbl_taxa_tree_families_norm_trgm, tbl_taxa_tree_genera_norm_trgm (+12 more)
-
-### Community 150 - "BibliographicReferenceReconciliationStrategy"
-Cohesion: 0.15
-Nodes (4): BibliographicReferenceReconciliationStrategy, _FakeBiblioRepo, TestBibliographicReferenceReconciliationStrategy, TestBibliographicReferenceRepository
+Cohesion: 0.14
+Nodes (14): idx_taxa_tree_families_name, idx_taxa_tree_families_order_id, idx_taxa_tree_genera_family_id, idx_taxa_tree_genera_name, tbl_taxa_tree_families_norm_trgm, tbl_taxa_tree_genera_norm_trgm, tbl_taxa_tree_families_norm_trgm, tbl_taxa_tree_genera_norm_trgm (+6 more)
 
 ### Community 151 - "dimension.yml"
 Cohesion: 0.12
 Nodes (15): alternate_identity_field, display_name, id_field, key, label_field, properties, description, id (+7 more)
-
-### Community 152 - "pathlib"
-Cohesion: 0.10
-Nodes (4): OpenAIProvider, LLMProvider, ProviderRegistry, _import_submodules()
 
 ### Community 153 - "public.tbl_record_types"
 Cohesion: 0.18
 Nodes (11): idx_taxa_tree_orders_order_id, tbl_record_types_norm_trgm, tbl_taxa_tree_orders_norm_trgm, tbl_record_types_norm_trgm, tbl_taxa_tree_orders_norm_trgm, authority.fuzzy_record_type(), authority.record_type, tbl_record_types_norm_trgm (+3 more)
 
 ### Community 155 - "options"
-Cohesion: 0.06
-Nodes (31): geonames, options, description, id, label, context, entity_type_description, lookup_fields_map (+23 more)
+Cohesion: 0.07
+Nodes (30): options, description, id, label, context, entity_type_description, lookup_fields_map, lookup_format (+22 more)
 
 ### Community 156 - "Countries Resource"
 Cohesion: 0.40
@@ -939,25 +937,17 @@ Nodes (14): llm, enable_semantic_matching, enable_translation, openai, provider,
 Cohesion: 0.13
 Nodes (14): data_type_group, alternate_identity_column, description_column, id_column, label_column, name, table_name, dating_uncertainty (+6 more)
 
-### Community 160 - "SuggestPropertyItem"
-Cohesion: 0.24
-Nodes (3): SuggestPropertyItem, TestSuggestPropertyItem, TestSuggestPropertyResponse
-
 ### Community 161 - "sead-authority-service"
 Cohesion: 0.14
 Nodes (13): env_file, extra_hosts, image, platform, ports, restart, user, userns_mode (+5 more)
 
 ### Community 162 - "ContractRegistrationPolicy"
-Cohesion: 0.16
-Nodes (4): ContractCaller, ContractRegistrationPolicy, _to_callers(), TestContractRegistrationPolicy
+Cohesion: 0.15
+Nodes (5): get_contract_registration_policy(), ContractCaller, ContractRegistrationPolicy, _to_callers(), TestContractRegistrationPolicy
 
 ### Community 163 - "public.tbl_data_types"
 Cohesion: 0.19
 Nodes (10): tbl_data_type_groups_norm_trgm, tbl_data_types_norm_trgm, tbl_data_type_groups_norm_trgm, tbl_data_types_norm_trgm, authority.data_type, authority.fuzzy_data_type(), authority.data_type_group, authority.fuzzy_data_type_group() (+2 more)
-
-### Community 164 - "StrategyRegistry"
-Cohesion: 0.05
-Nodes (11): TestStrategyRegistry, __init__(), __init__(), __init__(), __init__(), __init__(), __init__(), __init__() (+3 more)
 
 ### Community 165 - "public.tbl_relative_ages"
 Cohesion: 0.11
@@ -984,8 +974,8 @@ Cohesion: 0.17
 Nodes (12): dimensions, model, mcp, cache_ttl_seconds, embedding, enable_caching, retrieval, version (+4 more)
 
 ### Community 171 - "public.tbl_modification_types"
-Cohesion: 0.24
-Nodes (7): idx_abundance_modifications_abundance_id, idx_abundance_modifications_modification_type_id, tbl_modification_types_norm_trgm, tbl_modification_types_norm_trgm, authority.fuzzy_modification_type(), authority.modification_type, tbl_modification_types_norm_trgm
+Cohesion: 0.38
+Nodes (5): tbl_modification_types_norm_trgm, tbl_modification_types_norm_trgm, authority.fuzzy_modification_type(), authority.modification_type, tbl_modification_types_norm_trgm
 
 ### Community 172 - "mcp"
 Cohesion: 0.17
@@ -1016,8 +1006,8 @@ Cohesion: 0.17
 Nodes (12): llm, enable_semantic_matching, enable_translation, openai, prompts, provider, semantic_batch_size, translation_target_lang (+4 more)
 
 ### Community 181 - "06_indexes.sql"
-Cohesion: 0.05
-Nodes (41): idx_analysis_entity_prep_methods_analysis_entity_id, idx_analysis_entity_prep_methods_method_id, idx_biblio_id, idx_datasets_biblio_id, idx_datasets_data_type_id, idx_datasets_master_set_id, idx_datasets_method_id, idx_datasets_project_id (+33 more)
+Cohesion: 0.04
+Nodes (45): idx_abundance_modifications_abundance_id, idx_abundance_modifications_modification_type_id, idx_analysis_entity_prep_methods_analysis_entity_id, idx_analysis_entity_prep_methods_method_id, idx_biblio_id, idx_ecocode_groups_ecocode_system_id, idx_ecocode_groups_name, idx_ecocode_systems_biblio_id (+37 more)
 
 ### Community 182 - "handlers"
 Cohesion: 0.18
@@ -1044,15 +1034,15 @@ Cohesion: 0.32
 Nodes (17): assert_owned_container(), bootstrap_candidates(), check_setup_inputs(), destroy(), dump_source_database(), ensure_running(), fail(), main() (+9 more)
 
 ### Community 189 - "config_fixtures.py"
-Cohesion: 0.13
-Nodes (9): config_context(), mock_config_context(), mock_connection(), patch_config_provider(), reset_config(), restore_production_config(), setup_test_config(), test_config_dict() (+1 more)
+Cohesion: 0.07
+Nodes (13): reset_config_provider(), config_context(), mock_config_context(), mock_connection(), reset_config(), restore_production_config(), setup_test_config(), test_config_dict() (+5 more)
 
 ### Community 190 - "openai"
 Cohesion: 0.24
 Nodes (10): api_key, model, options, provider_id, anthropic, options, options, max_tokens (+2 more)
 
 ### Community 191 - "test_scope_contracts_service.py"
-Cohesion: 0.26
+Cohesion: 0.27
 Nodes (7): _declaration(), _fake_get_connection(), _make_contract(), _make_service(), _patch_connection(), TestRegisterScopeContracts, TestRequireRegisteredContracts
 
 ### Community 192 - "bibliographic_reference"
@@ -1083,6 +1073,10 @@ Nodes (10): site, alternate_identity_column, description_column, embedding_confi
 Cohesion: 0.20
 Nodes (10): taxa_tree_author, alternate_identity_column, description_column, embedding_config, extra_columns, id_column, label_column, materialized (+2 more)
 
+### Community 199 - "__init__"
+Cohesion: 0.12
+Nodes (7): __init__(), __init__(), __init__(), __init__(), __init__(), __init__(), registered_class_hook()
+
 ### Community 200 - "callers"
 Cohesion: 0.20
 Nodes (10): name, scope_prefixes, token, callers, identity, contract_registration, policy_file, well_known_scopes (+2 more)
@@ -1100,8 +1094,8 @@ Cohesion: 0.20
 Nodes (10): taxa_tree_family, alternate_identity_column, description_column, extra_columns, id_column, joins, label_column, materialized (+2 more)
 
 ### Community 204 - "Verify Reconciliation Candidates and Match Readiness"
-Cohesion: 0.11
-Nodes (19): Acceptance Criteria, Alternatives Considered, Current Behavior, Final Recommendation, Independent OpenRefine fixes, Non-Goals, Open Questions, Planning Handoff (+11 more)
+Cohesion: 0.14
+Nodes (14): Acceptance Criteria, Alternatives Considered, Current Behavior, Final Recommendation, Non-Goals, Open Questions, Planning Handoff, Problem (+6 more)
 
 ### Community 207 - "taxa_tree_master"
 Cohesion: 0.20
@@ -1124,12 +1118,12 @@ Cohesion: 0.20
 Nodes (10): taxonomic_order_system, alternate_identity_column, description_column, embedding_config, extra_columns, id_column, label_column, materialized (+2 more)
 
 ### Community 213 - "EntityPolicy"
-Cohesion: 0.42
-Nodes (3): EntityPolicy, TestEntityPolicyProperties, _provider_owned_policy()
+Cohesion: 0.36
+Nodes (4): EntityPolicy, TestEntityPolicyProperties, _provider_owned_policy(), _shared_metadata_policy()
 
 ### Community 216 - "json"
-Cohesion: 0.19
-Nodes (9): anchors_in_patch(), gh_api_json(), load_draft(), main(), require(), ReviewError, verify_on_github(), fix_imports_in_file() (+1 more)
+Cohesion: 0.35
+Nodes (7): anchors_in_patch(), gh_api_json(), load_draft(), main(), require(), ReviewError, verify_on_github()
 
 ### Community 217 - "taxonomy_note"
 Cohesion: 0.20
@@ -1139,21 +1133,13 @@ Nodes (10): taxonomy_note, alternate_identity_column, description_column, embedd
 Cohesion: 0.20
 Nodes (10): with, enable-cache, password, push-to-registry, python-version, ref, registry, subject-digest (+2 more)
 
-### Community 222 - "recursive_update"
-Cohesion: 0.12
-Nodes (3): recursive_update(), TestIntegration, TestRecursiveUpdate
-
 ### Community 229 - "location.yml"
 Cohesion: 0.14
 Nodes (13): display_name, id_field, key, label_field, properties, description, id, name (+5 more)
 
-### Community 231 - "public.tbl_taxa_tree_authors"
-Cohesion: 0.28
-Nodes (7): public.taxon_view, idx_taxa_tree_authors_name, tbl_taxa_tree_authors_norm_trgm, tbl_taxa_tree_authors_norm_trgm, authority.fuzzy_taxa_tree_author(), authority.taxa_tree_author, tbl_taxa_tree_authors_norm_trgm
-
-### Community 249 - "public.tbl_sample_location_types"
-Cohesion: 0.28
-Nodes (5): tbl_sample_location_types_norm_trgm, tbl_sample_location_types_norm_trgm, authority.fuzzy_sample_location_type(), authority.sample_location_type, tbl_sample_location_types_norm_trgm
+### Community 249 - "StrategyRegistry"
+Cohesion: 0.27
+Nodes (4): _compile_property_settings(), _get_default_types(), get_reconciliation_metadata(), StrategyRegistry
 
 ### Community 250 - "data_type.yml"
 Cohesion: 0.20
@@ -1183,6 +1169,10 @@ Nodes (7): Purpose, Requirements Docs, Scope boundaries, Size expectations, Sour
 Cohesion: 0.29
 Nodes (6): Context to verify, Evaluation, Research, Review the AI coding model strategy, Strategy file, Write the strategy
 
+### Community 257 - "bibliographic_reference"
+Cohesion: 0.22
+Nodes (9): bibliographic_reference, alternate_identity_column, description_column, extra_columns, id_column, label_column, materialized, name (+1 more)
+
 ### Community 258 - "Create a Phase Plan"
 Cohesion: 0.29
 Nodes (7): Create a Phase Plan, Inputs, Limits, Output, Phase Plan Standard, References, Workflow
@@ -1199,9 +1189,9 @@ Nodes (10): taxa_synonym, alternate_identity_column, description_column, extra_c
 Cohesion: 0.29
 Nodes (7): Create a Phase Task Plan, Inputs, Limits, Output, References, Task Plan Standard, Workflow
 
-### Community 262 - "taxonomic_order_system"
-Cohesion: 0.20
-Nodes (10): taxonomic_order_system, alternate_identity_column, description_column, embedding_config, extra_columns, id_column, label_column, materialized (+2 more)
+### Community 262 - "config/entities.yml"
+Cohesion: 0.07
+Nodes (27): Schema Generation from Templates, sample_type, alternate_identity_column, description_column, id_column, label_column, name, table_name (+19 more)
 
 ### Community 263 - "taxa_tree_family"
 Cohesion: 0.20
@@ -1220,8 +1210,8 @@ Cohesion: 0.20
 Nodes (10): taxa_tree_order, alternate_identity_column, description_column, extra_columns, id_column, joins, label_column, materialized (+2 more)
 
 ### Community 268 - "MockConfigProvider"
-Cohesion: 0.04
-Nodes (15): app(), client(), MockStrategies, MockStrategy, TestEndpointIntegration, TestErrorHandling, TestHealthCheck, TestMetaEndpoint (+7 more)
+Cohesion: 0.05
+Nodes (8): MockConfigProvider, MockStrategies, TestEndpointIntegration, TestErrorHandling, TestMetaEndpoint, TestPreviewEndpoint, TestPropertiesEndpoint, TestReconcileEndpoint
 
 ### Community 269 - "Create a Proposal"
 Cohesion: 0.29
@@ -1255,21 +1245,21 @@ Nodes (6): Inputs, Limits, Output, References, Review a Proposal, Workflow
 Cohesion: 0.33
 Nodes (4): Rewrite Rules, Clarify Technical Docs, Output, Use This Skill
 
-### Community 279 - "method_rag.yml"
+### Community 279 - "taxonomy_note"
 Cohesion: 0.22
-Nodes (8): alternate_identity_field, display_name, id_field, key, label_field, properties, property_settings, sql_queries
+Nodes (9): taxonomy_note, alternate_identity_column, description_column, extra_columns, id_column, label_column, materialized, name (+1 more)
 
 ### Community 280 - "build.sh"
 Cohesion: 0.53
 Nodes (5): env_or(), print_usage(), read_env_value(), seen_tags, build.sh script
 
-### Community 282 - "public.tbl_taxonomic_order_systems"
+### Community 281 - "public.tbl_sample_description_types"
 Cohesion: 0.32
-Nodes (6): idx_taxonomic_order_systems_taxonomic_system_id, tbl_taxonomic_order_systems_norm_trgm, tbl_taxonomic_order_systems_norm_trgm, authority.fuzzy_taxonomic_order_system(), authority.taxonomic_order_system, tbl_taxonomic_order_systems_norm_trgm
+Nodes (5): tbl_sample_description_types_norm_trgm, tbl_sample_description_types_norm_trgm, authority.fuzzy_sample_description_type(), authority.sample_description_type, tbl_sample_description_types_norm_trgm
 
-### Community 283 - "config/entities.yml"
-Cohesion: 0.07
-Nodes (29): Schema Generation from Templates, dating_uncertainty, alternate_identity_column, description_column, id_column, label_column, name, table_name (+21 more)
+### Community 283 - "dating_uncertainty"
+Cohesion: 0.29
+Nodes (7): dating_uncertainty, alternate_identity_column, description_column, id_column, label_column, name, table_name
 
 ### Community 284 - "handlers"
 Cohesion: 0.18
@@ -1277,7 +1267,7 @@ Nodes (11): backtrace, compression, diagnose, format, level, retention, rotation
 
 ### Community 286 - "config/config.yml"
 Cohesion: 0.08
-Nodes (24): features, use_mcp_server, table_specs, modification_type, alternate_identity_column, description_column, embedding_config, extra_columns (+16 more)
+Nodes (24): features, use_mcp_server, geonames, table_specs, modification_type, alternate_identity_column, description_column, extra_columns (+16 more)
 
 ### Community 287 - "Clarify Technical Docs"
 Cohesion: 0.50
@@ -1312,12 +1302,12 @@ Cohesion: 0.22
 Nodes (9): Conceptual model alignment, Core identity concepts, Domain Concepts, Entity subtypes, Provider-owned entities, Relationship entities, Relationship types, Shared metadata entities (+1 more)
 
 ### Community 300 - "Config"
-Cohesion: 0.03
-Nodes (15): Config, TestConfigClone, TestConfigResolveReferences, TestConfigSaveErrors, TestConfigUpdate, test_config_get_defaults_and_mandatory(), test_config_resolve_applies_env(), test_config_update_and_exists() (+7 more)
+Cohesion: 0.06
+Nodes (13): Config, TestConfigClone, TestConfigSaveErrors, TestConfigUpdate, test_config_get_defaults_and_mandatory(), test_config_resolve_applies_env(), test_config_save_creates_backup_and_applies_updates(), test_config_update_and_exists() (+5 more)
 
-### Community 301 - "Work Breakdown"
-Cohesion: 0.67
-Nodes (3): Area 1: Confirm target and prepare first deployment, Area 2: Start and verify the first Podman deployment, Work Breakdown
+### Community 301 - "sample_location_type"
+Cohesion: 0.29
+Nodes (7): sample_location_type, alternate_identity_column, description_column, id_column, label_column, name, table_name
 
 ### Community 303 - "SIMS Diagrams"
 Cohesion: 0.18
@@ -1330,6 +1320,10 @@ Nodes (8): display_name, id_field, key, label_field, property_settings, sql_quer
 ### Community 305 - "country.yml"
 Cohesion: 0.22
 Nodes (8): display_name, id_field, key, label_field, property_settings, sql_queries, details_sql, fuzzy_find_sql
+
+### Community 306 - "with_test_config"
+Cohesion: 0.07
+Nodes (14): MissingCandidateExistsQueryError, site_exists(), test_candidate_endpoint_omits_identity_fields_for_nonexistent_rows(), test_candidate_endpoint_rejects_more_than_one_hundred_items_without_database_calls(), test_database_failure_returns_503_without_partial_results(), test_missing_candidate_query_returns_configuration_error(), site_exists(), with_test_config() (+6 more)
 
 ### Community 307 - "policy"
 Cohesion: 0.29
@@ -1375,6 +1369,10 @@ Nodes (9): taxonomic_order_system, alternate_identity_column, description_column
 Cohesion: 0.22
 Nodes (9): taxonomy_note, alternate_identity_column, description_column, extra_columns, id_column, label_column, materialized, name (+1 more)
 
+### Community 318 - "sampling_context"
+Cohesion: 0.29
+Nodes (7): sampling_context, alternate_identity_column, description_column, id_column, label_column, name, table_name
+
 ### Community 319 - "defaults"
 Cohesion: 0.50
 Nodes (4): defaults, accept_uuid, auto_confirm, entity_subtype
@@ -1403,9 +1401,13 @@ Nodes (14): features, use_mcp_server, geonames, options, country_bias, feature_c
 Cohesion: 0.25
 Nodes (8): format, level, retention, rotation, sink, logging, folder, handlers
 
-### Community 326 - ".__init__"
-Cohesion: 0.07
-Nodes (3): DataTypeReconciliationStrategy, MethodReconciliationStrategy, TaxonReconciliationStrategy
+### Community 326 - ".test_is_alive"
+Cohesion: 0.29
+Nodes (3): Repository Findings, is_alive(), TestHealthCheck
+
+### Community 327 - "Implementation Phases"
+Cohesion: 0.29
+Nodes (7): Implementation Phases, ✅ Phase 0: Setup (Current), 🔄 Phase 1: Database Prep (In Progress), 📋 Phase 2: Embedding Ingestion, 📋 Phase 3: Hybrid Retrieval, 📋 Phase 5: LLM Integration, 📋 Phase 6: Rollout
 
 ### Community 328 - "sample_description_type"
 Cohesion: 0.29
@@ -1416,8 +1418,8 @@ Cohesion: 0.29
 Nodes (7): sample_group_description_type, alternate_identity_column, description_column, id_column, label_column, name, table_name
 
 ### Community 330 - "src/utility.py"
-Cohesion: 0.16
-Nodes (3): configure_logging(), TestConfigureLogging, TestImportSubModules
+Cohesion: 0.15
+Nodes (4): configure_logging(), import_sub_modules(), TestConfigureLogging, TestImportSubModules
 
 ### Community 333 - "ollama"
 Cohesion: 0.29
@@ -1679,21 +1681,49 @@ Nodes (4): concurrency, cancel-in-progress, group, name
 Cohesion: 0.40
 Nodes (5): prompts, abbreviation, language_detection, reconciliation, translation
 
+### Community 400 - "test_get_connection_from_pool"
+Cohesion: 0.29
+Nodes (3): test_get_connection_from_pool(), create_connection_cm(), test_get_connection_missing_pool_raises()
+
 ### Community 401 - "src/utility.py"
 Cohesion: 0.11
-Nodes (10): dget(), _ensure_key_property(), import_sub_modules(), load_resource_yaml(), normalize_text(), Registry, decorator(), resolve_specification() (+2 more)
+Nodes (7): dotset(), load_resource_yaml(), normalize_text(), resolve_specification(), TestIntegration, TestNormalizeText, TestResourceYaml
 
 ### Community 403 - "Canonical Use Cases"
 Cohesion: 0.33
 Nodes (6): 1. Reuse a confirmed binding for a known source identity, 2. Match a new source identity to an existing tracked identity, 3. Allocate a new tracked identity for an unmatched source identity, 4. Correct a confirmed binding, 5. Invalidate a tracked identity after a rejected change request, Canonical Use Cases
 
-### Community 404 - "authority.location"
-Cohesion: 0.67
-Nodes (3): tbl_location_types, authority.fuzzy_location(), authority.location
+### Community 404 - "test_config"
+Cohesion: 0.29
+Nodes (3): setup_test_logging(), test_config(), test_provider()
 
 ### Community 406 - "IdentityService"
 Cohesion: 0.60
 Nodes (5): BindingSet, IdentityService, models.py, ResolutionOutcome (DTO), TrackedIdentity
+
+### Community 409 - "Getting Started (5 Minutes)"
+Cohesion: 0.33
+Nodes (6): 1. Enable the Feature Flag, 2. Test the MCP Server, 3. Try It in Python REPL, 4. Integrate into a Strategy, 5. Enable and Test via OpenRefine, Getting Started (5 Minutes)
+
+### Community 411 - "Proposed Design"
+Cohesion: 0.40
+Nodes (5): Independent OpenRefine fixes, Proposed Design, Read-only candidate check, Readiness, SIMS state rule for approved IDs
+
+### Community 412 - "Proposed Design"
+Cohesion: 0.40
+Nodes (5): API change, Backward compatibility, Behavior rules, Identity ownership, Proposed Design
+
+### Community 413 - "Troubleshooting"
+Cohesion: 0.40
+Nodes (5): Connection errors, Feature flag not working, No candidates returned, Troubleshooting, "Unsupported table" error
+
+### Community 416 - "MCP Tools"
+Cohesion: 0.50
+Nodes (4): `get_by_id`, `list_lookup_tables`, MCP Tools, `search_lookup`
+
+### Community 417 - "Usage"
+Cohesion: 0.67
+Nodes (3): Basic Example, In a Reconciliation Strategy, Usage
 
 ## Ambiguous Edges - Review These
 - `method` → `taxa_tree_order`  [AMBIGUOUS]
@@ -1712,21 +1742,21 @@ Nodes (5): BindingSet, IdentityService, models.py, ResolutionOutcome (DTO), Trac
 ## Knowledge Gaps
 - **50 isolated node(s):** `seen_tags`, `authority-service`, `RED`, `GREEN`, `YELLOW` (+45 more)
   These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 3562 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **95 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **104 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `AGENTS.md - AI Coding Agent Instructions` connect `AGENTS.md - AI Coding Agent Instructions` to `BaseRepository`, `Proposal Document Structure Instructions`, `IdentityService`, `router.py`, `src/configuration/__init__.py`, `configuration/provider.py`, `config/entities.yml`?**
-  _High betweenness centrality (0.133) - this node is a cross-community bridge._
+- **Why does `AGENTS.md - AI Coding Agent Instructions` connect `AGENTS.md - AI Coding Agent Instructions` to `ConfigLike`, `Proposal Document Structure Instructions`, `config/entities.yml`, `IdentityService`, `ConfigValue`?**
+  _High betweenness centrality (0.140) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `with_test_config()` (e.g. with `async_wrapper()` and `sync_wrapper()`) actually correct?**
   _`with_test_config()` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `seen_tags`, `authority-service`, `RED` to the rest of the system?**
   _50 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `01_tables.sql` be split into smaller, more focused modules?**
   _Cohesion score 0.014598540145985401 - nodes in this community are weakly interconnected._
-- **Why does `SIMS Identity Module` connect `SIMS Identity Module` to `policy.py`, `service.py`, `IdentityService`, `config/config.yml`?**
-  _High betweenness centrality (0.059) - this node is a cross-community bridge._
+- **Why does `with_test_config()` connect `with_test_config` to `BaseRepository`, `TestClient`, `ExtendedMockConfigProvider`, `MockConfigProvider`, `FastAPI`, `MockConfigProvider`, `ConfigValue`, `.test_whoami_returns_host_and_port`, `FeatureTypeReconciliationStrategy`, `SiteReconciliationStrategy`, `router.py`, `.create_connection_mock`, `LLMModificationTypeReconciliationStrategy`, `test_metadata.py`, `test_mcp.py`, `.fetch_all`, `.get_config`, `render_preview`, `.create_connection_mock`, `TranslationService`, `GeoNamesRepository`, `strategies/test_strategy.py`, `.test_is_alive`, `._make_repo`, `ConfigValue`, `test_suggest.py`, `configuration/provider.py`?**
+  _High betweenness centrality (0.065) - this node is a cross-community bridge._
 
 ### Low-confidence Hints
 _AMBIGUOUS edges — the extractor was unsure. Verify before acting on these._
