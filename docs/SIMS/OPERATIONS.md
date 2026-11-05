@@ -19,33 +19,31 @@ For design context see the system reference docs in `docs/SIMS/` (reflect Phases
 
 Start with a SEAD database that contains the public tables used by the
 reconciliation strategies. From the Authority Service repository, generate
-and apply its `authority` schema:
+and apply both schemas:
 
 ```bash
-schema/create_schema.sh --deploy \
+schema/create_schema.sh --schema both --deploy \
   --database "$DB_NAME" \
   --host "$DB_HOST" \
   --port "$DB_PORT" \
   --user "$DB_USER"
 ```
 
-This generates `schema/__deploy__.sql` and deploys it. The generated SQL drops
-and recreates `authority` with `CASCADE`, creates the required extensions, and
-builds the configured reconciliation views and functions. Use it only when
-that schema replacement is appropriate for the target database. Store
-credentials in `~/.pgpass` or `PGPASSFILE`, not in command arguments.
+The script generates `schema/__deploy__.sql`, deploys the `authority` schema,
+then applies the numbered `sead_identity` SQL files in lexical order. The
+generated authority SQL drops and recreates `authority` with `CASCADE`, creates
+the required extensions, and builds the configured reconciliation views and
+functions. Use it only when that schema replacement is appropriate for the
+target database. Store credentials in `~/.pgpass` or `PGPASSFILE`, not in
+command arguments.
 
-Then apply the numbered `sead_identity` SQL files in lexical order. On a
-fresh database with no `sead_identity` schema, apply every file once. On an
-existing database, do not replay already-applied migrations:
-
-```bash
-for schema_file in schema/sql/identity/[0-9]*.sql; do
-  psql -X -v ON_ERROR_STOP=1 \
-    -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-    -f "$schema_file" || exit 1
-done
-```
+Use `--schema authority` to install only the authority schema or
+`--schema sead_identity` to apply only the identity migrations. The script
+does not track applied identity migrations and runs every numbered migration
+whenever `sead_identity` is selected. Use `both` only when those migrations
+have not already been applied. To refresh `authority` after SIMS has been
+installed, select `--schema authority` so the identity migrations are not
+replayed.
 
 The current sequence ends with `011_resolve_batch_idempotency.sql` and
 `012_scope_entity_contracts.sql`. These migrations rename `sead_internal_id` to

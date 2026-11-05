@@ -283,7 +283,7 @@ setup() {
     if ! (
         cd "$SCRIPT_DIR"
         PGPASSFILE="$passfile" "$AUTHORITY_SCHEMA_DIR/create_schema.sh" \
-            --no-generate --deploy \
+            --schema authority --no-generate --deploy \
             --database sead_staging \
             --host 127.0.0.1 \
             --port "$HOST_PORT" \
