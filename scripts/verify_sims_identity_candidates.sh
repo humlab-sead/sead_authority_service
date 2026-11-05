@@ -33,6 +33,7 @@ SCHEMA_FILES=(
     009_site_id_allocator.sql
     010_aggregate_identity_value.sql
     011_resolve_batch_idempotency.sql
+    012_scope_entity_contracts.sql
 )
 
 fail() {
@@ -282,7 +283,7 @@ setup() {
     if ! (
         cd "$SCRIPT_DIR"
         PGPASSFILE="$passfile" "$AUTHORITY_SCHEMA_DIR/create_schema.sh" \
-            --no-generate --deploy \
+            --schema authority --no-generate --deploy \
             --database sead_staging \
             --host 127.0.0.1 \
             --port "$HOST_PORT" \

@@ -154,6 +154,30 @@ Change Requests are owned by consuming workflows. SIMS does not store or manage 
 
 The current `binding_sets` table carries an optional `change_request_name` field from the SEAD integration. In the target design, any consumer change reference is opaque metadata; SIMS does not integrate with or manage a change-control system.
 
+### Provider-Scope Business-Key Contracts
+
+A provider scope such as `provider://<code>/<schema>` must register the ordered business-key list it uses for each entity type. The contract is the one place that decides which key list is valid for that provider, so two projects that share a provider scope cannot declare different lists.
+
+| Column                     | Purpose                                                                                  |
+|----------------------------|------------------------------------------------------------------------------------------|
+| `contract_uuid` (PK)       | Unique identifier                                                                        |
+| `scope_uuid` (FK)          | The owning Source Scope                                                                  |
+| `entity_type`              | Configured tracked aggregate type, e.g. `site`                                            |
+| `business_keys` (`text[]`) | Ordered key names used to build the business identity value                               |
+| Audit columns              | `created_at`, `created_by`                                                                |
+| **Uniqueness**             | `(scope_uuid, entity_type)`                                                               |
+
+The table is defined in `schema/sql/identity/012_scope_entity_contracts.sql`.
+
+Registration rules:
+
+- Registration creates a missing scope and its contracts in one transaction.
+- An exact ordered match is accepted and reported as `existing`.
+- A different key list or key order is a conflict. The call returns the registered and submitted lists and writes nothing, so a conflicting batch never leaves partial contracts.
+- Registration is authorized per caller. The caller allowlist and each caller's allowed scope prefixes live in SIMS configuration under `identity.contract_registration.callers`, and the caller sends its name and token in the `X-SIMS-Caller` and `X-SIMS-Caller-Token` headers. A caller can only register scopes that start with one of its configured prefixes. An unset token keeps the caller disabled.
+- A `provider://` scope resolve batch is rejected when any requested entity type has no registered contract. Internal scopes such as `sead://admin`, `sead://migration`, and `sead://reconciliation` are not checked.
+- Key-value validation stays with the caller. The contract answers whether an entity type may be resolved in that provider scope, not whether one row's values are valid.
+
 ---
 
 ## Core Operations
@@ -168,10 +192,11 @@ Implements step 1 of the decision flow: **Identity Resolution**.
 
 **Behavior:**
 
-1. Look up the Source Identity within its scope. If it already has a confirmed Binding, return that Tracked Identity.
-2. If the caller supplies an approved existing SIMS identity, bind the Source Identity to it (FR-17).
-3. If the caller requests a new identity, use the configured generic allocation operation. Reject the request when configuration does not permit it (FR-20).
-4. Return the existing or newly allocated Tracked Identity and its SIMS-issued identity values.
+1. For a `provider://` scope, reject the batch when a requested entity type has no registered business-key contract.
+2. Look up the Source Identity within its scope. If it already has a confirmed Binding, return that Tracked Identity.
+3. If the caller supplies an approved existing SIMS identity, bind the Source Identity to it (FR-17).
+4. If the caller requests a new identity, use the configured generic allocation operation. Reject the request when configuration does not permit it (FR-20).
+5. Return the existing or newly allocated Tracked Identity and its SIMS-issued identity values.
 
 **Design decision:** Reconciliation against SEAD or another consumer's domain records is outside SIMS. The consuming workflow supplies its approved match or allocation decision. SIMS stores and resolves source identities against its own Tracked Identities and applies validated SIMS configuration; it does not inspect consumer tables or implement per-entity reconciliation branches.
 

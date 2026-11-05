@@ -144,7 +144,7 @@ def test_declared_supported_type_must_be_registered():
 
 
 @with_test_config
-def test_reconciliation_metadata_adds_supported_types_only(test_provider):
+def test_reconciliation_metadata_adds_supported_types_only(test_provider):  # pylint: disable=unused-argument
     registry = _registered_strategies(taxon=FakeTaxonStrategy)
 
     metadata = get_reconciliation_metadata(registry, "http://testserver/")
@@ -161,7 +161,7 @@ def test_reconciliation_metadata_adds_supported_types_only(test_provider):
 
 
 @with_test_config
-def test_real_strategies_declare_their_own_properties(test_provider):
+def test_real_strategies_declare_their_own_properties(test_provider):  # pylint: disable=unused-argument
     registry = DummyRegistry({"feature_type": FeatureTypeReconciliationStrategy, "location": LocationReconciliationStrategy})
 
     assert get_reconcile_properties(registry, entity_type="feature_type") == []

@@ -8,9 +8,10 @@ Maps directly to the CM concepts and storage structures defined in:
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from src.identity.types import (
     BindingMethod,
@@ -252,3 +253,101 @@ class RejectDiagnostics(BaseModel):
     identity_type: IdentityType
     reason: str
     suggestions: list[str] = Field(default_factory=list, description="Candidate matches for manual review.")
+
+
+# ---------------------------------------------------------------------------
+# Provider-scope business-key contracts
+# ---------------------------------------------------------------------------
+
+
+class EntityKeyContract(BaseModel):
+    """Registered business-key contract for one entity type within a scope.
+
+    ``business_keys`` is the ordered list of key names used to build the
+    business identity value sent to SIMS for that entity type.
+    """
+
+    contract_uuid: UUID
+    scope_uuid: UUID
+    entity_type: str = Field(description="SEAD entity type, e.g. 'site' or 'sample_group'.")
+    business_keys: list[str] = Field(description="Ordered business key names, e.g. ['site_name', 'country'].")
+    created_at: datetime
+    created_by: str | None = None
+
+
+class EntityContractDeclaration(BaseModel):
+    """One entity business-key list submitted for registration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    entity_type: str = Field(description="SEAD entity type, e.g. 'site' or 'sample_group'.")
+    business_keys: list[str] = Field(
+        min_length=1,
+        description="Ordered business key names. Order matters: it defines the identity value layout.",
+    )
+
+    @field_validator("entity_type")
+    @classmethod
+    def _validate_entity_type(cls, value: str) -> str:
+        """Reject a blank entity type and return it without surrounding spaces."""
+        text = value.strip()
+        if not text:
+            raise ValueError("entity_type must not be blank")
+        return text
+
+    @field_validator("business_keys")
+    @classmethod
+    def _validate_business_keys(cls, values: list[str]) -> list[str]:
+        """Trim key names and reject blank or repeated names."""
+        cleaned = [value.strip() for value in values]
+        if any(not value for value in cleaned):
+            raise ValueError("business key names must not be blank")
+        if len(set(cleaned)) != len(cleaned):
+            raise ValueError("business key names must be unique within one entity contract")
+        return cleaned
+
+
+class RegisterScopeContractsRequest(BaseModel):
+    """Request body for provider-scope contract registration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    scope_name: str = Field(description="Provider scope name, e.g. 'provider://gbif/occurrence'.")
+    entities: list[EntityContractDeclaration] = Field(
+        min_length=1,
+        description="One declaration per entity type used by the scope.",
+    )
+    created_by: str | None = Field(default=None, description="Agent or user identifier for the audit trail.")
+
+    @field_validator("scope_name")
+    @classmethod
+    def _validate_scope_name(cls, value: str) -> str:
+        """Reject a blank scope name and return it without surrounding spaces."""
+        text = value.strip()
+        if not text:
+            raise ValueError("scope_name must not be blank")
+        return text
+
+
+class EntityContractState(BaseModel):
+    """Registration result for one entity contract."""
+
+    entity_type: str
+    business_keys: list[str]
+    state: Literal["created", "existing"] = Field(description="'created' for a new contract, 'existing' for an exact match.")
+
+
+class ScopeContractRegistration(BaseModel):
+    """Result of registering the contracts of one provider scope."""
+
+    scope_name: str
+    scope_uuid: UUID
+    entities: list[EntityContractState]
+
+
+class EntityContractConflict(BaseModel):
+    """One entity type whose submitted keys differ from the registered keys."""
+
+    entity_type: str
+    registered: list[str] = Field(description="Already registered ordered key list.")
+    submitted: list[str] = Field(description="Ordered key list submitted by the caller.")
