@@ -19,37 +19,42 @@ For design context see the system reference docs in `docs/SIMS/` (reflect Phases
 
 Start with a SEAD database that contains the public tables used by the
 reconciliation strategies. From the Authority Service repository, generate
-and apply its `authority` schema:
+and apply both schemas:
 
 ```bash
-schema/create_schema.sh --deploy \
+schema/create_schema.sh --schema both --deploy \
   --database "$DB_NAME" \
   --host "$DB_HOST" \
   --port "$DB_PORT" \
   --user "$DB_USER"
 ```
 
-This generates `schema/__deploy__.sql` and deploys it. The generated SQL drops
-and recreates `authority` with `CASCADE`, creates the required extensions, and
-builds the configured reconciliation views and functions. Use it only when
-that schema replacement is appropriate for the target database. Store
-credentials in `~/.pgpass` or `PGPASSFILE`, not in command arguments.
+The script generates `schema/__deploy__.sql`, deploys the `authority` schema,
+then applies the numbered `sead_identity` SQL files in lexical order. The
+generated authority SQL drops and recreates `authority` with `CASCADE`, creates
+the required extensions, and builds the configured reconciliation views and
+functions. Use it only when that schema replacement is appropriate for the
+target database. Store credentials in `~/.pgpass` or `PGPASSFILE`, not in
+command arguments.
 
-Then apply the numbered `sead_identity` SQL files in lexical order. On a
-fresh database with no `sead_identity` schema, apply every file once. On an
-existing database, do not replay already-applied migrations:
+Use `--schema authority` to install only the authority schema or
+`--schema sead_identity` to apply only the identity migrations. The script
+does not track applied identity migrations and runs every numbered migration
+whenever `sead_identity` is selected. Use `both` only when those migrations
+have not already been applied. To refresh `authority` after SIMS has been
+installed, select `--schema authority` so the identity migrations are not
+replayed.
 
-```bash
-for schema_file in schema/sql/identity/[0-9]*.sql; do
-  psql -X -v ON_ERROR_STOP=1 \
-    -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-    -f "$schema_file" || exit 1
-done
-```
+The current sequence ends with `011_resolve_batch_idempotency.sql` and
+`012_scope_entity_contracts.sql`. These migrations rename `sead_internal_id` to
+`aggregate_id`, add the `resolve_batches` table, and add the
+`scope_entity_contracts` table.
 
-The current sequence ends with `010_aggregate_identity_value.sql` and
-`011_resolve_batch_idempotency.sql`. These migrations rename
-`sead_internal_id` to `aggregate_id` and add the `resolve_batches` table.
+`012_scope_entity_contracts.sql` must be applied before the Shape Shifter client
+starts registering provider-scope contracts. Provider scopes have no contract
+rows before that change, so no backfill is needed. Existing internal scopes
+(`sead://admin`, `sead://migration`, `sead://reconciliation`) stay valid without
+contracts.
 
 ### Verify After Deployment
 
@@ -71,6 +76,9 @@ WHERE table_schema = 'sead_identity'
   AND table_name = 'tracked_identities';
 SELECT to_regclass('sead_identity.resolve_batches');
 
+-- Provider-scope contract table exists
+SELECT to_regclass('sead_identity.scope_entity_contracts');
+
 -- Well-known scopes seeded
 SELECT scope_name FROM sead_identity.source_scopes ORDER BY scope_name;
 -- Expected: sead://admin, sead://migration, sead://reconciliation
@@ -87,6 +95,7 @@ Set these in `.env` (root) or via environment before starting the service:
 | `SEAD_AUTHORITY_OPTIONS_DATABASE_USER`   | `database_user`             | DB user          |
 | `SEAD_AUTHORITY_OPTIONS_DATABASE_PORT`   | `nnnn`                      | DB port          |
 | `CONFIG_FILE`                            | `./config/config.yml`       | Config file path |
+| `SIMS_CONTRACT_REGISTRATION_TOKEN`       | (secret)                    | Token that a caller sends in `X-SIMS-Caller-Token` when it registers provider-scope contracts. The matching caller entry lives under `identity.contract_registration.callers` in `config/config.yml`. An unset token keeps the caller disabled and registration closed. |
 
 The identity module uses the shared connection pool set up by `setup_config_store()` at startup — no separate identity-specific connection configuration is needed.
 
@@ -94,6 +103,7 @@ The identity module uses the shared connection pool set up by `setup_config_stor
 
 ```bash
 SIMS_INTEGRATION_DB=1 uv run pytest -o addopts='' -q tests/identity/test_service_integration.py
+SIMS_INTEGRATION_DB=1 uv run pytest -o addopts='' -q tests/identity/test_scope_contracts_integration.py
 ```
 
 Run these tests only against the helper-owned disposable database. See

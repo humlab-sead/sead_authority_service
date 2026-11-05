@@ -197,6 +197,10 @@ class TestSourceScopeRepository:
             result = await repo.create("test://scope", description="Test", created_by="test_agent")
         assert isinstance(result, SourceScope)
         assert result.description == "Test"
+        sql, params = cursor.execute.call_args.args
+        assert "ON CONFLICT (scope_name) DO UPDATE" in str(sql)
+        assert "SET scope_name = EXCLUDED.scope_name" in str(sql)
+        assert params[1:] == ("test://scope", None, "Test", "test_agent")
 
 
 # ---------------------------------------------------------------------------

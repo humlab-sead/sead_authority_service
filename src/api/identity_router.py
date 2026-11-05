@@ -9,23 +9,34 @@ Endpoints:
   POST   /identity/binding-sets/{binding_set_uuid}/change-request  Associate a CR name
   POST   /identity/detect-change                                   Content-hash change detection
   GET    /identity/scopes                                          List known source scopes
+  POST   /identity/scope-contracts                                 Register provider-scope business-key contracts
+  GET    /identity/scope-contracts                                 List provider-scope business-key contracts
 """
 
 from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from src.configuration import get_config_provider, setup_config_store
 from src.configuration.interface import ConfigLike
+from src.identity.contracts import (
+    ContractAuthorizationError,
+    ContractRegistrationPolicy,
+    IdentityContractConflict,
+    IdentityContractRequired,
+)
 from src.identity.models import (
     BindingSetResponse,
     ChangeDetectionRequest,
     ChangeDetectionResult,
+    EntityKeyContract,
+    RegisterScopeContractsRequest,
     ResolutionOutcome,
     ResolutionRequest,
+    ScopeContractRegistration,
     SourceScope,
 )
 from src.identity.policy import CAPABILITY_VERSION, IdentityPolicy
@@ -58,6 +69,11 @@ def get_identity_service() -> IdentityService:
 def get_identity_policy() -> IdentityPolicy:
     """FastAPI dependency — returns a fresh policy snapshot for capability checks."""
     return IdentityPolicy()
+
+
+def get_contract_registration_policy() -> ContractRegistrationPolicy:
+    """FastAPI dependency — returns the configured contract registration allowlist."""
+    return ContractRegistrationPolicy.from_config()
 
 
 # ---------------------------------------------------------------------------
@@ -204,6 +220,8 @@ async def resolve(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except IdentityBindingConflict as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except IdentityContractRequired as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     return ResolveResponse(
         submission_uuid=result.submission_uuid,
@@ -320,3 +338,72 @@ async def list_scopes(
 ) -> list[SourceScope]:
     """Return all registered Source Scopes."""
     return await service.list_scopes()
+
+
+@identity_router.post(
+    "/scope-contracts",
+    response_model=ScopeContractRegistration,
+    status_code=status.HTTP_200_OK,
+    summary="Register provider-scope business-key contracts",
+    responses={
+        status.HTTP_403_FORBIDDEN: {"description": "Caller is not authorized for this provider scope"},
+        status.HTTP_409_CONFLICT: {"description": "A submitted key list differs from the registered key list"},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "The scope is not a provider scope or a declaration is invalid"},
+    },
+)
+async def register_scope_contracts(
+    body: RegisterScopeContractsRequest,
+    x_sims_caller: str | None = Header(default=None, alias="X-SIMS-Caller"),
+    x_sims_caller_token: str | None = Header(default=None, alias="X-SIMS-Caller-Token"),
+    _config: ConfigLike = Depends(get_config_dep),
+    service: IdentityService = Depends(get_identity_service),
+    registration_policy: ContractRegistrationPolicy = Depends(get_contract_registration_policy),
+) -> ScopeContractRegistration:
+    """Register the ordered business-key list of each entity type in one provider scope.
+
+    The caller must be listed in ``identity.contract_registration.callers`` and
+    must send the matching token in ``X-SIMS-Caller-Token``. A caller can only
+    register scopes that start with one of its configured ``scope_prefixes``.
+
+    The operation is idempotent: an exact ordered match returns ``state``
+    ``existing``. A different key list or key order returns HTTP 409 with the
+    registered and submitted lists, and writes nothing.
+    """
+    try:
+        caller_name: str = registration_policy.authorize(x_sims_caller, x_sims_caller_token, body.scope_name)
+    except ContractAuthorizationError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+    try:
+        return await service.register_scope_contracts(
+            scope_name=body.scope_name,
+            entities=body.entities,
+            created_by=body.created_by or caller_name,
+        )
+    except IdentityContractConflict as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": str(exc),
+                "conflicts": [conflict.model_dump(mode="json") for conflict in exc.conflicts],
+            },
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+
+@identity_router.get(
+    "/scope-contracts",
+    response_model=list[EntityKeyContract],
+    summary="List provider-scope business-key contracts",
+)
+async def list_scope_contracts(
+    scope_name: str = Query(description="Provider scope name, e.g. 'provider://gbif/occurrence'."),
+    _config: ConfigLike = Depends(get_config_dep),
+    service: IdentityService = Depends(get_identity_service),
+) -> list[EntityKeyContract]:
+    """Return the registered contracts for one scope name.
+
+    An unknown scope returns an empty list.
+    """
+    return await service.list_scope_contracts(scope_name)

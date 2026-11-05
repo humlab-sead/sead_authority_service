@@ -89,9 +89,9 @@ scripts/verify_sims_identity_candidates.sh credentials
 (`~/.pgpass` or `PGPASSFILE`). It excludes existing `authority` and
 `sead_identity` schemas. Setup restores the remaining SEAD database in a
 loopback-only Podman container, installs `authority` using
-`schema/create_schema.sh --no-generate --deploy`, then applies the numbered
-SQL files through `011_resolve_batch_idempotency.sql` in
-`schema/sql/identity/`. Because PostgreSQL roles are not included in the
+`schema/create_schema.sh --schema authority --no-generate --deploy`, then
+applies all numbered SQL files in `schema/sql/identity/`. Because PostgreSQL
+roles are not included in the
 database archive, setup creates `humlab_admin` as a local `NOLOGIN` role for
 Authority schema object ownership. It also installs the `unaccent` and
 `pg_trgm` extensions required by the Authority schema when they are absent.

@@ -8,6 +8,10 @@ Orchestrates the four operations from DESIGN.md § Core Operations:
   4. associate_change_request — link confirmed set to a Sqitch CR name
   5. detect_change     — opaque content-hash comparison (FR-24)
 
+Provider-scope business-key contracts (``register_scope_contracts``,
+``require_registered_contracts``) are checked before identity work runs for a
+``provider://`` scope.
+
 All repository and policy dependencies are injected via the constructor,
 making the service fully unit-testable without a live database.
 
@@ -31,22 +35,34 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Sequence
 from uuid import UUID
 
 from loguru import logger
 
 from src.configuration import get_connection
+from src.identity.contracts import (
+    IdentityContractConflict,
+    IdentityContractRequired,
+    is_provider_scope,
+    require_provider_scope,
+)
 from src.identity.models import (
     Binding,
     BindingSet,
     BindingSetResponse,
     ChangeDetectionRequest,
     ChangeDetectionResult,
+    EntityContractConflict,
+    EntityContractDeclaration,
+    EntityContractState,
+    EntityKeyContract,
     IdentitySignal,
     ResolutionOutcome,
     ResolutionRequest,
     ResolveBatchRecord,
     ResolveBatchResult,
+    ScopeContractRegistration,
     SourceIdentity,
     SourceScope,
     Submission,
@@ -58,6 +74,7 @@ from src.identity.repository import (
     BindingSetRepository,
     RepositoryError,
     ResolveBatchRepository,
+    ScopeEntityContractRepository,
     SourceIdentityRepository,
     SourceScopeRepository,
     SubmissionRepository,
@@ -92,6 +109,8 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
     scope_repo, submission_repo, source_identity_repo,
     tracked_identity_repo, binding_set_repo, binding_repo:
         Repository instances. Default to their own constructors.
+    contract_repo:
+        Repository for provider-scope business-key contracts.
     policy:
         Identity policy engine. Defaults to ``IdentityPolicy()`` which
         reads ``config/identity_policy.yml``.
@@ -106,6 +125,7 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
         binding_set_repo: BindingSetRepository | None = None,
         binding_repo: BindingRepository | None = None,
         resolve_batch_repo: ResolveBatchRepository | None = None,
+        contract_repo: ScopeEntityContractRepository | None = None,
         policy: IdentityPolicy | None = None,
     ) -> None:
         self.scope_repo: SourceScopeRepository = scope_repo or SourceScopeRepository()
@@ -115,6 +135,7 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
         self.binding_set_repo: BindingSetRepository = binding_set_repo or BindingSetRepository()
         self.binding_repo: BindingRepository = binding_repo or BindingRepository()
         self.resolve_batch_repo: ResolveBatchRepository = resolve_batch_repo or ResolveBatchRepository()
+        self.contract_repo: ScopeEntityContractRepository = contract_repo or ScopeEntityContractRepository()
         self.policy: IdentityPolicy = policy or IdentityPolicy()
 
     # ------------------------------------------------------------------
@@ -132,8 +153,110 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
         if existing:
             return existing
         created: SourceScope = await self.scope_repo.create(scope_name, description=description, created_by=created_by)
-        logger.info(f"Created scope '{scope_name}' ({created.scope_uuid})")
+        logger.info(f"Using scope '{scope_name}' ({created.scope_uuid})")
         return created
+
+    # ------------------------------------------------------------------
+    # Provider-scope business-key contracts
+    # ------------------------------------------------------------------
+
+    async def register_scope_contracts(
+        self,
+        scope_name: str,
+        entities: Sequence[EntityContractDeclaration],
+        created_by: str | None = None,
+    ) -> ScopeContractRegistration:
+        """Register the ordered business-key lists of one provider scope.
+
+        Missing scope and contract rows are created in one transaction. An
+        identical ordered key list is accepted and reported as ``existing``. A
+        different ordered list raises ``IdentityContractConflict`` before any
+        row is written, so a conflicting call never leaves partial contracts.
+
+        Raises
+        ------
+        ValueError:
+            The scope is not a provider scope, or one entity type appears twice
+            in the request.
+        IdentityContractConflict:
+            A submitted key list differs from the registered key list.
+        """
+        normalized_scope_name: str = require_provider_scope(scope_name)
+        declarations: list[EntityContractDeclaration] = _unique_declarations(entities)
+
+        async with get_connection():
+            scope: SourceScope = await self.get_or_create_scope(normalized_scope_name, created_by=created_by)
+            await self.contract_repo.lock_scope(scope.scope_uuid)
+
+            registered: dict[str, list[str]] = {
+                contract.entity_type: list(contract.business_keys) for contract in await self.contract_repo.list_by_scope(scope.scope_uuid)
+            }
+
+            conflicts: list[EntityContractConflict] = [
+                EntityContractConflict(
+                    entity_type=declaration.entity_type,
+                    registered=registered[declaration.entity_type],
+                    submitted=list(declaration.business_keys),
+                )
+                for declaration in declarations
+                if declaration.entity_type in registered and registered[declaration.entity_type] != list(declaration.business_keys)
+            ]
+            if conflicts:
+                raise IdentityContractConflict(normalized_scope_name, conflicts)
+
+            states: list[EntityContractState] = []
+            for declaration in declarations:
+                if declaration.entity_type in registered:
+                    states.append(
+                        EntityContractState(
+                            entity_type=declaration.entity_type,
+                            business_keys=registered[declaration.entity_type],
+                            state="existing",
+                        )
+                    )
+                    continue
+                created: EntityKeyContract = await self.contract_repo.create(
+                    scope_uuid=scope.scope_uuid,
+                    entity_type=declaration.entity_type,
+                    business_keys=list(declaration.business_keys),
+                    created_by=created_by,
+                )
+                states.append(
+                    EntityContractState(
+                        entity_type=created.entity_type,
+                        business_keys=list(created.business_keys),
+                        state="created",
+                    )
+                )
+
+        created_count: int = sum(1 for state in states if state.state == "created")
+        logger.info(
+            f"Registered contracts for scope '{normalized_scope_name}': "
+            f"{created_count} created, {len(states) - created_count} unchanged"
+        )
+        return ScopeContractRegistration(
+            scope_name=normalized_scope_name,
+            scope_uuid=scope.scope_uuid,
+            entities=states,
+        )
+
+    async def list_scope_contracts(self, scope_name: str) -> list[EntityKeyContract]:
+        """Return the registered contracts for one scope name."""
+        return await self.contract_repo.list_by_scope_name(scope_name.strip())
+
+    async def require_registered_contracts(self, scope_name: str, entity_types: Sequence[str]) -> None:
+        """Require a registered contract for each entity type in a provider scope.
+
+        Internal scopes are not checked. For a provider scope, every requested
+        entity type must have a registered contract, so a caller cannot send
+        identity work before registering one.
+        """
+        if not is_provider_scope(scope_name):
+            return
+        registered_types = {contract.entity_type for contract in await self.contract_repo.list_by_scope_name(scope_name.strip())}
+        missing: list[str] = [entity_type for entity_type in dict.fromkeys(entity_types) if entity_type not in registered_types]
+        if missing:
+            raise IdentityContractRequired(scope_name.strip(), missing)
 
     # ------------------------------------------------------------------
     # Operation 1 — Resolve Identity
@@ -420,8 +543,8 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
     ) -> ResolveBatchResult:
         """Resolve and bind one batch atomically, replaying an identical run.
 
-        The scoped run key is ``(scope_name, run_id)``. Within one database
-        transaction this method:
+        The scoped run key is ``(normalized_scope_name, run_id)``. Within one
+        database transaction this method:
         1. Serializes on the run key with an advisory lock.
         2. Replays the stored result when the key and fingerprint match.
         3. Rejects a reused key whose payload fingerprint differs.
@@ -431,21 +554,25 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
 
         A failure at any step rolls back every write, including the replay record.
         """
+        normalized_scope_name = scope_name.strip()
         fingerprint = _request_fingerprint(submission_name, requests)
 
         async with get_connection():
-            await self.resolve_batch_repo.acquire_run_lock(scope_name, run_id)
-            existing: ResolveBatchRecord | None = await self.resolve_batch_repo.find(scope_name, run_id)
+            await self.resolve_batch_repo.acquire_run_lock(normalized_scope_name, run_id)
+            await self.require_registered_contracts(normalized_scope_name, [request.entity_type for request in requests])
+            existing: ResolveBatchRecord | None = await self.resolve_batch_repo.find(normalized_scope_name, run_id)
             if existing is not None:
                 if existing.request_fingerprint != fingerprint:
-                    raise IdentityBatchConflict(f"Run '{run_id}' for scope '{scope_name}' was already resolved with a different payload")
+                    raise IdentityBatchConflict(
+                        f"Run '{run_id}' for scope '{normalized_scope_name}' was already resolved with a different payload"
+                    )
                 for request in requests:
                     if request.approved_aggregate_id is not None:
                         await self._lock_materialized_approved_identity(request.entity_type, request.approved_aggregate_id)
                 logger.info(f"resolve_batch: replaying stored result for run '{run_id}'")
                 return existing.result
 
-            scope = await self.get_or_create_scope(scope_name, created_by=created_by)
+            scope = await self.get_or_create_scope(normalized_scope_name, created_by=created_by)
             submission = await self.create_submission(scope.scope_uuid, submission_name, created_by=created_by)
 
             outcomes: list[ResolutionOutcome] = []
@@ -471,7 +598,7 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
                 binding_set=binding_set,
                 outcomes=outcomes,
             )
-            await self.resolve_batch_repo.create(scope_name, run_id, fingerprint, result)
+            await self.resolve_batch_repo.create(normalized_scope_name, run_id, fingerprint, result)
             return result
 
     # ------------------------------------------------------------------
@@ -611,6 +738,18 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+def _unique_declarations(entities: Sequence[EntityContractDeclaration]) -> list[EntityContractDeclaration]:
+    """Return the declarations in request order, rejecting repeated entity types."""
+    seen: set[str] = set()
+    ordered: list[EntityContractDeclaration] = []
+    for declaration in entities:
+        if declaration.entity_type in seen:
+            raise ValueError(f"Entity type '{declaration.entity_type}' appears more than once in the contract request")
+        seen.add(declaration.entity_type)
+        ordered.append(declaration)
+    return ordered
 
 
 def _request_fingerprint(submission_name: str, requests: list[ResolutionRequest]) -> str:

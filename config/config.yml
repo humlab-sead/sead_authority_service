@@ -54,6 +54,15 @@ identity:
       description: "Default scope for OpenRefine reconciliation submissions"
     - name: "sead://internal"
       description: "Internal SEAD system identity scope"
+  contract_registration:
+    # SIMS-side allowlist for provider-scope business-key contracts.
+    # A caller may register only scopes that start with one of its prefixes.
+    # An empty token disables the caller, so an unset secret keeps registration closed.
+    callers:
+      - name: "shape-shifter"
+        token: "${SIMS_CONTRACT_REGISTRATION_TOKEN}"
+        scope_prefixes:
+          - "provider://"
 
 mcp:
   version: "0.1.0"
