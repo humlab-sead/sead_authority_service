@@ -160,6 +160,8 @@ class SourceScopeRepository(BaseRepository[SourceScope]):
             INSERT INTO sead_identity.source_scopes
                 (scope_uuid, scope_name, parent_scope_uuid, description, created_by)
             VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (scope_name) DO UPDATE
+            SET scope_name = EXCLUDED.scope_name
             RETURNING *
             """,
             (_uuid(), scope_name, parent_scope_uuid, description, created_by),

@@ -143,7 +143,7 @@ class ContractRegistrationPolicy:
             raise ContractAuthorizationError(f"Caller '{name or '<missing>'}' is not authorized to register contracts")
         if not caller.token:
             raise ContractAuthorizationError(f"Caller '{caller.name}' has no registration token configured")
-        if not token or not hmac.compare_digest(caller.token, token):
+        if not token or not hmac.compare_digest(caller.token.encode("utf-8"), token.encode("utf-8")):
             raise ContractAuthorizationError(f"Caller '{caller.name}' supplied an invalid registration token")
         if not caller.allows(scope_name):
             raise ContractAuthorizationError(f"Caller '{caller.name}' is not authorized for scope '{scope_name}'")

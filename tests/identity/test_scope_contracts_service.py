@@ -15,14 +15,16 @@ import pytest
 
 from src.identity.contracts import IdentityContractConflict, IdentityContractRequired
 from src.identity.models import (
+    BindingSetResponse,
     EntityContractDeclaration,
     EntityKeyContract,
     IdentitySignal,
+    ResolutionOutcome,
     ResolutionRequest,
     SourceScope,
 )
 from src.identity.service import IdentityService
-from src.identity.types import IdentityType
+from src.identity.types import BindingSetState, IdentityType
 
 NOW = datetime(2026, 11, 5, 12, 0, 0, tzinfo=timezone.utc)
 
@@ -252,3 +254,32 @@ class TestResolveBatchContractEnforcement:
         service.submission_repo.create.assert_not_awaited()
         service.source_identity_repo.create_or_get.assert_not_awaited()
         service.binding_set_repo.create.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_padded_provider_scope_is_normalized_before_lookup_and_write(self) -> None:
+        service = _make_service([_make_contract("site", ["site_name"])])
+        service.resolve_batch_repo.find.return_value = None
+        service.get_or_create_scope = AsyncMock(return_value=SourceScope(scope_uuid=SCOPE_UUID, scope_name=PROVIDER_SCOPE, created_at=NOW))
+        service.create_submission = AsyncMock(return_value=MagicMock(submission_uuid=SCOPE_UUID))
+        service.resolve_identity = AsyncMock(
+            return_value=ResolutionOutcome(source_identity_uuid=uuid4(), entity_type="site", outcome="matched")
+        )
+        service.bind = AsyncMock(
+            return_value=BindingSetResponse(
+                binding_set_uuid=uuid4(),
+                submission_uuid=SCOPE_UUID,
+                lifecycle_state=BindingSetState.CONFIRMED,
+                change_request_name=None,
+                binding_count=1,
+                created_at=NOW,
+            )
+        )
+
+        with _patch_connection():
+            await service.resolve_batch(f" {PROVIDER_SCOPE} ", "batch", "run-1", [self._request()])
+
+        service.resolve_batch_repo.acquire_run_lock.assert_awaited_once_with(PROVIDER_SCOPE, "run-1")
+        service.contract_repo.list_by_scope_name.assert_awaited_once_with(PROVIDER_SCOPE)
+        service.resolve_batch_repo.find.assert_awaited_once_with(PROVIDER_SCOPE, "run-1")
+        service.get_or_create_scope.assert_awaited_once_with(PROVIDER_SCOPE, created_by=None)
+        assert service.resolve_batch_repo.create.await_args.args[0] == PROVIDER_SCOPE

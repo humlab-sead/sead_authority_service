@@ -108,6 +108,12 @@ class TestContractRegistrationPolicy:
         with pytest.raises(ContractAuthorizationError, match="invalid registration token"):
             policy.authorize("shape-shifter", "wrong", "provider://gbif/occurrence")
 
+    def test_non_ascii_token_is_rejected_without_type_error(self) -> None:
+        policy = ContractRegistrationPolicy(callers=(CALLER,))
+
+        with pytest.raises(ContractAuthorizationError, match="invalid registration token"):
+            policy.authorize("shape-shifter", "invalid-é", "provider://gbif/occurrence")
+
     def test_missing_token_header_is_rejected(self) -> None:
         policy = ContractRegistrationPolicy(callers=(CALLER,))
 

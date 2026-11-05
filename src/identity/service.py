@@ -153,7 +153,7 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
         if existing:
             return existing
         created: SourceScope = await self.scope_repo.create(scope_name, description=description, created_by=created_by)
-        logger.info(f"Created scope '{scope_name}' ({created.scope_uuid})")
+        logger.info(f"Using scope '{scope_name}' ({created.scope_uuid})")
         return created
 
     # ------------------------------------------------------------------
@@ -543,8 +543,8 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
     ) -> ResolveBatchResult:
         """Resolve and bind one batch atomically, replaying an identical run.
 
-        The scoped run key is ``(scope_name, run_id)``. Within one database
-        transaction this method:
+        The scoped run key is ``(normalized_scope_name, run_id)``. Within one
+        database transaction this method:
         1. Serializes on the run key with an advisory lock.
         2. Replays the stored result when the key and fingerprint match.
         3. Rejects a reused key whose payload fingerprint differs.
@@ -554,22 +554,25 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
 
         A failure at any step rolls back every write, including the replay record.
         """
+        normalized_scope_name = scope_name.strip()
         fingerprint = _request_fingerprint(submission_name, requests)
 
         async with get_connection():
-            await self.resolve_batch_repo.acquire_run_lock(scope_name, run_id)
-            await self.require_registered_contracts(scope_name, [request.entity_type for request in requests])
-            existing: ResolveBatchRecord | None = await self.resolve_batch_repo.find(scope_name, run_id)
+            await self.resolve_batch_repo.acquire_run_lock(normalized_scope_name, run_id)
+            await self.require_registered_contracts(normalized_scope_name, [request.entity_type for request in requests])
+            existing: ResolveBatchRecord | None = await self.resolve_batch_repo.find(normalized_scope_name, run_id)
             if existing is not None:
                 if existing.request_fingerprint != fingerprint:
-                    raise IdentityBatchConflict(f"Run '{run_id}' for scope '{scope_name}' was already resolved with a different payload")
+                    raise IdentityBatchConflict(
+                        f"Run '{run_id}' for scope '{normalized_scope_name}' was already resolved with a different payload"
+                    )
                 for request in requests:
                     if request.approved_aggregate_id is not None:
                         await self._lock_materialized_approved_identity(request.entity_type, request.approved_aggregate_id)
                 logger.info(f"resolve_batch: replaying stored result for run '{run_id}'")
                 return existing.result
 
-            scope = await self.get_or_create_scope(scope_name, created_by=created_by)
+            scope = await self.get_or_create_scope(normalized_scope_name, created_by=created_by)
             submission = await self.create_submission(scope.scope_uuid, submission_name, created_by=created_by)
 
             outcomes: list[ResolutionOutcome] = []
@@ -595,7 +598,7 @@ class IdentityService:  # pylint: disable=too-many-instance-attributes
                 binding_set=binding_set,
                 outcomes=outcomes,
             )
-            await self.resolve_batch_repo.create(scope_name, run_id, fingerprint, result)
+            await self.resolve_batch_repo.create(normalized_scope_name, run_id, fingerprint, result)
             return result
 
     # ------------------------------------------------------------------
