@@ -52,6 +52,14 @@ identity:
       description: "Default scope for OpenRefine reconciliation submissions"
     - name: "sead://internal"
       description: "Internal SEAD system identity scope"
+  contract_registration:
+    # Test allowlist: the token is read from the environment, so unit tests
+    # inject ContractRegistrationPolicy directly instead of relying on this.
+    callers:
+      - name: "shape-shifter"
+        token: "${SIMS_CONTRACT_REGISTRATION_TOKEN}"
+        scope_prefixes:
+          - "provider://"
 
 mcp:
   version: "0.1.0"

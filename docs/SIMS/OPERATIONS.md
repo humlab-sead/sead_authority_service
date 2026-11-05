@@ -47,9 +47,16 @@ for schema_file in schema/sql/identity/[0-9]*.sql; do
 done
 ```
 
-The current sequence ends with `010_aggregate_identity_value.sql` and
-`011_resolve_batch_idempotency.sql`. These migrations rename
-`sead_internal_id` to `aggregate_id` and add the `resolve_batches` table.
+The current sequence ends with `011_resolve_batch_idempotency.sql` and
+`012_scope_entity_contracts.sql`. These migrations rename `sead_internal_id` to
+`aggregate_id`, add the `resolve_batches` table, and add the
+`scope_entity_contracts` table.
+
+`012_scope_entity_contracts.sql` must be applied before the Shape Shifter client
+starts registering provider-scope contracts. Provider scopes have no contract
+rows before that change, so no backfill is needed. Existing internal scopes
+(`sead://admin`, `sead://migration`, `sead://reconciliation`) stay valid without
+contracts.
 
 ### Verify After Deployment
 
@@ -71,6 +78,9 @@ WHERE table_schema = 'sead_identity'
   AND table_name = 'tracked_identities';
 SELECT to_regclass('sead_identity.resolve_batches');
 
+-- Provider-scope contract table exists
+SELECT to_regclass('sead_identity.scope_entity_contracts');
+
 -- Well-known scopes seeded
 SELECT scope_name FROM sead_identity.source_scopes ORDER BY scope_name;
 -- Expected: sead://admin, sead://migration, sead://reconciliation
@@ -87,6 +97,7 @@ Set these in `.env` (root) or via environment before starting the service:
 | `SEAD_AUTHORITY_OPTIONS_DATABASE_USER`   | `database_user`             | DB user          |
 | `SEAD_AUTHORITY_OPTIONS_DATABASE_PORT`   | `nnnn`                      | DB port          |
 | `CONFIG_FILE`                            | `./config/config.yml`       | Config file path |
+| `SIMS_CONTRACT_REGISTRATION_TOKEN`       | (secret)                    | Token that a caller sends in `X-SIMS-Caller-Token` when it registers provider-scope contracts. The matching caller entry lives under `identity.contract_registration.callers` in `config/config.yml`. An unset token keeps the caller disabled and registration closed. |
 
 The identity module uses the shared connection pool set up by `setup_config_store()` at startup — no separate identity-specific connection configuration is needed.
 
@@ -94,6 +105,7 @@ The identity module uses the shared connection pool set up by `setup_config_stor
 
 ```bash
 SIMS_INTEGRATION_DB=1 uv run pytest -o addopts='' -q tests/identity/test_service_integration.py
+SIMS_INTEGRATION_DB=1 uv run pytest -o addopts='' -q tests/identity/test_scope_contracts_integration.py
 ```
 
 Run these tests only against the helper-owned disposable database. See

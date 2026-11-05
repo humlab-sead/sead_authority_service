@@ -9,9 +9,17 @@ Submodules:
 - models:     Domain models and request/response DTOs
 - repository: Async database repositories (one per table)
 - policy:     Identity policy engine (per-entity-type rules)
+- contracts:  Provider-scope business-key contracts and registration authorization
 - service:    Core operations — resolve, bind, confirm, detect_change, associate_cr
 """
 
+from src.identity.contracts import (
+    ContractAuthorizationError,
+    ContractRegistrationPolicy,
+    IdentityContractConflict,
+    IdentityContractRequired,
+    is_provider_scope,
+)
 from src.identity.models import (
     Binding,
     BindingSet,
@@ -19,10 +27,16 @@ from src.identity.models import (
     BindRequest,
     ChangeDetectionRequest,
     ChangeDetectionResult,
+    EntityContractConflict,
+    EntityContractDeclaration,
+    EntityContractState,
+    EntityKeyContract,
     IdentitySignal,
+    RegisterScopeContractsRequest,
     RejectDiagnostics,
     ResolutionOutcome,
     ResolutionRequest,
+    ScopeContractRegistration,
     SourceIdentity,
     SourceScope,
     Submission,
@@ -32,6 +46,7 @@ from src.identity.policy import EntityPolicy, IdentityPolicy
 from src.identity.repository import (
     BindingRepository,
     BindingSetRepository,
+    ScopeEntityContractRepository,
     SourceIdentityRepository,
     SourceScopeRepository,
     SubmissionRepository,
@@ -67,16 +82,29 @@ __all__ = [
     "BindRequest",
     "ChangeDetectionRequest",
     "ChangeDetectionResult",
+    "EntityContractConflict",
+    "EntityContractDeclaration",
+    "EntityContractState",
+    "EntityKeyContract",
     "IdentitySignal",
+    "RegisterScopeContractsRequest",
     "RejectDiagnostics",
     "ResolutionOutcome",
     "ResolutionRequest",
+    "ScopeContractRegistration",
+    # contracts
+    "ContractAuthorizationError",
+    "ContractRegistrationPolicy",
+    "IdentityContractConflict",
+    "IdentityContractRequired",
+    "is_provider_scope",
     # policy
     "EntityPolicy",
     "IdentityPolicy",
     # repositories
     "BindingRepository",
     "BindingSetRepository",
+    "ScopeEntityContractRepository",
     "SourceIdentityRepository",
     "SourceScopeRepository",
     "SubmissionRepository",

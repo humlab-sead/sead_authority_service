@@ -25,6 +25,7 @@ from src.configuration import get_connection
 from src.identity.models import (
     Binding,
     BindingSet,
+    EntityKeyContract,
     ResolveBatchRecord,
     ResolveBatchResult,
     SourceIdentity,
@@ -164,6 +165,87 @@ class SourceScopeRepository(BaseRepository[SourceScope]):
             (_uuid(), scope_name, parent_scope_uuid, description, created_by),
         )
         return self._to_model_required(row)
+
+
+# ---------------------------------------------------------------------------
+# ScopeEntityContractRepository
+# ---------------------------------------------------------------------------
+
+
+class ScopeEntityContractRepository(BaseRepository[EntityKeyContract]):
+    """CRUD for sead_identity.scope_entity_contracts.
+
+    One row per (scope_uuid, entity_type). ``business_keys`` keeps the declared
+    order, so an exact ordered match is the only accepted re-registration.
+    """
+
+    model = EntityKeyContract
+    table_name = "sead_identity.scope_entity_contracts"
+    pk_column = "contract_uuid"
+    default_order_by = "entity_type"
+
+    async def list_by_scope(self, scope_uuid: UUID) -> list[EntityKeyContract]:
+        """Return the contracts registered for one scope."""
+        rows = await self._fetchall(
+            """
+            SELECT * FROM sead_identity.scope_entity_contracts
+            WHERE scope_uuid = %s
+            ORDER BY entity_type
+            """,
+            (scope_uuid,),
+        )
+        return [self._to_model_required(row) for row in rows]
+
+    async def list_by_scope_name(self, scope_name: str) -> list[EntityKeyContract]:
+        """Return the contracts registered for one scope name."""
+        rows = await self._fetchall(
+            """
+            SELECT c.*
+            FROM sead_identity.scope_entity_contracts c
+            JOIN sead_identity.source_scopes s
+              ON s.scope_uuid = c.scope_uuid
+            WHERE s.scope_name = %s
+            ORDER BY c.entity_type
+            """,
+            (scope_name,),
+        )
+        return [self._to_model_required(row) for row in rows]
+
+    async def create(
+        self,
+        scope_uuid: UUID,
+        entity_type: str,
+        business_keys: list[str],
+        created_by: str | None = None,
+    ) -> EntityKeyContract:
+        """Insert one entity contract for a scope."""
+        row = await self._fetchone(
+            """
+            INSERT INTO sead_identity.scope_entity_contracts
+                (contract_uuid, scope_uuid, entity_type, business_keys, created_by)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING *
+            """,
+            (_uuid(), scope_uuid, entity_type, business_keys, created_by),
+        )
+        return self._to_model_required(row)
+
+    async def lock_scope(self, scope_uuid: UUID) -> None:
+        """Lock one scope row for the current transaction.
+
+        Contract registration runs inside this lock so concurrent registrations
+        for the same scope serialize and cannot write partial contract sets.
+        """
+        row = await self._fetchone(
+            """
+            SELECT scope_uuid FROM sead_identity.source_scopes
+            WHERE scope_uuid = %s
+            FOR UPDATE
+            """,
+            (scope_uuid,),
+        )
+        if row is None:
+            raise RepositoryError(f"Source scope {scope_uuid} does not exist")
 
 
 # ---------------------------------------------------------------------------

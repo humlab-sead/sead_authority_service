@@ -33,6 +33,7 @@ SCHEMA_FILES=(
     009_site_id_allocator.sql
     010_aggregate_identity_value.sql
     011_resolve_batch_idempotency.sql
+    012_scope_entity_contracts.sql
 )
 
 fail() {
