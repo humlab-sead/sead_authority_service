@@ -6,6 +6,7 @@ from loguru import logger
 from src.api.identity_router import identity_router
 from src.api.router import router
 from src.configuration import ConfigProvider, get_config_provider, setup_config_store, shutdown_connection_pool
+from src.strategies.configured_classifier import validate_classifier_configuration
 
 app = FastAPI(title="SEAD Entity Reconciliation Service")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -24,6 +25,8 @@ async def startup():
         provider: ConfigProvider = get_config_provider()
         if not provider.is_configured():
             raise RuntimeError("Configuration setup failed")
+
+        validate_classifier_configuration()
 
         logger.info("Application startup completed successfully")
 

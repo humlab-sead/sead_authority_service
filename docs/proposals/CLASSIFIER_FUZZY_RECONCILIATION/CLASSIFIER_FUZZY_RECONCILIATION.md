@@ -4,6 +4,7 @@
 
 - Confirmed feature / change request (2026-11-14)
 - Tier 1 of 2. Tier 2 is [Context-Scoped Classification and Lookup Reconciliation](../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md).
+- Revision 7: enable description scoring only for `rdb_code` after read-only staging population checks; defer the other three code-label weights
 - Revision 6: thresholds are service configuration passed as function parameters, not `pg_trgm` database settings
 - Revision 5: recorded excluded-classifier reasons in the reconciliation type inventory register tracked by [issue #43](https://github.com/humlab-sead/sead_authority_service/issues/43)
 - Revision 4: resolved description-scoring enablement to four code-label classifiers behind a data-population gate
@@ -16,7 +17,7 @@
 
 The Shape Shifter standard target model (v2.8.0) declares 53 classifier entities. Only a few are registered reconciliation types today, and each one currently needs three hand-maintained artifacts plus generated SQL. Missing classifiers return `Unknown query type` from `POST /reconcile`, so OpenRefine users cannot reconcile most controlled vocabularies.
 
-The recommendation is a single configured-classifier path driven by `config/entities.yml`. Marked entities get a stable view column contract, a fuzzy function that returns description and can optionally score it, and one shared strategy class. Description scoring is off by default and enabled for the four classifiers whose labels are codes or symbols, where label matching has no recall. When enabled it only reorders candidates, because automatic matching is always decided from label similarity. Unmarked entities keep their current generated views, functions, and resource SQL unchanged.
+The recommendation is a single configured-classifier path driven by `config/entities.yml`. Marked entities get a stable view column contract, a fuzzy function that returns description and can optionally score it, and one shared strategy class. Description scoring is off by default and enabled for `rdb_code`, the only proposed code-label classifier that passed the population gate. When enabled it only reorders candidates, because automatic matching is always decided from label similarity. Unmarked entities keep their current generated views, functions, and resource SQL unchanged.
 
 Support status becomes an explicit registration declaration, so the reconciliation manifest no longer depends on a hand-maintained tuple and a new registration cannot become supported by default.
 
@@ -31,7 +32,7 @@ The existing simple classifier implementations `feature_type` and `data_type` mo
   - `src/resources/feature_type.yml` selects `description` from `authority.feature_type`, but the generated view exposes `feature_type_description`.
   - `src/resources/data_type.yml` selects `dt.description` and joins on `data_type_group_id`; the generated `authority.data_type` view exposes `definition` and no `data_type_group_id`.
   - `src/resources/location.yml` selects `description`, but `location` has no configured `description_column`, so the generated view has no such column. `location` is a specialized strategy and is outside this change, but it shows the same failure mode.
-  - `config/entities.yml` declares `description_column: description` for `dating_uncertainty`, but the standard model lists only `uncertainty` on `tbl_dating_uncertainty`. This is the same failure mode as `feature_type` and must be corrected before that entity can return a description.
+  - `config/entities.yml` declares `description_column: description` for `dating_uncertainty`, but the standard model lists only `uncertainty` on `tbl_dating_uncertainty`. A read-only staging schema check on 2026-11-14 confirmed the physical `description` column exists there; verify each deployment target before using it.
   - `src/resources/dimension.yml` selects from `authority.dimension`, but no `schema/generated/dimension.sql` exists and `config/entities.yml` has no `dimension` entry. `dimension` is nevertheless listed in `SUPPORTED_RECONCILIATION_TYPES`. Tier 1 does not repair this; the tier-2 proposal owns it.
 - Generated `authority.fuzzy_<key>` functions score only the label. Description text is unused, even where the view already carries it.
 - `SUPPORTED_RECONCILIATION_TYPES` in `src/metadata.py` is a hand-maintained tuple. A new strategy stays invisible until someone edits the tuple, and the tuple can name a type whose matcher does not work.
@@ -41,7 +42,7 @@ The existing simple classifier implementations `feature_type` and `data_type` mo
 - Add a `reconciliation: simple` marker to the `config/entities.yml` entries that qualify for generic classification.
 - For marked entities only, expose `description` and `norm_description` in the generated view.
 - For marked entities only, return `description` from the generated fuzzy function, and score it only when a non-zero description weight is configured.
-- Enable description scoring for the four classifiers whose label is a code or symbol: `age_type`, `relative_age_type`, `rdb_code`, and `value_qualifier`.
+- Enable description scoring for `rdb_code`; keep `age_type`, `relative_age_type`, and `value_qualifier` on the generic label-only path until they pass a new population check and a separate enablement decision.
 - Make automatic matching depend on label similarity alone, so no threshold setting can turn a description hit into an automatic match.
 - Make match thresholds service configuration passed as function parameters, so no database setting can change reconciliation results.
 - Add one shared configured-classifier strategy and register it for every approved classifier key.
@@ -208,20 +209,29 @@ Scoring rules:
 
 Enable description scoring only where the label is a code, abbreviation, or symbol. A short code produces few trigrams, so a user who types the meaning can never match the label, and the description carries all the recall. Where the label is already a descriptive name, description scoring adds no recall and only dilutes ranking.
 
-| Entity | Label column | Label content | Description column |
-|---|---|---|---|
-| `age_type` | `age_type` | `AD`, `BC`, `BP` | `description` |
-| `relative_age_type` | `age_type` | `AD`, `BC`, `BP`, `cal BP` | `description` |
-| `rdb_code` | `rdb_category` | `EN`, `VU`, `NT`, `LC` | `rdb_definition` |
-| `value_qualifier` | `symbol` | `+`, `-`, `?`, `ca.` | `description` |
+| Entity | Label column | Label content | Description column | Scoring decision |
+|---|---|---|---|---|
+| `age_type` | `age_type` | `AD`, `BC`, `BP` | `description` | Off: 1 distinct description and 1 distinct label |
+| `relative_age_type` | `age_type` | `AD`, `BC`, `BP`, `cal BP` | `description` | Off: 10 of 14 rows have descriptions |
+| `rdb_code` | `rdb_category` | `EN`, `VU`, `NT`, `LC` | `rdb_definition` | On: 27 of 27 described; 27 descriptions, 20 labels |
+| `value_qualifier` | `symbol` | `+`, `-`, `?`, `ca.` | `description` | Off: 13 distinct descriptions and 13 distinct labels |
 
-The other 41 tier-1 classifiers keep the default weight of `0`. Four need a label choice rather than description scoring:
+Read-only checks on 2026-11-14 through the `SEAD TNG (9023)` profile's `sead_staging` database returned these physical-table counts (the separate `SEAD Staging (5433)` profile was unavailable):
+
+| Entity | Rows | With description | Distinct labels | Distinct descriptions |
+|---|---:|---:|---:|---:|
+| `age_type` | 1 | 1 | 1 | 1 |
+| `relative_age_type` | 14 | 10 | 14 | 10 |
+| `rdb_code` | 27 | 27 | 20 | 27 |
+| `value_qualifier` | 13 | 13 | 13 | 13 |
+
+The generated view was unavailable for three of the four keys, so each count used the same physical label and description columns specified for its planned view. Recheck `rdb_code` against the generated view before merge. The other 44 tier-1 classifiers keep the default weight of `0`. Four need a label choice rather than description scoring:
 
 - `identification_level` uses `identification_level_name` ("Species", "Genus") as its label; the abbreviation is the unique key, not the label.
 - `unit` uses `unit_name` ("millimetre") as its label; matching an abbreviation such as `mm` is alternate-identity behavior, which tier 2 owns.
 - `ecocode_definition` and `ecocode_group` use `name` as the label and keep `definition` as a returned description without scoring it.
 
-Eight tier-1 classifiers have no description-like column in the standard model and cannot enable scoring: `colour`, `dating_uncertainty`, `language`, `season`, `taxa_tree_author`, `taxa_tree_family`, `taxa_tree_genus`, and `taxa_tree_order`.
+Seven tier-1 classifiers have no description-like column in the standard model and cannot enable scoring: `colour`, `language`, `season`, `taxa_tree_author`, `taxa_tree_family`, `taxa_tree_genus`, and `taxa_tree_order`. The model also omits `dating_uncertainty.description`, although it exists on the checked staging table; leave its weight at zero.
 
 Enablement requires a data-population check against the generated view before merge:
 
@@ -329,8 +339,8 @@ Rules:
 - Thresholds live in service configuration rather than the database, so a threshold change is a configuration release, not a database change. That is the intended trade, but it means a threshold experiment needs a config update rather than a `SET` statement.
 - Explicit threshold comparisons are not index-accelerated. Classifier tables are small, so this is trivial today; the documented escape hatch is a per-entity prefilter when a base table grows.
 - Publishing 45 generic classifier types (43 newly registered) grows `defaultTypes` and `supportedTypes`. A larger OpenRefine type list is noisy but preferable to silent `Unknown query type` errors.
-- Some labels are codes or symbols (`value_qualifier`, `rdb_code`, `identification_level`). Description matching carries most of the search value there, and match quality will vary. The four enabled entities are covered by the population check, but that check reads live data and cannot run in CI.
-- `config/entities.yml` declares a description column for `dating_uncertainty` that the standard model does not list. Correct that entry or confirm the column exists before that entity returns a description.
+- Some labels are codes or symbols (`value_qualifier`, `rdb_code`, `identification_level`). Description matching carries most of the search value there, and match quality will vary. Only `rdb_code` passed the 2026-11-14 population gate; live-data checks cannot run in CI.
+- `config/entities.yml` declares a description column for `dating_uncertainty` that the standard model does not list. The staging table has the column; confirm it exists in the deployment target before returning a description.
 - `dimension` stays declared supported in `src/metadata.py` while its details query references a view that does not exist. Tier 1 leaves that pre-existing defect in place; tier 2 owns the repair, so it must not be treated as covered here.
 - `CLASSIFIER_KEYS` duplicates the `entities.yml` marker list. A drift test and startup validation are both required; without them the two can diverge silently.
 - Regenerating schema changes generated views and functions. Deployment must apply schema, then runtime configuration, then application code.
@@ -345,7 +355,7 @@ Rules:
 - Candidate payloads: label match, opt-in description scoring, combined score, `match` derived from label similarity, description passthrough, truncation at exactly 500 characters, and the ambiguity rule with duplicate labels.
 - Description default: an entity without `description_match_weight` generates no description predicate and no description index, and a description-only hit returns `match: false` even when its score is high.
 - Description weight: a configured weight raises the score of a description match, and an exact label match still outranks a better description match.
-- Enable list: exactly `age_type`, `relative_age_type`, `rdb_code`, and `value_qualifier` carry a non-zero weight, and every other tier-1 entry carries `0` or omits the field.
+- Enable list: only `rdb_code` carries a non-zero weight, and every other tier-1 entry carries `0` or omits the field.
 - Population gate: a recorded check per enabled entity shows descriptions present on more than 80% of rows and more distinct descriptions than labels.
 - Thresholds: a configured `label_threshold` changes which label candidates are returned, and the same query returns the configured result regardless of any session `pg_trgm` setting.
 - Threshold validation: a missing or out-of-range `options:reconciliation` value fails startup with a named error.
@@ -373,7 +383,7 @@ Rules:
 - `P-AC-11`: Unmarked entities keep their current generated views, function signatures, scoring, and resource SQL contracts; snapshots for `site` and `method` are unchanged.
 - `P-AC-12`: A registered classifier without a valid `table_specs` entry fails startup with a named error, and `deployment/container/config/entities.yml` carries the same classifier entries and markers as `config/entities.yml`.
 - `P-AC-13`: An entity with `description_match_weight` of `0` or absent generates no description predicate, no description index, and no description term in its fuzzy function.
-- `P-AC-14`: Description scoring is enabled for exactly `age_type`, `relative_age_type`, `rdb_code`, and `value_qualifier`, and each enabled entity passes the recorded population check.
+- `P-AC-14`: Description scoring is enabled for exactly `rdb_code`, which passes the recorded population check; `age_type`, `relative_age_type`, and `value_qualifier` stay at zero weight pending new data and a separate decision.
 - `P-AC-15`: Match thresholds come from `options:reconciliation` in service configuration and are passed to generated functions as parameters; no `pg_trgm.*` database setting affects reconciliation results.
 - `P-AC-16`: A missing or out-of-range threshold fails startup with a named error, and `deployment/container/config/config.yml` carries the same threshold values as `config/config.yml`.
 
@@ -388,12 +398,12 @@ Confirmed decisions:
 - Keep static registration, and describe enablement as a two-location edit: `entities.yml` plus `CLASSIFIER_KEYS`.
 - Return `description` from marked fuzzy functions whether or not description scoring is enabled; truncate candidates at 500 characters and keep full text in details.
 - Description scoring is off by default. Enabling it sets `description_match_weight` between `0.10` and `0.20`, uses `strict_word_similarity`, and only reorders candidates.
-- Description scoring is enabled for exactly four code-label classifiers: `age_type`, `relative_age_type`, `rdb_code`, and `value_qualifier`. Each must pass the population check before merge.
+- Description scoring is enabled only for `rdb_code`. The other three proposed code-label classifiers stay at zero weight; recheck `rdb_code` against the generated view before merge.
 - `match` is computed from label similarity alone, so no threshold setting can promote a description hit to an automatic match.
 - Thresholds are service configuration under `options:reconciliation`, passed to generated functions as `p_label_threshold` and `p_description_threshold`. No `pg_trgm` GUC affects results. The accepted cost is that those predicates are not index-accelerated.
 - Suppress automatic matches when two or more candidates share a normalized label.
 - Require an explicit support status on every registration.
-- Record excluded-classifier reasons in the reconciliation type inventory register tracked by [issue #43](https://github.com/humlab-sead/sead_authority_service/issues/43), not in `entities.yml` or in registration metadata.
+- Use the [issue #43 interim inventory](https://github.com/humlab-sead/sead_authority_service/issues/43#issuecomment-6882183123) for excluded-classifier reasons until the checked-in generated register requested in that issue is delivered; do not put those reasons in `entities.yml` or registration metadata.
 - Keep specialized strategies and their registration unchanged, including `sampling_context` and its custom details query.
 
 Constraints and behavior to preserve:

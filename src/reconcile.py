@@ -49,7 +49,7 @@ async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
             limit=query.get("limit") if query.get("limit") is not None else default_query_limit,
         )
 
-        candidates = [strategy.as_candidate(data, query.get("query", "")) for data in candidate_data]
+        candidates = strategy.as_candidates(candidate_data, query.get("query", ""))
 
         # Log summary with match counts and score ranges
         if candidates:

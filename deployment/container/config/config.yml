@@ -5,6 +5,9 @@ options:
   id_base: "https://w3id.org/sead/id/"
   auto_accept_threshold: 0.90
   default_query_limit: 10
+  reconciliation:
+    label_threshold: 0.30
+    description_threshold: 0.50
   database:
     dbname: "${SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME:-sead_staging}"
     host: "${SEAD_AUTHORITY_OPTIONS_DATABASE_HOST:-localhost}"

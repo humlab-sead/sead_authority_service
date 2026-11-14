@@ -13,16 +13,34 @@ from httpx import Response
 
 from src.api.router import router
 from src.configuration import MockConfigProvider
-from src.metadata import SUPPORTED_RECONCILIATION_TYPES
+from src.configuration.config import Config
+from src.configuration.provider import set_config_provider
+from src.strategies.configured_classifier import ClassifierConfigurationError
 from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
+
+SUPPORTED_TYPE_IDS = (
+    "administrative_region",
+    "bibliographic_reference",
+    "country",
+    "data_type",
+    "dimension",
+    "feature_type",
+    "location",
+    "method",
+    "sampling_context",
+    "site",
+)
+EXCLUDED_TYPE_IDS = ("geonames", "modification_type", "taxon")
 
 # pylint: disable=protected-access, unused-argument, redefined-outer-name
 
 
 class MockStrategy:
     """Mock strategy class with get_properties_meta method"""
+
+    support_status = "supported"
 
     def get_properties_meta(self):
         return [
@@ -46,14 +64,20 @@ class MockStrategy:
         return "Sites"
 
 
+class MockExcludedStrategy(MockStrategy):
+    """Mock strategy class registered without reconciliation support."""
+
+    support_status = "excluded"
+
+
 class MockStrategies:
     """Mock Strategies class for testing"""
 
     def __init__(self):
         # Declared supported types plus registered types without a matcher, so
         # the manifest can distinguish the two lists.
-        type_ids = (*SUPPORTED_RECONCILIATION_TYPES, "taxon", "geonames", "modification_type")
-        self.items: dict[str, type[MockStrategy]] = {type_id: MockStrategy for type_id in type_ids}
+        self.items: dict[str, type[MockStrategy]] = {type_id: MockStrategy for type_id in SUPPORTED_TYPE_IDS}
+        self.items.update({type_id: MockExcludedStrategy for type_id in EXCLUDED_TYPE_IDS})
 
 
 @pytest.fixture
@@ -115,10 +139,28 @@ class TestMetaEndpoint:
         # Check the reconciliation-specific supported types
         assert "reconciliation" in data
         supported = data["reconciliation"]["supportedTypes"]
-        assert supported == list(SUPPORTED_RECONCILIATION_TYPES)
+        assert supported == sorted(SUPPORTED_TYPE_IDS)
         assert len(supported) == len(set(supported))
         assert set(supported) <= set(type_ids)
         assert "taxon" not in supported
+
+    @with_test_config
+    def test_meta_endpoint_publishes_approved_classifiers(self, client, test_provider: MockConfigProvider):
+        """Test the manifest lists every approved classifier and none of the excluded ones."""
+        response = client.get("/reconcile")
+        assert response.status_code == 200
+
+        data = response.json()
+        type_ids = [entry["id"] for entry in data["defaultTypes"]]
+        supported = data["reconciliation"]["supportedTypes"]
+
+        for entity_key in ("abundance_element", "age_type", "rdb_code", "value_qualifier"):
+            assert entity_key in type_ids
+            assert entity_key in supported
+
+        for excluded_key in ("abundance_element_group", "coordinate_method_dimension", "value_qualifier_symbol"):
+            assert excluded_key not in type_ids
+            assert excluded_key not in supported
 
     @patch("src.api.router.Strategies", MockStrategies())
     @with_test_config
@@ -527,6 +569,39 @@ class TestErrorHandling:
         response = client.post("/reconcile", json={})
         assert response.status_code in [400, 422]
         assert "No queries provided" in response.json()["error"]
+
+
+class _LazyConfigProvider(MockConfigProvider):
+    """Provider that reports unconfigured until the lazy setup hook runs."""
+
+    def __init__(self, config: Config) -> None:
+        super().__init__(config)
+        self._configured = False
+
+    def is_configured(self, context: str | None = None) -> bool:  # pylint: disable=unused-argument
+        return self._configured
+
+    def mark_configured(self) -> None:
+        self._configured = True
+
+
+class TestLazyConfigurationValidation:
+    @pytest.mark.asyncio
+    async def test_lazy_setup_validates_classifier_configuration(self, monkeypatch: pytest.MonkeyPatch):
+        import src.api.router as router_module
+
+        provider = _LazyConfigProvider(Config(data={"table_specs": {}, "options": {}}))
+
+        async def fake_setup_config_store() -> None:
+            provider.mark_configured()
+
+        previous = set_config_provider(provider)
+        monkeypatch.setattr(router_module, "setup_config_store", fake_setup_config_store)
+        try:
+            with pytest.raises(ClassifierConfigurationError):
+                await router_module.get_config_dependency()
+        finally:
+            set_config_provider(previous)
 
 
 if __name__ == "__main__":

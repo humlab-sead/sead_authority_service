@@ -24,8 +24,13 @@ create or replace view authority.{{ entity_key }} as
     t.{{ entity.id_column }},
     t.{{ entity.label_column }} as label,
     authority.immutable_unaccent(lower(t.{{ entity.label_column }})) as norm_label
-{%- if entity.description_column %},
+{%- if entity.description_column %}
+{%- if entity.reconciliation == "simple" %},
+  t.{{ entity.description_column }} as description,
+  authority.immutable_unaccent(lower(t.{{ entity.description_column }})) as norm_description
+{%- else %},
     t.{{ entity.description_column }}
+{%- endif %}
 {%- endif %}
 {%- if entity.alternate_identity_column %},
     t.{{ entity.alternate_identity_column }}
@@ -63,6 +68,19 @@ create index if not exists {{ entity.table_name }}_norm_trgm
   on public.{{ entity.table_name }}
     using gin ( (authority.immutable_unaccent(lower({{ entity.label_column }}))) gin_trgm_ops );
 {% endif %}
+{% if entity.reconciliation == "simple" and entity.description_column and (entity.description_match_weight | default(0) | float) > 0 %}
+{% if entity.materialized | default(false) %}
+
+create index if not exists {{ entity_key }}_norm_desc_trgm
+  on authority.{{ entity_key }}
+    using gin (norm_description gin_trgm_ops);
+{% else %}
+
+create index if not exists {{ entity.table_name }}_norm_desc_trgm
+  on public.{{ entity.table_name }}
+    using gin ( (authority.immutable_unaccent(lower({{ entity.description_column }}))) gin_trgm_ops );
+{% endif -%}
+{% endif %}
 
 /***************************************************************************************************
  ** Procedure  authority.fuzzy_{{ entity_key }}
@@ -74,6 +92,111 @@ create index if not exists {{ entity.table_name }}_norm_trgm
 
  ****************************************************************************************************/
 
+{% if entity.reconciliation == "simple" %}
+drop function if exists authority.fuzzy_{{ entity_key }}(text, integer{% for param in trigram_config.filter_params | default([]) %}, {{ param.type }}{% endfor %}) cascade;
+drop function if exists authority.fuzzy_{{ entity_key }}(text, integer, double precision, double precision{% for param in trigram_config.filter_params | default([]) %}, {{ param.type }}{% endfor %}) cascade;
+
+create or replace function authority.fuzzy_{{ entity_key }}(
+  p_text text,
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50{% for param in trigram_config.filter_params | default([]) %},
+  {{ param.name }} {{ param.type }} default {{ param.default }}{% endfor %}
+) returns table (
+  {{ entity.id_column }} integer,
+  label text{% if entity.description_column %},
+  description text{% if (entity.description_match_weight | default(0) | float) > 0 %},
+  label_sim double precision{% endif %}{% endif %},
+  name_sim double precision
+) language sql stable
+as $$
+{% if entity.description_column and (entity.description_match_weight | default(0) | float) > 0 %}
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q
+  )
+{% if entity.filter_params %}
+  , filter_params as (
+{% for param in entity.filter_params %}
+    {{ param.cte_definition | indent(4) }}{% if not loop.last %},{% endif %}
+{% endfor %}
+  )
+{% endif %}
+  , scored as (
+    select
+      s.{{ entity.id_column }},
+      s.label,
+      s.description,
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q) end as label_sim,
+      coalesce(strict_word_similarity(pq.q, s.norm_description), 0) as description_sim
+    from authority.{{ entity_key }} as s
+    cross join params pq
+{% if entity.filter_params %}
+{% for param in entity.filter_params %}
+      {{ param.join_clause | indent(6) }}
+{% endfor %}
+{% endif %}
+{% if entity.filter_params %}
+    where true
+{% for param in entity.filter_params %}
+      {{ param.where_clause | indent(6) }}
+{% endfor %}
+{% endif %}
+  )
+  , filtered as (
+    select *
+    from scored
+    where scored.label_sim >= p_label_threshold
+       or scored.description_sim >= p_description_threshold
+  )
+  select
+    filtered.{{ entity.id_column }},
+    filtered.label,
+    filtered.description,
+    filtered.label_sim,
+    least(1.0, filtered.label_sim + {{ entity.description_match_weight }} * filtered.description_sim) as name_sim
+  from filtered
+  order by name_sim desc, filtered.label_sim desc, filtered.label
+  limit p_limit;
+{% else %}
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q
+  )
+{% if entity.filter_params %}
+  , filter_params as (
+{% for param in entity.filter_params %}
+    {{ param.cte_definition | indent(4) }}{% if not loop.last %},{% endif %}
+{% endfor %}
+  )
+{% endif %}
+  select
+    s.{{ entity.id_column }},
+    s.label{% if entity.description_column %},
+    s.description{% endif %},
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as name_sim
+  from authority.{{ entity_key }} as s
+  cross join params pq
+{% if entity.filter_params %}
+{% for param in entity.filter_params %}
+  {{ param.join_clause | indent(2) }}
+{% endfor %}
+{% endif %}
+  where case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q) end >= p_label_threshold
+{% if entity.filter_params %}
+{% for param in entity.filter_params %}
+    {{ param.where_clause | indent(4) }}
+{% endfor %}
+{% endif %}
+  order by name_sim desc, s.label
+  limit p_limit;
+{% endif %}
+$$;
+{% else %}
 drop function if exists authority.fuzzy_{{ entity_key }}(text, integer{% for param in trigram_config.filter_params | default([]) %}, {{ param.type }}{% endfor %}) cascade;
 
 create or replace function authority.fuzzy_{{ entity_key }}(
@@ -120,3 +243,4 @@ as $$
   order by name_sim desc, s.label
   limit p_limit;
 $$;
+{%- endif -%}

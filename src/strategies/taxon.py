@@ -52,7 +52,7 @@ class TaxonRepository(BaseRepository):
     # e.g., async def fetch_by_name(self, name: str, limit: int) -> list[dict[str, Any]]: ...
 
 
-@Strategies.register(key="taxon", repository_cls=TaxonRepository)
+@Strategies.register(key="taxon", repository_cls=TaxonRepository, support="excluded")
 class TaxonReconciliationStrategy(ReconciliationStrategy):
     """Future taxon reconciliation strategy"""
 

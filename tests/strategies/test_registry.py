@@ -129,6 +129,21 @@ class TestStrategyRegistry:
 
         assert "nonexistent_strategy" in str(exc_info.value)
 
+    def test_registration_without_support_does_not_inherit_parent_support(self):
+        """A subclass of a supported strategy registered without support= stays unsupported"""
+        strategies = StrategyRegistry()
+
+        @strategies.register(key="parent_strategy", support="supported")
+        class ParentStrategy(ReconciliationStrategy):
+            pass
+
+        @strategies.register(key="child_strategy")
+        class ChildStrategy(ParentStrategy):
+            pass
+
+        assert ParentStrategy.support_status == "supported"
+        assert ChildStrategy.support_status is None
+
     def test_is_registered_true(self):
         """Test is_registered returns True for registered strategy"""
         strategies = StrategyRegistry()

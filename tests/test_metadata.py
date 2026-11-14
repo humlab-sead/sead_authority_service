@@ -1,21 +1,23 @@
 import pytest
 
 from src.metadata import (
-    SUPPORTED_RECONCILIATION_TYPES,
     _compile_property_settings,
     _get_default_types,
     _get_supported_types,
     get_reconcile_properties,
     get_reconciliation_metadata,
 )
-from src.strategies.feature_type import FeatureTypeReconciliationStrategy
+from src.strategies.configured_classifier import CLASSIFIER_KEYS
 from src.strategies.location import LocationReconciliationStrategy
+from src.strategies.strategy import Strategies
 from tests.decorators import with_test_config
 
 # pylint: disable=redefined-outer-name, redefined-builtin
 
 
 class FakeSiteStrategy:
+    support_status = "supported"
+
     def __init__(self):
         pass
 
@@ -36,6 +38,8 @@ class FakeSiteStrategy:
 
 
 class FakeTaxonStrategy:
+    support_status = "excluded"
+
     def __init__(self):
         pass
 
@@ -105,51 +109,64 @@ def test_compile_property_settings_dedup_and_entity_types(strategies):
     assert lat["settings"] == {"min": -90.0, "max": 90.0, "precision": 6}
 
 
-def _registered_strategies(**overrides) -> DummyRegistry:
-    """Build a registry containing every declared supported type."""
-    items: dict[str, type] = {type_id: FakeSiteStrategy for type_id in SUPPORTED_RECONCILIATION_TYPES}
-    items.update(overrides)
-    return DummyRegistry(items)
+def _registry_with_support_status() -> DummyRegistry:
+    class FakeLocationStrategy(FakeSiteStrategy):
+        support_status = "supported"
+
+    return DummyRegistry(
+        {
+            "site": FakeSiteStrategy,
+            "taxon": FakeTaxonStrategy,
+            "location": FakeLocationStrategy,
+        }
+    )
 
 
-def test_supported_types_are_declared_once_and_published():
-    registry = _registered_strategies(taxon=FakeTaxonStrategy)
-    default_types = _get_default_types(registry)
+def test_supported_types_come_from_registration_status():
+    supported = _get_supported_types(_registry_with_support_status())
 
-    supported = _get_supported_types(default_types)
-
-    assert supported == list(SUPPORTED_RECONCILIATION_TYPES)
+    assert supported == ["location", "site"]
     assert len(supported) == len(set(supported))
-    published_ids = {entry["id"] for entry in default_types}
-    assert set(supported) <= published_ids
 
 
-def test_registered_placeholder_type_stays_openrefine_only():
-    registry = _registered_strategies(taxon=FakeTaxonStrategy)
+def test_excluded_type_is_published_but_not_supported():
+    registry = _registry_with_support_status()
     default_types = _get_default_types(registry)
 
     published_ids = {entry["id"] for entry in default_types}
-    supported = _get_supported_types(default_types)
+    supported = _get_supported_types(registry)
 
     assert "taxon" in published_ids
     assert "taxon" not in supported
 
 
-def test_declared_supported_type_must_be_registered():
-    items: dict[str, type] = {type_id: FakeSiteStrategy for type_id in SUPPORTED_RECONCILIATION_TYPES if type_id != "location"}
-    default_types = _get_default_types(DummyRegistry(items))
+def test_every_registered_strategy_declares_a_valid_support_status():
+    for key, strategy_cls in Strategies.items.items():
+        assert getattr(strategy_cls, "support_status", None) in {"supported", "excluded"}, key
 
-    with pytest.raises(ValueError, match="location"):
-        _get_supported_types(default_types)
+
+@with_test_config
+def test_manifest_publishes_every_approved_classifier(test_provider):  # pylint: disable=unused-argument
+    supported = _get_supported_types(Strategies)
+    published_ids = {entry["id"] for entry in _get_default_types(Strategies)}
+
+    for key in CLASSIFIER_KEYS:
+        assert key in supported
+        assert key in published_ids
+
+    assert len(supported) == len(set(supported))
+    for excluded_key in ("abundance_element_group", "coordinate_method_dimension", "value_qualifier_symbol"):
+        assert excluded_key not in supported
+        assert excluded_key not in published_ids
 
 
 @with_test_config
 def test_reconciliation_metadata_adds_supported_types_only(test_provider):  # pylint: disable=unused-argument
-    registry = _registered_strategies(taxon=FakeTaxonStrategy)
+    registry = _registry_with_support_status()
 
     metadata = get_reconciliation_metadata(registry, "http://testserver/")
 
-    assert metadata["reconciliation"]["supportedTypes"] == list(SUPPORTED_RECONCILIATION_TYPES)
+    assert metadata["reconciliation"]["supportedTypes"] == ["location", "site"]
     assert [entry["id"] for entry in metadata["defaultTypes"]].count("taxon") == 1
     # Existing OpenRefine fields stay available.
     assert metadata["view"]["url"] == "http://testserver/reconcile/preview?id={{id}}"
@@ -162,7 +179,7 @@ def test_reconciliation_metadata_adds_supported_types_only(test_provider):  # py
 
 @with_test_config
 def test_real_strategies_declare_their_own_properties(test_provider):  # pylint: disable=unused-argument
-    registry = DummyRegistry({"feature_type": FeatureTypeReconciliationStrategy, "location": LocationReconciliationStrategy})
+    registry = DummyRegistry({"feature_type": Strategies.items["feature_type"], "location": LocationReconciliationStrategy})
 
     assert get_reconcile_properties(registry, entity_type="feature_type") == []
     assert [prop["id"] for prop in get_reconcile_properties(registry, entity_type="location")] == ["place_name"]

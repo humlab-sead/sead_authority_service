@@ -6,7 +6,7 @@ class DimensionRepository(BaseRepository):
     """Dimension-specific query proxy"""
 
 
-@Strategies.register(key="dimension", repository_cls=DimensionRepository)
+@Strategies.register(key="dimension", repository_cls=DimensionRepository, support="supported")
 class DimensionReconciliationStrategy(ReconciliationStrategy):
     """Dimension-specific reconciliation with place names and coordinates"""
 
