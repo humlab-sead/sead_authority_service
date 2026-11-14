@@ -14,7 +14,10 @@ create or replace view authority.data_type as
     t.data_type_id,
     t.data_type_name as label,
     authority.immutable_unaccent(lower(t.data_type_name)) as norm_label,
-    t.definition  from public.tbl_data_types as t;
+  t.definition as description,
+  authority.immutable_unaccent(lower(t.definition)) as norm_description,
+    dtg.data_type_group_name as data_type_group_name,
+    dtg.description as data_type_group_description  from public.tbl_data_types as t  left join public.tbl_data_type_groups dtg using (data_type_group_id);
 
 create index if not exists tbl_data_types_norm_trgm
   on public.tbl_data_types
@@ -27,26 +30,35 @@ create index if not exists tbl_data_types_norm_trgm
  ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_data_type(text, integer) cascade;
+drop function if exists authority.fuzzy_data_type(text, integer, double precision, double precision) cascade;
 
 create or replace function authority.fuzzy_data_type(
   p_text text,
-  p_limit integer default 10) returns table (
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50) returns table (
   data_type_id integer,
   label text,
+  description text,
   name_sim double precision
 ) language sql stable
 as $$
   with params as (
     select authority.immutable_unaccent(lower(p_text))::text as q
-  )  select
+  )
+  select
     s.data_type_id,
     s.label,
+    s.description,
     greatest(
       case when s.norm_label = pq.q then 1.0
-          else similarity(s.norm_label, pq.q)
+           else similarity(s.norm_label, pq.q)
       end, 0.0001
     ) as name_sim
   from authority.data_type as s
-  cross join params pq  where s.norm_label % pq.q  order by name_sim desc, s.label
+  cross join params pq
+  where case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  order by name_sim desc, s.label
   limit p_limit;
 $$;

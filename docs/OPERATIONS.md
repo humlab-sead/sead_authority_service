@@ -216,6 +216,20 @@ A `false` result or `permission denied for schema authority` means the grants ar
 
 `authority.fuzzy_location` is `SECURITY INVOKER` and also reads `public.tbl_location_types` to filter by location type. A role that has only the `authority` grants can execute the function but receives `permission denied for table tbl_location_types`. Grant `SELECT` on that table through the database's normal role policy; `schema/sql/grants.sql` covers the `authority` schema only. `authority.fuzzy_feature_type` reads only `authority` objects.
 
+### Classifier schema, configuration, and code release order
+
+Classifier reconciliation ships as three separately released inputs. Apply them in this order:
+
+1. Schema: deploy the generated `schema/generated/<key>.sql` files for the classifier types you enable. Each file creates or replaces `authority.<key>` and `authority.fuzzy_<key>`.
+2. Mounted configuration: when a deployment mounts its own `config/`, update `entities.yml` and `config.yml` to match the application defaults. The classifier entries, the `reconciliation: simple` marker, `description_match_weight`, and `options:reconciliation` thresholds must agree with `config/`.
+3. Application code: deploy the image that registers the classifier keys in `CLASSIFIER_KEYS`.
+
+The service fails startup with a named classifier configuration error when a registered key has no marked `table_specs` entry, or when a reconciliation threshold is missing or outside `0 < value <= 1`. Deploy the schema and the mounted configuration before the image so a new image does not fail at startup.
+
+Reconciliation results do not depend on any `pg_trgm.*` database setting. The generated functions compare against `p_label_threshold` and `p_description_threshold`, which carry `options:reconciliation:label_threshold` and `options:reconciliation:description_threshold`. Changing `pg_trgm.similarity_threshold`, `pg_trgm.word_similarity_threshold`, or `pg_trgm.strict_word_similarity_threshold` does not change which candidates are returned or which candidate is marked `match`.
+
+Only `rdb_code` scores description text (`description_match_weight: 0.15`). Every other classifier returns its description without scoring it. Before you enable a weight for another classifier, run the population check from the design proposal against `authority.<key>` and record the result.
+
 ---
 
 ## Rollback

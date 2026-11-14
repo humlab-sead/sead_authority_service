@@ -32,6 +32,7 @@ from src.configuration.interface import ConfigLike
 from src.metadata import get_reconcile_properties, get_reconciliation_metadata
 from src.preview import render_preview
 from src.reconcile import UnsupportedReconciliationTypeError, reconcile_queries
+from src.strategies.configured_classifier import validate_classifier_configuration
 from src.strategies.site import MissingCandidateExistsQueryError
 from src.strategies.strategy import Strategies
 
@@ -42,6 +43,7 @@ async def get_config_dependency() -> ConfigLike:
     if not get_config_provider().is_configured():
         logger.info("Config Store is not configured, setting up...")
         await setup_config_store()
+        validate_classifier_configuration()
     return get_config_provider().get_config()
 
 

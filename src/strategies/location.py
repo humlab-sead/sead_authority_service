@@ -6,7 +6,7 @@ class LocationRepository(BaseRepository):
     """Location-specific query proxy"""
 
 
-@Strategies.register(key="location", repository_cls=LocationRepository)
+@Strategies.register(key="location", repository_cls=LocationRepository, support="supported")
 class LocationReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 

@@ -19,13 +19,13 @@ fetch-openrefine-manifest-types:
 .PHONY: generate-schema
 generate-schema:
 	@echo "Generating entity schema files from templates..."
-	@uv run python src/scripts/generate_entity_schema.py --all
+	@uv run python src/scripts/generate_entity_schema.py --all-entities
 	@echo "✅ Schema generation complete!"
 
 .PHONY: generate-schema-force
 generate-schema-force:
 	@echo "Regenerating all entity schema files..."
-	@uv run python src/scripts/generate_entity_schema.py --all --force
+	@uv run python src/scripts/generate_entity_schema.py --all-entities --force
 	@echo "✅ Schema regeneration complete!"
 	
 

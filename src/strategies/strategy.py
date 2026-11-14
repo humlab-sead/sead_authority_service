@@ -14,6 +14,7 @@ class ReconciliationStrategy(ABC):
     """Abstract base class for entity-specific reconciliation strategies"""
 
     repository_cls: type[BaseRepository] = BaseRepository
+    support_status: str | None = None
 
     def __init__(
         self,
@@ -101,6 +102,14 @@ class ReconciliationStrategy(ABC):
 
         return candidate
 
+    def as_candidates(self, entity_data: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
+        """Converts one query result to candidates.
+
+        Specialized strategies can override this to inspect the whole result at once,
+        for example to suppress matches shared by duplicate labels.
+        """
+        return [self.as_candidate(row, query) for row in entity_data]
+
     async def find_candidates(self, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
         """Find candidate matches for the given query
 
@@ -141,6 +150,10 @@ class StrategyRegistry(Registry):
             if args.get("repository_cls"):
                 if hasattr(fn_or_class, "repository_cls"):
                     setattr(fn_or_class, "repository_cls", staticmethod(args["repository_cls"]))
+            # Set the attribute on every registration, defaulting to None, so a
+            # subclass registered without support= cannot inherit "supported" from
+            # its parent class.
+            setattr(fn_or_class, "support_status", args.get("support"))
         return fn_or_class
 
 

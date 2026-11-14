@@ -72,7 +72,7 @@ class ModificationTypeRepository(BaseRepository):
         return await self.fetch_all(self.specification["sql_queries"]["get_lookup_data"])  # type: ignore
 
 
-@Strategies.register(key="modification_type", repository_cls=ModificationTypeRepository)
+@Strategies.register(key="modification_type", repository_cls=ModificationTypeRepository, support="excluded")
 class LLMModificationTypeReconciliationStrategy(LLMReconciliationStrategy):
     """LLM-powered modification type reconciliation strategy"""
 
