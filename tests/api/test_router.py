@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx import Response
 
+import src.api.router as router_module
 from src.api.router import router
 from src.configuration import MockConfigProvider
 from src.configuration.config import Config
@@ -588,8 +589,6 @@ class _LazyConfigProvider(MockConfigProvider):
 class TestLazyConfigurationValidation:
     @pytest.mark.asyncio
     async def test_lazy_setup_validates_classifier_configuration(self, monkeypatch: pytest.MonkeyPatch):
-        import src.api.router as router_module
-
         provider = _LazyConfigProvider(Config(data={"table_specs": {}, "options": {}}))
 
         async def fake_setup_config_store() -> None:

@@ -167,7 +167,7 @@ async def test_reconcile_queries_covers_strategy_cls_none_branch(monkeypatch: py
 
 @pytest.mark.asyncio
 async def test_reconcile_queries_accepts_candidate_description_at_limit(monkeypatch: pytest.MonkeyPatch):
-    class _DescriptionStrategy:
+    class _DescriptionStrategy:  # pylint: disable=unused-argument
         async def find_candidates(self, *, query: str, properties: dict[str, Any], limit: int) -> list[dict[str, Any]]:
             return [{"feature_type_id": 1, "label": "Flint", "name_sim": 1.0}]
 

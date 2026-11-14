@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+import main
 from src.configuration import setup
 from src.configuration.config import Config
 from src.configuration.provider import ConfigProvider, ConfigStore, MockConfigProvider, reset_config_provider, set_config_provider
@@ -215,28 +216,24 @@ def test_validate_classifier_configuration_rejects_invalid_config(provider_with_
 
 @pytest.mark.asyncio
 async def test_startup_validates_classifier_configuration(monkeypatch: pytest.MonkeyPatch, provider_with_config: Config) -> None:
-    import main as main_module
-
     provider_with_config.update(_classifier_config())
 
-    async def fake_setup_config_store(*args: Any, **kwargs: Any) -> None:
+    async def fake_setup_config_store() -> None:
         return None
 
-    monkeypatch.setattr(main_module, "setup_config_store", fake_setup_config_store)
+    monkeypatch.setattr(main, "setup_config_store", fake_setup_config_store)
 
-    await main_module.startup()
+    await main.startup()
 
 
 @pytest.mark.asyncio
 async def test_startup_fails_on_invalid_classifier_configuration(monkeypatch: pytest.MonkeyPatch, provider_with_config: Config) -> None:
-    import main as main_module
-
     provider_with_config.update({"table_specs": {}, "options": {}})
 
-    async def fake_setup_config_store(*args: Any, **kwargs: Any) -> None:
+    async def fake_setup_config_store() -> None:
         return None
 
-    monkeypatch.setattr(main_module, "setup_config_store", fake_setup_config_store)
+    monkeypatch.setattr(main, "setup_config_store", fake_setup_config_store)
 
     with pytest.raises(ClassifierConfigurationError):
-        await main_module.startup()
+        await main.startup()

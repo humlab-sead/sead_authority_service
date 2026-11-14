@@ -11,7 +11,13 @@ from typing import Any
 from loguru import logger
 
 from src.configuration import ConfigValue
-from src.utility import classifier_view_columns, normalize_text, view_column_source
+from src.utility import (
+    build_classifier_specification,
+    classifier_view_columns,
+    normalize_text,
+    set_configured_specification_resolver,
+    view_column_source,
+)
 
 from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies
@@ -180,6 +186,25 @@ def _validate_threshold(name: str) -> None:
         raise ClassifierConfigurationError(f"Reconciliation option 'options:reconciliation:{name}' must be a number")
     if not 0 < float(value) <= 1:
         raise ClassifierConfigurationError(f"Reconciliation option 'options:reconciliation:{name}' must be greater than 0 and at most 1")
+
+
+def _resolve_configured_specification(key: str) -> dict[str, Any] | None:
+    """Builds a classifier specification from the marked table spec, or None when unusable."""
+    try:
+        resolved_spec = ConfigValue(f"table_specs.{key}").resolve()
+    except ValueError:
+        return None
+    table_spec = resolved_spec if isinstance(resolved_spec, dict) else None
+    if table_spec is None:
+        return None
+    if table_spec.get("reconciliation") != "simple":
+        return None
+    if not table_spec.get("id_column") or not table_spec.get("label_column"):
+        return None
+    return build_classifier_specification(key, table_spec)
+
+
+set_configured_specification_resolver(_resolve_configured_specification)
 
 
 def _register_configured_classifiers() -> None:

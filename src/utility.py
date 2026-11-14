@@ -421,23 +421,25 @@ def classifier_view_columns(table_spec: dict[str, Any]) -> set[str]:
     return columns
 
 
-def resolve_configured_specification(key: str) -> dict[str, Any] | None:
-    """Builds a specification for a marked classifier key from loaded configuration."""
-    table_spec: dict[str, Any] | None
-    try:
-        from src.configuration.resolve import ConfigValue  # pylint: disable=import-outside-toplevel
+_ConfiguredSpecificationResolver = Callable[[str], "dict[str, Any] | None"]
+_configured_specification_resolver: "_ConfiguredSpecificationResolver | None" = None
 
-        resolved_spec = ConfigValue(f"table_specs.{key}").resolve()
-    except ValueError:
+
+def set_configured_specification_resolver(resolver: "_ConfiguredSpecificationResolver") -> None:
+    """Registers the function that builds a specification for a configured classifier key.
+
+    The strategies package sets this at import time. Keeping the configuration lookup
+    outside this module avoids a cyclic import between src.utility and src.configuration.
+    """
+    global _configured_specification_resolver  # pylint: disable=global-statement
+    _configured_specification_resolver = resolver
+
+
+def resolve_configured_specification(key: str) -> dict[str, Any] | None:
+    """Builds a specification for a marked classifier key using the registered resolver."""
+    if _configured_specification_resolver is None:
         return None
-    table_spec = resolved_spec if isinstance(resolved_spec, dict) else None
-    if table_spec is None:
-        return None
-    if table_spec.get("reconciliation") != "simple":
-        return None
-    if not table_spec.get("id_column") or not table_spec.get("label_column"):
-        return None
-    return build_classifier_specification(key, table_spec)
+    return _configured_specification_resolver(key)
 
 
 def resolve_specification(specification: dict[str, Any] | str | None) -> dict[str, Any]:
