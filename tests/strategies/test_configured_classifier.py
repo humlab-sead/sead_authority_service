@@ -63,6 +63,14 @@ class TestConfiguredClassifierRegistration:
         assert 's.description as "Description"' in strategy.specification["sql_queries"]["details_sql"]
 
     @with_test_config
+    def test_data_type_details_keep_group_columns(self, test_provider: ExtendedMockConfigProvider):
+        strategy = Strategies.items["data_type"]()
+
+        details_sql: str = strategy.specification["sql_queries"]["details_sql"]
+        assert 's.data_type_group_name as "Group"' in details_sql
+        assert 's.data_type_group_description as "Group Description"' in details_sql
+
+    @with_test_config
     def test_every_approved_classifier_resolves_its_generated_contract(self, test_provider: ExtendedMockConfigProvider):
         for key in CLASSIFIER_KEYS:
             strategy = Strategies.items[key]()

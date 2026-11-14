@@ -32,7 +32,14 @@ data_type:
     foreign_table: "data_type_group"
     foreign_key_column: "data_type_group_id"
   materialized: false
-  extra_columns: []
+  extra_columns:
+    - "dtg.data_type_group_name as data_type_group_name"
+    - "dtg.description as data_type_group_description"
+  joins:
+    - "left join public.tbl_data_type_groups dtg using (data_type_group_id)"
+  details_columns:
+    - 'data_type_group_name as "Group"'
+    - 'data_type_group_description as "Group Description"'
   embedding_config:
     dimension: 768
     ivfflat_lists: 100

@@ -15,7 +15,9 @@ create or replace view authority.data_type as
     t.data_type_name as label,
     authority.immutable_unaccent(lower(t.data_type_name)) as norm_label,
   t.definition as description,
-  authority.immutable_unaccent(lower(t.definition)) as norm_description  from public.tbl_data_types as t;
+  authority.immutable_unaccent(lower(t.definition)) as norm_description,
+    dtg.data_type_group_name as data_type_group_name,
+    dtg.description as data_type_group_description  from public.tbl_data_types as t  left join public.tbl_data_type_groups dtg using (data_type_group_id);
 
 create index if not exists tbl_data_types_norm_trgm
   on public.tbl_data_types

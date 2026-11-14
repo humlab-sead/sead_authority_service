@@ -11,7 +11,7 @@ from typing import Any
 from loguru import logger
 
 from src.configuration import ConfigValue
-from src.utility import classifier_view_columns, normalize_text
+from src.utility import classifier_view_columns, normalize_text, view_column_source
 
 from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies
@@ -149,7 +149,8 @@ def validate_classifier_configuration() -> None:
 
         allowed_columns: set[str] = classifier_view_columns(table_spec)
         for details_column in table_spec.get("details_columns") or []:
-            if details_column not in allowed_columns:
+            source: str | None = view_column_source(details_column)
+            if source not in allowed_columns:
                 raise ClassifierConfigurationError(
                     f"Classifier '{key}' details column '{details_column}' is not exposed by its generated view"
                 )

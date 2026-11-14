@@ -150,8 +150,10 @@ class StrategyRegistry(Registry):
             if args.get("repository_cls"):
                 if hasattr(fn_or_class, "repository_cls"):
                     setattr(fn_or_class, "repository_cls", staticmethod(args["repository_cls"]))
-            if args.get("support") is not None:
-                setattr(fn_or_class, "support_status", args["support"])
+            # Set the attribute on every registration, defaulting to None, so a
+            # subclass registered without support= cannot inherit "supported" from
+            # its parent class.
+            setattr(fn_or_class, "support_status", args.get("support"))
         return fn_or_class
 
 

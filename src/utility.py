@@ -1,5 +1,6 @@
 import importlib
 import os
+import re
 import sys
 import unicodedata
 from typing import Any, Callable, Generic, Literal, TypeVar
@@ -333,14 +334,52 @@ def build_classifier_fuzzy_sql(key: str) -> str:
     )
 
 
+_ALIAS_RE = re.compile(r"^(?P<source>.+?)\s+as\s+(?P<alias>\"[^\"]+\"|[A-Za-z_][\w.]*)\s*$", re.IGNORECASE | re.DOTALL)
+
+
+def view_column_source(column: Any) -> str | None:
+    """Returns the view column expression from a plain or 'as alias' column entry."""
+    if not isinstance(column, str):
+        return None
+    expression: str = column.strip()
+    if not expression:
+        return None
+    match: re.Match | None = _ALIAS_RE.match(expression)
+    if match:
+        return match.group("source").strip()
+    return expression
+
+
+def view_column_alias(column: Any) -> str:
+    """Returns the column name a view expression is exposed under, honoring 'as alias'."""
+    if not isinstance(column, str) or not column.strip():
+        raise ValueError(f"Invalid view column entry: {column!r}")
+    match: re.Match | None = _ALIAS_RE.match(column.strip())
+    if match:
+        return match.group("alias").strip('"')
+    return column.strip().split()[-1].split(".")[-1]
+
+
 def build_classifier_details_sql(key: str, table_spec: dict[str, Any]) -> str:
-    """Builds the details query for a marked classifier from its table specification."""
+    """Builds the details query for a marked classifier from its table specification.
+
+    Each details column is a name in the generated view, optionally with a display
+    header ('data_type_group_name as "Group"'). Qualified or aliased view columns
+    (from extra_columns and joins) are allowed here too.
+    """
     id_column: str = table_spec["id_column"]
     columns: list[str] = [f's.{id_column} as "ID"', 's.label as "Name"']
     if table_spec.get("description_column"):
         columns.append('s.description as "Description"')
     for details_column in table_spec.get("details_columns") or []:
-        columns.append(f's.{details_column} as "{details_column}"')
+        expression: str | None = view_column_source(details_column)
+        if expression is None:
+            raise ValueError(f"Classifier '{key}' has an invalid details column: {details_column!r}")
+        header: str = view_column_alias(details_column).strip('"')
+        if "." in expression:
+            columns.append(f'{expression} as "{header}"')
+        else:
+            columns.append(f's.{expression} as "{header}"')
     projected: str = ",\n       ".join(columns)
     return f"select {projected}\nfrom authority.{key} as s\nwhere s.{id_column} = %(id)s::int"
 
@@ -363,7 +402,11 @@ def build_classifier_specification(key: str, table_spec: dict[str, Any]) -> dict
 
 
 def classifier_view_columns(table_spec: dict[str, Any]) -> set[str]:
-    """Returns the column names a marked classifier view exposes for details queries."""
+    """Returns the column names a marked classifier view exposes for details queries.
+
+    Plain names are listed as-is; qualified or aliased expressions (from extra_columns)
+    are listed as the full expression, so details_columns can reference either form.
+    """
     columns: set[str] = {table_spec["id_column"], "label"}
     if table_spec.get("description_column"):
         columns.add("description")
@@ -371,8 +414,10 @@ def classifier_view_columns(table_spec: dict[str, Any]) -> set[str]:
     if alternate_identity_column:
         columns.add(alternate_identity_column)
     for extra_column in table_spec.get("extra_columns") or []:
-        if isinstance(extra_column, str) and extra_column.strip().isidentifier():
-            columns.add(extra_column.strip())
+        expression: str | None = view_column_source(extra_column)
+        if expression:
+            columns.add(expression)
+            columns.add(view_column_alias(extra_column))
     return columns
 
 

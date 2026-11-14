@@ -88,6 +88,14 @@ table_specs:
     type_or_grouping:
       foreign_table: "data_type_group"
       foreign_key_column: "data_type_group_id"
+    extra_columns:
+      - "dtg.data_type_group_name as data_type_group_name"
+      - "dtg.description as data_type_group_description"
+    joins:
+      - "left join public.tbl_data_type_groups dtg using (data_type_group_id)"
+    details_columns:
+      - 'data_type_group_name as "Group"'
+      - 'data_type_group_description as "Group Description"'
   data_type_group:
     table_name: "tbl_data_type_groups"
     id_column: "data_type_group_id"
