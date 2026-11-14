@@ -42,7 +42,7 @@ class SiteRepository(BaseRepository):
         return place_results
 
 
-@Strategies.register(key="site", repository_cls=SiteRepository)
+@Strategies.register(key="site", repository_cls=SiteRepository, support="supported")
 class SiteReconciliationStrategy(ReconciliationStrategy):
     """Site-specific reconciliation with place names and coordinates"""
 

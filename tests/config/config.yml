@@ -2,6 +2,9 @@ options:
   id_base: "https://w3id.org/sead/id/"
   auto_accept_threshold: 0.90
   default_query_limit: 10
+  reconciliation:
+    label_threshold: 0.30
+    description_threshold: 0.50
   database:
     host: humle.dumle.japp.ouch
     dbname: smurfs
@@ -81,6 +84,7 @@ table_specs:
     label_column: "data_type_name"
     description_column: "definition"
     alternate_identity_column: null
+    reconciliation: simple
     type_or_grouping:
       foreign_table: "data_type_group"
       foreign_key_column: "data_type_group_id"
@@ -90,18 +94,21 @@ table_specs:
     label_column: "data_type_group_name"
     description_column: "description"
     alternate_identity_column: null
+    reconciliation: simple
   dating_uncertainty:
     table_name: "tbl_dating_uncertainty"
     id_column: "dating_uncertainty_id"
     label_column: "uncertainty"
     description_column: "description"
     alternate_identity_column: null
+    reconciliation: simple
   feature_type:
     table_name: "tbl_feature_types"
     id_column: "feature_type_id"
     label_column: "feature_type_name"
     description_column: "feature_type_description"
     alternate_identity_column: null
+    reconciliation: simple
   feature:
     table_name: "tbl_features"
     id_column: "feature_id"
@@ -117,6 +124,7 @@ table_specs:
     label_column: "location_type"
     description_column: "description"
     alternate_identity_column: null
+    reconciliation: simple
   location:
     table_name: "tbl_locations"
     id_column: "location_id"
@@ -132,6 +140,7 @@ table_specs:
     label_column: "group_name"
     description_column: "description"
     alternate_identity_column: null
+    reconciliation: simple
   method:
     table_name: "tbl_methods"
     id_column: "method_id"
@@ -153,12 +162,14 @@ table_specs:
     label_column: "record_type_name"
     description_column: "record_type_description"
     alternate_identity_column: null
+    reconciliation: simple
   relative_age_type:
     table_name: "tbl_relative_age_types"
     id_column: "relative_age_type_id"
     label_column: "age_type"
     description_column: "description"
     alternate_identity_column: null
+    reconciliation: simple
   relative_age:
     table_name: "tbl_relative_ages"
     id_column: "relative_age_id"
@@ -186,24 +197,260 @@ table_specs:
     label_column: "type_name"
     description_column: "type_description"
     alternate_identity_column: null
+    reconciliation: simple
   sample_description_type:
     table_name: "tbl_sample_description_types"
     id_column: "sample_description_type_id"
     label_column: "type_name"
     description_column: "type_description"
     alternate_identity_column: null
+    reconciliation: simple
   sample_location_type:
     table_name: "tbl_sample_location_types"
     id_column: "sample_location_type_id"
     label_column: "location_type"
     description_column: "location_type_description"
     alternate_identity_column: null
+    reconciliation: simple
   sample_type:
     table_name: "tbl_sample_types"
     id_column: "sample_type_id"
     label_column: "type_name"
     description_column: "description"
     alternate_identity_column: null
+    reconciliation: simple
+  abundance_element:
+    table_name: "tbl_abundance_elements"
+    id_column: "abundance_element_id"
+    label_column: "element_name"
+    description_column: "element_description"
+    alternate_identity_column: null
+    reconciliation: simple
+  activity_type:
+    table_name: "tbl_activity_types"
+    id_column: "activity_type_id"
+    label_column: "activity_type"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  age_type:
+    table_name: "tbl_age_types"
+    id_column: "age_type_id"
+    label_column: "age_type"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  alt_ref_type:
+    table_name: "tbl_alt_ref_types"
+    id_column: "alt_ref_type_id"
+    label_column: "alt_ref_type"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  colour:
+    table_name: "tbl_colours"
+    id_column: "colour_id"
+    label_column: "colour_name"
+    description_column: null
+    alternate_identity_column: null
+    reconciliation: simple
+  contact_type:
+    table_name: "tbl_contact_types"
+    id_column: "contact_type_id"
+    label_column: "contact_type_name"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  dataset_submission_type:
+    table_name: "tbl_dataset_submission_types"
+    id_column: "submission_type_id"
+    label_column: "submission_type"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  ecocode_definition:
+    table_name: "tbl_ecocode_definitions"
+    id_column: "ecocode_definition_id"
+    label_column: "name"
+    description_column: "definition"
+    alternate_identity_column: null
+    reconciliation: simple
+  ecocode_group:
+    table_name: "tbl_ecocode_groups"
+    id_column: "ecocode_group_id"
+    label_column: "name"
+    description_column: "definition"
+    alternate_identity_column: null
+    reconciliation: simple
+  horizon:
+    table_name: "tbl_horizons"
+    id_column: "horizon_id"
+    label_column: "horizon_name"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  identification_level:
+    table_name: "tbl_identification_levels"
+    id_column: "identification_level_id"
+    label_column: "identification_level_name"
+    description_column: "notes"
+    alternate_identity_column: null
+    reconciliation: simple
+  language:
+    table_name: "tbl_languages"
+    id_column: "language_id"
+    label_column: "language_name_english"
+    description_column: null
+    alternate_identity_column: null
+    reconciliation: simple
+  project_stage:
+    table_name: "tbl_project_stages"
+    id_column: "project_stage_id"
+    label_column: "stage_name"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  project_type:
+    table_name: "tbl_project_types"
+    id_column: "project_type_id"
+    label_column: "project_type_name"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  property_type:
+    table_name: "tbl_property_types"
+    id_column: "property_type_id"
+    label_column: "property_type_name"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  property_type_group:
+    table_name: "tbl_property_type_groups"
+    id_column: "property_type_group_id"
+    label_column: "property_type_group"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  rdb_code:
+    table_name: "tbl_rdb_codes"
+    id_column: "rdb_code_id"
+    label_column: "rdb_category"
+    description_column: "rdb_definition"
+    alternate_identity_column: null
+    reconciliation: simple
+    description_match_weight: 0.15
+  season:
+    table_name: "tbl_seasons"
+    id_column: "season_id"
+    label_column: "season_name"
+    description_column: null
+    alternate_identity_column: null
+    reconciliation: simple
+  season_type:
+    table_name: "tbl_season_types"
+    id_column: "season_type_id"
+    label_column: "season_type"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  site_type:
+    table_name: "tbl_site_types"
+    id_column: "site_type_id"
+    label_column: "site_type"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  site_type_group:
+    table_name: "tbl_site_type_groups"
+    id_column: "site_type_group_id"
+    label_column: "site_type_group"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  species_association_type:
+    table_name: "tbl_species_association_types"
+    id_column: "association_type_id"
+    label_column: "association_type_name"
+    description_column: "association_description"
+    alternate_identity_column: null
+    reconciliation: simple
+  submission_state:
+    table_name: "tbl_submission_states"
+    id_column: "submission_state_id"
+    label_column: "submission_state"
+    description_column: "note"
+    alternate_identity_column: null
+    reconciliation: simple
+  submission_task_type:
+    table_name: "tbl_submission_task_types"
+    id_column: "submission_task_type_id"
+    label_column: "action_task_name"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  taxa_tree_author:
+    table_name: "tbl_taxa_tree_authors"
+    id_column: "author_id"
+    label_column: "author_name"
+    description_column: null
+    alternate_identity_column: null
+    reconciliation: simple
+  taxa_tree_family:
+    table_name: "tbl_taxa_tree_families"
+    id_column: "family_id"
+    label_column: "family_name"
+    description_column: null
+    alternate_identity_column: null
+    reconciliation: simple
+  taxa_tree_genus:
+    table_name: "tbl_taxa_tree_genera"
+    id_column: "genus_id"
+    label_column: "genus_name"
+    description_column: null
+    alternate_identity_column: null
+    reconciliation: simple
+  taxa_tree_order:
+    table_name: "tbl_taxa_tree_orders"
+    id_column: "order_id"
+    label_column: "order_name"
+    description_column: null
+    alternate_identity_column: null
+    reconciliation: simple
+  unit:
+    table_name: "tbl_units"
+    id_column: "unit_id"
+    label_column: "unit_name"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  value_class:
+    table_name: "tbl_value_classes"
+    id_column: "value_class_id"
+    label_column: "name"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  value_qualifier:
+    table_name: "tbl_value_qualifiers"
+    id_column: "qualifier_id"
+    label_column: "symbol"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  value_type:
+    table_name: "tbl_value_types"
+    id_column: "value_type_id"
+    label_column: "name"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
+  value_type_item:
+    table_name: "tbl_value_type_items"
+    id_column: "value_type_item_id"
+    label_column: "name"
+    description_column: "description"
+    alternate_identity_column: null
+    reconciliation: simple
 
 llm:
   provider: "openai"  # "openai" or "anthropic", "ollama"

@@ -14,7 +14,8 @@ create or replace view authority.record_type as
     t.record_type_id,
     t.record_type_name as label,
     authority.immutable_unaccent(lower(t.record_type_name)) as norm_label,
-    t.record_type_description  from public.tbl_record_types as t;
+  t.record_type_description as description,
+  authority.immutable_unaccent(lower(t.record_type_description)) as norm_description  from public.tbl_record_types as t;
 
 create index if not exists tbl_record_types_norm_trgm
   on public.tbl_record_types
@@ -27,26 +28,35 @@ create index if not exists tbl_record_types_norm_trgm
  ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_record_type(text, integer) cascade;
+drop function if exists authority.fuzzy_record_type(text, integer, double precision, double precision) cascade;
 
 create or replace function authority.fuzzy_record_type(
   p_text text,
-  p_limit integer default 10) returns table (
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50) returns table (
   record_type_id integer,
   label text,
+  description text,
   name_sim double precision
 ) language sql stable
 as $$
   with params as (
     select authority.immutable_unaccent(lower(p_text))::text as q
-  )  select
+  )
+  select
     s.record_type_id,
     s.label,
+    s.description,
     greatest(
       case when s.norm_label = pq.q then 1.0
-          else similarity(s.norm_label, pq.q)
+           else similarity(s.norm_label, pq.q)
       end, 0.0001
     ) as name_sim
   from authority.record_type as s
-  cross join params pq  where s.norm_label % pq.q  order by name_sim desc, s.label
+  cross join params pq
+  where case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  order by name_sim desc, s.label
   limit p_limit;
 $$;

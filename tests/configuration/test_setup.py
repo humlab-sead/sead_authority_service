@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -10,6 +11,7 @@ import pytest
 from src.configuration import setup
 from src.configuration.config import Config
 from src.configuration.provider import ConfigProvider, ConfigStore, MockConfigProvider, reset_config_provider, set_config_provider
+from src.strategies.configured_classifier import CLASSIFIER_KEYS, ClassifierConfigurationError, validate_classifier_configuration
 
 # pylint: disable=redefined-outer-name
 
@@ -104,3 +106,137 @@ async def test_get_connection_missing_pool_raises(provider_with_config: Config) 
     with pytest.raises(ValueError, match="Connection pool not initialized"):
         async with setup.get_connection():
             pass
+
+
+def _classifier_config() -> dict[str, Any]:
+    table_specs: dict[str, Any] = {
+        key: {
+            "name": key.replace("_", " ").title(),
+            "id_column": f"{key}_id",
+            "label_column": f"{key}_label",
+            "description_column": None,
+            "reconciliation": "simple",
+        }
+        for key in CLASSIFIER_KEYS
+    }
+    table_specs["data_type"] = {
+        "name": "Data Type",
+        "id_column": "data_type_id",
+        "label_column": "data_type_name",
+        "description_column": "definition",
+        "reconciliation": "simple",
+    }
+    table_specs["feature_type"] = {
+        "name": "Feature Type",
+        "id_column": "feature_type_id",
+        "label_column": "feature_type_name",
+        "description_column": "feature_type_description",
+        "reconciliation": "simple",
+    }
+    return {
+        "table_specs": table_specs,
+        "options": {"reconciliation": {"label_threshold": 0.30, "description_threshold": 0.50}},
+    }
+
+
+def _drop_classifier_key(config: dict[str, Any]) -> None:
+    del config["table_specs"]["feature_type"]
+
+
+def _drop_last_classifier_key(config: dict[str, Any]) -> None:
+    del config["table_specs"][CLASSIFIER_KEYS[-1]]
+
+
+def _drop_marker(config: dict[str, Any]) -> None:
+    del config["table_specs"]["feature_type"]["reconciliation"]
+
+
+def _add_unregistered_marked_key(config: dict[str, Any]) -> None:
+    config["table_specs"]["location"] = {
+        "id_column": "location_id",
+        "label_column": "location_name",
+        "reconciliation": "simple",
+    }
+
+
+def _blank_label_column(config: dict[str, Any]) -> None:
+    config["table_specs"]["feature_type"]["label_column"] = ""
+
+
+def _unknown_details_column(config: dict[str, Any]) -> None:
+    config["table_specs"]["feature_type"]["details_columns"] = ["missing_column"]
+
+
+def _missing_threshold(config: dict[str, Any]) -> None:
+    del config["options"]["reconciliation"]["label_threshold"]
+
+
+def _zero_threshold(config: dict[str, Any]) -> None:
+    config["options"]["reconciliation"]["description_threshold"] = 0
+
+
+def _above_one_threshold(config: dict[str, Any]) -> None:
+    config["options"]["reconciliation"]["label_threshold"] = 1.5
+
+
+def _non_numeric_threshold(config: dict[str, Any]) -> None:
+    config["options"]["reconciliation"]["description_threshold"] = "high"
+
+
+def test_validate_classifier_configuration_accepts_valid_config(provider_with_config: Config) -> None:
+    provider_with_config.update(_classifier_config())
+
+    validate_classifier_configuration()
+
+
+@pytest.mark.parametrize(
+    "mutation, expected_message",
+    [
+        (_drop_classifier_key, "feature_type"),
+        (_drop_last_classifier_key, CLASSIFIER_KEYS[-1]),
+        (_drop_marker, "reconciliation: simple"),
+        (_add_unregistered_marked_key, "not declared in CLASSIFIER_KEYS"),
+        (_blank_label_column, "label_column"),
+        (_unknown_details_column, "details column"),
+        (_missing_threshold, "label_threshold"),
+        (_zero_threshold, "description_threshold"),
+        (_above_one_threshold, "label_threshold"),
+        (_non_numeric_threshold, "description_threshold"),
+    ],
+)
+def test_validate_classifier_configuration_rejects_invalid_config(provider_with_config: Config, mutation, expected_message: str) -> None:
+    config_data: dict[str, Any] = _classifier_config()
+    mutation(config_data)
+    provider_with_config.update(config_data)
+
+    with pytest.raises(ClassifierConfigurationError, match=expected_message):
+        validate_classifier_configuration()
+
+
+@pytest.mark.asyncio
+async def test_startup_validates_classifier_configuration(monkeypatch: pytest.MonkeyPatch, provider_with_config: Config) -> None:
+    import main as main_module
+
+    provider_with_config.update(_classifier_config())
+
+    async def fake_setup_config_store(*args: Any, **kwargs: Any) -> None:
+        return None
+
+    monkeypatch.setattr(main_module, "setup_config_store", fake_setup_config_store)
+
+    await main_module.startup()
+
+
+@pytest.mark.asyncio
+async def test_startup_fails_on_invalid_classifier_configuration(monkeypatch: pytest.MonkeyPatch, provider_with_config: Config) -> None:
+    import main as main_module
+
+    provider_with_config.update({"table_specs": {}, "options": {}})
+
+    async def fake_setup_config_store(*args: Any, **kwargs: Any) -> None:
+        return None
+
+    monkeypatch.setattr(main_module, "setup_config_store", fake_setup_config_store)
+
+    with pytest.raises(ClassifierConfigurationError):
+        await main_module.startup()

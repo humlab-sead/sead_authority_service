@@ -5,9 +5,7 @@ import psycopg
 import pytest
 
 import src.strategies.query as query_module
-from src.strategies.data_type import DataTypeRepository
 from src.strategies.dimension import DimensionRepository
-from src.strategies.feature_type import FeatureTypeRepository
 from src.strategies.location import LocationRepository
 from src.strategies.method import MethodRepository
 from src.strategies.query import BaseRepository
@@ -20,9 +18,9 @@ from tests.decorators import with_test_config
 QUERY_PROXY_TESTS_SETUPS = [
     ("location", LocationRepository),
     ("country", LocationRepository),
-    ("feature_type", FeatureTypeRepository),
+    ("feature_type", BaseRepository),
     ("site", SiteRepository),
-    ("data_type", DataTypeRepository),
+    ("data_type", BaseRepository),
     ("dimension", DimensionRepository),
     ("method", MethodRepository),
 ]
@@ -52,7 +50,11 @@ class TestMultipleRepository:
         result: list[dict[str, Any]] = await proxy.find("test entity", limit=5)
 
         expected_sql: str = proxy.specification["sql_queries"]["fuzzy_find_sql"].strip()
-        test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"q": "test entity", "n": 5})
+        expected_params: dict[str, Any] = {"q": "test entity", "n": 5}
+        if proxy.specification.get("reconciliation") == "simple":
+            expected_params["label_threshold"] = 0.30
+            expected_params["description_threshold"] = 0.50
+        test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, expected_params)
         test_provider.cursor_mock.fetchall.assert_called_once()
         assert result == mock_rows
 
@@ -69,7 +71,11 @@ class TestMultipleRepository:
 
         await proxy.find("test")
         expected_sql: str = proxy.specification["sql_queries"]["fuzzy_find_sql"].strip()
-        test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"q": "test", "n": 10})
+        expected_params: dict[str, Any] = {"q": "test", "n": 10}
+        if proxy.specification.get("reconciliation") == "simple":
+            expected_params["label_threshold"] = 0.30
+            expected_params["description_threshold"] = 0.50
+        test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, expected_params)
 
     @pytest.mark.parametrize(
         "specification, proxy_cls",

@@ -323,12 +323,87 @@ def load_resource_yaml(key: str) -> dict[str, Any] | None:
         return yaml.safe_load(f)
 
 
+def build_classifier_fuzzy_sql(key: str) -> str:
+    """Builds the marked-classifier fuzzy query with explicit threshold parameters."""
+    return (
+        f"select * from authority.fuzzy_{key}("
+        "%(q)s::text, %(n)s::int, "
+        "%(label_threshold)s::double precision, "
+        "%(description_threshold)s::double precision);"
+    )
+
+
+def build_classifier_details_sql(key: str, table_spec: dict[str, Any]) -> str:
+    """Builds the details query for a marked classifier from its table specification."""
+    id_column: str = table_spec["id_column"]
+    columns: list[str] = [f's.{id_column} as "ID"', 's.label as "Name"']
+    if table_spec.get("description_column"):
+        columns.append('s.description as "Description"')
+    for details_column in table_spec.get("details_columns") or []:
+        columns.append(f's.{details_column} as "{details_column}"')
+    projected: str = ",\n       ".join(columns)
+    return f"select {projected}\nfrom authority.{key} as s\nwhere s.{id_column} = %(id)s::int"
+
+
+def build_classifier_specification(key: str, table_spec: dict[str, Any]) -> dict[str, Any]:
+    """Builds a strategy specification from a marked classifier table specification."""
+    return {
+        "key": key,
+        "display_name": table_spec.get("name") or key.replace("_", " ").title(),
+        "id_field": table_spec["id_column"],
+        "label_field": "label",
+        "properties": [],
+        "property_settings": {},
+        "reconciliation": "simple",
+        "sql_queries": {
+            "fuzzy_find_sql": build_classifier_fuzzy_sql(key),
+            "details_sql": build_classifier_details_sql(key, table_spec),
+        },
+    }
+
+
+def classifier_view_columns(table_spec: dict[str, Any]) -> set[str]:
+    """Returns the column names a marked classifier view exposes for details queries."""
+    columns: set[str] = {table_spec["id_column"], "label"}
+    if table_spec.get("description_column"):
+        columns.add("description")
+    alternate_identity_column: str | None = table_spec.get("alternate_identity_column")
+    if alternate_identity_column:
+        columns.add(alternate_identity_column)
+    for extra_column in table_spec.get("extra_columns") or []:
+        if isinstance(extra_column, str) and extra_column.strip().isidentifier():
+            columns.add(extra_column.strip())
+    return columns
+
+
+def resolve_configured_specification(key: str) -> dict[str, Any] | None:
+    """Builds a specification for a marked classifier key from loaded configuration."""
+    table_spec: dict[str, Any] | None
+    try:
+        from src.configuration.resolve import ConfigValue  # pylint: disable=import-outside-toplevel
+
+        resolved_spec = ConfigValue(f"table_specs.{key}").resolve()
+    except ValueError:
+        return None
+    table_spec = resolved_spec if isinstance(resolved_spec, dict) else None
+    if table_spec is None:
+        return None
+    if table_spec.get("reconciliation") != "simple":
+        return None
+    if not table_spec.get("id_column") or not table_spec.get("label_column"):
+        return None
+    return build_classifier_specification(key, table_spec)
+
+
 def resolve_specification(specification: dict[str, Any] | str | None) -> dict[str, Any]:
     """Resolves a specification which can be either a dict or a resource key string."""
     if isinstance(specification, dict):
         return specification
     if isinstance(specification, str):
-        return load_resource_yaml(specification)  # type: ignore
+        resource_specification: dict[str, Any] | None = load_resource_yaml(specification)
+        if resource_specification is not None:
+            return resource_specification
+        return resolve_configured_specification(specification)  # type: ignore
     return {
         "key": "unknown",
         "id_field": "id",

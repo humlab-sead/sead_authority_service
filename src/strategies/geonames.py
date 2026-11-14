@@ -45,7 +45,7 @@ class GeoNamesRepository(BaseRepository):
         raise NotImplementedError("Alternate identity lookup not implemented for GeoNames")
 
 
-@Strategies.register(key="geonames", repository_cls=GeoNamesRepository)
+@Strategies.register(key="geonames", repository_cls=GeoNamesRepository, support="excluded")
 class GeoNamesReconciliationStrategy(ReconciliationStrategy):
     """Location-specific reconciliation with place names and coordinates"""
 
