@@ -167,7 +167,7 @@ rsync "${stage_rsync_args[@]}" "$g_container_dir/" "$stage_dir/"
 # Stage only the tracked configuration templates needed for first-time setup.
 # Never make arbitrary local config files readable to the target account.
 mkdir -p "$stage_dir/config"
-for config_file in config.yml entities.yml prompts.yml; do
+for config_file in config.yml entities.yml prompts.yml identity_policy.yml; do
   cp -- "$g_container_dir/config/$config_file" "$stage_dir/config/$config_file"
 done
 setup_env_template="$stage_dir/.env.example"

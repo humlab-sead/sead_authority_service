@@ -63,10 +63,20 @@ setup:
 		echo "Keeping existing $(ENV_FILE)."; \
 	fi
 	@if [ ! -f "$(DEPLOY_DIR)/config/config.yml" ]; then \
-		cp "$(BUNDLE_DIR)config/config.yml" "$(BUNDLE_DIR)config/entities.yml" "$(BUNDLE_DIR)config/prompts.yml" "$(DEPLOY_DIR)/config/"; \
+		cp "$(BUNDLE_DIR)config/config.yml" "$(BUNDLE_DIR)config/entities.yml" "$(BUNDLE_DIR)config/prompts.yml" "$(BUNDLE_DIR)config/identity_policy.yml" "$(DEPLOY_DIR)/config/"; \
 		echo "Copied config templates to $(DEPLOY_DIR)/config."; \
 	else \
 		echo "Keeping existing $(DEPLOY_DIR)/config."; \
+		drifted=""; \
+		for f in config.yml entities.yml prompts.yml identity_policy.yml; do \
+			if [ ! -f "$(DEPLOY_DIR)/config/$$f" ] || ! cmp -s "$(BUNDLE_DIR)config/$$f" "$(DEPLOY_DIR)/config/$$f"; then \
+				drifted="$$drifted $$f"; \
+			fi; \
+		done; \
+		if [ -n "$$drifted" ]; then \
+			echo "WARNING: $(DEPLOY_DIR)/config is missing files or differs from the tracked templates:$$drifted"; \
+			echo "         Update it before restarting. The service fails startup when classifier keys are not marked 'reconciliation: simple' in the mounted entities.yml, and /identity endpoints fail when identity_policy.yml is missing."; \
+		fi; \
 	fi
 	@echo "Deployment directory $(DEPLOY_DIR) is ready."
 
