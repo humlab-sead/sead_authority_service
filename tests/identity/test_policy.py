@@ -3,11 +3,28 @@
 from __future__ import annotations
 
 import textwrap
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
+from src.configuration import ConfigFactory, MockConfigProvider, set_config_provider
 from src.identity.policy import _resolve_policy_path
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture(name="policy_config_provider")
+def _policy_config_provider(request: pytest.FixtureRequest) -> Iterator[MockConfigProvider]:
+    """Install a mock config provider for one payload and restore the previous one."""
+    payload: dict = getattr(request, "param", {})
+    provider = MockConfigProvider(ConfigFactory().load(source=payload))
+    previous = set_config_provider(provider)
+    try:
+        yield provider
+    finally:
+        set_config_provider(previous)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -97,6 +114,48 @@ class TestPolicyConstruction:
 
         resolved = _resolve_policy_path()
         assert resolved == minimal_policy_file
+
+    @pytest.mark.usefixtures("policy_config_provider")
+    @pytest.mark.parametrize(
+        "policy_config_provider",
+        [{"identity": {"policy_file": "config/identity_policy.yml"}}],
+        indirect=True,
+    )
+    def test_configured_path_is_resolved_from_application_root(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A relative identity.policy_file resolves from the application root."""
+        monkeypatch.delenv("IDENTITY_POLICY_FILE", raising=False)
+
+        resolved = _resolve_policy_path()
+
+        assert resolved == REPOSITORY_ROOT / "config" / "identity_policy.yml"
+        assert resolved.is_file()
+
+    @pytest.mark.usefixtures("policy_config_provider")
+    @pytest.mark.parametrize("policy_config_provider", [{}], indirect=True)
+    def test_missing_config_falls_back_to_default_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Without identity.policy_file the packaged default is used."""
+        monkeypatch.delenv("IDENTITY_POLICY_FILE", raising=False)
+
+        resolved = _resolve_policy_path()
+
+        assert resolved == REPOSITORY_ROOT / "config" / "identity_policy.yml"
+
+    def test_unconfigured_store_falls_back_to_default_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An unconfigured store must not raise while resolving the path."""
+        monkeypatch.delenv("IDENTITY_POLICY_FILE", raising=False)
+
+        resolved = _resolve_policy_path()
+
+        assert resolved == REPOSITORY_ROOT / "config" / "identity_policy.yml"
+
+    def test_deployment_bundle_ships_policy_file(self) -> None:
+        """The container bundle must include the policy file it mounts at /app/config."""
+        tracked = REPOSITORY_ROOT / "config" / "identity_policy.yml"
+        bundled = REPOSITORY_ROOT / "deployment" / "container" / "config" / "identity_policy.yml"
+
+        assert bundled.is_file(), "deployment/container/config/identity_policy.yml is missing"
+        assert bundled.read_bytes() == tracked.read_bytes(), "bundled identity policy differs from config/identity_policy.yml"
+        assert IdentityPolicy(policy_path=bundled).known_entity_types()
 
 
 # ---------------------------------------------------------------------------

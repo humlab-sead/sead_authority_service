@@ -41,7 +41,7 @@ The Compose service reads runtime variables from `~/container/.env`. `make setup
 | `LLM_PROVIDER`, `OPENAI_*`, `ANTHROPIC_*`, `OLLAMA_*`           | LLM provider selection and settings                                      |
 | `GEONAMES_USERNAME`                                             | GeoNames service account, when used                                      |
 
-The `config/` directory is mounted read-only at `/app/config/`. `config.yml` includes the entity and prompt configuration files; keep included files together or preserve their configured paths. Compose maps `host.docker.internal` to the host gateway. Use that database hostname when PostgreSQL runs on the deployment host; use the database's normal network hostname when it runs elsewhere.
+The `config/` directory is mounted read-only at `/app/config/`. `config.yml` includes the entity and prompt configuration files, and `identity_policy.yml` supplies the SIMS identity policy read by `/identity/capabilities` and `/identity/resolve`; keep these files together or preserve their configured paths. Compose maps `host.docker.internal` to the host gateway. Use that database hostname when PostgreSQL runs on the deployment host; use the database's normal network hostname when it runs elsewhere.
 
 ---
 
@@ -221,7 +221,7 @@ A `false` result or `permission denied for schema authority` means the grants ar
 Classifier reconciliation ships as three separately released inputs. Apply them in this order:
 
 1. Schema: deploy the generated `schema/generated/<key>.sql` files for the classifier types you enable. Each file creates or replaces `authority.<key>` and `authority.fuzzy_<key>`.
-2. Mounted configuration: when a deployment mounts its own `config/`, update `entities.yml` and `config.yml` to match the application defaults. The classifier entries, the `reconciliation: simple` marker, `description_match_weight`, and `options:reconciliation` thresholds must agree with `config/`.
+2. Mounted configuration: when a deployment mounts its own `config/`, update `entities.yml`, `config.yml`, and `identity_policy.yml` to match the application defaults. The classifier entries, the `reconciliation: simple` marker, `description_match_weight`, and `options:reconciliation` thresholds must agree with `config/`. The identity policy file must be present because `/identity/capabilities` and `/identity/resolve` read it.
 3. Application code: deploy the image that registers the classifier keys in `CLASSIFIER_KEYS`.
 
 The service fails startup with a named classifier configuration error when a registered key has no marked `table_specs` entry, or when a reconciliation threshold is missing or outside `0 < value <= 1`. Deploy the schema and the mounted configuration before the image so a new image does not fail at startup.

@@ -26,9 +26,11 @@ from typing import Literal
 import yaml
 from loguru import logger
 
-# Path resolution: honour CONFIG_FILE env var directory structure, or fall back
-# to the standard location relative to this file's package root.
-_DEFAULT_POLICY_PATH = Path(__file__).parent.parent.parent / "config" / "identity_policy.yml"
+from src.configuration import ConfigValue
+
+# Application root: the directory that holds `src/` and `config/`.
+_PACKAGE_ROOT = Path(__file__).parent.parent.parent
+_DEFAULT_POLICY_PATH = _PACKAGE_ROOT / "config" / "identity_policy.yml"
 
 EntitySubtype = Literal["provider_owned", "shared_metadata", "relationship"]
 EntityOperation = Literal["bind_existing", "allocate_new"]
@@ -63,10 +65,28 @@ class EntityPolicy:
 
 
 def _resolve_policy_path() -> Path:
-    """Return the policy file path, honouring the IDENTITY_POLICY_FILE env var."""
+    """Return the path of the identity policy file.
+
+    Precedence: the ``IDENTITY_POLICY_FILE`` environment variable, then
+    ``identity.policy_file`` from the loaded configuration, then the packaged
+    default at ``config/identity_policy.yml``. A relative configured path is
+    resolved from the application root, so the result does not depend on the
+    working directory.
+    """
     env_override: str | None = os.environ.get("IDENTITY_POLICY_FILE")
     if env_override:
         return Path(env_override)
+
+    try:
+        configured = ConfigValue("identity:policy_file").resolve()
+    except (TypeError, ValueError):
+        # The configuration store is not set up yet, for example during tests.
+        configured = None
+
+    if isinstance(configured, str) and configured.strip():
+        configured_path = Path(configured.strip())
+        return configured_path if configured_path.is_absolute() else _PACKAGE_ROOT / configured_path
+
     return _DEFAULT_POLICY_PATH
 
 
@@ -78,9 +98,10 @@ class IdentityPolicy:
     ----------
     policy_path:
         Path to a YAML file.  Defaults to ``config/identity_policy.yml``
-        (resolved relative to the repository root).  Override in tests by
-        passing an explicit path, or via the ``IDENTITY_POLICY_FILE``
-        environment variable.
+        (resolved relative to the application root).  Override in tests by
+        passing an explicit path, in a deployment by setting
+        ``identity.policy_file`` in the configuration, or by setting the
+        ``IDENTITY_POLICY_FILE`` environment variable.
     """
 
     policy_path: Path = field(default_factory=_resolve_policy_path)
