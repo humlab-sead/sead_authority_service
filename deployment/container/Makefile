@@ -13,6 +13,9 @@ SHELL := /bin/bash
 BUNDLE_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 DEPLOY_DIR ?= $(HOME)/container
 ENV_TEMPLATE ?= $(BUNDLE_DIR).env.example
+CONFIG_SOURCE_DIR ?= $(BUNDLE_DIR)../../config
+CONFIG_FILES := config.yml entities.yml prompts.yml identity_policy.yml
+SYNC_CONFIG ?= false
 COMPOSE_FILE := podman-compose.yml
 COMPOSE := podman-compose -f $(COMPOSE_FILE)
 SERVICE_NAME := sead-authority-service
@@ -30,7 +33,8 @@ IMAGE_TAG := $(shell sed -n 's/^SEAD_AUTHORITY_IMAGE_TAG=\(.*\)/\1/p' $(ENV_FILE
 help:
 	@echo "SEAD Authority Service - rootless Podman deployment"
 	@echo ""
-	@echo "  make setup             Create ~/container runtime dirs and .env (from the example)"
+	@echo "  make setup             Create runtime dirs and .env; preserve existing config by default"
+	@echo "  make setup SYNC_CONFIG=true  Replace the four mounted config files from CONFIG_SOURCE_DIR"
 	@echo "  make pull              Pull the image tag named by .env"
 	@echo "  make up                Start the service"
 	@echo "  make down              Stop the service"
@@ -62,20 +66,40 @@ setup:
 	else \
 		echo "Keeping existing $(ENV_FILE)."; \
 	fi
-	@if [ ! -f "$(DEPLOY_DIR)/config/config.yml" ]; then \
-		cp "$(BUNDLE_DIR)config/config.yml" "$(BUNDLE_DIR)config/entities.yml" "$(BUNDLE_DIR)config/prompts.yml" "$(BUNDLE_DIR)config/identity_policy.yml" "$(DEPLOY_DIR)/config/"; \
-		echo "Copied config templates to $(DEPLOY_DIR)/config."; \
+	@for f in $(CONFIG_FILES); do \
+		if [ ! -f "$(CONFIG_SOURCE_DIR)/$$f" ]; then \
+			echo "Missing configuration source: $(CONFIG_SOURCE_DIR)/$$f" >&2; \
+			exit 1; \
+		fi; \
+	done; \
+	has_config=false; \
+	for f in $(CONFIG_FILES); do \
+		if [ -e "$(DEPLOY_DIR)/config/$$f" ]; then has_config=true; fi; \
+	done; \
+	if [ "$$has_config" = false ]; then \
+		cp $(foreach f,$(CONFIG_FILES),"$(CONFIG_SOURCE_DIR)/$(f)") "$(DEPLOY_DIR)/config/"; \
+		echo "Initialized $(DEPLOY_DIR)/config from $(CONFIG_SOURCE_DIR)."; \
 	else \
-		echo "Keeping existing $(DEPLOY_DIR)/config."; \
 		drifted=""; \
-		for f in config.yml entities.yml prompts.yml identity_policy.yml; do \
-			if [ ! -f "$(DEPLOY_DIR)/config/$$f" ] || ! cmp -s "$(BUNDLE_DIR)config/$$f" "$(DEPLOY_DIR)/config/$$f"; then \
+		for f in $(CONFIG_FILES); do \
+			source_file="$(CONFIG_SOURCE_DIR)/$$f"; \
+			target_file="$(DEPLOY_DIR)/config/$$f"; \
+			if [ ! -f "$$target_file" ] || ! cmp -s "$$source_file" "$$target_file"; then \
 				drifted="$$drifted $$f"; \
+				if [ "$(SYNC_CONFIG)" = "true" ]; then \
+					cp "$$source_file" "$$target_file"; \
+					echo "Synchronized configuration: $$f"; \
+				elif [ ! -f "$$target_file" ]; then \
+					echo "WARNING: configuration file is missing and was preserved: $$target_file"; \
+				else \
+					echo "WARNING: configuration drift detected and preserved: $$target_file"; \
+				fi; \
+			else \
+				echo "Configuration matches source: $$f"; \
 			fi; \
 		done; \
-		if [ -n "$$drifted" ]; then \
-			echo "WARNING: $(DEPLOY_DIR)/config is missing files or differs from the tracked templates:$$drifted"; \
-			echo "         Update it before restarting. The service fails startup when classifier keys are not marked 'reconciliation: simple' in the mounted entities.yml, and /identity endpoints fail when identity_policy.yml is missing."; \
+		if [ -n "$$drifted" ] && [ "$(SYNC_CONFIG)" != "true" ]; then \
+			echo "         Review differences; rerun with SYNC_CONFIG=true to replace these files:$$drifted"; \
 		fi; \
 	fi
 	@echo "Deployment directory $(DEPLOY_DIR) is ready."

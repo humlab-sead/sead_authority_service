@@ -10,6 +10,8 @@ import yaml
 from src.configuration.config import Config, ConfigFactory, is_config_path, is_path_to_existing_file
 from src.configuration.interface import ConfigLike
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
 
 def test_is_config_path_validation(tmp_path) -> None:
     """Validate config path detection and missing file handling."""
@@ -120,3 +122,33 @@ def test_configfactory_applies_env_prefix(tmp_path: Path, monkeypatch) -> None:
 
     assert cfg.data["section"]["key"] == "from_env"
     assert cfg.env_prefix == "MYAPP"
+
+
+def test_repository_config_resolves_supported_environment_placeholders(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The runtime config resolves placeholders supported by ConfigFactory."""
+    monkeypatch.setenv("SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME", "test_database")
+    monkeypatch.setenv("SEAD_AUTHORITY_OPTIONS_DATABASE_HOST", "db.test")
+    monkeypatch.setenv("SEAD_AUTHORITY_OPTIONS_DATABASE_PORT", "5544")
+    monkeypatch.setenv("SEAD_AUTHORITY_OPTIONS_DATABASE_USER", "test_user")
+    monkeypatch.setenv("LLM_PROVIDER", "test-provider")
+    monkeypatch.setenv("OLLAMA_MODEL", "test-model")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama.test")
+    monkeypatch.setenv("ANTHROPIC_MODEL", "test-anthropic-model")
+    monkeypatch.setenv("GEONAMES_USERNAME", "test-geonames-user")
+
+    config = ConfigFactory().load(
+        source=str(REPOSITORY_ROOT / "config" / "config.yml"),
+        env_prefix="SEAD_AUTHORITY",
+    )
+
+    assert config.get("options.database.dbname") == "test_database"
+    assert config.get("options.database.host") == "db.test"
+    assert config.get("options.database.port") == "5544"
+    assert config.get("options.database.user") == "test_user"
+    assert config.get("llm.provider") == "test-provider"
+    assert config.get("llm.ollama.model") == "test-model"
+    assert config.get("llm.ollama.host") == "http://ollama.test"
+    assert config.get("llm.anthropic.model") == "test-anthropic-model"
+    assert config.get("geonames.options.username") == "test-geonames-user"
+    assert config.get("policy.geonames.geonames.options.username") == "test-geonames-user"
+    assert config.get("policy.geonames.geonames.options.lang") == "en"

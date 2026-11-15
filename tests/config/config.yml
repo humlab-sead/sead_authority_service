@@ -36,14 +36,15 @@ policy:
     output:
       format: json
   geonames:
-    options:
-      username: "${GEONAMES_USERNAME}"
-      lang: "en"
-      country_bias: "en"
-      fuzzy: 0.8
-      feature_classes: ["P", "A"]  # Populated places and Administrative divisions
-      orderby: "relevance"
-      style: "FULL"
+    geonames:
+      options:
+        username: "${GEONAMES_USERNAME}"
+        lang: "en"
+        country_bias: "en"
+        fuzzy: 0.8
+        feature_classes: ["P", "A"]  # Populated places and Administrative divisions
+        orderby: "relevance"
+        style: "FULL"
 
 features:
   use_mcp_server: false  # Start disabled, flip to true when ready

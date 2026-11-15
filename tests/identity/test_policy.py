@@ -148,14 +148,7 @@ class TestPolicyConstruction:
 
         assert resolved == REPOSITORY_ROOT / "config" / "identity_policy.yml"
 
-    def test_deployment_bundle_ships_policy_file(self) -> None:
-        """The container bundle must include the policy file it mounts at /app/config."""
-        tracked = REPOSITORY_ROOT / "config" / "identity_policy.yml"
-        bundled = REPOSITORY_ROOT / "deployment" / "container" / "config" / "identity_policy.yml"
 
-        assert bundled.is_file(), "deployment/container/config/identity_policy.yml is missing"
-        assert bundled.read_bytes() == tracked.read_bytes(), "bundled identity policy differs from config/identity_policy.yml"
-        assert IdentityPolicy(policy_path=bundled).known_entity_types()
 
 
 # ---------------------------------------------------------------------------

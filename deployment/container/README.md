@@ -32,9 +32,12 @@ The deployment runtime lives in `~/container` for the deployment user:
 └── logs/                 # mounted read-write at /app/logs
 ```
 
-The runtime bundle contains no image build tools. `make setup` copies only
-runtime files and creates `.env` and `config/` from the tracked templates.
-Edit `~/container/.env` with the target host's own values before starting the
+The runtime bundle contains no image build tools. The repository root
+`config/` is the only tracked source for the four mounted YAML files. Run
+`make setup` to create `.env` and initialize an empty mounted `config/` from
+that source. The command reports missing or changed config files on later runs
+and preserves them unless `SYNC_CONFIG=true` is explicitly set. Edit
+`~/container/.env` with the target host's own values before starting the
 service. Keep credentials out of tracked files.
 
 ## First-time setup
@@ -77,13 +80,18 @@ deployment/scripts/sync-to-deploy authority-service.sead.se --dry-run
 deployment/scripts/sync-to-deploy authority-service.sead.se
 ```
 
-The helper copies runtime files from `deployment/container/` into the
-deployment user's `~/container`, removes obsolete bundle files, and preserves
-the target `.env`, `config/`, and `logs/`. On first sync it creates missing
-`.env` and `config/` from templates. It installs the systemd user unit for the
-default `container` directory and reloads the user manager when it is running.
-It does not enable or restart the service or pull a new image. Use the
-lifecycle steps below after syncing if the deployment should run a new image.
+The helper copies runtime files from `deployment/container/` and the managed
+YAML files from the repository root `config/` into the deployment user's
+`~/container`. It removes obsolete bundle files and preserves the target
+`.env`, `config/`, and `logs/`. On first sync it creates missing `.env` and
+initializes an empty mounted config. Later syncs report config differences and
+preserve them by default. Preview replacement with `--dry-run --sync-config`;
+use `--sync-config` only when the mounted files should be replaced by the
+checkout's versions. The checkout should match the source revision used for
+the image. The helper installs the systemd user unit for the default
+`container` directory and reloads the user manager when it is running. It does
+not enable or restart the service or pull a new image. Use the lifecycle steps
+below after syncing if the deployment should run a new image.
 
 For an isolated bundle such as `container-dev`, use:
 
