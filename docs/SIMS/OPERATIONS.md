@@ -216,8 +216,8 @@ Re-submitting the same entity in the same scope is expected to produce the **sam
 FileNotFoundError: ... config/identity_policy.yml
 ```
 
-**Cause:** Working directory is not the repo root, or `CONFIG_FILE` env var points to a non-standard location that changes the resolved path.  
-**Fix:** Run the service from the repo root, or set an explicit policy path by overriding `ConfigValue("identity:policy_file")` in `config.yml`.
+**Cause:** The resolved policy path does not exist. Resolution order is the `IDENTITY_POLICY_FILE` environment variable, then `identity.policy_file` in the loaded configuration (a relative value resolves from the application root), then the default `config/identity_policy.yml`. A container that mounts `config/` without shipping `identity_policy.yml` leaves `/app/config/identity_policy.yml` missing.  
+**Fix:** Ship `identity_policy.yml` in the mounted `config/` directory (the tracked deployment bundle includes it), or set `identity.policy_file` in `config.yml`, or set `IDENTITY_POLICY_FILE` in the deployment environment.
 
 ---
 

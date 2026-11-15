@@ -52,6 +52,11 @@ policy:
 features:
   use_mcp_server: false
 
+identity:
+  # Path inside the container, resolved from the application root. The file is
+  # part of the mounted config/ directory.
+  policy_file: "config/identity_policy.yml"
+
 mcp:
   version: "0.1.0"
   retrieval:
