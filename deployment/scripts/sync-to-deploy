@@ -156,14 +156,15 @@ trap cleanup EXIT
 
 # Build a readable temporary runtime bundle so the deployment account can run
 # rsync and setup even when it cannot read the developer's checkout. Exclude
-# build tools and operator-owned files from this copy.
+# build tools and operator-owned files from this copy. This copy only fills a
+# temporary directory, so it stays silent even with --verbose: its file list
+# would describe a throwaway staging directory, not the deployment target.
 stage_rsync_args=(
   --archive
   --no-owner
   --no-group
   --delete
   --delete-delay
-  --itemize-changes
   --human-readable
   --exclude=/.env
   --exclude=/.env.dev.example
