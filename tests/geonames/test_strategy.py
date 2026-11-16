@@ -21,13 +21,13 @@ class TestGeoNamesRepository:
         """Test initialization with default configuration values"""
         test_provider.get_config().update(
             {
-                "geonames.username": "test_user",
-                "geonames.lang": "sv",
-                "geonames.country_bias": "SE",
-                "geonames.fuzzy": 0.9,
-                "geonames.feature_classes": ["P", "A", "H"],
-                "geonames.orderby": "population",
-                "geonames.style": "SHORT",
+                "policy.geonames.options.username": "test_user",
+                "policy.geonames.options.lang": "sv",
+                "policy.geonames.options.country_bias": "SE",
+                "policy.geonames.options.fuzzy": 0.9,
+                "policy.geonames.options.feature_classes": ["P", "A", "H"],
+                "policy.geonames.options.orderby": "population",
+                "policy.geonames.options.style": "SHORT",
             }
         )
 
@@ -208,7 +208,7 @@ class TestGeoNamesReconciliationStrategy:
     def test_init_with_strategy_options(self, test_provider: MockConfigProvider):
         """Test initialization with strategy options from config"""
         test_provider.get_config().update(
-            {"policy.geonames.geonames.options": {"username": "strategy_user", "lang": "sv", "country_bias": "SE"}}
+            {"policy.geonames.options": {"username": "strategy_user", "lang": "sv", "country_bias": "SE"}}
         )
 
         mock_proxy = MagicMock()
