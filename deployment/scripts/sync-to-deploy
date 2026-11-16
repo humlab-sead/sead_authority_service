@@ -148,6 +148,10 @@ if [[ "$g_verbose" == true ]]; then
 fi
 
 command -v mktemp >/dev/null || { echo "mktemp is required." >&2; exit 1; }
+
+printf 'Synchronizing %s/\n' "$g_container_dir"
+printf '     to local %s/\n' "$destination"
+
 stage_dir="$(mktemp -d "${TMPDIR:-/tmp}/authority-container-sync.XXXXXX")"
 cleanup() {
   rm -rf -- "$stage_dir"
