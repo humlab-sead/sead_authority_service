@@ -210,9 +210,6 @@ if [[ "$g_dry_run" == true ]]; then
   target_rsync_args+=(--dry-run)
 fi
 
-printf 'Synchronizing %s/\n' "$g_container_dir"
-printf '     to local %s/\n' "$destination"
-
 if [[ "$g_dry_run" == true ]]; then
   sudo -n -u "$g_deploy_user" test -d "$destination" || {
     echo "Cannot dry-run: target directory does not exist: $destination" >&2
@@ -243,7 +240,9 @@ if [[ "$g_dry_run" == true ]]; then
   done
   echo "Dry run complete; the target and systemd unit were not changed."
 else
-  sudo -n -u "$g_deploy_user" -H make -C "$stage_dir" setup \
+  # --no-print-directory drops make's Entering/Leaving messages, which would
+  # otherwise name the temporary staging directory and add no useful detail.
+  sudo -n -u "$g_deploy_user" -H make --no-print-directory -C "$stage_dir" setup \
     "DEPLOY_DIR=$destination" "ENV_TEMPLATE=$setup_env_template" \
     "CONFIG_SOURCE_DIR=$stage_dir/config" "SYNC_CONFIG=$g_sync_config"
   if [[ "$g_remote_dir" == "container" ]]; then
