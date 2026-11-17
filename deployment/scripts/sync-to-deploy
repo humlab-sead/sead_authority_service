@@ -3,11 +3,14 @@
 set -euo pipefail
 
 g_script_dir="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+g_repository_dir="$(CDPATH= cd -- "$g_script_dir/../.." && pwd)"
 g_container_dir="$(CDPATH= cd -- "$g_script_dir/../container" && pwd)"
 g_deploy_user="${DEPLOY_USER:-authority-service.sead.se}"
 g_remote_dir="${REMOTE_DIR:-container}"
 g_dry_run=false
+g_sync_config=false
 g_verbose=false
+config_files=(config.yml entities.yml prompts.yml identity_policy.yml)
 
 usage() {
   local message="${1:-}"
@@ -15,16 +18,18 @@ usage() {
     echo "error: $message" >&2
   fi
   cat <<'EOF'
-Usage: deployment/scripts/sync-to-deploy [TARGET_USER] [--remote-dir DIR] [--dry-run] [--verbose]
+Usage: deployment/scripts/sync-to-deploy [TARGET_USER] [--remote-dir DIR] [--dry-run] [--sync-config] [--verbose]
 
-Synchronize runtime files from deployment/container/ to a deployment user's
-runtime directory on this host. Build files stay in the developer checkout.
-The caller must have passwordless sudo access to TARGET_USER. The target
-account does not need read access to this checkout.
+Synchronize runtime files from deployment/container/ and config/ to a
+deployment user's runtime directory on this host. config/ is the tracked
+source for the mounted application configuration. Build files stay in the
+developer checkout. The caller must have passwordless sudo access to
+TARGET_USER. The target account does not need read access to this checkout.
 
-The sync removes obsolete runtime files, preserves the target .env, config/,
-and logs/, and creates missing .env and config/ files from the tracked
-templates. It installs the systemd user unit for the default container/
+The sync removes obsolete runtime files and preserves the target .env, config/,
+and logs/. It initializes an empty mounted config from config/. Later syncs
+report missing or changed files and preserve them unless --sync-config is
+specified. It installs the systemd user unit for the default container/
 directory and reloads the user manager when it is running. It does not restart
 or enable the service.
 
@@ -36,15 +41,19 @@ Defaults:
 Examples:
   deployment/scripts/sync-to-deploy
   deployment/scripts/sync-to-deploy authority-service.sead.se --dry-run
+  deployment/scripts/sync-to-deploy authority-service.sead.se --dry-run --sync-config
+  deployment/scripts/sync-to-deploy authority-service.sead.se --sync-config
   deployment/scripts/sync-to-deploy authority-service.sead.se --remote-dir container-dev
 
 Use a separate container-dev directory for isolated development. A new
 non-default directory uses .env.dev.example. Syncing it does not install or
-reload the production systemd user unit.
+reload the production systemd user unit. Use --sync-config only when replacing
+the mounted configuration with the version in this checkout.
 
 Options:
   --remote-dir DIR   Target directory under the deployment user's home
-  --dry-run          Show rsync changes without modifying the target
+  --dry-run          Show runtime and configuration changes without modifying the target
+  --sync-config      Replace config.yml, entities.yml, prompts.yml, and identity_policy.yml
   --verbose          Show detailed rsync output
   -h, --help         Show this help message
 EOF
@@ -60,6 +69,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --dry-run)
       g_dry_run=true
+      shift
+      ;;
+    --sync-config)
+      g_sync_config=true
       shift
       ;;
     --verbose)
@@ -135,6 +148,10 @@ if [[ "$g_verbose" == true ]]; then
 fi
 
 command -v mktemp >/dev/null || { echo "mktemp is required." >&2; exit 1; }
+
+printf 'Synchronizing %s/\n' "$g_container_dir"
+printf '     to local %s/\n' "$destination"
+
 stage_dir="$(mktemp -d "${TMPDIR:-/tmp}/authority-container-sync.XXXXXX")"
 cleanup() {
   rm -rf -- "$stage_dir"
@@ -143,14 +160,15 @@ trap cleanup EXIT
 
 # Build a readable temporary runtime bundle so the deployment account can run
 # rsync and setup even when it cannot read the developer's checkout. Exclude
-# build tools and operator-owned files from this copy.
+# build tools and operator-owned files from this copy. This copy only fills a
+# temporary directory, so it stays silent even with --verbose: its file list
+# would describe a throwaway staging directory, not the deployment target.
 stage_rsync_args=(
   --archive
   --no-owner
   --no-group
   --delete
   --delete-delay
-  --itemize-changes
   --human-readable
   --exclude=/.env
   --exclude=/.env.dev.example
@@ -164,11 +182,11 @@ stage_rsync_args=(
 )
 rsync "${stage_rsync_args[@]}" "$g_container_dir/" "$stage_dir/"
 
-# Stage only the tracked configuration templates needed for first-time setup.
+# Stage only the allowlisted configuration files from the repository source.
 # Never make arbitrary local config files readable to the target account.
 mkdir -p "$stage_dir/config"
-for config_file in config.yml entities.yml prompts.yml identity_policy.yml; do
-  cp -- "$g_container_dir/config/$config_file" "$stage_dir/config/$config_file"
+for config_file in "${config_files[@]}"; do
+  cp -- "$g_repository_dir/config/$config_file" "$stage_dir/config/$config_file"
 done
 setup_env_template="$stage_dir/.env.example"
 if [[ "$g_remote_dir" != "container" ]]; then
@@ -181,6 +199,7 @@ target_rsync_args=(
   --archive
   --no-owner
   --no-group
+  --omit-dir-times
   --delete
   --delete-delay
   --itemize-changes
@@ -196,9 +215,6 @@ if [[ "$g_dry_run" == true ]]; then
   target_rsync_args+=(--dry-run)
 fi
 
-printf 'Synchronizing %s/\n' "$g_container_dir"
-printf '     to local %s/\n' "$destination"
-
 if [[ "$g_dry_run" == true ]]; then
   sudo -n -u "$g_deploy_user" test -d "$destination" || {
     echo "Cannot dry-run: target directory does not exist: $destination" >&2
@@ -209,9 +225,31 @@ else
 fi
 sudo -n -u "$g_deploy_user" -H rsync "${target_rsync_args[@]}" "$stage_dir/" "$destination/"
 
-if [[ "$g_dry_run" == false ]]; then
-  sudo -n -u "$g_deploy_user" -H make -C "$stage_dir" setup \
-    "DEPLOY_DIR=$destination" "ENV_TEMPLATE=$setup_env_template"
+if [[ "$g_dry_run" == true ]]; then
+  echo "Configuration comparison with repository config/:"
+  for config_file in "${config_files[@]}"; do
+    target_file="$destination/config/$config_file"
+    if sudo -n -u "$g_deploy_user" test -f "$target_file"; then
+      if sudo -n -u "$g_deploy_user" cmp -s "$stage_dir/config/$config_file" "$target_file"; then
+        printf '  matches: %s\n' "$config_file"
+      elif [[ "$g_sync_config" == true ]]; then
+        printf '  would update: %s\n' "$config_file"
+      else
+        printf '  differs: %s (preserved; use --sync-config to overwrite)\n' "$config_file"
+      fi
+    elif [[ "$g_sync_config" == true ]]; then
+      printf '  would create: %s\n' "$config_file"
+    else
+      printf '  missing: %s (preserved; use --sync-config to create)\n' "$config_file"
+    fi
+  done
+  echo "Dry run complete; the target and systemd unit were not changed."
+else
+  # --no-print-directory drops make's Entering/Leaving messages, which would
+  # otherwise name the temporary staging directory and add no useful detail.
+  sudo -n -u "$g_deploy_user" -H make --no-print-directory -C "$stage_dir" setup \
+    "DEPLOY_DIR=$destination" "ENV_TEMPLATE=$setup_env_template" \
+    "CONFIG_SOURCE_DIR=$stage_dir/config" "SYNC_CONFIG=$g_sync_config"
   if [[ "$g_remote_dir" == "container" ]]; then
     unit_dir="${deploy_home}/.config/systemd/user"
     sudo -n -u "$g_deploy_user" -H install -d -m 700 "$unit_dir"
@@ -229,6 +267,4 @@ if [[ "$g_dry_run" == false ]]; then
     echo "Skipped systemd unit install for non-default directory $g_remote_dir."
   fi
   echo "Synchronized files are owned by $g_deploy_user. The service was not restarted or enabled."
-else
-  echo "Dry run complete; the target and systemd unit were not changed."
 fi

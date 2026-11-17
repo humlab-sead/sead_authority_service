@@ -4,6 +4,7 @@
 
 - Confirmed feature / change request (2026-11-14)
 - Tier 1 of 2. Tier 2 is [Context-Scoped Classification and Lookup Reconciliation](../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md).
+- Revision 8: make root `config/` the only tracked runtime configuration source; deployment setup reports drift and overwrites only with explicit approval, tracked by [issue #48](https://github.com/humlab-sead/sead_authority_service/issues/48)
 - Revision 7: enable description scoring only for `rdb_code` after read-only staging population checks; defer the other three code-label weights
 - Revision 6: thresholds are service configuration passed as function parameters, not `pg_trgm` database settings
 - Revision 5: recorded excluded-classifier reasons in the reconciliation type inventory register tracked by [issue #43](https://github.com/humlab-sead/sead_authority_service/issues/43)
@@ -307,13 +308,13 @@ Rules:
 - Keep `sampling_context` on its current registered path because its details query returns related description types that the generic details query does not reproduce.
 - Exclude `dimension` from `CLASSIFIER_KEYS` and from the marked set. It keeps `src/strategies/dimension.py` and `src/resources/dimension.yml` unchanged until tier 2 replaces them.
 
-### 7. Configuration validation and deployment parity
+### 7. Configuration validation and deployment workflow
 
 `GET /reconcile` instantiates every registered strategy, so an unresolvable classifier specification breaks the manifest for all types. Two additions prevent that:
 
 - Startup validation: after configuration loads, confirm every `CLASSIFIER_KEYS` key exists in `table_specs` with `reconciliation: simple`, a text `label_column`, and an integer `id_column`. Fail startup with a named error rather than serving a partial manifest.
 - Threshold validation: `options:reconciliation:label_threshold` and `description_threshold` must be present and inside `0 < value <= 1`. Fail startup with a named error otherwise, rather than falling back to a default that nobody reviewed.
-- Deployment parity: `deployment/container/config/entities.yml` is an independently maintained runtime configuration that deployments can mount in place of the application default. It must receive the same classifier entries and marker. `deployment/container/config/config.yml` must carry the same `options:reconciliation` thresholds. The required order for a release is schema, then runtime configuration, then application code.
+- Deployment configuration: the repository root `config/` is the only tracked source for runtime YAML. Setup initializes an empty mounted directory from that source and reports missing or changed files without overwriting them. `--sync-config` explicitly replaces the four managed files. Use the source revision associated with the image unless an intentional mounted override is documented. The required release order is schema, then runtime configuration, then application code.
 - Deployment guidance states that reconciliation results do not depend on any `pg_trgm.*` database setting, so a database administrator cannot change match behavior silently.
 
 ## Alternatives Considered
@@ -366,7 +367,7 @@ Rules:
 - HTTP level: `POST /reconcile` for a classifier whose description exceeds 500 characters returns a valid response with a truncated `description`.
 - Database smoke test on a disposable schema: for each marked classifier, run the details query for one row and the fuzzy function with a known label.
 - Reconciliation smoke test: `POST /reconcile` for a representative entity from each category (name-only, name+description, code label, duplicate labels) returns the expected ordering and `match` flags.
-- Deployment parity: `deployment/container/config/entities.yml` classifier entries and markers match `config/entities.yml`.
+- Deployment setup: initial mounted configuration comes from root `config/`; later syncs report differences and preserve mounted files unless `--sync-config` is used.
 
 ## Acceptance Criteria
 
@@ -381,11 +382,11 @@ Rules:
 - `P-AC-9`: `coordinate_method_dimension`, `value_qualifier_symbol`, and `abundance_element_group` are not registered and are documented as excluded.
 - `P-AC-10`: Every registration declares a support status, the manifest is derived from those declarations, and a registration without a valid status fails a test.
 - `P-AC-11`: Unmarked entities keep their current generated views, function signatures, scoring, and resource SQL contracts; snapshots for `site` and `method` are unchanged.
-- `P-AC-12`: A registered classifier without a valid `table_specs` entry fails startup with a named error, and `deployment/container/config/entities.yml` carries the same classifier entries and markers as `config/entities.yml`.
+- `P-AC-12`: A registered classifier without a valid `table_specs` entry fails startup with a named error, and deployment setup initializes `entities.yml` from root `config/entities.yml` and reports later differences without overwriting by default.
 - `P-AC-13`: An entity with `description_match_weight` of `0` or absent generates no description predicate, no description index, and no description term in its fuzzy function.
 - `P-AC-14`: Description scoring is enabled for exactly `rdb_code`, which passes the recorded population check; `age_type`, `relative_age_type`, and `value_qualifier` stay at zero weight pending new data and a separate decision.
 - `P-AC-15`: Match thresholds come from `options:reconciliation` in service configuration and are passed to generated functions as parameters; no `pg_trgm.*` database setting affects reconciliation results.
-- `P-AC-16`: A missing or out-of-range threshold fails startup with a named error, and `deployment/container/config/config.yml` carries the same threshold values as `config/config.yml`.
+- `P-AC-16`: A missing or out-of-range threshold fails startup with a named error, and deployment setup initializes `config.yml` from root `config/config.yml` and reports later differences without overwriting by default.
 
 ## Planning Handoff
 
@@ -412,7 +413,7 @@ Constraints and behavior to preserve:
 - `Strategies.items` remains a plain dict; tests, `suggest.py`, and the manifest depend on it.
 - Existing `defaultTypes` ordering and public type IDs.
 - Generated schema remains authoritative and generated by `src/scripts/generate_entity_schema.py`.
-- `tests/config/config.yml`, `tests/config/entities.yml`, `deployment/container/config/config.yml`, and `deployment/container/config/entities.yml` must stay in sync with their counterparts under `config/`.
+- Keep shared runtime YAML only under root `config/`. `tests/config/config.yml` remains a test-specific fixture with inline test data; deployment setup copies the four managed YAML files from root `config/`.
 - `src/metadata.py` reads support status from registration metadata only; it must not read the inventory register, which is a documentation artefact.
 - Required release order: schema, then runtime configuration, then application code.
 - Do not write to production data.

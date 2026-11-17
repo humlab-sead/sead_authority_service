@@ -13,14 +13,9 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATHS = (
     REPOSITORY_ROOT / "config/config.yml",
     REPOSITORY_ROOT / "tests/config/config.yml",
-    REPOSITORY_ROOT / "deployment/container/config/config.yml",
 )
 
-ENTITY_CONFIG_PATHS = (
-    REPOSITORY_ROOT / "config/entities.yml",
-    REPOSITORY_ROOT / "tests/config/entities.yml",
-    REPOSITORY_ROOT / "deployment/container/config/entities.yml",
-)
+ENTITY_CONFIG_PATHS = (REPOSITORY_ROOT / "config/entities.yml",)
 
 APPROVED_INVENTORY = 45
 
@@ -224,13 +219,6 @@ def test_marked_filter_parameters_are_preserved_with_description_scoring(tmp_pat
     assert "and filter_id is not null" in sql
 
 
-REFERENCE_ENTITY_CONFIG_PATHS = (
-    REPOSITORY_ROOT / "config/entities.yml",
-    REPOSITORY_ROOT / "tests/config/entities.yml",
-    REPOSITORY_ROOT / "deployment/container/config/entities.yml",
-)
-
-
 def test_approved_classifier_inventory_matches_marked_entries() -> None:
     expected_keys = set(CLASSIFIER_KEYS)
 
@@ -293,10 +281,10 @@ def test_weighted_and_zero_weight_classifier_contracts_differ() -> None:
 
 
 def test_reference_entities_are_marked_simple_in_entity_configurations() -> None:
-    for config_path in REFERENCE_ENTITY_CONFIG_PATHS:
-        entities = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-        for entity_key in ("feature_type", "data_type"):
-            assert entities[entity_key].get("reconciliation") == "simple", (config_path, entity_key)
+    config_path = REPOSITORY_ROOT / "config/entities.yml"
+    entities = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    for entity_key in ("feature_type", "data_type"):
+        assert entities[entity_key].get("reconciliation") == "simple", (config_path, entity_key)
 
 
 def test_reference_entities_are_marked_in_inline_test_table_specs() -> None:

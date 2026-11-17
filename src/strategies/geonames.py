@@ -15,15 +15,18 @@ class GeoNamesRepository(BaseRepository):
 
     def __init__(self, specification: StrategySpecification | str, **kwargs) -> None:
         super().__init__(specification, **kwargs)
-        self.username: str | None = kwargs.get("username") or ConfigValue("geonames.username").resolve() or "demo"
-        self.lang: str | None = kwargs.get("lang") or ConfigValue("geonames.lang").resolve() or "en"
-        self.country_bias: str | None = kwargs.get("country_bias") or ConfigValue("geonames.country_bias").resolve()
-        self.fuzzy: float = float(kwargs.get("fuzzy") or ConfigValue("geonames.fuzzy").resolve() or 0.8)
+        config_path: str = "policy.geonames.options"
+        self.username: str | None = kwargs.get("username") or ConfigValue(f"{config_path}.username").resolve() or "demo"
+        self.lang: str | None = kwargs.get("lang") or ConfigValue(f"{config_path}.lang").resolve() or "en"
+        self.country_bias: str | None = kwargs.get("country_bias") or ConfigValue(f"{config_path}.country_bias").resolve()
+        self.fuzzy: float = float(kwargs.get("fuzzy") or ConfigValue(f"{config_path}.fuzzy").resolve() or 0.8)
         self.feature_classes: tuple[str, ...] = tuple(
-            kwargs.get("feature_classes") or ConfigValue("geonames.feature_classes").resolve() or ("P", "A")
+            kwargs.get("feature_classes") or ConfigValue(f"{config_path}.feature_classes").resolve() or ("P", "A")
         )
-        self.orderby: Literal["relevance", "population"] = kwargs.get("orderby") or ConfigValue("geonames.orderby").resolve() or "relevance"
-        self.style: Literal["FULL", "SHORT", "MEDIUM"] = kwargs.get("style") or ConfigValue("geonames.style").resolve() or "FULL"
+        self.orderby: Literal["relevance", "population"] = (
+            kwargs.get("orderby") or ConfigValue(f"{config_path}.orderby").resolve() or "relevance"
+        )
+        self.style: Literal["FULL", "SHORT", "MEDIUM"] = kwargs.get("style") or ConfigValue(f"{config_path}.style").resolve() or "FULL"
 
         self.proxy: GeoNamesProxy = GeoNamesProxy(username=self.username, lang=self.lang)
 
@@ -53,7 +56,7 @@ class GeoNamesReconciliationStrategy(ReconciliationStrategy):
         self, specification: dict[str, str] | str | None = None, repository_or_cls: type[BaseRepository] | BaseRepository | None = None
     ) -> None:
         specification = resolve_specification(specification=specification or self.key)
-        strategy_options: dict[str, Any] = ConfigValue(f"policy.{self.key}.geonames.options").resolve() or {}
+        strategy_options: dict[str, Any] = ConfigValue(f"policy.{self.key}.options").resolve() or {}
         if isinstance(repository_or_cls, BaseRepository):
             proxy: BaseRepository = repository_or_cls
         else:

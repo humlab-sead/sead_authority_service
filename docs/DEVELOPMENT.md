@@ -62,6 +62,12 @@ For PostgreSQL passwords, prefer `~/.pgpass` over environment variables.
 
 See `config/config.yml` and `deployment/container/.env.example` for supported variables. For production deployment configuration see [OPERATIONS.md](OPERATIONS.md).
 
+The repository root `config/` is the tracked source for shared runtime
+configuration. `tests/config/config.yml` is a test-specific configuration with
+inline test data, not a second source for the shared entity, prompt, or identity
+policy files. Deployment setup copies the root files into the mounted runtime
+directory; see [OPERATIONS.md](OPERATIONS.md) for drift and override handling.
+
 ### Disposable database for integration tests
 
 The identity integration tests need a local SEAD database with the current

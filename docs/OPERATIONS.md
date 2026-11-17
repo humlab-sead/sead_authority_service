@@ -43,6 +43,16 @@ The Compose service reads runtime variables from `~/container/.env`. `make setup
 
 The `config/` directory is mounted read-only at `/app/config/`. `config.yml` includes the entity and prompt configuration files, and `identity_policy.yml` supplies the SIMS identity policy read by `/identity/capabilities` and `/identity/resolve`; keep these files together or preserve their configured paths. Compose maps `host.docker.internal` to the host gateway. Use that database hostname when PostgreSQL runs on the deployment host; use the database's normal network hostname when it runs elsewhere.
 
+The repository root `config/` is the only tracked source for `config.yml`,
+`entities.yml`, `prompts.yml`, and `identity_policy.yml`. Deployment setup copies
+these files when the mounted directory has no managed config files, then
+reports missing or changed files without overwriting them. Use
+`sync-to-deploy --sync-config` only when the checkout is at the source revision
+associated with the image and the mounted files should be replaced. Record any
+intentional mounted overrides in `~/container/config/OVERRIDES.md`, including
+the file or key, reason, image tag, and source commit. Keep credentials in
+`.env`, not in tracked YAML.
+
 ---
 
 ## Runtime Data Layout
@@ -107,7 +117,10 @@ deployment/scripts/sync-to-deploy authority-service.sead.se
 
 The helper syncs runtime files to the deployment user's `~/container`, removes
 obsolete bundle files, and preserves `.env`, `config/`, and `logs/`. On first
-sync it creates missing `.env` and `config/` from templates. It installs the
+sync it creates missing `.env` and seeds the mounted config from the checkout's
+root `config/`. Later syncs report config differences and preserve them by
+default. Preview config updates with `--dry-run --sync-config`; use
+`--sync-config` only to replace the four managed files. The helper installs the
 systemd user unit for the default `container` directory and reloads the user
 manager when it is running, but does not enable or restart the service or pull
 an image. It uses local `sudo` and does not connect over SSH.

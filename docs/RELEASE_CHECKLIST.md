@@ -10,7 +10,7 @@ Run every command as the deployment user unless a step names the developer accou
 
 - [ ] The image tag you intend to deploy is published to `ghcr.io/humlab-sead/sead_authority_service`.
 - [ ] The database schema for that image is deployed. Classifier reconciliation needs `authority.<key>` and `authority.fuzzy_<key>` for every registered classifier key.
-- [ ] The mounted configuration matches the image's expected classifier inventory.
+- [ ] The mounted `entities.yml` configures every classifier registered by the image tag being deployed (see section 5).
 - [ ] You know the previous image tag. That is the rollback target.
 
 Release order is schema, then mounted configuration, then image. An image deployed before its configuration fails startup with a named classifier configuration error.
@@ -41,6 +41,8 @@ deployment/scripts/sync-to-deploy authority-service.sead.se
 The helper writes `~/container`, removes obsolete bundle files, and preserves `.env`, `config/`, and `logs/`. It installs the systemd user unit but does not enable, restart, or pull anything.
 
 - [ ] Preview an existing deployment first: add `--dry-run`.
+- [ ] Review the config comparison in the dry run. Existing mounted config is preserved unless `--sync-config` is supplied.
+- [ ] When replacing config, use a checkout at the source revision associated with the image tag; preview with `--dry-run --sync-config` first.
 - [ ] Isolated instance: add `--remote-dir container-dev` and pass `DEPLOY_DIR=~/container-dev` to later Makefile commands.
 
 ---
@@ -64,19 +66,23 @@ Edit `~/container/.env` and keep mode `0600`.
 `~/container/config/` is mounted read-only at `/app/config/`. Verify it before pulling the new image.
 
 - [ ] `config.yml`, `entities.yml`, and `prompts.yml` are present.
-- [ ] `identity_policy.yml` is present. `GET /identity/capabilities` and `POST /identity/resolve` fail with `FileNotFoundError` when it is missing. When the synced bundle does not provide it, copy it from the checkout: `cp config/identity_policy.yml ~/container/config/`.
-- [ ] `entities.yml` marks each registered classifier with `reconciliation: simple`. The current inventory is 45 entries.
+- [ ] `identity_policy.yml` is present. `GET /identity/capabilities` and `POST /identity/resolve` fail with `FileNotFoundError` when it is missing.
+- [ ] The mounted `entities.yml` sets `reconciliation: simple` for every classifier registered by the image tag being deployed. The current inventory is 45 entries.
 - [ ] `options:reconciliation:label_threshold` and `options:reconciliation:description_threshold` in `config.yml` are numbers greater than 0 and at most 1.
 - [ ] Only `rdb_code` sets `description_match_weight` above 0.
-- [ ] The mounted files match the tracked templates:
+- [ ] Compare the mounted files with the checkout's single tracked source:
 
 ```bash
 for f in config.yml entities.yml prompts.yml identity_policy.yml; do
-  cmp -s "deployment/container/config/$f" "$HOME/container/config/$f" || echo "differs or missing: $f"
+  cmp -s "config/$f" "$HOME/container/config/$f" || echo "differs or missing: $f"
 done
 ```
 
-Any output is either an intentional environment override or drift. Record which, before pulling the image.
+Any output is either an intentional environment override or drift. Preserve it
+by default. Use `sync-to-deploy --sync-config` only when replacing all four
+mounted files with the checkout versions. Record intentional overrides in
+`~/container/config/OVERRIDES.md`, including the file or key, reason, image tag,
+and source commit.
 
 ---
 
