@@ -69,6 +69,9 @@ class SiteReconciliationStrategy(ReconciliationStrategy):
         if not candidates:
             candidates.extend(await self.get_repository().find(query, limit))
 
+        for candidate in candidates:
+            candidate["name_sim"] = float(candidate.get("name_sim", 0))
+
         # 3) Geographic proximity boost if coordinates provided
         if properties.get("latitude") and properties.get("longitude") and candidates:
             candidates = await self._apply_geographic_scoring(candidates, {"lat": properties["latitude"], "lon": properties["longitude"]})
