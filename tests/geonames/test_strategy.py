@@ -207,9 +207,7 @@ class TestGeoNamesReconciliationStrategy:
     @with_test_config
     def test_init_with_strategy_options(self, test_provider: MockConfigProvider):
         """Test initialization with strategy options from config"""
-        test_provider.get_config().update(
-            {"policy.geonames.options": {"username": "strategy_user", "lang": "sv", "country_bias": "SE"}}
-        )
+        test_provider.get_config().update({"policy.geonames.options": {"username": "strategy_user", "lang": "sv", "country_bias": "SE"}})
 
         mock_proxy = MagicMock()
         mock_query_proxy_class = MagicMock()

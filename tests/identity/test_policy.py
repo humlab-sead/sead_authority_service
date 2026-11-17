@@ -149,8 +149,6 @@ class TestPolicyConstruction:
         assert resolved == REPOSITORY_ROOT / "config" / "identity_policy.yml"
 
 
-
-
 # ---------------------------------------------------------------------------
 # known_entity_types
 # ---------------------------------------------------------------------------
