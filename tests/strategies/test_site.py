@@ -2,6 +2,7 @@
 Unit tests for Site reconciliation strategy.
 """
 
+from decimal import Decimal
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -316,6 +317,34 @@ class TestSiteReconciliationStrategy:
         mock_proxy.fetch_site_by_national_id.assert_called_once_with("TEST123")
         mock_proxy.find.assert_not_called()
         assert result == mock_sites
+
+    @patch("src.strategies.site.SiteRepository")
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_decimal_national_id_score_accepts_location_boosts(
+        self, mock_query_proxy_class, test_provider: ExtendedMockConfigProvider
+    ):
+        """Normalize exact-ID scores before adding geographic and place-name boosts."""
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
+        mock_proxy = AsyncMock()
+        mock_query_proxy_class.return_value = mock_proxy
+        mock_proxy.fetch_site_by_national_id.return_value = [{"site_id": 1, "label": "Test Site", "name_sim": Decimal("0.5")}]
+        mock_proxy.fetch_site_distances.return_value = {1: 0.5}
+        mock_proxy.fetch_site_location_similarity.return_value = {1: 0.9}
+        properties: dict[str, Any] = {
+            "national_id": "TEST123",
+            "latitude": 59.3293,
+            "longitude": 18.0686,
+            "place_name": "Stockholm",
+        }
+
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
+            result = await strategy.find_candidates("test query", properties, limit=10)
+
+        mock_proxy.fetch_site_by_national_id.assert_called_once_with("TEST123")
+        mock_proxy.find.assert_not_called()
+        assert isinstance(result[0]["name_sim"], float)
+        assert result[0]["name_sim"] == pytest.approx(0.78)
 
     @patch("src.strategies.site.SiteRepository")
     @pytest.mark.asyncio

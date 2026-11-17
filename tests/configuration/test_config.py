@@ -149,5 +149,5 @@ def test_repository_config_resolves_supported_environment_placeholders(monkeypat
     assert config.get("llm.ollama.model") == "test-model"
     assert config.get("llm.ollama.host") == "http://ollama.test"
     assert config.get("llm.anthropic.model") == "test-anthropic-model"
-    assert config.get("policy.geonames.options.username") == "test-geonames-user"
-    assert config.get("policy.geonames.options.lang") == "en"
+    assert config.get("geonames.options.username") == "test-geonames-user"
+    assert config.get("geonames.options.lang") == "en"

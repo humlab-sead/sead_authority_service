@@ -15,9 +15,7 @@ CONFIG_PATHS = (
     REPOSITORY_ROOT / "tests/config/config.yml",
 )
 
-ENTITY_CONFIG_PATHS = (
-    REPOSITORY_ROOT / "config/entities.yml",
-)
+ENTITY_CONFIG_PATHS = (REPOSITORY_ROOT / "config/entities.yml",)
 
 APPROVED_INVENTORY = 45
 

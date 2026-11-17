@@ -23,7 +23,9 @@ class GeoNamesRepository(BaseRepository):
         self.feature_classes: tuple[str, ...] = tuple(
             kwargs.get("feature_classes") or ConfigValue(f"{config_path}.feature_classes").resolve() or ("P", "A")
         )
-        self.orderby: Literal["relevance", "population"] = kwargs.get("orderby") or ConfigValue(f"{config_path}.orderby").resolve() or "relevance"
+        self.orderby: Literal["relevance", "population"] = (
+            kwargs.get("orderby") or ConfigValue(f"{config_path}.orderby").resolve() or "relevance"
+        )
         self.style: Literal["FULL", "SHORT", "MEDIUM"] = kwargs.get("style") or ConfigValue(f"{config_path}.style").resolve() or "FULL"
 
         self.proxy: GeoNamesProxy = GeoNamesProxy(username=self.username, lang=self.lang)
