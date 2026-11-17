@@ -45,6 +45,9 @@ Request flow: `OpenRefine → POST /reconcile → router.py → reconcile.py →
 - Run targeted tests for the changed area before finishing.
 - Run broader tests when a change crosses layers.
 - When completing work tracked by a task or phase plan, update its progress tracker, checklist, status, and deliverables in the same change; do not leave completed work marked as not started.
+- When drafting a pull request title or description, follow `.github/pr-description-instructions.md`. Use `.github/promotion_pr_template.md` for promotions (`dev` into `staging` or `staging` into `main`), and `.github/pull_request_template.md` for other pull requests.
+- When uncommitted work must reach `dev` through review, run `scripts/workflow/create_change_pr.py` instead of assembling branch, commit, push, and `gh pr create` calls by hand. Pass `--closes <issue>` for every issue the change resolves.
+- Prepare and publish a promotion with `scripts/workflow/promote_dev_to_staging.sh prepare` and `publish <number>`. The script verifies that code changes reached the source branch through pull requests.
 
 ## Cross-cutting instructions
 
