@@ -124,6 +124,10 @@ class ReconciliationStrategy(ABC):
 
         return sorted(candidates, key=lambda x: x.get("name_sim", x.get("score", 0)), reverse=True)[:limit]
 
+    async def suggest_candidates(self, prefix: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Find autocomplete candidates for a text prefix."""
+        return await self.find_candidates(query=prefix, properties={}, limit=limit)
+
     async def _find_candidates(self, query, properties, limit, proxy) -> list[dict]:
         """Internal method to find candidates, can be overridden by subclasses"""
         candidates: list[dict] = []

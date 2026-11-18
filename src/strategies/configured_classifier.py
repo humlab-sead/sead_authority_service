@@ -80,6 +80,10 @@ class ClassifierConfigurationError(ValueError):
 class ConfiguredClassifierStrategy(ReconciliationStrategy):
     """Reconciles a classifier using its marked table specification and generated SQL."""
 
+    async def suggest_candidates(self, prefix: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Return classifier rows whose normalized labels start with the prefix."""
+        return await self.get_repository().find_by_prefix(prefix, limit)
+
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:
         """Converts one row to a candidate using label evidence for the match flag."""
         return self._as_label_evidence_candidate(entity_data, normalize_text(query))

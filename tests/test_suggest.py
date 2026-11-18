@@ -323,6 +323,9 @@ class _SuggestStrategyBase:
     def get_properties_meta(self) -> list[dict[str, str]]:
         return self.properties
 
+    async def suggest_candidates(self, prefix: str, limit: int = 10) -> list[dict[str, Any]]:
+        return await self.find_candidates(query=prefix, properties={}, limit=limit)
+
     async def find_candidates(self, query: str, properties: dict[str, Any] | None = None, limit: int = 10) -> list[dict[str, Any]]:
         if self.raise_on_find:
             raise RuntimeError("boom")
@@ -437,6 +440,28 @@ async def test_suggest_entities_filters_and_sorts(monkeypatch: pytest.MonkeyPatc
     assert data["result"][0]["id"] == "https://w3id.org/sead/id/location/9"
     assert data["result"][0]["description"] == "desc"
     assert data["result"][1]["id"] == "https://w3id.org/sead/id/site/1"
+
+
+@pytest.mark.asyncio
+async def test_suggest_entities_uses_prefix_suggestions_for_short_queries(monkeypatch: pytest.MonkeyPatch):
+    calls: list[tuple[str, int]] = []
+
+    class ContactTypeStrategy(_SuggestStrategyBase):
+        async def suggest_candidates(self, prefix: str, limit: int = 10) -> list[dict[str, Any]]:
+            calls.append((prefix, limit))
+            return [{"id": 1, "label": "Samples taken by", "name_sim": 0.2}]
+
+        async def find_candidates(self, query: str, properties: dict[str, Any] | None = None, limit: int = 10) -> list[dict[str, Any]]:
+            raise AssertionError("Autocomplete should use the prefix search")
+
+    monkeypatch.setattr(suggest_module, "ConfigValue", _TestConfigValue)
+    monkeypatch.setattr(suggest_module.Strategies, "items", {"contact_type": ContactTypeStrategy}, raising=False)
+
+    data = await suggest_module.suggest_entities(prefix=" Sa ", entity_type="contact_type")
+
+    assert calls == [("Sa", 10)]
+    assert data["result"][0]["name"] == "Samples taken by"
+    assert data["result"][0]["id"] == "https://w3id.org/sead/id/contact_type/1"
 
 
 @pytest.mark.asyncio

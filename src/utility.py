@@ -334,6 +334,26 @@ def build_classifier_fuzzy_sql(key: str) -> str:
     )
 
 
+def build_classifier_prefix_sql(key: str, table_spec: dict[str, Any]) -> str:
+    """Builds a normalized label-prefix query for a marked classifier."""
+    description_column: str = ", s.description" if table_spec.get("description_column") else ""
+    id_column: str = table_spec["id_column"]
+    return f"""
+with params as (
+  select authority.immutable_unaccent(lower(%(q)s))::text as q
+)
+select
+  s.{id_column},
+  s.label{description_column},
+  greatest(similarity(s.norm_label, pq.q), 0.0001) as name_sim
+from authority.{key} as s
+cross join params pq
+where left(s.norm_label, char_length(pq.q)) = pq.q
+order by name_sim desc, s.label
+limit %(n)s::int;
+""".strip()
+
+
 _ALIAS_RE = re.compile(r"^(?P<source>.+?)\s+as\s+(?P<alias>\"[^\"]+\"|[A-Za-z_][\w.]*)\s*$", re.IGNORECASE | re.DOTALL)
 
 
@@ -396,6 +416,7 @@ def build_classifier_specification(key: str, table_spec: dict[str, Any]) -> dict
         "reconciliation": "simple",
         "sql_queries": {
             "fuzzy_find_sql": build_classifier_fuzzy_sql(key),
+            "prefix_find_sql": build_classifier_prefix_sql(key, table_spec),
             "details_sql": build_classifier_details_sql(key, table_spec),
         },
     }
