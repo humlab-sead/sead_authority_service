@@ -1,7 +1,5 @@
 """Verify reconciliation candidates against SEAD and report match readiness."""
 
-from urllib.parse import urlsplit
-
 import psycopg
 from loguru import logger
 from psycopg_pool import PoolClosed, PoolTimeout
@@ -13,6 +11,8 @@ from src.api.model import (
 )
 from src.configuration import ConfigValue
 from src.identity.policy import IdentityPolicy
+from src.record_identifiers import parse_record_uri, valid_id_base
+from src.record_selection import PILOT_TYPES, RecordSelectionPolicy, fetch_record_row, load_record_selection_policy
 from src.strategies.site import SiteRepository
 from src.strategies.strategy import ReconciliationStrategy, Strategies
 
@@ -29,13 +29,7 @@ def _configured_id_base() -> str | None:
 
 
 def _valid_id_base(id_base: str | None) -> bool:
-    if not id_base or "?" in id_base or "#" in id_base:
-        return False
-    try:
-        parsed = urlsplit(id_base)
-    except ValueError:
-        return False
-    return bool(parsed.scheme and parsed.netloc and parsed.path.endswith("/") and not parsed.query and not parsed.fragment)
+    return valid_id_base(id_base)
 
 
 def _site_strategy(entity_type: str, policy: IdentityPolicy) -> type[ReconciliationStrategy] | None:
@@ -46,38 +40,40 @@ def _site_strategy(entity_type: str, policy: IdentityPolicy) -> type[Reconciliat
 
 
 def _site_id_from_candidate(candidate_id: str, entity_type: str, id_base: str | None) -> int | None:
-    if not _valid_id_base(id_base) or "?" in candidate_id or "#" in candidate_id:
-        return None
-    try:
-        base = urlsplit(id_base)
-        candidate = urlsplit(candidate_id)
-    except ValueError:
-        return None
-    if (
-        not candidate.scheme  # pylint: disable=too-many-boolean-expressions
-        or not candidate.netloc
-        or candidate.scheme.casefold() != base.scheme.casefold()
-        or candidate.netloc.casefold() != base.netloc.casefold()
-        or candidate.query
-        or candidate.fragment
-        or not candidate.path.startswith(base.path)
-    ):
-        return None
+    return parse_record_uri(candidate_id, entity_type, id_base)
 
-    relative_path = candidate.path[len(base.path) :]
-    type_segment, separator, id_segment = relative_path.partition("/")
-    if not separator or type_segment != entity_type or "/" in id_segment or not id_segment.isascii() or not id_segment.isdecimal():
-        return None
-    try:
-        aggregate_id = int(id_segment)
-    except ValueError:
-        return None
-    return aggregate_id if aggregate_id > 0 else None
+
+async def _verify_pilot_item(
+    item: CandidateVerificationItem, policy: RecordSelectionPolicy, id_base: str | None
+) -> CandidateVerificationResult:
+    """Verify one pilot candidate with the same typed lookup used by details."""
+    flags = policy.types.get(item.type)
+    if flags is None or not flags.export_verification:
+        return CandidateVerificationResult(type=item.type, id=item.id, outcome="unsupported_type")
+
+    target_id: int | None = parse_record_uri(item.id, item.type, id_base)
+    if target_id is None:
+        return CandidateVerificationResult(type=item.type, id=item.id, outcome="invalid_candidate")
+
+    row = await fetch_record_row(item.type, target_id)
+    if row is None:
+        return CandidateVerificationResult(type=item.type, id=item.id, outcome="not_found")
+
+    return CandidateVerificationResult(
+        type=item.type,
+        id=item.id,
+        outcome="exists",
+        entity_type=item.type,
+        aggregate_id=target_id,
+    )
 
 
 async def verify_candidate_batch(items: list[CandidateVerificationItem]) -> list[CandidateVerificationResult]:
     """Return one ordered, read-only SEAD existence result for each candidate."""
     policy = IdentityPolicy()
+    selection_policy: RecordSelectionPolicy | None = (
+        load_record_selection_policy() if any(item.type in PILOT_TYPES for item in items) else None
+    )
     id_base = _configured_id_base()
     site_strategy_cls = _site_strategy("site", policy) if any(item.type == "site" for item in items) else None
     site_repository: SiteRepository | None = None
@@ -85,6 +81,11 @@ async def verify_candidate_batch(items: list[CandidateVerificationItem]) -> list
     results: list[CandidateVerificationResult] = []
 
     for item in items:
+        if item.type in PILOT_TYPES:
+            assert selection_policy is not None
+            results.append(await _verify_pilot_item(item, selection_policy, id_base))
+            continue
+
         if item.type != "site" or site_strategy_cls is None:
             results.append(CandidateVerificationResult(type=item.type, id=item.id, outcome="unsupported_type"))
             continue

@@ -15,6 +15,28 @@ ID_BASE = "https://w3id.org/sead/id/"
 
 # pylint: disable=protected-access, unused-argument
 
+_ALL_FLAGS = (
+    "search_supported",
+    "identifier_search_supported",
+    "browse_supported",
+    "details_supported",
+    "export_verification_supported",
+)
+
+
+def _enable_pilot(test_provider, entity_type: str, **flags: bool) -> None:
+    """Enable selected capabilities for one pilot type without touching the others."""
+    entry = {flag: False for flag in _ALL_FLAGS}
+    entry.update(flags)
+    block = {
+        "version": 1,
+        "browse_max_rows": 500,
+        "browse_max_bytes": 1_048_576,
+        "interactive_search_max_results": 50,
+        "types": {entity_type: entry},
+    }
+    test_provider.get_config().update({"options:record_selection": block})
+
 
 @pytest.fixture(name="client")
 def _client() -> TestClient:
@@ -181,3 +203,174 @@ def test_candidate_endpoint_rejects_more_than_one_hundred_items_without_database
 
     assert response.status_code == 422
     site_exists.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@with_test_config
+async def test_pilot_batch_preserves_order_echoes_and_ids(monkeypatch, test_provider) -> None:
+    _enable_pilot(test_provider, "feature_type", export_verification_supported=True)
+    looked_up: list[tuple[str, int]] = []
+
+    async def fetch_record_row(entity_type: str, target_id: int):
+        looked_up.append((entity_type, target_id))
+        return {"target_id": target_id, "name": "row"} if target_id in {1, 2} else None
+
+    monkeypatch.setattr(candidate_verification, "fetch_record_row", fetch_record_row)
+
+    items = [
+        CandidateVerificationItem(type="feature_type", id=f"{ID_BASE}feature_type/1"),
+        CandidateVerificationItem(type="feature_type", id=f"{ID_BASE}feature_type/002"),
+        CandidateVerificationItem(type="feature_type", id=f"{ID_BASE}feature_type/3"),
+        CandidateVerificationItem(type="feature_type", id="https://invalid.example/site/1"),
+        CandidateVerificationItem(type="feature_type", id=f"{ID_BASE}country/1"),
+        CandidateVerificationItem(type="feature_type", id=f"{ID_BASE}feature_type/1"),
+    ]
+    results = await candidate_verification.verify_candidate_batch(items)
+
+    assert [result.outcome for result in results] == [
+        "exists",
+        "exists",
+        "not_found",
+        "invalid_candidate",
+        "invalid_candidate",
+        "exists",
+    ]
+    assert [result.aggregate_id for result in results] == [1, 2, None, None, None, 1]
+    assert [result.type for result in results] == ["feature_type"] * len(items)
+    assert [result.id for result in results] == [item.id for item in items]
+    assert looked_up == [("feature_type", 1), ("feature_type", 2), ("feature_type", 3), ("feature_type", 1)]
+
+
+@pytest.mark.asyncio
+@with_test_config
+async def test_pilot_verification_does_not_use_sims_policy(monkeypatch, test_provider) -> None:
+    _enable_pilot(test_provider, "country", export_verification_supported=True)
+
+    class FailingPolicy:
+        def __init__(self) -> None:
+            pass
+
+        def supports(self, entity_type: str, operation: str) -> bool:
+            raise AssertionError("SIMS policy must not be consulted for pilot verification")
+
+    async def fetch_record_row(entity_type: str, target_id: int):
+        return {"target_id": target_id, "name": "Sweden"}
+
+    monkeypatch.setattr(candidate_verification, "IdentityPolicy", FailingPolicy)
+    monkeypatch.setattr(candidate_verification, "fetch_record_row", fetch_record_row)
+
+    results = await candidate_verification.verify_candidate_batch([CandidateVerificationItem(type="country", id=f"{ID_BASE}country/1")])
+
+    assert results[0].outcome == "exists"
+    assert results[0].entity_type == "country"
+    assert results[0].aggregate_id == 1
+
+
+@pytest.mark.asyncio
+@with_test_config
+async def test_disabled_pilot_verification_does_not_hit_database(monkeypatch, test_provider) -> None:
+    _enable_pilot(test_provider, "feature_type", details_supported=True, identifier_search_supported=True)
+    fetch_record_row = AsyncMock()
+    monkeypatch.setattr(candidate_verification, "fetch_record_row", fetch_record_row)
+
+    results = await candidate_verification.verify_candidate_batch(
+        [CandidateVerificationItem(type="feature_type", id=f"{ID_BASE}feature_type/1")]
+    )
+
+    assert results[0].outcome == "unsupported_type"
+    fetch_record_row.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@with_test_config
+async def test_pilot_verification_works_with_details_capabilities_off(monkeypatch, test_provider) -> None:
+    _enable_pilot(test_provider, "feature_type", export_verification_supported=True)
+
+    async def fetch_record_row(entity_type: str, target_id: int):
+        return {"target_id": target_id, "name": "row"}
+
+    monkeypatch.setattr(candidate_verification, "fetch_record_row", fetch_record_row)
+
+    results = await candidate_verification.verify_candidate_batch(
+        [CandidateVerificationItem(type="feature_type", id=f"{ID_BASE}feature_type/12")]
+    )
+
+    assert results[0].outcome == "exists"
+    assert results[0].aggregate_id == 12
+
+
+@pytest.mark.asyncio
+@with_test_config
+async def test_non_country_location_is_not_found(monkeypatch, test_provider) -> None:
+    _enable_pilot(test_provider, "country", export_verification_supported=True)
+
+    async def fetch_record_row(entity_type: str, target_id: int):
+        return {"target_id": target_id, "name": "Sweden"} if target_id == 1 else None
+
+    monkeypatch.setattr(candidate_verification, "fetch_record_row", fetch_record_row)
+
+    results = await candidate_verification.verify_candidate_batch(
+        [
+            CandidateVerificationItem(type="country", id=f"{ID_BASE}country/1"),
+            CandidateVerificationItem(type="country", id=f"{ID_BASE}country/2"),
+        ]
+    )
+
+    assert [result.outcome for result in results] == ["exists", "not_found"]
+
+
+@pytest.mark.asyncio
+@with_test_config
+async def test_mixed_site_and_pilot_batch_keeps_site_behavior(monkeypatch, test_provider) -> None:
+    _enable_pilot(test_provider, "feature_type", export_verification_supported=True)
+
+    async def fetch_record_row(entity_type: str, target_id: int):
+        return {"target_id": target_id, "name": "row"}
+
+    async def site_exists(self, site_id: int) -> bool:
+        return site_id == 7
+
+    monkeypatch.setattr(candidate_verification, "fetch_record_row", fetch_record_row)
+    monkeypatch.setattr(SiteRepository, "site_exists", site_exists)
+
+    results = await candidate_verification.verify_candidate_batch(
+        [
+            CandidateVerificationItem(type="feature_type", id=f"{ID_BASE}feature_type/4"),
+            CandidateVerificationItem(type="site", id=f"{ID_BASE}site/7"),
+            CandidateVerificationItem(type="site", id=f"{ID_BASE}site/8"),
+        ]
+    )
+
+    assert [result.outcome for result in results] == ["exists", "exists", "not_found"]
+    assert results[0].entity_type == "feature_type"
+    assert results[0].aggregate_id == 4
+    assert results[1].entity_type == "site"
+    assert results[1].aggregate_id == 7
+
+
+@with_test_config
+def test_pilot_database_failure_after_success_returns_only_503(monkeypatch, client, test_provider) -> None:
+    _enable_pilot(test_provider, "feature_type", export_verification_supported=True)
+    lookups: list[int] = []
+
+    async def fetch_record_row(entity_type: str, target_id: int):
+        lookups.append(target_id)
+        if target_id == 1:
+            return {"target_id": 1, "name": "row"}
+        raise psycopg.OperationalError("database unavailable")
+
+    monkeypatch.setattr(candidate_verification, "fetch_record_row", fetch_record_row)
+
+    response = client.post(
+        "/reconcile/verify-candidates",
+        json={
+            "items": [
+                {"type": "feature_type", "id": f"{ID_BASE}feature_type/1"},
+                {"type": "feature_type", "id": f"{ID_BASE}feature_type/2"},
+            ]
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "SEAD database is unavailable"}
+    assert lookups == [1, 2]

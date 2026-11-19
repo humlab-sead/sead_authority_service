@@ -11,6 +11,7 @@ from typing import Any
 from loguru import logger
 
 from src.configuration import ConfigValue
+from src.record_identifiers import format_record_uri
 from src.utility import (
     build_classifier_specification,
     classifier_view_columns,
@@ -117,7 +118,7 @@ class ConfiguredClassifierStrategy(ReconciliationStrategy):
         is_match: bool = bool(is_exact_label or label_sim >= auto_accept_threshold)
 
         candidate: dict[str, Any] = {
-            "id": f"{id_base}{self.get_id_path()}/{entity_id}",
+            "id": format_record_uri(id_base, self.get_id_path(), entity_id),
             "name": label,
             "score": score_percent,
             "match": is_match,

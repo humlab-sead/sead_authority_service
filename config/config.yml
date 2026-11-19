@@ -8,6 +8,27 @@ options:
   reconciliation:
     label_threshold: 0.30
     description_threshold: 0.50
+  # Record selection (browse, details, interactive search, verification) for the
+  # Phase 1 pilot types. Every capability is off by default; enable one type and
+  # one capability at a time in an isolated test configuration.
+  record_selection:
+    version: 1
+    browse_max_rows: 500
+    browse_max_bytes: 1048576
+    interactive_search_max_results: 50
+    types:
+      feature_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      country:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
   database:
     dbname: "${SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME}"
     host: "${SEAD_AUTHORITY_OPTIONS_DATABASE_HOST}"

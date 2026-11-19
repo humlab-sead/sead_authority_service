@@ -196,6 +196,39 @@ class TestMetaEndpoint:
         assert lat_prop["settings"]["max"] == 90.0
 
 
+class TestRecordSelectionDiscovery:
+    """Test record-selection discovery and the marked request entry point."""
+
+    @with_test_config
+    def test_manifest_includes_record_selection_descriptor(self, client, test_provider: MockConfigProvider):
+        data = client.get("/reconcile").json()
+
+        assert data["reconciliation"]["record_selection"] == {"version": 1, "types_path": "/records/types"}
+        assert "supportedTypes" in data["reconciliation"]
+
+    @with_test_config
+    def test_discovery_lists_pilots_with_capabilities_off(self, client, test_provider: MockConfigProvider):
+        response = client.get("/records/types")
+
+        assert response.status_code == 200
+        types = {entry["type"]: entry for entry in response.json()["types"]}
+        assert set(types) == {"feature_type", "country"}
+        assert all(entry["search_supported"] is False for entry in types.values())
+        assert all(entry["browse_max_rows"] is None for entry in types.values())
+        assert all(entry["interactive_search_max_results"] is None for entry in types.values())
+
+    @with_test_config
+    def test_marked_request_without_enabled_capability_is_rejected(self, client, test_provider: MockConfigProvider):
+        response = client.post(
+            "/reconcile",
+            headers={"X-Record-Selection": "interactive"},
+            json={"queries": {"q0": {"query": "pit", "type": "feature_type", "limit": 5}}},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "unsupported_capability"
+
+
 class TestReconcileEndpoint:
     """Test reconciliation endpoint"""
 
