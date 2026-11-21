@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from src.api import candidate_verification
 from src.api.model import CandidateVerificationItem
 from src.api.router import router
+from src.record_selection import RecordSelectionConfigurationError
 from src.strategies.site import MissingCandidateExistsQueryError, SiteReconciliationStrategy, SiteRepository
 from tests.decorators import with_test_config
 
@@ -175,6 +176,23 @@ def test_missing_candidate_query_returns_configuration_error(monkeypatch, client
 
     monkeypatch.setattr(SiteRepository, "site_exists", site_exists)
     response = client.post("/reconcile/verify-candidates", json={"items": [{"type": "site", "id": f"{ID_BASE}site/123"}]})
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Candidate verification is misconfigured"}
+
+
+@with_test_config
+def test_record_selection_config_error_returns_500_without_partial_results(monkeypatch, client, test_provider) -> None:
+    """A record-selection config error raised while loading the policy mid-batch returns 500, not an unhandled error."""
+
+    def fail_policy_load():
+        raise RecordSelectionConfigurationError("options:record_selection:browse_max_rows must be a positive integer")
+
+    monkeypatch.setattr(candidate_verification, "load_record_selection_policy", fail_policy_load)
+    response = client.post(
+        "/reconcile/verify-candidates",
+        json={"items": [{"type": "feature_type", "id": f"{ID_BASE}feature_type/1"}]},
+    )
 
     assert response.status_code == 500
     assert response.json() == {"detail": "Candidate verification is misconfigured"}

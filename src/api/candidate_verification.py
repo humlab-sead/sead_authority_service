@@ -12,7 +12,7 @@ from src.api.model import (
 from src.configuration import ConfigValue
 from src.identity.policy import IdentityPolicy
 from src.record_identifiers import parse_record_uri, valid_id_base
-from src.record_selection import PILOT_TYPES, RecordSelectionPolicy, fetch_record_row, load_record_selection_policy
+from src.record_selection import RecordSelectionPolicy, fetch_record_row, load_record_selection_policy
 from src.strategies.site import SiteRepository
 from src.strategies.strategy import ReconciliationStrategy, Strategies
 
@@ -71,9 +71,7 @@ async def _verify_pilot_item(
 async def verify_candidate_batch(items: list[CandidateVerificationItem]) -> list[CandidateVerificationResult]:
     """Return one ordered, read-only SEAD existence result for each candidate."""
     policy = IdentityPolicy()
-    selection_policy: RecordSelectionPolicy | None = (
-        load_record_selection_policy() if any(item.type in PILOT_TYPES for item in items) else None
-    )
+    selection_policy: RecordSelectionPolicy | None = None
     id_base = _configured_id_base()
     site_strategy_cls = _site_strategy("site", policy) if any(item.type == "site" for item in items) else None
     site_repository: SiteRepository | None = None
@@ -81,12 +79,16 @@ async def verify_candidate_batch(items: list[CandidateVerificationItem]) -> list
     results: list[CandidateVerificationResult] = []
 
     for item in items:
-        if item.type in PILOT_TYPES:
-            assert selection_policy is not None
-            results.append(await _verify_pilot_item(item, selection_policy, id_base))
+        if item.type != "site":
+            if selection_policy is None:
+                selection_policy = load_record_selection_policy()
+            if item.type in selection_policy.types:
+                results.append(await _verify_pilot_item(item, selection_policy, id_base))
+                continue
+            results.append(CandidateVerificationResult(type=item.type, id=item.id, outcome="unsupported_type"))
             continue
 
-        if item.type != "site" or site_strategy_cls is None:
+        if site_strategy_cls is None:
             results.append(CandidateVerificationResult(type=item.type, id=item.id, outcome="unsupported_type"))
             continue
 

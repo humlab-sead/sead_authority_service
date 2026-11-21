@@ -52,7 +52,7 @@ from src.record_selection import (
     validate_interactive_query,
     validate_record_selection_configuration,
 )
-from src.strategies.configured_classifier import validate_classifier_configuration
+from src.strategies.configured_classifier import initialize_classifiers
 from src.strategies.site import MissingCandidateExistsQueryError
 from src.strategies.strategy import Strategies
 
@@ -158,7 +158,7 @@ async def get_config_dependency() -> ConfigLike:
     if not get_config_provider().is_configured():
         logger.info("Config Store is not configured, setting up...")
         await setup_config_store()
-        validate_classifier_configuration()
+        initialize_classifiers()
         validate_record_selection_configuration()
     return get_config_provider().get_config()
 
@@ -211,6 +211,9 @@ async def verify_candidates(
     try:
         return VerifyCandidatesResponse(results=await verify_candidate_batch(body.items))
     except MissingCandidateExistsQueryError as exc:
+        logger.exception("Candidate verification is misconfigured: {}", exc)
+        raise HTTPException(status_code=500, detail="Candidate verification is misconfigured") from exc
+    except RecordSelectionConfigurationError as exc:
         logger.exception("Candidate verification is misconfigured: {}", exc)
         raise HTTPException(status_code=500, detail="Candidate verification is misconfigured") from exc
     except DATABASE_ERRORS as exc:

@@ -13,7 +13,9 @@ create or replace view authority.language as
   select
     t.language_id,
     t.language_name_english as label,
-    authority.immutable_unaccent(lower(t.language_name_english)) as norm_label  from public.tbl_languages as t;
+    authority.immutable_unaccent(lower(t.language_name_english)) as norm_label,
+  null::text as description,
+  null::text as norm_description  from public.tbl_languages as t;
 
 create index if not exists tbl_languages_norm_trgm
   on public.tbl_languages
@@ -35,6 +37,8 @@ create or replace function authority.fuzzy_language(
   p_description_threshold double precision default 0.50) returns table (
   language_id integer,
   label text,
+  description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -44,6 +48,12 @@ as $$
   select
     s.language_id,
     s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)

@@ -336,7 +336,6 @@ def build_classifier_fuzzy_sql(key: str) -> str:
 
 def build_classifier_prefix_sql(key: str, table_spec: dict[str, Any]) -> str:
     """Builds a normalized label-prefix query for a marked classifier."""
-    description_column: str = ", s.description" if table_spec.get("description_column") else ""
     id_column: str = table_spec["id_column"]
     return f"""
 with params as (
@@ -344,7 +343,8 @@ with params as (
 )
 select
   s.{id_column},
-  s.label{description_column},
+  s.label,
+  s.description,
   greatest(similarity(s.norm_label, pq.q), 0.0001) as name_sim
 from authority.{key} as s
 cross join params pq
@@ -388,9 +388,7 @@ def build_classifier_details_sql(key: str, table_spec: dict[str, Any]) -> str:
     (from extra_columns and joins) are allowed here too.
     """
     id_column: str = table_spec["id_column"]
-    columns: list[str] = [f's.{id_column} as "ID"', 's.label as "Name"']
-    if table_spec.get("description_column"):
-        columns.append('s.description as "Description"')
+    columns: list[str] = [f's.{id_column} as "ID"', 's.label as "Name"', 's.description as "Description"']
     for details_column in table_spec.get("details_columns") or []:
         expression: str | None = view_column_source(details_column)
         if expression is None:
@@ -428,9 +426,7 @@ def classifier_view_columns(table_spec: dict[str, Any]) -> set[str]:
     Plain names are listed as-is; qualified or aliased expressions (from extra_columns)
     are listed as the full expression, so details_columns can reference either form.
     """
-    columns: set[str] = {table_spec["id_column"], "label"}
-    if table_spec.get("description_column"):
-        columns.add("description")
+    columns: set[str] = {table_spec["id_column"], "label", "description"}
     alternate_identity_column: str | None = table_spec.get("alternate_identity_column")
     if alternate_identity_column:
         columns.add(alternate_identity_column)

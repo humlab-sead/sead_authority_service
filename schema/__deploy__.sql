@@ -334,6 +334,7 @@ create or replace function authority.fuzzy_abundance_element(
   abundance_element_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -344,6 +345,11 @@ as $$
     s.abundance_element_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -398,6 +404,7 @@ create or replace function authority.fuzzy_activity_type(
   activity_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -408,6 +415,11 @@ as $$
     s.activity_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -462,6 +474,7 @@ create or replace function authority.fuzzy_age_type(
   age_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -472,6 +485,11 @@ as $$
     s.age_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -526,6 +544,7 @@ create or replace function authority.fuzzy_alt_ref_type(
   alt_ref_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -536,6 +555,11 @@ as $$
     s.alt_ref_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -628,7 +652,9 @@ create or replace view authority.colour as
   select
     t.colour_id,
     t.colour_name as label,
-    authority.immutable_unaccent(lower(t.colour_name)) as norm_label  from public.tbl_colours as t;
+    authority.immutable_unaccent(lower(t.colour_name)) as norm_label,
+  null::text as description,
+  null::text as norm_description  from public.tbl_colours as t;
 
 create index if not exists tbl_colours_norm_trgm
   on public.tbl_colours
@@ -650,6 +676,8 @@ create or replace function authority.fuzzy_colour(
   p_description_threshold double precision default 0.50) returns table (
   colour_id integer,
   label text,
+  description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -659,6 +687,12 @@ as $$
   select
     s.colour_id,
     s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -713,6 +747,7 @@ create or replace function authority.fuzzy_contact_type(
   contact_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -727,8 +762,83 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
+    ) as label_sim,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
     ) as name_sim
   from authority.contact_type as s
+  cross join params pq
+  where case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  order by name_sim desc, s.label
+  limit p_limit;
+$$;
+
+
+/**********************************************************************************************
+**  Country - Tri-gram Search Objects
+**  Generated from template by generate_entity_schema.py
+**  
+**  Note: This file creates the base view WITHOUT embeddings.
+**        If the entity has embeddings, also install semantic-{entity}.sql to create
+**        the embeddings table and semantic search functions.
+**********************************************************************************************/
+
+drop view if exists authority.country cascade;
+
+create or replace view authority.country as
+  select
+    t.location_id,
+    t.location_name as label,
+    authority.immutable_unaccent(lower(t.location_name)) as norm_label,
+  null::text as description,
+  null::text as norm_description  from public.tbl_locations as t  where location_type_id = 1;
+
+create index if not exists tbl_locations_norm_trgm
+  on public.tbl_locations
+    using gin ( (authority.immutable_unaccent(lower(location_name))) gin_trgm_ops );
+
+/***************************************************************************************************
+ ** Procedure  authority.fuzzy_country
+ ** What       Trigram fuzzy search function using pg_trgm similarity
+ ** Usage      SELECT * FROM authority.fuzzy_country('query text', 10);
+ ****************************************************************************************************/
+
+drop function if exists authority.fuzzy_country(text, integer) cascade;
+drop function if exists authority.fuzzy_country(text, integer, double precision, double precision) cascade;
+
+create or replace function authority.fuzzy_country(
+  p_text text,
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50) returns table (
+  location_id integer,
+  label text,
+  description text,
+  label_sim double precision,
+  name_sim double precision
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q
+  )
+  select
+    s.location_id,
+    s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as name_sim
+  from authority.country as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
              else similarity(s.norm_label, pq.q) end >= p_label_threshold
@@ -777,6 +887,7 @@ create or replace function authority.fuzzy_dataset_submission_type(
   submission_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -787,6 +898,11 @@ as $$
     s.submission_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -841,6 +957,7 @@ create or replace function authority.fuzzy_data_type_group(
   data_type_group_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -851,6 +968,11 @@ as $$
     s.data_type_group_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -907,6 +1029,7 @@ create or replace function authority.fuzzy_data_type(
   data_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -917,6 +1040,11 @@ as $$
     s.data_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -971,6 +1099,7 @@ create or replace function authority.fuzzy_dating_uncertainty(
   dating_uncertainty_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -981,6 +1110,11 @@ as $$
     s.dating_uncertainty_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -1035,6 +1169,7 @@ create or replace function authority.fuzzy_ecocode_definition(
   ecocode_definition_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -1045,6 +1180,11 @@ as $$
     s.ecocode_definition_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -1099,6 +1239,7 @@ create or replace function authority.fuzzy_ecocode_group(
   ecocode_group_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -1109,6 +1250,11 @@ as $$
     s.ecocode_group_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -1216,6 +1362,7 @@ create or replace function authority.fuzzy_feature_type(
   feature_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -1226,6 +1373,11 @@ as $$
     s.feature_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -1280,6 +1432,7 @@ create or replace function authority.fuzzy_horizon(
   horizon_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -1290,6 +1443,11 @@ as $$
     s.horizon_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -1344,6 +1502,7 @@ create or replace function authority.fuzzy_identification_level(
   identification_level_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -1354,6 +1513,11 @@ as $$
     s.identification_level_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -1383,7 +1547,9 @@ create or replace view authority.language as
   select
     t.language_id,
     t.language_name_english as label,
-    authority.immutable_unaccent(lower(t.language_name_english)) as norm_label  from public.tbl_languages as t;
+    authority.immutable_unaccent(lower(t.language_name_english)) as norm_label,
+  null::text as description,
+  null::text as norm_description  from public.tbl_languages as t;
 
 create index if not exists tbl_languages_norm_trgm
   on public.tbl_languages
@@ -1405,6 +1571,8 @@ create or replace function authority.fuzzy_language(
   p_description_threshold double precision default 0.50) returns table (
   language_id integer,
   label text,
+  description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -1414,6 +1582,12 @@ as $$
   select
     s.language_id,
     s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -1530,6 +1704,7 @@ create or replace function authority.fuzzy_location_type(
   location_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -1540,6 +1715,11 @@ as $$
     s.location_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -1594,6 +1774,7 @@ create or replace function authority.fuzzy_method_group(
   method_group_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -1604,6 +1785,11 @@ as $$
     s.method_group_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -1765,6 +1951,7 @@ create or replace function authority.fuzzy_project_stage(
   project_stage_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -1775,6 +1962,11 @@ as $$
     s.project_stage_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -1829,6 +2021,7 @@ create or replace function authority.fuzzy_project_type(
   project_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -1839,6 +2032,11 @@ as $$
     s.project_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -1893,6 +2091,7 @@ create or replace function authority.fuzzy_property_type_group(
   property_type_group_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -1903,6 +2102,11 @@ as $$
     s.property_type_group_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -1957,6 +2161,7 @@ create or replace function authority.fuzzy_property_type(
   property_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -1967,6 +2172,11 @@ as $$
     s.property_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -2101,6 +2311,7 @@ create or replace function authority.fuzzy_record_type(
   record_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -2111,6 +2322,11 @@ as $$
     s.record_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -2218,6 +2434,7 @@ create or replace function authority.fuzzy_relative_age_type(
   relative_age_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -2228,6 +2445,11 @@ as $$
     s.relative_age_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -2282,6 +2504,7 @@ create or replace function authority.fuzzy_sample_description_type(
   sample_description_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -2292,6 +2515,11 @@ as $$
     s.sample_description_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -2346,6 +2574,7 @@ create or replace function authority.fuzzy_sample_group_description_type(
   sample_group_description_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -2356,6 +2585,11 @@ as $$
     s.sample_group_description_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -2410,6 +2644,7 @@ create or replace function authority.fuzzy_sample_location_type(
   sample_location_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -2420,6 +2655,11 @@ as $$
     s.sample_location_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -2474,6 +2714,7 @@ create or replace function authority.fuzzy_sample_type(
   sample_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -2484,6 +2725,11 @@ as $$
     s.sample_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -2566,7 +2812,9 @@ create or replace view authority.season as
   select
     t.season_id,
     t.season_name as label,
-    authority.immutable_unaccent(lower(t.season_name)) as norm_label  from public.tbl_seasons as t;
+    authority.immutable_unaccent(lower(t.season_name)) as norm_label,
+  null::text as description,
+  null::text as norm_description  from public.tbl_seasons as t;
 
 create index if not exists tbl_seasons_norm_trgm
   on public.tbl_seasons
@@ -2588,6 +2836,8 @@ create or replace function authority.fuzzy_season(
   p_description_threshold double precision default 0.50) returns table (
   season_id integer,
   label text,
+  description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -2597,6 +2847,12 @@ as $$
   select
     s.season_id,
     s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -2651,6 +2907,7 @@ create or replace function authority.fuzzy_season_type(
   season_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -2661,6 +2918,11 @@ as $$
     s.season_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -2781,6 +3043,7 @@ create or replace function authority.fuzzy_site_type_group(
   site_type_group_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -2791,6 +3054,11 @@ as $$
     s.site_type_group_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -2845,6 +3113,7 @@ create or replace function authority.fuzzy_site_type(
   site_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -2855,6 +3124,11 @@ as $$
     s.site_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -2909,6 +3183,7 @@ create or replace function authority.fuzzy_species_association_type(
   association_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -2919,6 +3194,11 @@ as $$
     s.association_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -2973,6 +3253,7 @@ create or replace function authority.fuzzy_submission_state(
   submission_state_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -2983,6 +3264,11 @@ as $$
     s.submission_state_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -3037,6 +3323,7 @@ create or replace function authority.fuzzy_submission_task_type(
   submission_task_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -3047,6 +3334,11 @@ as $$
     s.submission_task_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -3129,7 +3421,9 @@ create or replace view authority.taxa_tree_author as
   select
     t.author_id,
     t.author_name as label,
-    authority.immutable_unaccent(lower(t.author_name)) as norm_label  from public.tbl_taxa_tree_authors as t;
+    authority.immutable_unaccent(lower(t.author_name)) as norm_label,
+  null::text as description,
+  null::text as norm_description  from public.tbl_taxa_tree_authors as t;
 
 create index if not exists tbl_taxa_tree_authors_norm_trgm
   on public.tbl_taxa_tree_authors
@@ -3151,6 +3445,8 @@ create or replace function authority.fuzzy_taxa_tree_author(
   p_description_threshold double precision default 0.50) returns table (
   author_id integer,
   label text,
+  description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -3160,6 +3456,12 @@ as $$
   select
     s.author_id,
     s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -3190,6 +3492,8 @@ create or replace view authority.taxa_tree_family as
     t.family_id,
     t.family_name as label,
     authority.immutable_unaccent(lower(t.family_name)) as norm_label,
+  null::text as description,
+  null::text as norm_description,
     t.order_id  from public.tbl_taxa_tree_families as t  join public.tbl_taxa_tree_orders ord using (order_id);
 
 create index if not exists tbl_taxa_tree_families_norm_trgm
@@ -3212,6 +3516,8 @@ create or replace function authority.fuzzy_taxa_tree_family(
   p_description_threshold double precision default 0.50) returns table (
   family_id integer,
   label text,
+  description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -3221,6 +3527,12 @@ as $$
   select
     s.family_id,
     s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -3251,6 +3563,8 @@ create or replace view authority.taxa_tree_genus as
     t.genus_id,
     t.genus_name as label,
     authority.immutable_unaccent(lower(t.genus_name)) as norm_label,
+  null::text as description,
+  null::text as norm_description,
     t.family_id  from public.tbl_taxa_tree_genera as t  join public.tbl_taxa_tree_families fam using (family_id);
 
 create index if not exists tbl_taxa_tree_genera_norm_trgm
@@ -3273,6 +3587,8 @@ create or replace function authority.fuzzy_taxa_tree_genus(
   p_description_threshold double precision default 0.50) returns table (
   genus_id integer,
   label text,
+  description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -3282,6 +3598,12 @@ as $$
   select
     s.genus_id,
     s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -3365,6 +3687,8 @@ create or replace view authority.taxa_tree_order as
     t.order_id,
     t.order_name as label,
     authority.immutable_unaccent(lower(t.order_name)) as norm_label,
+  null::text as description,
+  null::text as norm_description,
     t.record_type_id  from public.tbl_taxa_tree_orders as t  join public.tbl_record_types rt using (record_type_id);
 
 create index if not exists tbl_taxa_tree_orders_norm_trgm
@@ -3387,6 +3711,8 @@ create or replace function authority.fuzzy_taxa_tree_order(
   p_description_threshold double precision default 0.50) returns table (
   order_id integer,
   label text,
+  description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -3396,6 +3722,12 @@ as $$
   select
     s.order_id,
     s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -3555,6 +3887,7 @@ create or replace function authority.fuzzy_unit(
   unit_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -3565,6 +3898,11 @@ as $$
     s.unit_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -3619,6 +3957,7 @@ create or replace function authority.fuzzy_value_class(
   value_class_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -3629,6 +3968,11 @@ as $$
     s.value_class_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -3683,6 +4027,7 @@ create or replace function authority.fuzzy_value_qualifier(
   qualifier_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -3693,6 +4038,11 @@ as $$
     s.qualifier_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -3747,6 +4097,7 @@ create or replace function authority.fuzzy_value_type_item(
   value_type_item_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -3757,6 +4108,11 @@ as $$
     s.value_type_item_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
@@ -3811,6 +4167,7 @@ create or replace function authority.fuzzy_value_type(
   value_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -3821,6 +4178,11 @@ as $$
     s.value_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)

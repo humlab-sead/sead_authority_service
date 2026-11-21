@@ -1,8 +1,12 @@
-"""Shared reconciliation strategy for classifier entities marked `reconciliation: simple`.
+"""Shared reconciliation strategy for entities marked `reconciliation: simple`.
 
-Registration stays static: `CLASSIFIER_KEYS` names every eligible key and a startup check
-verifies the loaded configuration matches it in both directions. Specification details come
-from the marked `table_specs` entry, so no per-entity Python class or resource YAML is needed.
+`initialize_classifiers()` is the only registration entry point. It validates the marked
+`table_specs` entries, then registers one strategy per marked key. Specification details come
+from that entry, so no per-entity Python class or resource YAML is needed.
+
+Configuration must be loaded before classifiers exist. Application startup and the router's
+configuration dependency call the entry point; tooling that builds strategies directly must
+call it too, otherwise the registry stays empty for simple classifiers.
 """
 
 from collections import Counter
@@ -22,54 +26,6 @@ from src.utility import (
 
 from .query import BaseRepository
 from .strategy import ReconciliationStrategy, Strategies
-
-CLASSIFIER_KEYS: tuple[str, ...] = (
-    "abundance_element",
-    "activity_type",
-    "age_type",
-    "alt_ref_type",
-    "colour",
-    "contact_type",
-    "data_type",
-    "data_type_group",
-    "dataset_submission_type",
-    "dating_uncertainty",
-    "ecocode_definition",
-    "ecocode_group",
-    "feature_type",
-    "horizon",
-    "identification_level",
-    "language",
-    "location_type",
-    "method_group",
-    "project_stage",
-    "project_type",
-    "property_type",
-    "property_type_group",
-    "rdb_code",
-    "record_type",
-    "relative_age_type",
-    "sample_description_type",
-    "sample_group_description_type",
-    "sample_location_type",
-    "sample_type",
-    "season",
-    "season_type",
-    "site_type",
-    "site_type_group",
-    "species_association_type",
-    "submission_state",
-    "submission_task_type",
-    "taxa_tree_author",
-    "taxa_tree_family",
-    "taxa_tree_genus",
-    "taxa_tree_order",
-    "unit",
-    "value_class",
-    "value_qualifier",
-    "value_type",
-    "value_type_item",
-)
 
 CANDIDATE_DESCRIPTION_LIMIT = 500
 
@@ -141,22 +97,32 @@ def _get_table_specs() -> dict[str, Any]:
     return resolved if isinstance(resolved, dict) else {}
 
 
-def validate_classifier_configuration() -> None:
-    """Checks marked classifier entries and reconciliation thresholds after configuration loads."""
+def marked_classifier_keys(table_specs: dict[str, Any] | None = None) -> list[str]:
+    """Returns the sorted keys whose table specification declares `reconciliation: simple`."""
+    specs: dict[str, Any] = _get_table_specs() if table_specs is None else table_specs
+    return sorted(key for key, table_spec in specs.items() if isinstance(table_spec, dict) and table_spec.get("reconciliation") == "simple")
+
+
+def validate_classifier_configuration() -> list[str]:
+    """Checks every marked simple classifier and the reconciliation thresholds.
+
+    Returns the validated keys. Validation is unconditional: a marked spec that the system
+    would serve must satisfy the simple-classifier contract whether or not record selection
+    currently enables it.
+    """
     table_specs: dict[str, Any] = _get_table_specs()
     if not table_specs:
         raise ClassifierConfigurationError("Missing 'table_specs' configuration for classifier reconciliation")
 
-    for key in CLASSIFIER_KEYS:
-        table_spec: Any = table_specs.get(key)
-        if not isinstance(table_spec, dict):
-            raise ClassifierConfigurationError(f"Classifier '{key}' is not configured in 'table_specs'")
-        if table_spec.get("reconciliation") != "simple":
-            raise ClassifierConfigurationError(f"Classifier '{key}' must declare 'reconciliation: simple'")
+    keys: list[str] = marked_classifier_keys(table_specs)
+    for key in keys:
+        table_spec: dict[str, Any] = table_specs[key]
         _validate_text_column(key, table_spec, "label_column")
         _validate_text_column(key, table_spec, "id_column")
         if table_spec.get("description_column") is not None:
             _validate_text_column(key, table_spec, "description_column")
+        _reject_openrefine_properties(key, table_spec)
+        _reject_weight_without_description(key, table_spec)
 
         allowed_columns: set[str] = classifier_view_columns(table_spec)
         for details_column in table_spec.get("details_columns") or []:
@@ -166,17 +132,32 @@ def validate_classifier_configuration() -> None:
                     f"Classifier '{key}' details column '{details_column}' is not exposed by its generated view"
                 )
 
-    marked_keys: set[str] = {
-        key for key, table_spec in table_specs.items() if isinstance(table_spec, dict) and table_spec.get("reconciliation") == "simple"
-    }
-    unexpected_keys: list[str] = sorted(marked_keys.difference(CLASSIFIER_KEYS))
-    if unexpected_keys:
-        raise ClassifierConfigurationError("Marked classifiers are not declared in CLASSIFIER_KEYS: " + ", ".join(unexpected_keys))
-
     _validate_threshold("label_threshold")
     _validate_threshold("description_threshold")
 
-    logger.info(f"Validated configured classifier configuration for: {', '.join(CLASSIFIER_KEYS)}")
+    logger.info(f"Validated configured classifier configuration for: {', '.join(keys)}")
+    return keys
+
+
+def _reject_openrefine_properties(key: str, table_spec: dict[str, Any]) -> None:
+    """Rejects OpenRefine property mappings, which the simple contract does not support."""
+    if table_spec.get("properties"):
+        raise ClassifierConfigurationError(f"Classifier '{key}' must not declare 'properties'; simple types publish no properties")
+    if table_spec.get("property_settings"):
+        raise ClassifierConfigurationError(
+            f"Classifier '{key}' must not declare 'property_settings'; simple types publish no property settings"
+        )
+
+
+def _reject_weight_without_description(key: str, table_spec: dict[str, Any]) -> None:
+    """Rejects description scoring without a description column to score."""
+    weight: Any = table_spec.get("description_match_weight")
+    if weight is None:
+        return
+    if isinstance(weight, bool) or not isinstance(weight, (int, float)):
+        raise ClassifierConfigurationError(f"Classifier '{key}' must declare a numeric 'description_match_weight'")
+    if float(weight) > 0 and table_spec.get("description_column") is None:
+        raise ClassifierConfigurationError(f"Classifier '{key}' declares 'description_match_weight' above 0 without a 'description_column'")
 
 
 def _validate_text_column(key: str, table_spec: dict[str, Any], field: str) -> None:
@@ -212,14 +193,18 @@ def _resolve_configured_specification(key: str) -> dict[str, Any] | None:
 set_configured_specification_resolver(_resolve_configured_specification)
 
 
-def _register_configured_classifiers() -> None:
-    for key in CLASSIFIER_KEYS:
+def initialize_classifiers() -> list[str]:
+    """Validates the simple-classifier configuration, then registers one strategy per marked spec.
+
+    Returns the registered keys. Registration is derived entirely from configuration, so
+    calling this again simply replaces the same entries.
+    """
+    keys: list[str] = validate_classifier_configuration()
+    for key in keys:
         strategy_cls = type(
             f"{key.title().replace('_', '')}ReconciliationStrategy",
             (ConfiguredClassifierStrategy,),
             {"__module__": __name__},
         )
         Strategies.register(key=key, repository_cls=BaseRepository, support="supported")(strategy_cls)
-
-
-_register_configured_classifiers()
+    return keys

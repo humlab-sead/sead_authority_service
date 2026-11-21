@@ -24,13 +24,16 @@ create or replace view authority.{{ entity_key }} as
     t.{{ entity.id_column }},
     t.{{ entity.label_column }} as label,
     authority.immutable_unaccent(lower(t.{{ entity.label_column }})) as norm_label
-{%- if entity.description_column %}
-{%- if entity.reconciliation == "simple" %},
+{%- if entity.reconciliation == "simple" %}
+{%- if entity.description_column %},
   t.{{ entity.description_column }} as description,
   authority.immutable_unaccent(lower(t.{{ entity.description_column }})) as norm_description
 {%- else %},
-    t.{{ entity.description_column }}
+  null::text as description,
+  null::text as norm_description
 {%- endif %}
+{%- elif entity.description_column %},
+    t.{{ entity.description_column }}
 {%- endif %}
 {%- if entity.alternate_identity_column %},
     t.{{ entity.alternate_identity_column }}
@@ -104,9 +107,9 @@ create or replace function authority.fuzzy_{{ entity_key }}(
   {{ param.name }} {{ param.type }} default {{ param.default }}{% endfor %}
 ) returns table (
   {{ entity.id_column }} integer,
-  label text{% if entity.description_column %},
-  description text{% if (entity.description_match_weight | default(0) | float) > 0 %},
-  label_sim double precision{% endif %}{% endif %},
+  label text,
+  description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -171,8 +174,13 @@ as $$
 {% endif %}
   select
     s.{{ entity.id_column }},
-    s.label{% if entity.description_column %},
-    s.description{% endif %},
+    s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
