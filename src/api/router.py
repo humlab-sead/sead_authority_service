@@ -36,7 +36,7 @@ from src.configuration.interface import ConfigLike
 from src.metadata import get_reconcile_properties, get_reconciliation_metadata
 from src.preview import render_preview
 from src.reconcile import UnsupportedReconciliationTypeError, reconcile_queries
-from src.record_identifiers import parse_record_uri
+from src.record_identifiers import POSTGRES_INTEGER_MAX, parse_record_uri
 from src.record_selection import (
     RecordSelectionConfigurationError,
     RecordSelectionError,
@@ -47,6 +47,7 @@ from src.record_selection import (
     fetch_record_row,
     load_record_selection_policy,
     record_payload,
+    resolve_id_path,
     search_interactive,
     validate_interactive_query,
     validate_record_selection_configuration,
@@ -56,6 +57,9 @@ from src.strategies.site import MissingCandidateExistsQueryError
 from src.strategies.strategy import Strategies
 
 # pylint: disable=unused-argument, redefined-builtin, too-many-locals, too-many-return-statements, too-many-branches
+
+# Widest digit string that can still fit a PostgreSQL ``integer`` primary key.
+_POSTGRES_INTEGER_MAX_DIGITS: int = len(str(POSTGRES_INTEGER_MAX))
 
 
 def _record_selection_error(exc: RecordSelectionError) -> JSONResponse:
@@ -82,14 +86,22 @@ def _single_record_identifier(request: Request) -> tuple[str, str]:
     return name, value
 
 
-def _parse_record_target_id(value: str) -> int:
-    """Parse a positive ASCII decimal target ID, rejecting non-numeric and non-positive values."""
+def _parse_record_target_id(value: str) -> int | None:
+    """Parse a positive ASCII decimal target ID.
+
+    Returns ``None`` when the digits cannot name a PostgreSQL ``integer`` record, so
+    a very long request value is reported as absent instead of raising from ``int()``,
+    which limits how many digits it converts at once.
+    """
     if not value.isascii() or not value.isdecimal():
         raise RecordSelectionError("invalid_request", "The 'target_id' value must be a positive integer.")
-    target_id: int = int(value)
-    if target_id <= 0:
+    digits: str = value.lstrip("0")
+    if not digits:
         raise RecordSelectionError("invalid_request", "The 'target_id' value must be a positive integer.")
-    return target_id
+    if len(digits) > _POSTGRES_INTEGER_MAX_DIGITS:
+        return None
+    target_id: int = int(digits)
+    return target_id if target_id <= POSTGRES_INTEGER_MAX else None
 
 
 async def _read_interactive_queries(request: Request) -> Any:
@@ -109,7 +121,9 @@ async def _read_interactive_queries(request: Request) -> Any:
         payload = json.loads(body)
     except RecordSelectionError:  # pylint: disable=try-except-raise
         raise
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+    except (ValueError, UnicodeDecodeError) as exc:
+        # ``json.loads`` raises a plain ``ValueError`` for an integer literal that
+        # exceeds the interpreter's digit limit, not only ``JSONDecodeError``.
         raise RecordSelectionError("invalid_request", "Invalid JSON in request.") from exc
 
     if not isinstance(payload, dict):
@@ -118,7 +132,7 @@ async def _read_interactive_queries(request: Request) -> Any:
     if isinstance(queries, str):
         try:
             queries = json.loads(queries)
-        except json.JSONDecodeError as exc:
+        except ValueError as exc:
             raise RecordSelectionError("invalid_request", "Invalid JSON in queries.") from exc
     return queries
 
@@ -470,11 +484,11 @@ async def record_details(
                 raise RecordSelectionError("unsupported_capability", f"Identifier lookup is not enabled for '{type}'.")
             target_id = _parse_record_target_id(raw_value)
 
-        row = await fetch_record_row(type, target_id)
+        row = await fetch_record_row(type, target_id) if target_id is not None else None
         if row is None:
             raise RecordSelectionError("record_not_found", "No record exists for the requested identifier.", 404)
 
-        body: bytes = encode_json({"item": record_payload(type, row, id_base)})
+        body: bytes = encode_json({"item": record_payload(type, row, id_base, resolve_id_path(type))})
         return Response(content=body, media_type="application/json")
     except RecordSelectionError as exc:
         return _record_selection_error(exc)

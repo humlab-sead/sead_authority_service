@@ -250,7 +250,13 @@ def configured_id_base() -> str:
     return str(id_base)
 
 
-def _id_path(entity_type: str) -> str:
+def resolve_id_path(entity_type: str) -> str:
+    """Return the URI path segment for a record type.
+
+    Constructing a strategy can read a resource specification, so callers that
+    format many records for one type should call this once and pass the result to
+    ``record_payload``.
+    """
     strategy_cls = Strategies.items.get(entity_type)
     if strategy_cls is not None:
         path: str = strategy_cls().get_id_path()
@@ -287,11 +293,15 @@ def encode_json(payload: Any) -> bytes:
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
 
-def record_payload(entity_type: str, row: Mapping[str, Any], id_base: str) -> dict[str, Any]:
-    """Convert one projected row to the record shape shared by list and details."""
+def record_payload(entity_type: str, row: Mapping[str, Any], id_base: str, id_path: str) -> dict[str, Any]:
+    """Convert one projected row to the record shape shared by list and details.
+
+    ``id_path`` comes from ``resolve_id_path`` so a caller formatting many rows
+    resolves it once per request.
+    """
     target_id: int = int(row["target_id"])
     record: dict[str, Any] = {
-        "id": format_record_uri(id_base, _id_path(entity_type), target_id),
+        "id": format_record_uri(id_base, id_path, target_id),
         "target_id": target_id,
         "type": entity_type,
         "name": "" if row.get("name") is None else str(row["name"]),
@@ -315,7 +325,8 @@ async def collect_browse_list(entity_type: str, policy: RecordSelectionPolicy) -
         raise RecordSelectionError("too_large_to_browse", "The list exceeds the configured row limit.", 409)
 
     id_base: str = configured_id_base()
-    items: list[dict[str, Any]] = [record_payload(entity_type, row, id_base) for row in rows]
+    id_path: str = resolve_id_path(entity_type)
+    items: list[dict[str, Any]] = [record_payload(entity_type, row, id_base, id_path) for row in rows]
     body: bytes = encode_json({"items": items, "completeness": "complete"})
     if len(body) > policy.browse_max_bytes:
         raise RecordSelectionError("too_large_to_browse", "The list exceeds the configured byte limit.", 409)
@@ -475,7 +486,7 @@ def discovery_types() -> list[dict[str, Any]]:
                 "details_supported": flags.details,
                 "export_verification_supported": flags.export_verification,
                 "id_base": id_base_value,
-                "id_path": _id_path(entity_type),
+                "id_path": resolve_id_path(entity_type),
                 "browse_max_rows": policy.browse_max_rows if flags.browse else None,
                 "browse_max_bytes": policy.browse_max_bytes if flags.browse else None,
                 "interactive_search_max_results": policy.interactive_search_max_results if flags.search else None,

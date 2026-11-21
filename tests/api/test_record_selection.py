@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import src.api.router as router_module
+import src.record_selection as record_selection_module
 from src.api.router import router
 from src.configuration import MockConfigProvider
 from src.record_identifiers import POSTGRES_INTEGER_MAX, parse_record_uri
@@ -275,6 +276,31 @@ class TestListRecords:
         assert disabled.json()["error"]["code"] == "unsupported_capability"
 
     @with_test_config
+    def test_list_resolves_id_path_once_for_all_rows(self, client: TestClient, test_provider: MockConfigProvider, monkeypatch):
+        _set_selection(test_provider, {"feature_type": {"browse_supported": True}})
+        _mock_db(
+            test_provider,
+            fetchall=[
+                {"target_id": 1, "name": "A", "description": None},
+                {"target_id": 2, "name": "B", "description": None},
+                {"target_id": 3, "name": "C", "description": None},
+            ],
+        )
+        resolved: list[str] = []
+
+        def counting_resolve_id_path(entity_type: str) -> str:
+            resolved.append(entity_type)
+            return "feature_type"
+
+        monkeypatch.setattr(record_selection_module, "resolve_id_path", counting_resolve_id_path)
+
+        response = client.get("/records/feature_type")
+
+        assert response.status_code == 200
+        assert len(response.json()["items"]) == 3
+        assert resolved == ["feature_type"]
+
+    @with_test_config
     def test_database_failure_is_not_an_empty_success(self, client: TestClient, test_provider: MockConfigProvider, monkeypatch):
         _set_selection(test_provider, {"feature_type": {"browse_supported": True}})
 
@@ -373,6 +399,28 @@ class TestDetails:
 
         assert response.status_code == 404
         assert response.json()["error"]["code"] == "record_not_found"
+
+    @with_test_config
+    def test_target_id_over_the_conversion_limit_is_absent(self, client: TestClient, test_provider: MockConfigProvider):
+        _set_selection(test_provider, {"feature_type": {"identifier_search_supported": True}})
+        cursor = _mock_db(test_provider, fetchone=None)
+
+        response = client.get(f"/records/feature_type/details?target_id={'9' * 5000}")
+
+        assert response.status_code == 404
+        assert response.json()["error"]["code"] == "record_not_found"
+        cursor.execute.assert_not_awaited()
+
+    @pytest.mark.parametrize("target_id", ["000", "0", "12.5", "-3", "abc"])
+    @with_test_config
+    def test_non_positive_and_non_decimal_target_ids_are_rejected(self, client: TestClient, test_provider: MockConfigProvider, target_id):
+        _set_selection(test_provider, {"feature_type": {"identifier_search_supported": True}})
+        _mock_db(test_provider)
+
+        response = client.get("/records/feature_type/details", params={"target_id": target_id})
+
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "invalid_request"
 
     @with_test_config
     def test_disabled_capability_is_reported(self, client: TestClient, test_provider: MockConfigProvider):
@@ -485,6 +533,21 @@ class TestInteractiveSearch:
         if limit is not None:
             query["limit"] = limit
         response = client.post("/reconcile", headers={"X-Record-Selection": "interactive"}, json={"queries": {"q0": query}})
+
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "invalid_request"
+        cursor.execute.assert_not_awaited()
+
+    @with_test_config
+    def test_integer_literal_over_the_conversion_limit_is_rejected(self, client: TestClient, test_provider: MockConfigProvider):
+        _set_selection(test_provider, {"feature_type": {"search_supported": True}})
+        cursor = _mock_db(test_provider)
+
+        response = client.post(
+            "/reconcile",
+            headers={"X-Record-Selection": "interactive", "Content-Type": "application/json"},
+            content=f'{{"queries": {{"q0": {{"query": "pit", "type": "feature_type", "limit": {"9" * 5000}}}}}}}',
+        )
 
         assert response.status_code == 422
         assert response.json()["error"]["code"] == "invalid_request"
