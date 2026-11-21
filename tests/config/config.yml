@@ -143,6 +143,14 @@ table_specs:
     type_or_grouping:
       foreign_table: "location_type"
       foreign_key_column: "location_type_id"  
+  country:
+    table_name: "tbl_locations"
+    id_column: "location_id"
+    label_column: "location_name"
+    description_column: null
+    alternate_identity_column: null
+    reconciliation: simple
+    where_clause: "location_type_id = 1"
   method_group:
     table_name: "tbl_method_groups"
     id_column: "method_group_id"

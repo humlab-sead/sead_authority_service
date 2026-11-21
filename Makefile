@@ -29,6 +29,17 @@ generate-schema-force:
 	@echo "✅ Schema regeneration complete!"
 	
 
+.PHONY: generate-schema-bundle
+generate-schema-bundle:
+	@echo "Rebuilding deployment SQL from existing generated files..."
+	@./schema/create_schema.sh --bundle-only
+	@echo "✅ Deployment bundle rebuilt!"
+	
+
+deploy-authority-schema:
+	@./schema/create_schema.sh --schema authority --deploy \
+		--database $(SEAD_DBNAME) --port $(SEAD_PORT) --user $(SEAD_USER) --no-generate
+	
 .PHONY: podman-build podman-up podman-down podman-logs
 podman-build:
 	@$(MAKE) -C $(PODMAN_DEPLOYMENT_DIR) build

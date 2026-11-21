@@ -13,7 +13,9 @@ create or replace view authority.taxa_tree_author as
   select
     t.author_id,
     t.author_name as label,
-    authority.immutable_unaccent(lower(t.author_name)) as norm_label  from public.tbl_taxa_tree_authors as t;
+    authority.immutable_unaccent(lower(t.author_name)) as norm_label,
+  null::text as description,
+  null::text as norm_description  from public.tbl_taxa_tree_authors as t;
 
 create index if not exists tbl_taxa_tree_authors_norm_trgm
   on public.tbl_taxa_tree_authors
@@ -35,6 +37,8 @@ create or replace function authority.fuzzy_taxa_tree_author(
   p_description_threshold double precision default 0.50) returns table (
   author_id integer,
   label text,
+  description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -44,6 +48,12 @@ as $$
   select
     s.author_id,
     s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)

@@ -127,6 +127,15 @@ location:
     dimension: 768
     ivfflat_lists: 100
     analyze: false  
+country:
+  name: "Country"
+  table_name: "tbl_locations"
+  id_column: "location_id"
+  label_column: "location_name"
+  description_column: null
+  alternate_identity_column: null
+  reconciliation: simple
+  where_clause: "location_type_id = 1"
 method_group:
   name: "Method Group"
   table_name: "tbl_method_groups"

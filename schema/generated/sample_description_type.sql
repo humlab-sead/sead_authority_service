@@ -38,6 +38,7 @@ create or replace function authority.fuzzy_sample_description_type(
   sample_description_type_id integer,
   label text,
   description text,
+  label_sim double precision,
   name_sim double precision
 ) language sql stable
 as $$
@@ -48,6 +49,11 @@ as $$
     s.sample_description_type_id,
     s.label,
     s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
     greatest(
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)

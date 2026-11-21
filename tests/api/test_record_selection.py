@@ -13,6 +13,7 @@ import src.record_selection as record_selection_module
 from src.api.router import router
 from src.configuration import MockConfigProvider
 from src.record_identifiers import POSTGRES_INTEGER_MAX, parse_record_uri
+from src.strategies.configured_classifier import initialize_classifiers, marked_classifier_keys
 from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
@@ -43,6 +44,7 @@ def _set_selection(
     interactive_search_max_results: int = 50,
 ) -> None:
     """Replace the record-selection block for one test."""
+    initialize_classifiers()
     block: dict[str, Any] = {
         "version": 1,
         "browse_max_rows": browse_max_rows,
@@ -66,12 +68,15 @@ class TestDiscovery:
     """Discovery reports independent capabilities without querying target data."""
 
     @with_test_config
-    def test_stock_config_lists_both_pilots_with_all_capabilities_off(self, client: TestClient, test_provider: MockConfigProvider):
+    def test_stock_config_lists_every_selectable_type_with_all_capabilities_off(
+        self, client: TestClient, test_provider: MockConfigProvider
+    ):
         response = client.get("/records/types")
 
         assert response.status_code == 200
         types = {entry["type"]: entry for entry in response.json()["types"]}
-        assert set(types) == {"feature_type", "country"}
+        assert set(types) == set(marked_classifier_keys())
+        assert {"feature_type", "country"} <= set(types)
         for entry in types.values():
             assert entry["search_supported"] is False
             assert entry["identifier_search_supported"] is False
@@ -260,8 +265,8 @@ class TestListRecords:
         assert response.status_code == 200
         assert response.json()["items"][0]["id"] == f"{ID_BASE}country/1"
         sql = cursor.execute.call_args.args[0]
-        assert "location_type_id = 1" in sql
-        assert "authority.location" in sql
+        assert "authority.country" in sql
+        assert "location_type_id" not in sql
 
     @with_test_config
     def test_unsupported_and_disabled_types_are_distinguishable(self, client: TestClient, test_provider: MockConfigProvider):
@@ -488,8 +493,30 @@ class TestInteractiveSearch:
         assert response.status_code == 200
         assert response.json()["q0"]["result"][0]["id"] == f"{ID_BASE}country/3"
         sql, params = cursor.execute.call_args.args
-        assert "fuzzy_location" in sql
-        assert params["location_type_ids"] == [1]
+        assert "fuzzy_country" in sql
+        assert params["label_threshold"] == 0.30
+        assert params["description_threshold"] == 0.50
+
+    @with_test_config
+    def test_country_search_suppresses_duplicate_normalized_labels(self, client: TestClient, test_provider: MockConfigProvider):
+        """Country adopts simple-classifier search semantics, including duplicate-label suppression."""
+        _set_selection(test_provider, {"country": {"search_supported": True}})
+        _mock_db(
+            test_provider,
+            fetchall=[
+                {"location_id": 3, "label": "Åland", "name_sim": 0.95},
+                {"location_id": 4, "label": "Aland", "name_sim": 0.94},
+            ],
+        )
+
+        response = client.post(
+            "/reconcile",
+            headers={"X-Record-Selection": "interactive"},
+            json={"queries": {"q0": {"query": "aland", "type": "country", "limit": 5}}},
+        )
+
+        assert response.status_code == 200
+        assert [item["match"] for item in response.json()["q0"]["result"]] == [False, False]
 
     @with_test_config
     def test_search_miss_returns_empty_result(self, client: TestClient, test_provider: MockConfigProvider):
@@ -661,6 +688,64 @@ class TestInteractiveSearch:
 
         assert response.status_code == 200
         assert captured == {"q0": {"query": "test", "type": "site"}}
+
+
+class TestThirdSimpleClassifier:
+    """A simple classifier enabled only through configuration serves every surface.
+
+    This is the acceptance proof for a third type: the entity is already a marked
+    table spec, and the only change needed to serve it is its record-selection entry.
+    No Python module names it.
+    """
+
+    ENTITY_TYPE = "data_type_group"
+
+    @with_test_config
+    def test_data_type_group_serves_discovery_list_details_and_search(self, client: TestClient, test_provider: MockConfigProvider):
+        _set_selection(
+            test_provider,
+            {
+                self.ENTITY_TYPE: {
+                    "search_supported": True,
+                    "identifier_search_supported": True,
+                    "browse_supported": True,
+                    "details_supported": True,
+                }
+            },
+        )
+        cursor = _mock_db(
+            test_provider,
+            fetchall=[{"target_id": 7, "name": "Group", "description": None}],
+            fetchone={"target_id": 7, "name": "Group", "description": None},
+        )
+
+        entry = next(item for item in client.get("/records/types").json()["types"] if item["type"] == self.ENTITY_TYPE)
+        assert entry["browse_supported"] is True
+        assert entry["search_supported"] is True
+        assert entry["id_path"] == self.ENTITY_TYPE
+        assert [field["name"] for field in entry["display_fields"]] == ["name", "target_id", "description"]
+
+        listing = client.get(f"/records/{self.ENTITY_TYPE}")
+        assert listing.status_code == 200
+        assert listing.json()["items"][0]["id"] == f"{ID_BASE}{self.ENTITY_TYPE}/7"
+        assert f"from authority.{self.ENTITY_TYPE}" in cursor.execute.call_args.args[0]
+
+        details = client.get(f"/records/{self.ENTITY_TYPE}/details?target_id=7")
+        assert details.status_code == 200
+        assert details.json()["item"]["id"] == f"{ID_BASE}{self.ENTITY_TYPE}/7"
+
+        cursor.fetchall.return_value = [{"data_type_group_id": 7, "label": "Group", "name_sim": 0.9}]
+        search = client.post(
+            "/reconcile",
+            headers={"X-Record-Selection": "interactive"},
+            json={"queries": {"q0": {"query": "group", "type": self.ENTITY_TYPE, "limit": 5}}},
+        )
+
+        assert search.status_code == 200
+        assert search.json()["q0"]["result"][0]["id"] == f"{ID_BASE}{self.ENTITY_TYPE}/7"
+        sql, params = cursor.execute.call_args.args
+        assert f"fuzzy_{self.ENTITY_TYPE}" in sql
+        assert params["label_threshold"] == 0.30
 
 
 class TestRecordIdentifierParsing:
