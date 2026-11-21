@@ -147,6 +147,15 @@ class TestDiscovery:
         assert entry["interactive_search_max_results"] == 11
 
     @with_test_config
+    def test_discovery_lists_only_configured_types(self, client: TestClient, test_provider: MockConfigProvider):
+        _set_selection(test_provider, {"feature_type": {}})
+
+        types = {entry["type"] for entry in client.get("/records/types").json()["types"]}
+
+        assert types == {"feature_type"}
+        assert "country" not in types
+
+    @with_test_config
     def test_manifest_publishes_record_selection_descriptor(self, client: TestClient, test_provider: MockConfigProvider):
         data = client.get("/reconcile").json()
 
@@ -279,6 +288,25 @@ class TestListRecords:
         assert unregistered.json()["error"]["code"] == "unsupported_type"
         assert disabled.status_code == 422
         assert disabled.json()["error"]["code"] == "unsupported_capability"
+
+    @with_test_config
+    def test_marked_but_unconfigured_type_is_unsupported(self, client: TestClient, test_provider: MockConfigProvider):
+        _set_selection(test_provider, {"feature_type": {"browse_supported": True, "details_supported": True}})
+
+        listing = client.get("/records/country")
+        details = client.get("/records/country/details", params={"target_id": 1})
+        search = client.post(
+            "/reconcile",
+            headers={"X-Record-Selection": "interactive"},
+            json={"queries": {"q0": {"query": "sweden", "type": "country", "limit": 5}}},
+        )
+
+        assert listing.status_code == 422
+        assert listing.json()["error"]["code"] == "unsupported_type"
+        assert details.status_code == 422
+        assert details.json()["error"]["code"] == "unsupported_type"
+        assert search.status_code == 422
+        assert search.json()["error"]["code"] == "unsupported_type"
 
     @with_test_config
     def test_list_resolves_id_path_once_for_all_rows(self, client: TestClient, test_provider: MockConfigProvider, monkeypatch):

@@ -5,6 +5,293 @@ options:
   reconciliation:
     label_threshold: 0.30
     description_threshold: 0.50
+  # Record selection (browse, details, interactive search, verification). Every
+  # entity marked `reconciliation: simple` in entities.yml is listed here and
+  # every capability is off, so the section is an explicit inventory rather than
+  # an enablement. Enable one type and one capability at a time, and only after
+  # the rollout checks in docs/OPERATIONS.md pass for that type.
+  record_selection:
+    version: 1
+    browse_max_rows: 500
+    browse_max_bytes: 1048576
+    interactive_search_max_results: 50
+    types:
+      abundance_element:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      activity_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      age_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      alt_ref_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      colour:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      contact_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      country:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      data_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      data_type_group:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      dataset_submission_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      dating_uncertainty:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      ecocode_definition:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      ecocode_group:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      feature_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      horizon:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      identification_level:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      language:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      location_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      method_group:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      project_stage:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      project_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      property_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      property_type_group:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      rdb_code:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      record_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      relative_age_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      sample_description_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      sample_group_description_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      sample_location_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      sample_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      season:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      season_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      site_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      site_type_group:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      species_association_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      submission_state:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      submission_task_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      taxa_tree_author:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      taxa_tree_family:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      taxa_tree_genus:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      taxa_tree_order:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      unit:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      value_class:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      value_qualifier:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      value_type:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
+      value_type_item:
+        search_supported: false
+        identifier_search_supported: false
+        browse_supported: false
+        details_supported: false
+        export_verification_supported: false
   database:
     host: humle.dumle.japp.ouch
     dbname: smurfs

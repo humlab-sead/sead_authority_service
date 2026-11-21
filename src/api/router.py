@@ -213,6 +213,9 @@ async def verify_candidates(
     except MissingCandidateExistsQueryError as exc:
         logger.exception("Candidate verification is misconfigured: {}", exc)
         raise HTTPException(status_code=500, detail="Candidate verification is misconfigured") from exc
+    except RecordSelectionConfigurationError as exc:
+        logger.exception("Candidate verification is misconfigured: {}", exc)
+        raise HTTPException(status_code=500, detail="Candidate verification is misconfigured") from exc
     except DATABASE_ERRORS as exc:
         logger.exception("Candidate verification failed because the SEAD database is unavailable: {}", exc)
         raise HTTPException(status_code=503, detail="SEAD database is unavailable") from exc

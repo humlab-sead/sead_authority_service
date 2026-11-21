@@ -119,6 +119,11 @@ def load_record_selection_policy() -> RecordSelectionPolicy:
     Missing settings and missing switches mean disabled. Configured limits are
     validated as positive integers, and the interactive cap is kept inside the
     existing 500-result query-model maximum.
+
+    Only selectable types listed under ``types`` appear in the policy, so an
+    unconfigured type is reported as ``unsupported_type`` and stays out of
+    discovery, while a configured type whose switches are all off is reported as
+    ``unsupported_capability``.
     """
     block: Any = ConfigValue("options:record_selection").resolve()
     block = block if isinstance(block, dict) else {}
@@ -139,10 +144,14 @@ def load_record_selection_policy() -> RecordSelectionPolicy:
     configured_types = configured_types if isinstance(configured_types, dict) else {}
 
     selectable: tuple[str, ...] = selectable_types()
-    types: dict[str, CapabilityFlags] = {entity_type: _flags_from_entry(configured_types.get(entity_type)) for entity_type in selectable}
+    types: dict[str, CapabilityFlags] = {}
     for entity_type, entry in configured_types.items():
-        if entity_type not in selectable and _flags_from_entry(entry).any_enabled:
-            raise RecordSelectionConfigurationError(f"options:record_selection:types enables unsupported type '{entity_type}'")
+        flags: CapabilityFlags = _flags_from_entry(entry)
+        if entity_type not in selectable:
+            if flags.any_enabled:
+                raise RecordSelectionConfigurationError(f"options:record_selection:types enables unsupported type '{entity_type}'")
+            continue
+        types[entity_type] = flags
 
     return RecordSelectionPolicy(
         browse_max_rows=browse_max_rows,
@@ -153,7 +162,7 @@ def load_record_selection_policy() -> RecordSelectionPolicy:
 
 
 def validate_record_selection_configuration() -> None:
-    """Validate enabled pilot types and the identifier base during startup."""
+    """Validate enabled record-selection types and the identifier base during startup."""
     policy: RecordSelectionPolicy = load_record_selection_policy()
     enabled_types: list[str] = [entity_type for entity_type, flags in policy.types.items() if flags.any_enabled]
     if not enabled_types:
@@ -410,14 +419,13 @@ def _field_filters(projection: RecordProjection) -> list[dict[str, str]]:
 
 
 def discovery_types() -> list[dict[str, Any]]:
-    """Return per-type capability descriptors without querying target data."""
+    """Return per-type capability descriptors for the configured types without querying target data."""
     policy: RecordSelectionPolicy = load_record_selection_policy()
     id_base: Any = ConfigValue("options:id_base").resolve()
     id_base_value: str | None = id_base if isinstance(id_base, str) and id_base else None
 
     entries: list[dict[str, Any]] = []
-    for entity_type in selectable_types():
-        flags: CapabilityFlags = policy.types[entity_type]
+    for entity_type, flags in policy.types.items():
         projection: RecordProjection = build_projection(entity_type)
         entries.append(
             {

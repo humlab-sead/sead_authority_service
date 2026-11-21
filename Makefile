@@ -35,7 +35,7 @@ generate-schema-bundle:
 	@./schema/create_schema.sh --bundle-only
 	@echo "✅ Deployment bundle rebuilt!"
 	
-
+.PHONY: deploy-authority-schema
 deploy-authority-schema:
 	@./schema/create_schema.sh --schema authority --deploy \
 		--database $(SEAD_DBNAME) --port $(SEAD_PORT) --user $(SEAD_USER) --no-generate

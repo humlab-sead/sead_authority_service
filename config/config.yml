@@ -15,7 +15,7 @@ options:
   # the rollout checks in docs/OPERATIONS.md pass for that type.
   record_selection:
     version: 1
-    browse_max_rows: 1000
+    browse_max_rows: 500
     browse_max_bytes: 1048576
     interactive_search_max_results: 50
     types:
