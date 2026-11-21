@@ -20,281 +20,281 @@ options:
     interactive_search_max_results: 50
     types:
       abundance_element:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       activity_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       age_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       alt_ref_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       colour:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       contact_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       country:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       data_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       data_type_group:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       dataset_submission_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       dating_uncertainty:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       ecocode_definition:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       ecocode_group:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       feature_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       horizon:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       identification_level:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       language:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       location_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       method_group:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       project_stage:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       project_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       property_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       property_type_group:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       rdb_code:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       record_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       relative_age_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       sample_description_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       sample_group_description_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       sample_location_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       sample_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       season:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       season_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       site_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       site_type_group:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       species_association_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       submission_state:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       submission_task_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       taxa_tree_author:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       taxa_tree_family:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       taxa_tree_genus:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       taxa_tree_order:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       unit:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       value_class:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       value_qualifier:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       value_type:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
       value_type_item:
-        search_supported: false
-        identifier_search_supported: false
-        browse_supported: false
-        details_supported: false
-        export_verification_supported: false
+        search_supported: true
+        identifier_search_supported: true
+        browse_supported: true
+        details_supported: true
+        export_verification_supported: true
   database:
     dbname: "${SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME}"
     host: "${SEAD_AUTHORITY_OPTIONS_DATABASE_HOST}"
