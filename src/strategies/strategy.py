@@ -4,6 +4,7 @@ from typing import Any
 from loguru import logger
 
 from src.configuration import ConfigValue
+from src.record_identifiers import format_record_uri
 from src.utility import Registry, resolve_specification
 
 from . import StrategySpecification
@@ -82,7 +83,7 @@ class ReconciliationStrategy(ABC):
         is_match = bool(label.lower() == query.lower() or score >= auto_accept_threshold)
 
         candidate: dict[str, Any] = {
-            "id": f"{id_base}{self.get_id_path()}/{entity_id}",
+            "id": format_record_uri(id_base, self.get_id_path(), entity_id),
             "name": label,
             "score": score_percent,
             "match": is_match,
@@ -123,6 +124,10 @@ class ReconciliationStrategy(ABC):
         candidates: list[dict] = await self._find_candidates(query, properties, limit, self.get_repository())
 
         return sorted(candidates, key=lambda x: x.get("name_sim", x.get("score", 0)), reverse=True)[:limit]
+
+    async def suggest_candidates(self, prefix: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Find autocomplete candidates for a text prefix."""
+        return await self.find_candidates(query=prefix, properties={}, limit=limit)
 
     async def _find_candidates(self, query, properties, limit, proxy) -> list[dict]:
         """Internal method to find candidates, can be overridden by subclasses"""

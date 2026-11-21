@@ -132,6 +132,13 @@ class BaseRepository(AbstractRepository):
             params["description_threshold"] = ConfigValue("options:reconciliation:description_threshold").resolve()
         return await self.fetch_all(self.get_find_fuzzy_sql(), params)
 
+    async def find_by_prefix(self, prefix: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Find rows whose normalized label starts with a prefix."""
+        query = self.get_sql_query("prefix_find_sql")
+        if not query:
+            raise ValueError(f"No prefix search query is configured for '{self.key}'")
+        return await self.fetch_all(query, {"q": prefix, "n": limit})
+
     async def fetch_by_alternate_identity(
         self, alternate_identity: str, **kwargs
     ) -> list[dict[str, Any]]:  # pylint: disable=unused-argument

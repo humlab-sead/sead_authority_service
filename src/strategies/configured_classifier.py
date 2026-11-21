@@ -11,6 +11,7 @@ from typing import Any
 from loguru import logger
 
 from src.configuration import ConfigValue
+from src.record_identifiers import format_record_uri
 from src.utility import (
     build_classifier_specification,
     classifier_view_columns,
@@ -80,6 +81,10 @@ class ClassifierConfigurationError(ValueError):
 class ConfiguredClassifierStrategy(ReconciliationStrategy):
     """Reconciles a classifier using its marked table specification and generated SQL."""
 
+    async def suggest_candidates(self, prefix: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Return classifier rows whose normalized labels start with the prefix."""
+        return await self.get_repository().find_by_prefix(prefix, limit)
+
     def as_candidate(self, entity_data: dict[str, Any], query: str) -> dict[str, Any]:
         """Converts one row to a candidate using label evidence for the match flag."""
         return self._as_label_evidence_candidate(entity_data, normalize_text(query))
@@ -113,7 +118,7 @@ class ConfiguredClassifierStrategy(ReconciliationStrategy):
         is_match: bool = bool(is_exact_label or label_sim >= auto_accept_threshold)
 
         candidate: dict[str, Any] = {
-            "id": f"{id_base}{self.get_id_path()}/{entity_id}",
+            "id": format_record_uri(id_base, self.get_id_path(), entity_id),
             "name": label,
             "score": score_percent,
             "match": is_match,

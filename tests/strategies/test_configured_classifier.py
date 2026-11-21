@@ -79,10 +79,13 @@ class TestConfiguredClassifierRegistration:
             assert strategy.get_label_field() == "label"
             assert strategy.specification["reconciliation"] == "simple"
             fuzzy_sql: str = strategy.specification["sql_queries"]["fuzzy_find_sql"]
+            prefix_sql: str = strategy.specification["sql_queries"]["prefix_find_sql"]
             details_sql: str = strategy.specification["sql_queries"]["details_sql"]
             assert fuzzy_sql.startswith(f"select * from authority.fuzzy_{key}(")
             assert "%(label_threshold)s" in fuzzy_sql
             assert "%(description_threshold)s" in fuzzy_sql
+            assert f"from authority.{key} as s" in prefix_sql
+            assert "where left(s.norm_label, char_length(pq.q)) = pq.q" in prefix_sql
             assert f"from authority.{key} as s" in details_sql
 
     @with_test_config
@@ -125,6 +128,25 @@ class TestMarkedFind:
             "label_threshold": 0.30,
             "description_threshold": 0.50,
         }
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_classifier_suggestions_use_prefix_query(
+        self, monkeypatch: pytest.MonkeyPatch, test_provider: ExtendedMockConfigProvider
+    ):
+        strategy = Strategies.items["contact_type"]()
+        repository = strategy.get_repository()
+        rows = [{"contact_type_id": 1, "label": "Samples taken by", "name_sim": 0.2}]
+        fetch_all = AsyncMock(return_value=rows)
+        monkeypatch.setattr(repository, "fetch_all", fetch_all)
+
+        suggestions = await strategy.suggest_candidates(prefix="Sa", limit=10)
+
+        assert suggestions == rows
+        query, params = fetch_all.await_args.args
+        assert query == strategy.specification["sql_queries"]["prefix_find_sql"]
+        assert "where left(s.norm_label, char_length(pq.q)) = pq.q" in query
+        assert params == {"q": "Sa", "n": 10}
 
 
 class TestCandidateBehavior:

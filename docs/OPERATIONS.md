@@ -209,6 +209,37 @@ The site strategy requires `authority.fuzzy_site(text, integer)` and the `author
 
 `POST /reconcile/verify-candidates` performs a read-only existence check against `authority.site`. It accepts full candidate IDs under `options:id_base` and currently supports `site` only when the strategy is registered and SIMS allows `bind_existing`. Results distinguish `exists`, `not_found`, `invalid_candidate`, and `unsupported_type`. A database or pool failure returns HTTP 503; do not treat it as a missing site. This check does not create SIMS identities or bindings and does not adopt an existing SEAD site into SIMS.
 
+### Record selection (browse, details, interactive search, verification)
+
+Phase 1 adds bounded, read-only record selection for `feature_type` and `country`. The shipped `config/config.yml` leaves both pilot types off. A missing setting or switch also means disabled.
+
+| Setting | Meaning |
+|---|---|
+| `options:record_selection:browse_max_rows` | Maximum rows a complete list may return (default 500). |
+| `options:record_selection:browse_max_bytes` | Maximum uncompressed UTF-8 response bytes for a complete list (default 1048576). |
+| `options:record_selection:interactive_search_max_results` | Maximum interactive search results (default 50, at most 500). |
+| `options:record_selection:types:<type>:search_supported` | Marked interactive search. |
+| `options:record_selection:types:<type>:identifier_search_supported` | Details lookup by numeric `target_id`. |
+| `options:record_selection:types:<type>:browse_supported` | Complete record list. |
+| `options:record_selection:types:<type>:details_supported` | Details lookup by record URI (`id`). |
+| `options:record_selection:types:<type>:export_verification_supported` | Ordered candidate verification. |
+
+`GET /records/types` reports the version 1 discovery document and does not read target data. Unsupported limits are `null`. `GET /records/{type}` returns `{items, completeness: "complete"}` or `409 too_large_to_browse` with no items. `GET /records/{type}/details` accepts exactly one of `id` or `target_id`; a `target_id` that is not a positive decimal value returns `422 invalid_request`, and one outside the PostgreSQL integer range returns `404 record_not_found`. `POST /reconcile` with `X-Record-Selection: interactive` requires one query, an explicit type, non-blank text, and a positive integer `limit`; a limit above the type cap returns `search_limit_exceeded`. Record-selection failures use `{"error": {"code", "message"}}`, and a database or pool failure returns `503 database_unavailable` rather than an empty success.
+
+`country` reads `authority.location` filtered to `location_type_id = 1` and calls `authority.fuzzy_location(text, integer, integer[])` for marked search. `feature_type` reuses the registered classifier with `authority.feature_type` and `authority.fuzzy_feature_type`. When enabled, `POST /reconcile/verify-candidates` verifies pilot types with the same typed lookup as details and does not consult SIMS policy; `site` behavior is unchanged.
+
+Test a capability in isolation by overriding only one type and switch:
+
+```yaml
+options:
+  record_selection:
+    types:
+      feature_type:
+        browse_supported: true
+```
+
+Do not enable a capability on a deployment until Phase 4 records the exact Authority image and contract and, for interactive search, measures 100 warm searches per type through the Shape Shifter backend with p95 at most 2000 ms. A failed measurement leaves only that capability and type disabled.
+
 ### Reconciliation manifest and schema access
 
 `GET /reconcile` publishes `reconciliation.supportedTypes`, the type IDs that have an implemented matcher. The manifest is built from the strategy registry and does not query the database, so a healthy manifest does not prove that matching works. Verify each type you rely on with a real `POST /reconcile` request.

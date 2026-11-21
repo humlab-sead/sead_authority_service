@@ -171,6 +171,28 @@ class TestBaseRepositoryUnit:
         fetch_all.assert_awaited_once_with("SQL", {"alternate_identity": "ABC"})
 
     @pytest.mark.asyncio
+    async def test_find_by_prefix_uses_configured_prefix_query(self, monkeypatch: pytest.MonkeyPatch):
+        repo = self._make_repo(monkeypatch, {"key": "contact_type", "sql_queries": {"prefix_find_sql": "PREFIX SQL"}})
+        fetch_all = AsyncMock(return_value=[{"contact_type_id": 1, "label": "Samples taken by"}])
+        monkeypatch.setattr(repo, "fetch_all", fetch_all)
+
+        rows = await repo.find_by_prefix("Sa", limit=5)
+
+        assert rows == [{"contact_type_id": 1, "label": "Samples taken by"}]
+        fetch_all.assert_awaited_once_with("PREFIX SQL", {"q": "Sa", "n": 5})
+
+    @pytest.mark.asyncio
+    async def test_find_by_prefix_fails_when_query_is_not_configured(self, monkeypatch: pytest.MonkeyPatch):
+        repo = self._make_repo(monkeypatch, {"key": "x", "sql_queries": {}})
+        fetch_all = AsyncMock(return_value=[])
+        monkeypatch.setattr(repo, "fetch_all", fetch_all)
+
+        with pytest.raises(ValueError, match="No prefix search query is configured"):
+            await repo.find_by_prefix("Sa")
+
+        fetch_all.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_get_details_handles_psycopg_error(self, monkeypatch: pytest.MonkeyPatch):
         repo = self._make_repo(monkeypatch, {"key": "x", "sql_queries": {"details_sql": "SQL"}})
         fetch_one = AsyncMock(side_effect=psycopg.Error("db"))
