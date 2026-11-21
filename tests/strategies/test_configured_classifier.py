@@ -9,8 +9,9 @@ import pytest
 
 from src.strategies.configured_classifier import (
     CANDIDATE_DESCRIPTION_LIMIT,
-    CLASSIFIER_KEYS,
     ConfiguredClassifierStrategy,
+    initialize_classifiers,
+    marked_classifier_keys,
 )
 from src.strategies.strategy import Strategies
 from tests.conftest import ExtendedMockConfigProvider, MockRow
@@ -26,6 +27,7 @@ def candidate_row(**overrides: Any) -> dict[str, Any]:
 
 
 def feature_type_strategy() -> ConfiguredClassifierStrategy:
+    initialize_classifiers()
     strategy_cls = Strategies.items["feature_type"]
     assert issubclass(strategy_cls, ConfiguredClassifierStrategy)
     return strategy_cls()
@@ -34,7 +36,10 @@ def feature_type_strategy() -> ConfiguredClassifierStrategy:
 class TestConfiguredClassifierRegistration:
     @with_test_config
     def test_registers_every_classifier_key(self, test_provider: ExtendedMockConfigProvider):
-        for key in CLASSIFIER_KEYS:
+        classifier_keys: list[str] = initialize_classifiers()
+
+        assert classifier_keys
+        for key in classifier_keys:
             strategy_cls = Strategies.items[key]
             assert issubclass(strategy_cls, ConfiguredClassifierStrategy)
             assert strategy_cls.support_status == "supported"
@@ -72,7 +77,9 @@ class TestConfiguredClassifierRegistration:
 
     @with_test_config
     def test_every_approved_classifier_resolves_its_generated_contract(self, test_provider: ExtendedMockConfigProvider):
-        for key in CLASSIFIER_KEYS:
+        initialize_classifiers()
+
+        for key in marked_classifier_keys():
             strategy = Strategies.items[key]()
 
             assert strategy.get_id_path() == key

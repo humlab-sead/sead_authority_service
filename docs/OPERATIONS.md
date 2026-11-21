@@ -211,7 +211,7 @@ The site strategy requires `authority.fuzzy_site(text, integer)` and the `author
 
 ### Record selection (browse, details, interactive search, verification)
 
-Phase 1 adds bounded, read-only record selection for `feature_type` and `country`. The shipped `config/config.yml` leaves both pilot types off. A missing setting or switch also means disabled.
+Phase 1 adds bounded, read-only record selection for any entity marked `reconciliation: simple` in `table_specs`. A type is served only when it has that marked spec, the generated `authority.<type>` and `authority.fuzzy_<type>` objects, and an `options:record_selection:types` entry. The shipped `config/config.yml` lists all 46 simple classifiers with every capability off, so it is an inventory rather than an enablement. A type without an `options:record_selection:types` entry is not configured and reports `unsupported_type`; a configured type whose capability switch is absent or `false` is disabled and reports `unsupported_capability`.
 
 | Setting | Meaning |
 |---|---|
@@ -224,9 +224,15 @@ Phase 1 adds bounded, read-only record selection for `feature_type` and `country
 | `options:record_selection:types:<type>:details_supported` | Details lookup by record URI (`id`). |
 | `options:record_selection:types:<type>:export_verification_supported` | Ordered candidate verification. |
 
-`GET /records/types` reports the version 1 discovery document and does not read target data. Unsupported limits are `null`. `GET /records/{type}` returns `{items, completeness: "complete"}` or `409 too_large_to_browse` with no items. `GET /records/{type}/details` accepts exactly one of `id` or `target_id`; a `target_id` that is not a positive decimal value returns `422 invalid_request`, and one outside the PostgreSQL integer range returns `404 record_not_found`. `POST /reconcile` with `X-Record-Selection: interactive` requires one query, an explicit type, non-blank text, and a positive integer `limit`; a limit above the type cap returns `search_limit_exceeded`. Record-selection failures use `{"error": {"code", "message"}}`, and a database or pool failure returns `503 database_unavailable` rather than an empty success.
+`GET /records/types` reports the version 1 discovery document and does not read target data. It lists exactly the types configured under `options:record_selection:types`, so a marked classifier without an entry stays out of the document. Unsupported limits are `null`. `GET /records/{type}` returns `{items, completeness: "complete"}` or `409 too_large_to_browse` with no items. `GET /records/{type}/details` accepts exactly one of `id` or `target_id`; a `target_id` that is not a positive decimal value returns `422 invalid_request`, and one outside the PostgreSQL integer range returns `404 record_not_found`. `POST /reconcile` with `X-Record-Selection: interactive` requires one query, an explicit type, non-blank text, and a positive integer `limit`; a limit above the type cap returns `search_limit_exceeded`. Record-selection failures use `{"error": {"code", "message"}}`, and a database or pool failure returns `503 database_unavailable` rather than an empty success.
 
-`country` reads `authority.location` filtered to `location_type_id = 1` and calls `authority.fuzzy_location(text, integer, integer[])` for marked search. `feature_type` reuses the registered classifier with `authority.feature_type` and `authority.fuzzy_feature_type`. When enabled, `POST /reconcile/verify-candidates` verifies pilot types with the same typed lookup as details and does not consult SIMS policy; `site` behavior is unchanged.
+`country` is a simple classifier defined in `config/entities.yml` over tracked locations. `authority.country` exposes the `location_type_id = 1` subset of `public.tbl_locations`, and marked search calls `authority.fuzzy_country(text, integer, double precision, double precision)`. It uses the same candidate conversion as the other simple classifiers, so duplicate normalized labels are not marked as matches. `feature_type` uses `authority.feature_type` and `authority.fuzzy_feature_type`. When enabled, `POST /reconcile/verify-candidates` verifies these types with the same typed lookup as details and does not consult SIMS policy; `site` behavior is unchanged.
+
+`authority.country` and `authority.fuzzy_country` are defined in `schema/generated/country.sql` and are included in the deploy bundle. Code and configuration can land first; the `country` routes fail against a database that has not had the rebuilt `schema/__deploy__.sql` applied. Apply the rebuilt bundle as part of that deployment, then enable `country`.
+
+To rebuild only the bundle from files that are already generated, without re-running the generator or deleting `schema/generated/`, run `make generate-schema-bundle` or `./schema/create_schema.sh --bundle-only`. The default `./schema/create_schema.sh` deletes `schema/generated/` and regenerates it before building the bundle, so use `--bundle-only` when the generated files are already current.
+
+Enable another simple classifier by adding only its `options:record_selection:types` entry. The type needs no Python change; its columns, displayed fields, and filters come from its `table_specs` entry.
 
 Test a capability in isolation by overriding only one type and switch:
 
@@ -251,14 +257,14 @@ Do not enable a capability on a deployment until Phase 4 records the exact Autho
 ```sql
 select has_schema_privilege(current_user, 'authority', 'usage');
 select has_function_privilege(current_user, 'authority.fuzzy_feature_type(text,integer)', 'execute');
-select has_function_privilege(current_user, 'authority.fuzzy_location(text,integer,integer[])', 'execute');
+select has_function_privilege(current_user, 'authority.fuzzy_country(text,integer,double precision,double precision)', 'execute');
 select has_table_privilege(current_user, 'authority.feature_type', 'select');
 select has_table_privilege(current_user, 'authority.location', 'select');
 ```
 
 A `false` result or `permission denied for schema authority` means the grants are missing. Regenerate and redeploy the schema through the approved database process.
 
-`authority.fuzzy_location` is `SECURITY INVOKER` and also reads `public.tbl_location_types` to filter by location type. A role that has only the `authority` grants can execute the function but receives `permission denied for table tbl_location_types`. Grant `SELECT` on that table through the database's normal role policy; `schema/sql/grants.sql` covers the `authority` schema only. `authority.fuzzy_feature_type` reads only `authority` objects.
+`authority.fuzzy_location` is `SECURITY INVOKER` and also reads `public.tbl_location_types` to filter by location type. A role that has only the `authority` grants can execute the function but receives `permission denied for table tbl_location_types`. Grant `SELECT` on that table through the database's normal role policy; `schema/sql/grants.sql` covers the `authority` schema only. `authority.fuzzy_feature_type` and `authority.fuzzy_country` read only `authority` objects.
 
 ### Classifier schema, configuration, and code release order
 
@@ -266,7 +272,7 @@ Classifier reconciliation ships as three separately released inputs. Apply them 
 
 1. Schema: deploy the generated `schema/generated/<key>.sql` files for the classifier types you enable. Each file creates or replaces `authority.<key>` and `authority.fuzzy_<key>`.
 2. Mounted configuration: when a deployment mounts its own `config/`, update `entities.yml`, `config.yml`, and `identity_policy.yml` to match the application defaults. The classifier entries, the `reconciliation: simple` marker, `description_match_weight`, and `options:reconciliation` thresholds must agree with `config/`. The identity policy file must be present because `/identity/capabilities` and `/identity/resolve` read it.
-3. Application code: deploy the image that registers the classifier keys in `CLASSIFIER_KEYS`.
+3. Application code: deploy the image that registers the simple classifiers from the marked `table_specs` entries.
 
 The service fails startup with a named classifier configuration error when a registered key has no marked `table_specs` entry, or when a reconciliation threshold is missing or outside `0 < value <= 1`. Deploy the schema and the mounted configuration before the image so a new image does not fail at startup.
 

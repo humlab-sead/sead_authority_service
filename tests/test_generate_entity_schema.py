@@ -6,8 +6,9 @@ import yaml
 from jinja2 import Environment, FileSystemLoader
 
 from src.scripts.generate_entity_schema import generate_trigram_sql
-from src.strategies.configured_classifier import CLASSIFIER_KEYS
+from src.strategies.configured_classifier import initialize_classifiers
 from src.strategies.strategy import Strategies
+from tests.decorators import with_test_config
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATHS = (
@@ -17,7 +18,10 @@ CONFIG_PATHS = (
 
 ENTITY_CONFIG_PATHS = (REPOSITORY_ROOT / "config/entities.yml",)
 
-APPROVED_INVENTORY = 45
+APPROVED_INVENTORY = 46
+
+# `country` is a simple classifier over tracked locations and is not a target-model entity.
+DERIVED_CLASSIFIER_KEYS = ("country",)
 
 EXCLUDED_CLASSIFIER_KEYS = (
     "abundance_element_group",
@@ -56,6 +60,11 @@ def load_table_specs(config_path: Path) -> dict[str, Any]:
 def marked_keys(table_specs: dict[str, Any]) -> set[str]:
     """Returns the keys declared with `reconciliation: simple`."""
     return {key for key, table_spec in table_specs.items() if isinstance(table_spec, dict) and table_spec.get("reconciliation") == "simple"}
+
+
+def repository_classifier_keys() -> set[str]:
+    """Returns the simple classifier keys declared by the shipped entity configuration."""
+    return marked_keys(load_table_specs(REPOSITORY_ROOT / "config/entities.yml"))
 
 
 def render_sql(tmp_path: Path, entity_key: str, entity: dict[str, Any]) -> str:
@@ -135,7 +144,7 @@ def test_marked_positive_weight_scores_and_indexes_description(tmp_path: Path) -
     assert "<<%" not in sql
 
 
-def test_marked_entity_without_description_keeps_three_return_columns(tmp_path: Path) -> None:
+def test_marked_entity_without_description_returns_null_description(tmp_path: Path) -> None:
     entity = {
         "name": "Test Classifier",
         "table_name": "tbl_test_classifier",
@@ -147,9 +156,17 @@ def test_marked_entity_without_description_keeps_three_return_columns(tmp_path: 
 
     sql = render_sql(tmp_path, "test_classifier", entity)
 
-    assert "description text" not in sql
-    assert "norm_description" not in sql
-    assert "returns table (\n  test_classifier_id integer,\n  label text,\n  name_sim double precision" in sql
+    assert "null::text as description" in sql
+    assert "null::text as norm_description" in sql
+    assert (
+        "returns table (\n"
+        "  test_classifier_id integer,\n"
+        "  label text,\n"
+        "  description text,\n"
+        "  label_sim double precision,\n"
+        "  name_sim double precision\n"
+        ") language sql stable"
+    ) in sql
     assert "p_label_threshold double precision default 0.30" in sql
     assert "p_description_threshold double precision default 0.50" in sql
 
@@ -220,9 +237,9 @@ def test_marked_filter_parameters_are_preserved_with_description_scoring(tmp_pat
 
 
 def test_approved_classifier_inventory_matches_marked_entries() -> None:
-    expected_keys = set(CLASSIFIER_KEYS)
+    expected_keys = repository_classifier_keys()
 
-    assert len(CLASSIFIER_KEYS) == len(expected_keys) == APPROVED_INVENTORY
+    assert len(expected_keys) == APPROVED_INVENTORY
     for config_path in ENTITY_CONFIG_PATHS:
         assert marked_keys(load_table_specs(config_path)) == expected_keys, config_path
 
@@ -230,11 +247,16 @@ def test_approved_classifier_inventory_matches_marked_entries() -> None:
     assert marked_keys(inline_test_specs) == expected_keys
 
 
-def test_excluded_classifiers_are_not_generically_registered() -> None:
-    assert len(CLASSIFIER_KEYS) + len(EXCLUDED_CLASSIFIER_KEYS) == TARGET_MODEL_CLASSIFIER_COUNT
+@with_test_config
+def test_excluded_classifiers_are_not_generically_registered(test_provider) -> None:  # pylint: disable=unused-argument
+    classifier_keys = repository_classifier_keys()
+
+    assert len(classifier_keys) - len(DERIVED_CLASSIFIER_KEYS) + len(EXCLUDED_CLASSIFIER_KEYS) == TARGET_MODEL_CLASSIFIER_COUNT
 
     for key in EXCLUDED_CLASSIFIER_KEYS:
-        assert key not in CLASSIFIER_KEYS
+        assert key not in classifier_keys
+
+    initialize_classifiers()
 
     for key in UNREGISTERED_CLASSIFIER_KEYS:
         assert key not in Strategies.items
@@ -246,7 +268,7 @@ def test_excluded_classifiers_are_not_generically_registered() -> None:
 def test_only_rdb_code_enables_description_scoring() -> None:
     for config_path in (*ENTITY_CONFIG_PATHS, REPOSITORY_ROOT / "tests/config/config.yml"):
         table_specs = load_table_specs(config_path)
-        weights = {key: float(table_specs[key].get("description_match_weight") or 0) for key in CLASSIFIER_KEYS}
+        weights = {key: float(table_specs[key].get("description_match_weight") or 0) for key in marked_keys(table_specs)}
 
         assert {key for key, weight in weights.items() if weight > 0} == {"rdb_code"}, config_path
         assert 0.10 <= weights["rdb_code"] <= 0.20
@@ -261,10 +283,10 @@ def test_generated_classifier_sql_matches_tracked_output(tmp_path: Path, entity_
     assert generated == tracked
 
 
-def test_weighted_and_zero_weight_classifier_contracts_differ() -> None:
+def test_weighted_and_zero_weight_classifier_contracts_differ(tmp_path: Path) -> None:
     entities = yaml.safe_load((REPOSITORY_ROOT / "config/entities.yml").read_text(encoding="utf-8"))
-    weighted = (REPOSITORY_ROOT / "schema/generated/rdb_code.sql").read_text(encoding="utf-8")
-    plain = (REPOSITORY_ROOT / "schema/generated/age_type.sql").read_text(encoding="utf-8")
+    weighted = render_sql(tmp_path, "rdb_code", entities["rdb_code"])
+    plain = render_sql(tmp_path, "age_type", entities["age_type"])
 
     assert "strict_word_similarity(pq.q, s.norm_description)" in weighted
     assert "tbl_rdb_codes_norm_desc_trgm" in weighted
@@ -276,7 +298,7 @@ def test_weighted_and_zero_weight_classifier_contracts_differ() -> None:
     assert "description text" in plain
     assert "strict_word_similarity" not in plain
     assert "_norm_desc_trgm" not in plain
-    assert "label_sim double precision" not in plain
+    assert "label_sim double precision" in plain
     assert "p_label_threshold double precision default 0.30" in plain
 
 
@@ -303,6 +325,6 @@ def test_marked_reference_entities_render_tracked_sql(tmp_path: Path, entity_key
     assert "as description" in generated
     assert "as norm_description" in generated
     assert "description text" in generated
-    assert "label_sim" not in generated
+    assert "label_sim double precision" in generated
     assert "strict_word_similarity" not in generated
     assert "_norm_desc_trgm" not in generated

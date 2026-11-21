@@ -3,18 +3,23 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import yaml
 
 import main
 from src.configuration import setup
 from src.configuration.config import Config
 from src.configuration.provider import ConfigProvider, ConfigStore, MockConfigProvider, reset_config_provider, set_config_provider
-from src.strategies.configured_classifier import CLASSIFIER_KEYS, ClassifierConfigurationError, validate_classifier_configuration
+from src.record_selection import RecordSelectionConfigurationError, validate_record_selection_configuration
+from src.strategies.configured_classifier import ClassifierConfigurationError, validate_classifier_configuration
 
 # pylint: disable=redefined-outer-name
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture()
@@ -110,29 +115,12 @@ async def test_get_connection_missing_pool_raises(provider_with_config: Config) 
 
 
 def _classifier_config() -> dict[str, Any]:
+    """Builds a classifier validation payload from the inline test table specifications."""
+    specs: dict[str, Any] = yaml.safe_load((REPOSITORY_ROOT / "tests/config/config.yml").read_text(encoding="utf-8"))["table_specs"]
     table_specs: dict[str, Any] = {
-        key: {
-            "name": key.replace("_", " ").title(),
-            "id_column": f"{key}_id",
-            "label_column": f"{key}_label",
-            "description_column": None,
-            "reconciliation": "simple",
-        }
-        for key in CLASSIFIER_KEYS
-    }
-    table_specs["data_type"] = {
-        "name": "Data Type",
-        "id_column": "data_type_id",
-        "label_column": "data_type_name",
-        "description_column": "definition",
-        "reconciliation": "simple",
-    }
-    table_specs["feature_type"] = {
-        "name": "Feature Type",
-        "id_column": "feature_type_id",
-        "label_column": "feature_type_name",
-        "description_column": "feature_type_description",
-        "reconciliation": "simple",
+        key: dict(table_spec)
+        for key, table_spec in specs.items()
+        if isinstance(table_spec, dict) and table_spec.get("reconciliation") == "simple"
     }
     return {
         "table_specs": table_specs,
@@ -140,24 +128,20 @@ def _classifier_config() -> dict[str, Any]:
     }
 
 
-def _drop_classifier_key(config: dict[str, Any]) -> None:
-    del config["table_specs"]["feature_type"]
+def _blank_id_column(config: dict[str, Any]) -> None:
+    del config["table_specs"]["location_type"]["id_column"]
 
 
-def _drop_last_classifier_key(config: dict[str, Any]) -> None:
-    del config["table_specs"][CLASSIFIER_KEYS[-1]]
+def _declare_properties(config: dict[str, Any]) -> None:
+    config["table_specs"]["feature_type"]["properties"] = [{"id": "code", "name": "Code", "type": "string"}]
 
 
-def _drop_marker(config: dict[str, Any]) -> None:
-    del config["table_specs"]["feature_type"]["reconciliation"]
+def _declare_property_settings(config: dict[str, Any]) -> None:
+    config["table_specs"]["feature_type"]["property_settings"] = {"code": {"max": 10}}
 
 
-def _add_unregistered_marked_key(config: dict[str, Any]) -> None:
-    config["table_specs"]["location"] = {
-        "id_column": "location_id",
-        "label_column": "location_name",
-        "reconciliation": "simple",
-    }
+def _weight_without_description_column(config: dict[str, Any]) -> None:
+    config["table_specs"]["country"]["description_match_weight"] = 0.15
 
 
 def _blank_label_column(config: dict[str, Any]) -> None:
@@ -193,12 +177,12 @@ def test_validate_classifier_configuration_accepts_valid_config(provider_with_co
 @pytest.mark.parametrize(
     "mutation, expected_message",
     [
-        (_drop_classifier_key, "feature_type"),
-        (_drop_last_classifier_key, CLASSIFIER_KEYS[-1]),
-        (_drop_marker, "reconciliation: simple"),
-        (_add_unregistered_marked_key, "not declared in CLASSIFIER_KEYS"),
         (_blank_label_column, "label_column"),
+        (_blank_id_column, "id_column"),
         (_unknown_details_column, "details column"),
+        (_declare_properties, "properties"),
+        (_declare_property_settings, "property_settings"),
+        (_weight_without_description_column, "description_column"),
         (_missing_threshold, "label_threshold"),
         (_zero_threshold, "description_threshold"),
         (_above_one_threshold, "label_threshold"),
@@ -212,6 +196,17 @@ def test_validate_classifier_configuration_rejects_invalid_config(provider_with_
 
     with pytest.raises(ClassifierConfigurationError, match=expected_message):
         validate_classifier_configuration()
+
+
+def test_record_selection_rejects_an_enabled_key_that_is_not_a_simple_classifier(provider_with_config: Config) -> None:
+    """An enabled record type that is no longer marked fails configuration, not a request."""
+    config_data: dict[str, Any] = _classifier_config()
+    del config_data["table_specs"]["feature_type"]
+    provider_with_config.update(config_data)
+    provider_with_config.update({"options:record_selection": {"types": {"feature_type": {"search_supported": True}}}})
+
+    with pytest.raises(RecordSelectionConfigurationError, match="feature_type"):
+        validate_record_selection_configuration()
 
 
 @pytest.mark.asyncio

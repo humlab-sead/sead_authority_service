@@ -1,10 +1,9 @@
-"""Bounded, read-only record selection for the reconciliation pilot types.
+"""Bounded, read-only record selection for configured simple classifiers.
 
-Phase 1 covers two pilot types, ``feature_type`` and ``country``. Each type has an
-independent set of capability switches and two small read-only projections:
-``feature_type`` reads the generated classifier view derived from its marked table
-spec, and ``country`` reads the country subset of ``authority.location``. Nothing in
-this module writes to the target database or to SIMS state.
+Any entity marked `reconciliation: simple` in `table_specs` can be enabled through
+`options:record_selection:types`. Discovery, lists, details, and interactive search read the
+generated `authority.<key>` objects and derive their columns from the same table spec, so no
+per-type code is needed. Nothing in this module writes to the target database or to SIMS state.
 """
 
 from __future__ import annotations
@@ -18,6 +17,7 @@ from loguru import logger
 
 from src.configuration import ConfigValue
 from src.record_identifiers import format_record_uri, parse_record_uri, valid_id_base, within_postgres_integer
+from src.strategies.configured_classifier import marked_classifier_keys
 from src.strategies.query import BaseRepository
 from src.strategies.strategy import Strategies
 
@@ -28,10 +28,6 @@ MAX_INTERACTIVE_SEARCH_RESULTS = 500
 
 RECORD_SELECTION_VERSION = 1
 RECORD_SELECTION_TYPES_PATH = "/records/types"
-
-PILOT_TYPES: tuple[str, ...] = ("feature_type", "country")
-COUNTRY_LOCATION_TYPE_IDS: tuple[int, ...] = (1,)
-COUNTRY_FUZZY_SQL = "select * from authority.fuzzy_location(%(q)s::text, %(n)s::int, %(location_type_ids)s::integer[])"
 
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -52,7 +48,7 @@ class RecordSelectionError(ValueError):
 
 @dataclass(frozen=True)
 class CapabilityFlags:
-    """Independent capability switches for one pilot type."""
+    """Independent capability switches for one selectable type."""
 
     search: bool = False
     identifier_search: bool = False
@@ -75,7 +71,7 @@ class RecordSelectionPolicy:
     types: dict[str, CapabilityFlags]
 
     def flags_for(self, entity_type: str) -> CapabilityFlags:
-        """Return the capability flags for a pilot type, or raise ``unsupported_type``."""
+        """Return the capability flags for a selectable type, or raise ``unsupported_type``."""
         flags: CapabilityFlags | None = self.types.get(entity_type)
         if flags is None:
             raise RecordSelectionError("unsupported_type", f"Unsupported record type '{entity_type}'.")
@@ -123,6 +119,11 @@ def load_record_selection_policy() -> RecordSelectionPolicy:
     Missing settings and missing switches mean disabled. Configured limits are
     validated as positive integers, and the interactive cap is kept inside the
     existing 500-result query-model maximum.
+
+    Only selectable types listed under ``types`` appear in the policy, so an
+    unconfigured type is reported as ``unsupported_type`` and stays out of
+    discovery, while a configured type whose switches are all off is reported as
+    ``unsupported_capability``.
     """
     block: Any = ConfigValue("options:record_selection").resolve()
     block = block if isinstance(block, dict) else {}
@@ -142,10 +143,15 @@ def load_record_selection_policy() -> RecordSelectionPolicy:
     configured_types: Any = block.get("types")
     configured_types = configured_types if isinstance(configured_types, dict) else {}
 
-    types: dict[str, CapabilityFlags] = {entity_type: _flags_from_entry(configured_types.get(entity_type)) for entity_type in PILOT_TYPES}
+    selectable: tuple[str, ...] = selectable_types()
+    types: dict[str, CapabilityFlags] = {}
     for entity_type, entry in configured_types.items():
-        if entity_type not in PILOT_TYPES and _flags_from_entry(entry).any_enabled:
-            raise RecordSelectionConfigurationError(f"options:record_selection:types enables unsupported type '{entity_type}'")
+        flags: CapabilityFlags = _flags_from_entry(entry)
+        if entity_type not in selectable:
+            if flags.any_enabled:
+                raise RecordSelectionConfigurationError(f"options:record_selection:types enables unsupported type '{entity_type}'")
+            continue
+        types[entity_type] = flags
 
     return RecordSelectionPolicy(
         browse_max_rows=browse_max_rows,
@@ -156,7 +162,7 @@ def load_record_selection_policy() -> RecordSelectionPolicy:
 
 
 def validate_record_selection_configuration() -> None:
-    """Validate enabled pilot types and the identifier base during startup."""
+    """Validate enabled record-selection types and the identifier base during startup."""
     policy: RecordSelectionPolicy = load_record_selection_policy()
     enabled_types: list[str] = [entity_type for entity_type, flags in policy.types.items() if flags.any_enabled]
     if not enabled_types:
@@ -180,42 +186,31 @@ def _identifier(value: Any, label: str) -> str:
     return value
 
 
-def _feature_type_projection() -> RecordProjection:
-    table_spec: Any = ConfigValue("table_specs.feature_type").resolve()
-    if not isinstance(table_spec, dict):
-        raise RecordSelectionConfigurationError("Missing 'table_specs.feature_type' configuration for record selection.")
-    return RecordProjection(
-        entity_type="feature_type",
-        table="authority.feature_type",
-        id_column=_identifier(table_spec.get("id_column"), "feature_type id_column"),
-        label_column="label",
-        description_column="description" if table_spec.get("description_column") else None,
-    )
-
-
-def _country_projection() -> RecordProjection:
-    return RecordProjection(
-        entity_type="country",
-        table="authority.location",
-        id_column="location_id",
-        label_column="label",
-        description_column=None,
-        membership_clause="location_type_id = 1",
-    )
-
-
-_PROJECTION_BUILDERS = {
-    "feature_type": _feature_type_projection,
-    "country": _country_projection,
-}
+def selectable_types() -> tuple[str, ...]:
+    """Return the marked simple classifier keys that record selection can serve."""
+    return tuple(marked_classifier_keys())
 
 
 def build_projection(entity_type: str) -> RecordProjection:
-    """Return the read-only projection for a pilot type."""
-    builder = _PROJECTION_BUILDERS.get(entity_type)
-    if builder is None:
+    """Return the read-only projection for a selectable simple classifier.
+
+    The projection reads the generated ``authority.<key>`` view, so a spec's
+    ``where_clause`` and ``joins`` are already applied there.
+    """
+    if entity_type not in selectable_types():
         raise RecordSelectionError("unsupported_type", f"Unsupported record type '{entity_type}'.")
-    return builder()
+
+    table_spec: Any = ConfigValue(f"table_specs.{entity_type}").resolve()
+    if not isinstance(table_spec, dict):
+        raise RecordSelectionError("unsupported_type", f"Unsupported record type '{entity_type}'.")
+
+    return RecordProjection(
+        entity_type=entity_type,
+        table=f"authority.{entity_type}",
+        id_column=_identifier(table_spec.get("id_column"), f"{entity_type} id_column"),
+        label_column="label",
+        description_column="description" if table_spec.get("description_column") else None,
+    )
 
 
 def _select_columns(projection: RecordProjection) -> str:
@@ -370,35 +365,15 @@ def validate_interactive_query(raw_queries: Any, policy: RecordSelectionPolicy) 
     return str(query_id), entity_type, limit, text
 
 
-async def _feature_type_candidates(query_text: str, limit: int) -> list[dict[str, Any]]:
-    strategy_cls = Strategies.items.get("feature_type")
-    if strategy_cls is None:
-        raise RecordSelectionError("unsupported_type", "Unsupported record type 'feature_type'.")
+async def search_interactive(entity_type: str, query_text: str, limit: int) -> dict[str, Any]:
+    """Run a bounded search through the registered classifier strategy for one type."""
+    strategy_cls = Strategies.items.get(entity_type)
+    if strategy_cls is None or entity_type not in selectable_types():
+        raise RecordSelectionError("unsupported_type", f"Unsupported record type '{entity_type}'.")
+
     strategy = strategy_cls()
     rows: list[dict[str, Any]] = await strategy.find_candidates(query=query_text, properties={}, limit=limit)
-    return strategy.as_candidates(rows, query_text)
-
-
-async def _country_candidates(query_text: str, limit: int) -> list[dict[str, Any]]:
-    strategy_cls = Strategies.items.get("country")
-    if strategy_cls is None:
-        raise RecordSelectionError("unsupported_type", "Unsupported record type 'country'.")
-    strategy = strategy_cls()
-    rows: list[dict[str, Any]] = await strategy.get_repository().fetch_all(
-        COUNTRY_FUZZY_SQL,
-        {"q": query_text, "n": limit, "location_type_ids": list(COUNTRY_LOCATION_TYPE_IDS)},
-    )
-    return strategy.as_candidates(rows, query_text)
-
-
-async def search_interactive(entity_type: str, query_text: str, limit: int) -> dict[str, Any]:
-    """Run a bounded pilot search and return an OpenRefine result keyed by the caller."""
-    if entity_type == "country":
-        candidates: list[dict[str, Any]] = await _country_candidates(query_text, limit)
-    elif entity_type == "feature_type":
-        candidates = await _feature_type_candidates(query_text, limit)
-    else:
-        raise RecordSelectionError("unsupported_type", f"Unsupported record type '{entity_type}'.")
+    candidates: list[dict[str, Any]] = strategy.as_candidates(rows, query_text)
 
     id_base: str = configured_id_base()
     valid: list[dict[str, Any]] = []
@@ -414,69 +389,44 @@ async def search_interactive(entity_type: str, query_text: str, limit: int) -> d
 # ---------- Discovery ----------
 
 
-@dataclass(frozen=True)
-class DisplayField:
-    """One ordered display field advertised for a pilot type."""
-
-    name: str
-    source: str
-    label: str
-    value_type: str
-    display: bool
-
-
-_DISPLAY_FIELDS: dict[str, tuple[DisplayField, ...]] = {
-    "feature_type": (
-        DisplayField("name", "record", "Name", "string", True),
-        DisplayField("target_id", "record", "ID", "integer", True),
-        DisplayField("description", "record", "Description", "string", True),
-    ),
-    "country": (
-        DisplayField("name", "record", "Name", "string", True),
-        DisplayField("target_id", "record", "ID", "integer", True),
-    ),
-}
-
 SORT_FIELDS: tuple[str, ...] = ("name", "target_id")
 
 
-def _display_fields(entity_type: str) -> list[dict[str, Any]]:
-    return [
-        {
-            "name": field.name,
-            "source": field.source,
-            "label": field.label,
-            "value_type": field.value_type,
-            "display": field.display,
-        }
-        for field in _DISPLAY_FIELDS[entity_type]
+def _display_fields(projection: RecordProjection) -> list[dict[str, Any]]:
+    """Return the ordered display fields a projection exposes."""
+    fields: list[dict[str, Any]] = [
+        {"name": "name", "source": "record", "label": "Name", "value_type": "string", "display": True},
+        {"name": "target_id", "source": "record", "label": "ID", "value_type": "integer", "display": True},
     ]
+    if projection.description_column:
+        fields.append({"name": "description", "source": "record", "label": "Description", "value_type": "string", "display": True})
+    return fields
 
 
-def _text_filter_fields(entity_type: str) -> list[str]:
-    fields = ["name"]
-    if entity_type == "feature_type":
+def _text_filter_fields(projection: RecordProjection) -> list[str]:
+    fields: list[str] = ["name"]
+    if projection.description_column:
         fields.append("description")
     return fields
 
 
-def _field_filters(entity_type: str) -> list[dict[str, str]]:
+def _field_filters(projection: RecordProjection) -> list[dict[str, str]]:
     filters: list[dict[str, str]] = [{"field": "name", "operator": "contains_ci"}]
-    if entity_type == "feature_type":
+    if projection.description_column:
         filters.append({"field": "description", "operator": "contains_ci"})
     filters.append({"field": "target_id", "operator": "equals"})
     return filters
 
 
 def discovery_types() -> list[dict[str, Any]]:
-    """Return per-type capability descriptors without querying target data."""
+    """Return per-type capability descriptors for the configured types without querying target data."""
     policy: RecordSelectionPolicy = load_record_selection_policy()
     id_base: Any = ConfigValue("options:id_base").resolve()
     id_base_value: str | None = id_base if isinstance(id_base, str) and id_base else None
 
     entries: list[dict[str, Any]] = []
-    for entity_type in PILOT_TYPES:
-        flags: CapabilityFlags = policy.types[entity_type]
+    for entity_type, flags in policy.types.items():
+        projection: RecordProjection = build_projection(entity_type)
         entries.append(
             {
                 "type": entity_type,
@@ -490,10 +440,10 @@ def discovery_types() -> list[dict[str, Any]]:
                 "browse_max_rows": policy.browse_max_rows if flags.browse else None,
                 "browse_max_bytes": policy.browse_max_bytes if flags.browse else None,
                 "interactive_search_max_results": policy.interactive_search_max_results if flags.search else None,
-                "display_fields": _display_fields(entity_type),
-                "text_filter_fields": _text_filter_fields(entity_type),
+                "display_fields": _display_fields(projection),
+                "text_filter_fields": _text_filter_fields(projection),
                 "sort_fields": list(SORT_FIELDS),
-                "field_filters": _field_filters(entity_type),
+                "field_filters": _field_filters(projection),
             }
         )
     return entries

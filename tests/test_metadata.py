@@ -7,7 +7,7 @@ from src.metadata import (
     get_reconcile_properties,
     get_reconciliation_metadata,
 )
-from src.strategies.configured_classifier import CLASSIFIER_KEYS
+from src.strategies.configured_classifier import initialize_classifiers, marked_classifier_keys
 from src.strategies.location import LocationReconciliationStrategy
 from src.strategies.strategy import Strategies
 from tests.decorators import with_test_config
@@ -147,10 +147,11 @@ def test_every_registered_strategy_declares_a_valid_support_status():
 
 @with_test_config
 def test_manifest_publishes_every_approved_classifier(test_provider):  # pylint: disable=unused-argument
+    initialize_classifiers()
     supported = _get_supported_types(Strategies)
     published_ids = {entry["id"] for entry in _get_default_types(Strategies)}
 
-    for key in CLASSIFIER_KEYS:
+    for key in marked_classifier_keys():
         assert key in supported
         assert key in published_ids
 

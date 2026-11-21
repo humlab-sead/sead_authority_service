@@ -16,7 +16,7 @@ from src.api.router import router
 from src.configuration import MockConfigProvider
 from src.configuration.config import Config
 from src.configuration.provider import set_config_provider
-from src.strategies.configured_classifier import ClassifierConfigurationError
+from src.strategies.configured_classifier import ClassifierConfigurationError, marked_classifier_keys
 from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
@@ -207,12 +207,13 @@ class TestRecordSelectionDiscovery:
         assert "supportedTypes" in data["reconciliation"]
 
     @with_test_config
-    def test_discovery_lists_pilots_with_capabilities_off(self, client, test_provider: MockConfigProvider):
+    def test_discovery_lists_selectable_types_with_capabilities_off(self, client, test_provider: MockConfigProvider):
         response = client.get("/records/types")
 
         assert response.status_code == 200
         types = {entry["type"]: entry for entry in response.json()["types"]}
-        assert set(types) == {"feature_type", "country"}
+        assert set(types) == set(marked_classifier_keys())
+        assert {"feature_type", "country"} <= set(types)
         assert all(entry["search_supported"] is False for entry in types.values())
         assert all(entry["browse_max_rows"] is None for entry in types.values())
         assert all(entry["interactive_search_max_results"] is None for entry in types.values())
