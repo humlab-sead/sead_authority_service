@@ -14,7 +14,7 @@ from main import app
 from src.api.candidate_verification import _configured_id_base, get_reconciliation_readiness, verify_candidate_batch
 from src.api.identity_router import get_identity_service
 from src.api.model import CandidateVerificationItem
-from src.configuration import get_connection
+from src.configuration import get_config_provider, get_connection
 from src.identity.models import IdentitySignal, ResolutionRequest, TrackedIdentity
 from src.identity.repository import ResolveBatchRepository
 from src.identity.service import IdentityBindingConflict, IdentityService
@@ -312,3 +312,159 @@ async def test_binding_state_row_lock_serializes_lifecycle_update() -> None:
     assert update_was_blocked
     assert updated_identity is not None
     assert updated_identity.lifecycle_state == TrackedIdentityState.INVALIDATED
+
+
+_PILOT_SELECTION = {
+    "version": 1,
+    "browse_max_rows": 100000,
+    "browse_max_bytes": 10_485_760,
+    "interactive_search_max_results": 50,
+    "types": {
+        "feature_type": {
+            "search_supported": True,
+            "identifier_search_supported": True,
+            "browse_supported": True,
+            "details_supported": True,
+            "export_verification_supported": True,
+        },
+        "country": {
+            "search_supported": True,
+            "identifier_search_supported": True,
+            "browse_supported": True,
+            "details_supported": True,
+            "export_verification_supported": True,
+        },
+    },
+}
+
+
+async def _table_counts() -> tuple[int, int, int, int]:
+    async with get_connection() as connection, connection.cursor() as cursor:
+        await cursor.execute(
+            """
+            SELECT
+                (SELECT count(*) FROM public.tbl_feature_types),
+                (SELECT count(*) FROM public.tbl_locations),
+                (SELECT count(*) FROM authority.feature_type),
+                (SELECT count(*) FROM authority.location)
+            """
+        )
+        return await cursor.fetchone()
+
+
+@pytest.mark.skipif(not _RUN_INTEGRATION, reason=_SKIP_REASON)
+@pytest.mark.asyncio
+async def test_phase1_record_selection_read_only() -> None:
+    id_base = _configured_id_base()
+    assert id_base is not None
+
+    config = get_config_provider().get_config()
+    previous_selection = config.get("options:record_selection")
+    config.update({"options:record_selection": _PILOT_SELECTION})
+
+    try:
+        async with get_connection() as connection:
+            async with connection.cursor() as cursor:
+                await cursor.execute("SET TRANSACTION READ ONLY")
+                await cursor.execute("SHOW transaction_read_only")
+                assert (await cursor.fetchone())[0] == "on"
+
+                await cursor.execute("SELECT to_regprocedure('authority.fuzzy_location(text,integer,integer[])')")
+                country_function = await cursor.fetchone()
+                assert country_function is not None and country_function[0] is not None, (
+                    "authority.fuzzy_location(text,integer,integer[]) is missing from the helper-owned database; "
+                    "deploy it through the generated schema procedure before rerunning V-4"
+                )
+
+                await cursor.execute(
+                    """
+                    SELECT feature_type_id, label FROM authority.feature_type
+                    WHERE label IS NOT NULL AND btrim(label) <> ''
+                    ORDER BY feature_type_id LIMIT 1
+                    """
+                )
+                feature_row = await cursor.fetchone()
+                assert feature_row is not None, "The helper-owned database must contain a labelled feature type."
+                feature_id, feature_label = feature_row
+
+                await cursor.execute(
+                    """
+                    SELECT location_id, label FROM authority.location
+                    WHERE location_type_id = 1 AND label IS NOT NULL AND btrim(label) <> ''
+                    ORDER BY location_id LIMIT 1
+                    """
+                )
+                country_row = await cursor.fetchone()
+                assert country_row is not None, "The helper-owned database must contain a labelled country."
+                country_id, country_label = country_row
+
+                await cursor.execute("SELECT location_id FROM authority.location WHERE location_type_id <> 1 ORDER BY location_id LIMIT 1")
+                non_country_row = await cursor.fetchone()
+                assert non_country_row is not None, "The helper-owned database must contain a non-country location."
+                non_country_id = non_country_row[0]
+
+                before_counts = await _table_counts()
+                before_sims = await _sims_row_counts()
+
+                async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                    feature_search = await client.post(
+                        "/reconcile",
+                        headers={"X-Record-Selection": "interactive"},
+                        json={"queries": {"q0": {"query": feature_label, "type": "feature_type", "limit": 5}}},
+                    )
+                    assert feature_search.status_code == 200, feature_search.text
+                    feature_candidate_ids = [item["id"] for item in feature_search.json()["q0"]["result"]]
+                    feature_uri = f"{id_base}feature_type/{feature_id}"
+                    assert feature_uri in feature_candidate_ids
+
+                    country_search = await client.post(
+                        "/reconcile",
+                        headers={"X-Record-Selection": "interactive"},
+                        json={"queries": {"q0": {"query": country_label, "type": "country", "limit": 5}}},
+                    )
+                    assert country_search.status_code == 200, country_search.text
+                    country_candidate_ids = [item["id"] for item in country_search.json()["q0"]["result"]]
+                    country_uri = f"{id_base}country/{country_id}"
+                    assert country_uri in country_candidate_ids
+
+                    feature_list = await client.get("/records/feature_type")
+                    assert feature_list.status_code == 200, feature_list.text
+                    assert feature_list.json()["completeness"] == "complete"
+                    assert feature_uri in [item["id"] for item in feature_list.json()["items"]]
+
+                    country_list = await client.get("/records/country")
+                    assert country_list.status_code == 200, country_list.text
+                    assert country_list.json()["completeness"] == "complete"
+                    assert country_uri in [item["id"] for item in country_list.json()["items"]]
+                    assert f"{id_base}country/{non_country_id}" not in [item["id"] for item in country_list.json()["items"]]
+
+                    by_target = await client.get(f"/records/feature_type/details?target_id={feature_id}")
+                    by_uri = await client.get("/records/feature_type/details", params={"id": feature_uri})
+                    assert by_target.status_code == 200, by_target.text
+                    assert by_uri.status_code == 200, by_uri.text
+                    assert by_target.json()["item"] == by_uri.json()["item"]
+                    assert by_target.json()["item"]["target_id"] == feature_id
+
+                    verification = await client.post(
+                        "/reconcile/verify-candidates",
+                        json={
+                            "items": [
+                                {"type": "feature_type", "id": feature_uri},
+                                {"type": "country", "id": country_uri},
+                                {"type": "country", "id": f"{id_base}country/{non_country_id}"},
+                            ]
+                        },
+                    )
+                    assert verification.status_code == 200, verification.text
+                    outcomes = [result["outcome"] for result in verification.json()["results"]]
+                    assert outcomes == ["exists", "exists", "not_found"]
+                    assert verification.json()["results"][0]["aggregate_id"] == feature_id
+                    assert verification.json()["results"][1]["aggregate_id"] == country_id
+
+                after_counts = await _table_counts()
+                after_sims = await _sims_row_counts()
+
+        assert after_counts == before_counts
+        assert after_sims == before_sims
+    finally:
+        config.update({"options:record_selection": previous_selection})

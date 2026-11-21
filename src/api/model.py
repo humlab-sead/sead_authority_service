@@ -210,15 +210,140 @@ class ExtendDescriptor(BaseModel):
     property_settings: List[PropertySetting]
 
 
+# ---------- Record selection (discovery, lists, details) ----------
+
+
+class RecordSelectionDescriptor(BaseModel):
+    """Points a client at the versioned record-selection discovery route."""
+
+    version: int = Field(..., ge=1)
+    types_path: str = Field(..., min_length=1)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class RecordDisplayField(BaseModel):
+    """One ordered display field advertised for a record type."""
+
+    name: str = Field(..., min_length=1)
+    source: Literal["record", "fields"]
+    label: str = Field(..., min_length=1)
+    value_type: Literal["string", "integer", "number", "boolean"]
+    display: bool
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class RecordFieldFilter(BaseModel):
+    """A client-side field filter advertised for a record type."""
+
+    field: str = Field(..., min_length=1)
+    operator: Literal["contains_ci", "equals"]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class RecordSelectionTypeDescriptor(BaseModel):
+    """Capabilities, limits, and declared fields for one record-selection type.
+
+    A limit is ``null`` when its capability is not enabled. Field references must
+    name a projected display field.
+    """
+
+    type: str = Field(..., min_length=1)
+    search_supported: bool
+    identifier_search_supported: bool
+    browse_supported: bool
+    details_supported: bool
+    export_verification_supported: bool
+    id_base: Optional[str] = None
+    id_path: str = Field(..., min_length=1)
+    browse_max_rows: Optional[int] = Field(default=None, gt=0)
+    browse_max_bytes: Optional[int] = Field(default=None, gt=0)
+    interactive_search_max_results: Optional[int] = Field(default=None, gt=0)
+    display_fields: List[RecordDisplayField]
+    text_filter_fields: List[str] = Field(default_factory=list)
+    sort_fields: List[str] = Field(default_factory=list)
+    field_filters: List[RecordFieldFilter] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("display_fields")
+    @classmethod
+    def validate_unique_display_names(cls, value: List[RecordDisplayField]) -> List[RecordDisplayField]:
+        names: List[str] = [field.name for field in value]
+        if len(set(names)) != len(names):
+            raise ValueError("display_fields names must be unique")
+        return value
+
+    @model_validator(mode="after")
+    def validate_declared_field_references(self) -> "RecordSelectionTypeDescriptor":
+        projected: set[str] = {field.name for field in self.display_fields}
+        for name in [*self.text_filter_fields, *self.sort_fields]:
+            if name not in projected:
+                raise ValueError(f"field '{name}' is referenced but not projected")
+        for field_filter in self.field_filters:
+            if field_filter.field not in projected:
+                raise ValueError(f"field filter '{field_filter.field}' references an unprojected field")
+        return self
+
+
+class RecordSelectionTypesResponse(BaseModel):
+    """Discovery response listing capabilities for the pilot record types."""
+
+    types: List[RecordSelectionTypeDescriptor]
+
+
+class RecordItem(BaseModel):
+    """One projected record shared by list and details responses."""
+
+    id: str = Field(..., min_length=1)
+    target_id: int = Field(..., gt=0)
+    type: str = Field(..., min_length=1)
+    name: str
+    description: Optional[str] = None
+    fields: Dict[str, JsonScalar] = Field(default_factory=dict)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class RecordListResponse(BaseModel):
+    """A complete record list for one type."""
+
+    items: List[RecordItem]
+    completeness: Literal["complete"] = "complete"
+
+
+class RecordDetailsResponse(BaseModel):
+    """A single record returned by an exact-ID or URI lookup."""
+
+    item: RecordItem
+
+
+class RecordSelectionErrorDetail(BaseModel):
+    """A machine-readable record-selection error."""
+
+    code: str = Field(..., min_length=1)
+    message: str = Field(..., min_length=1)
+
+
+class RecordSelectionErrorEnvelope(BaseModel):
+    """The error envelope used by record-selection routes."""
+
+    error: RecordSelectionErrorDetail
+
+
 class ReconciliationDescriptor(BaseModel):
     """Declares the OpenRefine types this service implements for matching.
 
     `defaultTypes` is the OpenRefine type list and may contain types without a
     matcher. `supportedTypes` lists only implemented matching behavior; an empty
-    array is valid and means no type is implemented.
+    array is valid and means no type is implemented. `record_selection` points a
+    client at the independent record-selection capabilities.
     """
 
     supportedTypes: List[str]
+    record_selection: Optional[RecordSelectionDescriptor] = None
 
     @field_validator("supportedTypes")
     @classmethod

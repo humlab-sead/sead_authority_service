@@ -1,6 +1,7 @@
 from typing import Any
 
 from src.configuration import ConfigValue
+from src.record_selection import record_selection_manifest
 from src.strategies.strategy import ReconciliationStrategy, StrategyRegistry
 
 
@@ -137,7 +138,10 @@ def get_reconciliation_metadata(strategies: StrategyRegistry, host: str) -> dict
         "identifierSpace": f"{id_base}",
         "schemaSpace": "http://www.w3.org/2004/02/skos/core#",
         "defaultTypes": default_types,
-        "reconciliation": {"supportedTypes": _get_supported_types(strategies)},
+        "reconciliation": {
+            "supportedTypes": _get_supported_types(strategies),
+            "record_selection": record_selection_manifest(),
+        },
         "view": {"url": f"{base_url_clean}/reconcile/preview?id={{{{id}}}}"},
         "preview": {"url": f"{base_url_clean}/reconcile/preview?id={{{{id}}}}", "width": 400, "height": 300},
         "suggest": {
