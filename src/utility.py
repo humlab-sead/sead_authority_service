@@ -327,6 +327,22 @@ def load_resource_yaml(key: str) -> dict[str, Any] | None:
 RECONCILIATION_MARKERS: tuple[str, ...] = ("simple", "lookup")
 CONTEXT_PROPERTY_ID: str = "context"
 CONTEXT_DESCRIPTION_PREFIX: str = "Context: "
+CONTEXT_SEPARATOR: str = " / "
+
+
+def context_matches(supplied_context: str, row_context: str) -> bool:
+    """Returns whether a supplied parent context selects a row's context.
+
+    A row context holds the parent labels joined in declaration order. A supplied
+    value matches only a whole parent label or the whole joined context. A partial
+    word is rejected, so `age` does not select a parent labelled `Storage` and
+    `empera` does not select `Tempera`. The generated SQL applies the same rule.
+    """
+    if not supplied_context or not row_context:
+        return False
+    if supplied_context == row_context:
+        return True
+    return supplied_context in {normalize_text(part) for part in row_context.split(CONTEXT_SEPARATOR)}
 
 
 def reconciliation_marker(table_spec: Any) -> str | None:
@@ -434,20 +450,37 @@ def build_classifier_fuzzy_sql(key: str, table_spec: dict[str, Any]) -> str:
 
 
 def build_classifier_alternate_identity_sql(key: str, table_spec: dict[str, Any]) -> str:
-    """Builds an exact alternate-identity query that keeps the configured ID field."""
+    """Builds an exact alternate-identity query that keeps the configured ID field.
+
+    A scoped entity filters on the supplied parent context using the same
+    whole-label rule as the generated fuzzy function, so a partial word cannot
+    select a row under the wrong parent.
+    """
     id_column: str = table_spec["id_column"]
     alternate_column: str = table_spec["alternate_identity_column"]
     scoped: bool = bool(scope_columns(table_spec))
     context_filter: str = ""
     extra_columns: str = ""
+    params_cte: str = ""
     if scoped:
-        context_filter = (
-            "  and (nullif(%(context)s::text, '') is null\n"
-            "       or position(authority.immutable_unaccent(lower(%(context)s::text)) in coalesce(t.norm_context, '')) > 0)\n"
+        params_cte = "\n".join(
+            (
+                "with params as (",
+                "  select authority.immutable_unaccent(lower(nullif(%(context)s::text, '')))::text as ctx",
+                ")",
+                "",
+            )
         )
-        extra_columns = ", t.context, true as context_match"
+        context_filter = (
+            "cross join params pq\n"
+            "where pq.ctx is null\n"
+            "   or pq.ctx = t.norm_context\n"
+            "   or pq.ctx = any(string_to_array(t.norm_context, ' / '))"
+        )
+        extra_columns = ", t.context, pq.ctx is not null as context_match"
+    target_cte: str = "with target as (\n" if not scoped else ", target as (\n"
     return (
-        "with target as (\n"
+        f"{params_cte}{target_cte}"
         "  select *\n"
         f"  from authority.{key}\n"
         f"  where {alternate_column} = %(alternate_identity)s\n"
@@ -462,8 +495,7 @@ def build_classifier_alternate_identity_sql(key: str, table_spec: dict[str, Any]
         "  ) as label_ambiguous"
         f"{extra_columns}\n"
         "from target as t\n"
-        "where true\n"
-        f"{context_filter}".rstrip()
+        f"{context_filter if scoped else 'where true'}".rstrip()
     )
 
 

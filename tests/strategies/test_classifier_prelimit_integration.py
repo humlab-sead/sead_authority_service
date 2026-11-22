@@ -596,6 +596,33 @@ def test_lookup_scores_labels_only_and_uses_parent_context(
 
 
 @with_test_config
+def test_partial_parent_word_does_not_select_the_wrong_parent(
+    test_provider: MockConfigProvider,  # pylint: disable=unused-argument
+    bootstrapped: DisposablePostgres,
+) -> None:
+    """`age` is a substring of `Storage`, so a substring test would select the wrong parent."""
+    bootstrapped.execute("update public.tbl_value_types set name = 'Storage' where value_type_id = 1")
+
+    partial: list[dict[str, Any]] = _scoped_fuzzy_rows(bootstrapped, "value_class", "alpha", 10, "age")
+    assert partial and all(row["context_match"] is False for row in partial)
+    assert _matches(_configured_strategy("value_class").as_candidates(partial, "alpha", {"context": "age"})) == [False] * len(partial)
+
+    # A whole parent label selects the rows under it; their shared label stays ambiguous.
+    exact: list[dict[str, Any]] = _scoped_fuzzy_rows(bootstrapped, "value_class", "alpha", 10, "Storage")
+    assert [row["value_class_id"] for row in exact] == [1, 2]
+    assert all(row["context_match"] is True and row["label_ambiguous"] is True for row in exact)
+    assert _matches(_configured_strategy("value_class").as_candidates(exact, "alpha", {"context": "Storage"})) == [False, False]
+
+    # One component of a composite context selects only the rows under that component.
+    component: list[dict[str, Any]] = _scoped_fuzzy_rows(bootstrapped, "value_class", "alpha", 10, "Tempera")
+    assert [row["value_class_id"] for row in component] == [1]
+    assert component[0]["context"] == "Storage / Tempera"
+    assert component[0]["context_match"] is True
+    assert component[0]["label_ambiguous"] is False
+    assert _matches(_configured_strategy("value_class").as_candidates(component, "alpha", {"context": "Tempera"})) == [True]
+
+
+@with_test_config
 def test_two_parent_scope_joins_labels_in_declaration_order(
     test_provider: MockConfigProvider,  # pylint: disable=unused-argument
     bootstrapped: DisposablePostgres,

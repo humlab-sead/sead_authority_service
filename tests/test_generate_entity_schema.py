@@ -337,10 +337,21 @@ def test_scoped_classifier_exposes_context_and_filters_before_limit(tmp_path: Pa
     assert "p_context text default null" in sql
     assert "context text," in sql
     assert "context_match boolean" in sql
-    assert "position(pq.ctx in coalesce(scored.norm_context, '')) > 0" in sql
+    assert "or pq.ctx = scored.norm_context" in sql
+    assert "or pq.ctx = any(string_to_array(scored.norm_context, ' / '))" in sql
+    assert "position(pq.ctx in" not in sql
     assert "count(*) over (partition by selected.norm_label) > 1 as label_ambiguous" in sql
     assert "not exists (select 1 from matched)" in sql
     assert "limit p_limit" in sql
+
+
+def test_weighted_scoped_classifier_matches_whole_parent_labels(tmp_path: Path) -> None:
+    entities = yaml.safe_load((REPOSITORY_ROOT / "config/entities.yml").read_text(encoding="utf-8"))
+    sql = render_sql(tmp_path, "rdb_code", entities["rdb_code"], entities)
+
+    assert "or pq.ctx = filtered.norm_context" in sql
+    assert "or pq.ctx = any(string_to_array(filtered.norm_context, ' / '))" in sql
+    assert "position(pq.ctx in" not in sql
 
 
 def test_scoped_entity_joins_parents_in_declaration_order(tmp_path: Path) -> None:
@@ -373,6 +384,19 @@ def test_alternate_identity_sql_uses_configured_id_field() -> None:
     assert "as id," not in sql
     assert "label_ambiguous" in sql
     assert "%(alternate_identity)s" in sql
+
+
+def test_scoped_alternate_identity_matches_whole_parent_labels() -> None:
+    """A scoped alternate query uses the same whole-label rule as the fuzzy function."""
+    entities = yaml.safe_load((REPOSITORY_ROOT / "config/entities.yml").read_text(encoding="utf-8"))
+    table_spec = dict(entities["colour"], alternate_identity_column="colour_name")
+    sql: str = build_classifier_specification("colour", table_spec)["sql_queries"]["alternate_identity_sql"]
+
+    assert "or pq.ctx = t.norm_context" in sql
+    assert "or pq.ctx = any(string_to_array(t.norm_context, ' / '))" in sql
+    assert "position(" not in sql
+    assert "t.context," in sql
+    assert "context_match" in sql
 
 
 def test_deployment_candidate_configuration_matches_repository_and_tests(tmp_path: Path) -> None:

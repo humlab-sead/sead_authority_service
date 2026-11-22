@@ -21,6 +21,7 @@ from src.utility import (
     CONTEXT_PROPERTY_ID,
     build_classifier_specification,
     classifier_view_columns,
+    context_matches,
     is_marked_for_reconciliation,
     normalize_text,
     reconciliation_marker,
@@ -115,14 +116,15 @@ class ConfiguredClassifierStrategy(ReconciliationStrategy):
         """Returns whether the row belongs to the supplied context.
 
         Generated fuzzy rows report `context_match` themselves. Rows that omit the flag
-        are compared using their normalized context, so a row found outside the supplied
-        context is returned as a suggestion that cannot auto-match.
+        are compared with the same whole-parent-label rule the generated SQL uses, so a
+        row found outside the supplied context is returned as a suggestion that cannot
+        auto-match.
         """
         row_context_match: Any = row.get("context_match")
         if isinstance(row_context_match, bool):
             return row_context_match
         row_norm_context: str = str(row.get("norm_context") or normalize_text(str(row.get("context") or "")))
-        return bool(row_norm_context) and supplied_context in row_norm_context
+        return context_matches(supplied_context, row_norm_context)
 
     def _label_ambiguous(self, row: dict[str, Any]) -> bool:
         """Returns the generated schema's ambiguity flag for one fuzzy row.

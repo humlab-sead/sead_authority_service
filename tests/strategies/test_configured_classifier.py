@@ -55,6 +55,13 @@ def colour_strategy() -> ConfiguredClassifierStrategy:
     return strategy_cls()
 
 
+def value_class_strategy() -> ConfiguredClassifierStrategy:
+    initialize_classifiers()
+    strategy_cls = Strategies.items["value_class"]
+    assert issubclass(strategy_cls, ConfiguredClassifierStrategy)
+    return strategy_cls()
+
+
 class TestConfiguredClassifierRegistration:
     @with_test_config
     def test_registers_every_classifier_key(self, test_provider: ExtendedMockConfigProvider):
@@ -427,6 +434,25 @@ class TestContextBehaviour:
         assert len(candidates) == 1
         assert candidates[0]["context_match"] is False
         assert candidates[0]["match"] is False
+
+    @with_test_config
+    def test_partial_parent_word_does_not_select_a_row(self, test_provider: ExtendedMockConfigProvider):
+        """`age` is a substring of `Storage` but must not select that parent."""
+        row = {"value_class_id": 1, "label": "Alpha", "name_sim": 1.0, "label_ambiguous": False, "norm_context": "length / storage"}
+
+        candidates = value_class_strategy().as_candidates([row], "alpha", {"context": "age"})
+
+        assert candidates[0]["context_match"] is False
+        assert candidates[0]["match"] is False
+
+    @with_test_config
+    def test_single_component_of_a_composite_context_still_selects_the_row(self, test_provider: ExtendedMockConfigProvider):
+        row = {"value_class_id": 1, "label": "Alpha", "name_sim": 1.0, "label_ambiguous": False, "norm_context": "length / tempera"}
+
+        candidates = value_class_strategy().as_candidates([row], "alpha", {"context": "Tempera"})
+
+        assert candidates[0]["context_match"] is True
+        assert candidates[0]["match"] is True
 
     @with_test_config
     def test_context_description_is_truncated_to_the_limit(self, test_provider: ExtendedMockConfigProvider):

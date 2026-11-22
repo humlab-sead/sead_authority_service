@@ -75,7 +75,8 @@ as $$
     from scored
     cross join params pq
     where pq.ctx is null
-       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+       or pq.ctx = scored.norm_context
+       or pq.ctx = any(string_to_array(scored.norm_context, ' / '))
   )
   , selected as (
     select matched.*, params.ctx is not null as context_match

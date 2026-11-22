@@ -79,7 +79,8 @@ as $$
     from filtered
     cross join params pq
     where pq.ctx is null
-       or position(pq.ctx in coalesce(filtered.norm_context, '')) > 0
+       or pq.ctx = filtered.norm_context
+       or pq.ctx = any(string_to_array(filtered.norm_context, ' / '))
   )
   , selected as (
     select matched.*, params.ctx is not null as context_match

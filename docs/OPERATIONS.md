@@ -286,6 +286,8 @@ The deployment operator must confirm that the mounted `config/entities.yml` on t
 
 `context_match` is returned only when the request supplies a `context` property. It is `true` for candidates found inside the supplied parent context and `false` for the unfiltered fallback suggestions. It is not returned for requests without a context property, and a fallback candidate never sets `match`.
 
+A supplied context must equal a whole parent label, or the whole joined context when an entity has several parents. The comparison is normalized for case and accents but not for partial words, so `age` does not select a parent labelled `Storage` and `empera` does not select `Tempera`. When an entity has several parents, supplying one parent label still selects its rows, for example `Tempera` selects a `Length / Tempera` context. A partial match cannot produce `context_match: true` and cannot auto-match.
+
 `label_ambiguous` is internal. It is not returned to OpenRefine, it is not a candidate property, and it does not change `label`, `label_sim`, or `name_sim`. It only clears the automatic `match` flag when the row limit hides an eligible row with the same normalized label.
 
 Roll back schema and image together. The previous image does not read the column, but the current image cannot run against a function that omits it. Returning to an earlier image is safe with either schema version; moving forward again requires the schema that includes `label_ambiguous`.
