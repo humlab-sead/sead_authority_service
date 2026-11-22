@@ -1,6 +1,6 @@
 # Fuzzy Reconciliation for Classifier Entities: Phase Plan
 
-Source: [Fuzzy Reconciliation for Classifier Entities](CLASSIFIER_FUZZY_RECONCILIATION.md). This plan covers tier 1 only; [tier 2](../../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md) owns `dimension` and context-scoped reconciliation.
+Source: [Fuzzy Reconciliation for Classifier Entities](CLASSIFIER_FUZZY_RECONCILIATION.md). This plan covers tier 1 only; [tier 2](../../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2/CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md) owns `dimension` and context-scoped reconciliation.
 
 ## Summary
 

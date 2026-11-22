@@ -52,7 +52,7 @@ The existing simple classifier implementations `feature_type` and `data_type` mo
 - The existing specialized strategies: `site`, `location`, `method`, `taxon`, `modification_type`, `bibliographic_reference`, `administrative_region`, `country`, and `geonames`.
 - Classifiers without a usable text label: `coordinate_method_dimension` and `value_qualifier_symbol`.
 - `abundance_element_group`, which has no target table.
-- `dimension`. Deferred to [tier 2](../../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md), which owns its table spec, generated view, and column verification.
+- `dimension`. Deferred to [tier 2](../../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2/CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md), which owns its table spec, generated view, and column verification.
 - Alternate-identity matching beyond the existing `alternate_identity_column` behavior.
 - Embeddings, semantic search, LLM disambiguation, SIMS identity allocation, and OpenRefine UI changes.
 - Renaming existing reconciliation type IDs; Shape Shifter project configuration references them.
@@ -389,7 +389,7 @@ Confirmed decisions:
 - Use one configured path, not per-entity copies.
 - Gate every generated change on `reconciliation: simple` so unmarked entities keep their current contracts.
 - Reuse existing type IDs. Do not add aliases for `sample_group_sampling_context` (`sampling_context`) or `taxa` (`taxon`/`taxa_tree_master`) in this change.
-- Exclude `dimension` from the simple tier. Its table spec, generated view, and resource SQL are deferred to [tier 2](../../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md).
+- Exclude `dimension` from the simple tier. Its table spec, generated view, and resource SQL are deferred to [tier 2](../../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2/CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md).
 - Keep static registration, and describe enablement as a two-location edit: `entities.yml` plus `CLASSIFIER_KEYS`.
 - Return `description` from marked fuzzy functions whether or not description scoring is enabled; truncate candidates at 500 characters and keep full text in details.
 - Description scoring is off by default. Enabling it sets `description_match_weight` between `0.10` and `0.20`, uses `strict_word_similarity`, and only reorders candidates.
@@ -419,7 +419,7 @@ Expected validation outcomes:
 - A disposable-database smoke test reconciles one classifier per category, including a duplicate-label case.
 - Specialized strategy snapshot and regression suite pass unchanged.
 
-Cross-repository drift against `sead_standard_model.yml` is out of scope for this tier. [Tier 2](../../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md) decides whether a sync check is required or the checked-in snapshot is sufficient.
+Cross-repository drift against `sead_standard_model.yml` is out of scope for this tier. [Tier 2](../../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2/CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md) decides whether a sync check is required or the checked-in snapshot is sufficient.
 
 ## Final Recommendation
 
