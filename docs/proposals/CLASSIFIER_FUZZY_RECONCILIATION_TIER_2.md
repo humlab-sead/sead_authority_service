@@ -4,6 +4,7 @@
 
 - Proposed feature / change request
 - Tier 2 of a two-tier change. Tier 1, [Fuzzy Reconciliation for Classifier Entities](./done/CLASSIFIER_FUZZY_RECONCILIATION/CLASSIFIER_FUZZY_RECONCILIATION.md), is implemented and validated across Phases 1–3. Its completion records include disposable-database and HTTP checks; production deployment was out of scope. See the [Phase 1](./done/CLASSIFIER_FUZZY_RECONCILIATION/CLASSIFIER_FUZZY_RECONCILIATION_PHASE_1_TASK_PLAN.md), [Phase 2](./done/CLASSIFIER_FUZZY_RECONCILIATION/CLASSIFIER_FUZZY_RECONCILIATION_PHASE_2_TASK_PLAN.md), and [Phase 3](./done/CLASSIFIER_FUZZY_RECONCILIATION/CLASSIFIER_FUZZY_RECONCILIATION_PHASE_3_TASK_PLAN.md) task plans. This proposal depends on the completed tier-1 baseline and does not restate its contracts.
+- The completed [One Contract for Simple Classifiers](./done/SIMPLE_CLASSIFIER_CONTRACT/SIMPLE_CLASSIFIER_CONTRACT.md) supersedes the earlier `reconciliation: simple` view and function shapes. Its [Phase 1 task plan](./done/SIMPLE_CLASSIFIER_CONTRACT/SIMPLE_CLASSIFIER_CONTRACT_PHASE_1_TASK_PLAN.md) records 1,336 passing tests, 50 skips, and a successful disposable PostgreSQL 17 bundle apply; deployment to a real environment was not part of that work. Tier 2 uses this completed contract as its baseline.
 - Acceptance criteria use the `P2-AC-<N>` prefix so they stay distinguishable from tier-1 `P-AC-<N>` criteria in phase plans.
 - Scope: `sead_authority_service` reconciliation for classifiers whose label is unique only within a parent, for lookups that have no reconciliation strategy, and for `dimension`
 - Goal: extend the tier-1 configured path with parent-context matching, derived labels, and lookup reconciliation, without adding per-entity Python classes
@@ -39,7 +40,7 @@ Because tier 1 already suppresses automatic matches on duplicate labels, tier 2 
 
 ## Non-Goals
 
-- Tier-1 contracts: the marker `reconciliation: simple`, its view shape, the 500-character candidate limit, the opt-in `description_match_weight` default of `0`, the `label_sim`-only `match` rule, the duplicate-label suppression rule, and the declared support status. Tier 2 reuses these unchanged.
+- Completed `reconciliation: simple` contracts: uniform view and function shapes, no OpenRefine property mappings, the 500-character candidate limit, the opt-in `description_match_weight` default of `0`, the `label_sim`-only `match` rule, duplicate-label suppression, and declared support status. Existing simple entities keep these contracts unchanged; the optional `context` property is specific to scoped entities in tier 2.
 - Specialized strategies: `site`, `location`, `method`, `taxon`, `modification_type`, `bibliographic_reference`, `administrative_region`, `country`, `geonames`, and `sampling_context`. `taxon` keeps its current registration and remains excluded from `supportedTypes`.
 - `contact`, which has no label column and no unique set.
 - `abundance_element_group`, which has no target table.
@@ -49,12 +50,12 @@ Because tier 1 already suppresses automatic matches on duplicate labels, tier 2 
 
 ## Current Behavior
 
-Tier 1 publishes `authority.<key>` views with `label`, `norm_label`, and optional `description`, and `authority.fuzzy_<key>` functions scoring label plus capped description. Duplicate normalized labels never auto-accept.
+The completed simple-classifier path publishes `authority.<key>` views with `label`, `norm_label`, `description`, and `norm_description`; the description columns are null when no source description is configured. Each `authority.fuzzy_<key>` function takes four parameters and returns `<id_column>, label, description, label_sim, name_sim`. Label scoring is the default, description scoring is opt-in, and duplicate normalized labels never auto-accept.
 
 Against that baseline, tier 2 differs in three verified ways:
 
 - No generated artifact carries parent context, so `colour_name` "dark brown" from two different methods is indistinguishable in a candidate list.
-- The fuzzy function signature is fixed at id, label, optional description, and `name_sim`; there is no place to return context.
+- The fuzzy function has the fixed four-parameter signature and five result columns described above; it has no context columns.
 - Lookups without a strategy are rejected by `src/reconcile.py` as an unknown type before any query runs.
 
 ## Proposed Design
@@ -94,6 +95,8 @@ select
   t.colour_id,
   t.colour_name as label,
   authority.immutable_unaccent(lower(t.colour_name)) as norm_label,
+  null::text as description,
+  null::text as norm_description,
   m.method_name as context,
   authority.immutable_unaccent(lower(m.method_name)) as norm_context
 from public.tbl_colours as t
@@ -103,7 +106,7 @@ join public.tbl_methods m using (method_id);
 Rules:
 
 - `scope_columns` are foreign keys to other configured entities, so the context is a readable label, not a numeric id. With two or more scope columns, the parent labels are concatenated with `' / '` in declaration order; `value_class` yields `<value type name> / <method name>`, and the entity's own label is never part of the context.
-- The fuzzy function gains `context` and `norm_context` return columns and keeps `name_sim` as its score.
+- The fuzzy function adds `context` and `norm_context` to the completed five-column result (`<id_column>, label, description, label_sim, name_sim`). `label_sim` remains the automatic-match input, and `name_sim` remains the ranking score.
 - Entities without `scope_columns` keep the tier-1 signature. An unmarked entity is unchanged.
 
 ### 3. Context matching behavior
@@ -175,7 +178,7 @@ Rules:
 
 ### 8. Inherited guarantees
 
-Tier 2 inherits without restating: candidate description truncation at 500 characters, opt-in `description_match_weight` with a default of `0`, `label_sim`-only `match`, duplicate-label suppression, explicit `support` declaration on every registration, startup validation of `table_specs`, and `deployment/container/config/entities.yml` parity.
+Tier 2 preserves the completed simple-classifier contract: views include `description` and `norm_description` even when both are null; fuzzy functions keep the four-parameter signature and five base result columns; and simple entities publish no OpenRefine property mappings. Scoped functions and views add context, and scoped types may declare the optional `context` property. The path also retains the 500-character candidate description limit, opt-in `description_match_weight` with a default of `0`, `label_sim`-only `match`, duplicate-label suppression, explicit `support` declaration on every registration, startup validation of `table_specs`, and `deployment/container/config/entities.yml` parity.
 
 Extending startup validation: a `scoped` entry must declare at least one `scope_column` that resolves to a configured entity label, and a `lookup` entry must declare a label. Either failing is a startup error, not a runtime surprise. A `lookup` entry that also sets `description_match_weight` above `0` is rejected, because lookups must resolve on label.
 
@@ -193,7 +196,7 @@ Extending startup validation: a `scoped` entry must declare at least one `scope_
 - Joins to parent tables make generated views depend on parent tables having rows. A colour whose method is missing would disappear from the view if the join is inner. Use a left join and accept null context rather than dropping rows.
 - Concatenated context strings are display aids, not keys; two parents with the same name still produce the same context text. The duplicate-label rule keeps that safe.
 - `lookup` semantics differ from `simple` only in defaults, which is a small conceptual difference for reviewers to hold. The diagnostic label in the manifest is the mitigation.
-- Adding joins to generated views increases regeneration and deployment surface. Schema snapshots for tier-1 entities must confirm their output is unchanged.
+- Adding joins to generated views increases regeneration and deployment surface. Schema snapshots for tier-1 entities must confirm their output is unchanged from the completed simple-classifier contract baseline.
 - `label_expression` allows arbitrary SQL fragments in configuration. It is restricted to identifier and `||` usage by review, and must never interpolate user input.
 - Repairing `dimension` may require correcting an unverified column name, which cannot be confirmed without database access. This is a phase-1 gate, not an assumption.
 - Lookup reconciliation exposes admin-maintained vocabularies through the public manifest. That is the same exposure `site` and `location` already have.
@@ -207,7 +210,7 @@ Extending startup validation: a `scoped` entry must declare at least one `scope_
 - Alternate identity: generated SQL replaces the hand-written queries for `method` and `dimension`; an entity without `alternate_identity_column` returns no alternate candidates.
 - Lookups: each registered lookup ignores `description_match_weight` and never returns a description-driven score or match.
 - `dimension`: details and fuzzy queries succeed against the regenerated schema, and the description column is verified before merge.
-- Schema snapshots: tier-1 entities generate identical SQL before and after tier 2, including `authority.site`, `authority.feature_type`, and `authority.fuzzy_method`.
+- Schema snapshots: tier-1 entities generate identical SQL before and after tier 2 relative to the completed simple-classifier contract baseline, including `authority.site`, `authority.feature_type`, and `authority.fuzzy_method`.
 - HTTP level: `POST /reconcile` for `colour` with and without a `context` property returns the expected `match` flags.
 - Database smoke test on a disposable schema: one scoped classifier, one scoped lookup, one flat lookup, and `dimension`.
 - Deployment parity: classifier and lookup entries plus markers match across `config/entities.yml`, `tests/config/entities.yml`, and `deployment/container/config/entities.yml`.
@@ -221,7 +224,7 @@ Extending startup validation: a `scoped` entry must declare at least one `scope_
 - `P2-AC-5`: `dimension` has a table spec, a generated view and function, verified column names, and no remaining `src/resources/dimension.yml` or `src/strategies/dimension.py`.
 - `P2-AC-6`: Alternate-identity SQL is generated from `alternate_identity_column`, and `method` behaves as before with no hand-written query.
 - `P2-AC-7`: `contact`, `abundance_element_group`, `dataset`, `taxa`, and the specialized strategies are unchanged, and their exclusion reasons appear in the reconciliation type inventory register tracked by [issue #43](https://github.com/humlab-sead/sead_authority_service/issues/43).
-- `P2-AC-8`: Tier-1 generated SQL is unchanged for every `simple` entity, and tier-1 tests pass without modification.
+- `P2-AC-8`: Generated SQL for every existing `simple` entity is unchanged from the completed simple-classifier contract baseline, and that contract's regression tests pass without modification.
 - `P2-AC-9`: A `scoped` entry without a resolvable scope target, or a `lookup` entry without a label, fails startup with a named error.
 - `P2-AC-10`: Classifier and lookup configuration is identical across production, test, and deployment container configuration files.
 
@@ -240,10 +243,11 @@ Confirmed decisions:
 
 Constraints and behavior to preserve:
 
-- All tier-1 contracts: 500-character candidate limit, opt-in `description_match_weight` with a default of `0`, `label_sim`-only `match`, duplicate-label suppression, support declaration, startup validation, deployment parity.
+- Preserve the completed simple-classifier contract: uniform view columns, the four-parameter/five-result fuzzy function contract, and no OpenRefine properties on existing `simple` entities. Scoped entities add only the optional `context` property defined here.
+- Preserve the tier-1 500-character candidate limit, opt-in `description_match_weight` with a default of `0`, `label_sim`-only `match`, duplicate-label suppression, support declaration, startup validation, and deployment parity.
 - `Strategies.items` remains a plain dict; the manifest is derived from declared support status.
 - Generated schema remains authoritative and produced by `src/scripts/generate_entity_schema.py`.
-- Tier-1 schema output must not change for `simple` entities.
+- Generated SQL for existing `simple` entities must remain identical to the completed simple-classifier contract baseline.
 - Do not write to production data.
 - Exclusion reasons for tier-2 entities are recorded in the reconciliation type inventory register tracked by [issue #43](https://github.com/humlab-sead/sead_authority_service/issues/43), not in `entities.yml` or in registration metadata.
 
@@ -251,7 +255,7 @@ Expected validation outcomes:
 
 - One schema generation command produces scoped views and functions with readable context.
 - A disposable-database smoke test reconciles a scoped classifier, a scoped lookup, a flat lookup, and `dimension`.
-- Tier-1 snapshot and regression suites pass unchanged.
+- The completed simple-classifier contract's schema snapshots and regression tests pass unchanged.
 
 Open questions to resolve during phase planning:
 
@@ -264,4 +268,4 @@ Open questions to resolve during phase planning:
 
 ## Final Recommendation
 
-Adopt tier 2 as an additive layer on the implemented tier-1 path. Parent context, derived labels, and lookup markers all fit the same configured strategy, so the work stays configuration and template work rather than new per-entity code. Tier 1 remains safe on its own: deferring tier 2 never produces a wrong automatic match, only a less precise candidate list.
+Adopt tier 2 as an additive layer on the implemented tier-1 path and its completed simple-classifier contract. Parent context, derived labels, and lookup markers fit the same configured strategy, so the work stays configuration and template work rather than new per-entity code. Deferring tier 2 remains safe: duplicate-label suppression prevents wrong automatic matches, leaving only less precise candidate lists.

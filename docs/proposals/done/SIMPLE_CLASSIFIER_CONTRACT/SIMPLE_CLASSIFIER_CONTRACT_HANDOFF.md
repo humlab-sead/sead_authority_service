@@ -22,8 +22,8 @@ How to make one `reconciliation: simple` entity servable through record selectio
 
 | Topic | Document |
 |---|---|
-| The three requirements, capability settings, and rollout gate | [docs/OPERATIONS.md](../../OPERATIONS.md), section *Record selection* |
-| Schema, configuration, and code release order | [docs/OPERATIONS.md](../../OPERATIONS.md), section *Classifier schema, configuration, and code release order* |
+| The three requirements, capability settings, and rollout gate | [docs/OPERATIONS.md](../../../OPERATIONS.md), section *Record selection* |
+| Schema, configuration, and code release order | [docs/OPERATIONS.md](../../../OPERATIONS.md), section *Classifier schema, configuration, and code release order* |
 | Design decisions and their reasons | [SIMPLE_CLASSIFIER_CONTRACT.md](./SIMPLE_CLASSIFIER_CONTRACT.md) |
 | Minimal working spec to copy | `config/entities.yml`, the `country` entry |
 | Validation and registration | `src/strategies/configured_classifier.py`, `initialize_classifiers()` |
@@ -112,7 +112,7 @@ The entry should report the one capability you enabled, and `null` for the limit
 
 ## Risks
 
-- Do not enable a capability on a deployment until the rollout gate in [docs/OPERATIONS.md](../../OPERATIONS.md) is met: Phase 4 records the exact Authority image and contract, and for interactive search, 100 warm searches per type are measured through the Shape Shifter backend at p95 ≤ 2000 ms. A failed measurement leaves only that capability and type disabled.
+- Do not enable a capability on a deployment until the rollout gate in [docs/OPERATIONS.md](../../../OPERATIONS.md) is met: Phase 4 records the exact Authority image and contract, and for interactive search, 100 warm searches per type are measured through the Shape Shifter backend at p95 ≤ 2000 ms. A failed measurement leaves only that capability and type disabled.
 - Enablement before schema deployment produces confusing `503 database_unavailable` responses rather than an obvious configuration error.
 - The deploy bundle expects the SEAD prerequisites to exist already: the `sead_utility` schema with `table_columns`, the `humlab_admin` role, and the `public.tbl_*` base tables. This predates the contract work and applies to every deployment.
 
