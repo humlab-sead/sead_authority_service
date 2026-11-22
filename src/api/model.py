@@ -80,6 +80,10 @@ class ReconCandidate(BaseModel):
     type: List[TypeRef] = Field(default_factory=list)
     score: Optional[Annotated[float, Field(ge=0.0, le=100.0)]] = None
     match: Optional[bool] = None
+    context_match: Optional[bool] = Field(
+        default=None,
+        description="Whether the candidate matched the supplied parent context; omitted when no context was supplied",
+    )
     description: Optional[str] = Field(None, max_length=500)  # optional, but useful
     # You may also return extra keys like 'uri', 'notable', etc., if you want.
 

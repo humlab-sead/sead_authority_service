@@ -34,7 +34,12 @@ class _RecordingStrategy:
             "query": query,
         }
 
-    def as_candidates(self, entity_data: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
+    def as_candidates(
+        self,
+        entity_data: list[dict[str, Any]],
+        query: str,
+        properties: dict[str, Any] | None = None,  # pylint: disable=unused-argument
+    ) -> list[dict[str, Any]]:
         return [self.as_candidate(data, query) for data in entity_data]
 
 
@@ -171,7 +176,9 @@ async def test_reconcile_queries_accepts_candidate_description_at_limit(monkeypa
         async def find_candidates(self, *, query: str, properties: dict[str, Any], limit: int) -> list[dict[str, Any]]:
             return [{"feature_type_id": 1, "label": "Flint", "name_sim": 1.0}]
 
-        def as_candidates(self, entity_data: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
+        def as_candidates(
+            self, entity_data: list[dict[str, Any]], query: str, properties: dict[str, Any] | None = None
+        ) -> list[dict[str, Any]]:
             return [
                 {
                     "id": "https://w3id.org/sead/id/feature_type/1",

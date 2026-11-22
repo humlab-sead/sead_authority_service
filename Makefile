@@ -5,6 +5,7 @@ export
 
 UVICORN_PORT := 8000
 PODMAN_DEPLOYMENT_DIR := deployment/container
+TARGET_MODEL ?= ../sead_shape_shifter/resources/target_models/sead_standard_model.yml
 
 
 test-workflow:
@@ -15,6 +16,10 @@ fetch-openrefine-manifest:
 
 fetch-openrefine-manifest-types:
 	@curl -s http://localhost:8000/reconcile | jq -r '.defaultTypes[].id'
+
+.PHONY: generate-reconciliation-inventory
+generate-reconciliation-inventory:
+	@uv run python -m src.scripts.generate_reconciliation_inventory --target-model "$(TARGET_MODEL)"
 
 .PHONY: generate-schema
 generate-schema:

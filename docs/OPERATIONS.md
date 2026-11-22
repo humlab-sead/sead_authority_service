@@ -211,7 +211,9 @@ The site strategy requires `authority.fuzzy_site(text, integer)` and the `author
 
 ### Record selection (browse, details, interactive search, verification)
 
-Phase 1 adds bounded, read-only record selection for any entity marked `reconciliation: simple` in `table_specs`. A type is served only when it has that marked spec, the generated `authority.<type>` and `authority.fuzzy_<type>` objects, and an `options:record_selection:types` entry. The shipped `config/config.yml` lists all 46 simple classifiers with every capability off, so it is an inventory rather than an enablement. A type without an `options:record_selection:types` entry is not configured and reports `unsupported_type`; a configured type whose capability switch is absent or `false` is disabled and reports `unsupported_capability`.
+Phase 1 adds bounded, read-only record selection for any entity marked `reconciliation: simple` in `table_specs`. A type is served only when it has that marked spec, the generated `authority.<type>` and `authority.fuzzy_<type>` objects, and an `options:record_selection:types` entry. The shipped `config/config.yml` lists all 46 simple classifiers and enables all five capabilities for each of them; lookups are reconcilable but are not selectable records, so they are absent from the list. `tests/config/config.yml` keeps the same inventory with every capability off, so a test enables one switch at a time. A type without an `options:record_selection:types` entry is not configured and reports `unsupported_type`; a configured type whose capability switch is absent or `false` is disabled and reports `unsupported_capability`.
+
+A shipped entry that enables a capability for a type which is not a simple classifier fails startup with a configuration error, so adding a type is configuration-only and cannot silently expose an unrelated entity.
 
 | Setting | Meaning |
 |---|---|
@@ -232,19 +234,19 @@ Phase 1 adds bounded, read-only record selection for any entity marked `reconcil
 
 To rebuild only the bundle from files that are already generated, without re-running the generator or deleting `schema/generated/`, run `make generate-schema-bundle` or `./schema/create_schema.sh --bundle-only`. The default `./schema/create_schema.sh` deletes `schema/generated/` and regenerates it before building the bundle, so use `--bundle-only` when the generated files are already current.
 
-Enable another simple classifier by adding only its `options:record_selection:types` entry. The type needs no Python change; its columns, displayed fields, and filters come from its `table_specs` entry.
+Add another simple classifier to discovery by adding only its `options:record_selection:types` entry. The type needs no Python change; its columns, displayed fields, and filters come from its `table_specs` entry. A switch that is absent counts as disabled, so set each capability you want that type to serve to `true`.
 
-Test a capability in isolation by overriding only one type and switch:
+Disable one capability for one type by overriding only that switch:
 
 ```yaml
 options:
   record_selection:
     types:
       feature_type:
-        browse_supported: true
+        browse_supported: false
 ```
 
-Do not enable a capability on a deployment until Phase 4 records the exact Authority image and contract and, for interactive search, measures 100 warm searches per type through the Shape Shifter backend with p95 at most 2000 ms. A failed measurement leaves only that capability and type disabled.
+Changing a capability is configuration-only: set its switch to `false` to disable it for one type, with no code change. Before relying on interactive search for a type on a deployment, measure 100 warm searches per type through the Shape Shifter backend with p95 at most 2000 ms; leave only that capability and type disabled if the measurement fails.
 
 ### Reconciliation manifest and schema access
 
@@ -270,11 +272,23 @@ A `false` result or `permission denied for schema authority` means the grants ar
 
 Classifier reconciliation ships as three separately released inputs. Apply them in this order:
 
-1. Schema: deploy the generated `schema/generated/<key>.sql` files for the classifier types you enable. Each file creates or replaces `authority.<key>` and `authority.fuzzy_<key>`.
-2. Mounted configuration: when a deployment mounts its own `config/`, update `entities.yml`, `config.yml`, and `identity_policy.yml` to match the application defaults. The classifier entries, the `reconciliation: simple` marker, `description_match_weight`, and `options:reconciliation` thresholds must agree with `config/`. The identity policy file must be present because `/identity/capabilities` and `/identity/resolve` read it.
-3. Application code: deploy the image that registers the simple classifiers from the marked `table_specs` entries.
+1. Schema: deploy the generated `schema/generated/<key>.sql` files for the classifier types you enable. Each file creates or replaces `authority.<key>` and `authority.fuzzy_<key>`. The marked fuzzy functions also return an internal `label_ambiguous` column, which reports whether another eligible row shares the same normalized label. The current application requires that column and fails candidate conversion with a classifier schema error when a fuzzy row does not carry it, so a function from an earlier release is not compatible with this image. Each file drops the function before recreating it, so the changed return type installs safely, including a repeat install.
+2. Mounted configuration: when a deployment mounts its own `config/`, update `entities.yml`, `config.yml`, and `identity_policy.yml` to match the application defaults. The classifier and lookup entries, the `reconciliation: simple` or `reconciliation: lookup` marker, `scope_columns`, `description_match_weight`, and `options:reconciliation` thresholds must agree with `config/`. The identity policy file must be present because `/identity/capabilities` and `/identity/resolve` read it.
+3. Application code: deploy the image that registers the configured reconciliation types from the marked `table_specs` entries.
 
-The service fails startup with a named classifier configuration error when a registered key has no marked `table_specs` entry, or when a reconciliation threshold is missing or outside `0 < value <= 1`. Deploy the schema and the mounted configuration before the image so a new image does not fail at startup.
+The service fails startup with a named classifier configuration error when a registered key has no marked `table_specs` entry, when a reconciliation threshold is missing or outside `0 < value <= 1`, when a declared scope column does not resolve to exactly one configured parent label, or when a `lookup` entry declares a nonzero `description_match_weight`. Deploy the schema and the mounted configuration before the image so a new image does not fail at startup.
+
+### Scoped context and lookup release order
+
+Entities with `scope_columns` gain a `p_context` argument and two extra result columns (`context`, `context_match`). The previous four-argument call still works because every added argument has a default, so an older image can run against the new functions. The new image requires the regenerated files for the scoped types it serves and for the `lookup` types it registers; a function from an earlier release does not return the context columns.
+
+The deployment operator must confirm that the mounted `config/entities.yml` on the target host carries the same marked entries as the repository before enabling scoped or lookup types. `make -C deployment/container setup` initializes a fresh directory from `config/` but preserves an existing mounted file, so a stale mount is not replaced by a normal setup run. Compare the marked specifications, or run `make setup SYNC_CONFIG=true` when replacement is intended.
+
+`context_match` is returned only when the request supplies a `context` property. It is `true` for candidates found inside the supplied parent context and `false` for the unfiltered fallback suggestions. It is not returned for requests without a context property, and a fallback candidate never sets `match`.
+
+`label_ambiguous` is internal. It is not returned to OpenRefine, it is not a candidate property, and it does not change `label`, `label_sim`, or `name_sim`. It only clears the automatic `match` flag when the row limit hides an eligible row with the same normalized label.
+
+Roll back schema and image together. The previous image does not read the column, but the current image cannot run against a function that omits it. Returning to an earlier image is safe with either schema version; moving forward again requires the schema that includes `label_ambiguous`.
 
 Reconciliation results do not depend on any `pg_trgm.*` database setting. The generated functions compare against `p_label_threshold` and `p_description_threshold`, which carry `options:reconciliation:label_threshold` and `options:reconciliation:description_threshold`. Changing `pg_trgm.similarity_threshold`, `pg_trgm.word_similarity_threshold`, or `pg_trgm.strict_word_similarity_threshold` does not change which candidates are returned or which candidate is marked `match`.
 

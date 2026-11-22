@@ -30,6 +30,8 @@ import yaml
 from jinja2 import Environment, FileSystemLoader, Template, TemplateNotFound
 from loguru import logger
 
+from src.utility import resolve_scope_context
+
 
 def setup_logging(verbose: bool = False) -> None:
     """Configure logging with loguru"""
@@ -45,7 +47,7 @@ def setup_logging(verbose: bool = False) -> None:
 def load_entities_config(config_path: Path) -> dict[str, Any]:
     """Load entities configuration from YAML file"""
     logger.info(f"Loading entities configuration from {config_path}")
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         config: dict[str, Any] = yaml.safe_load(f)
     return config
 
@@ -70,8 +72,19 @@ def get_trigram_config(entity: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def generate_trigram_sql(entity_key: str, entity: dict[str, Any], env: Environment, output_dir: Path, force: bool = False) -> None:
-    """Generate tri-gram SQL file for a single entity"""
+def generate_trigram_sql(
+    entity_key: str,
+    entity: dict[str, Any],
+    env: Environment,
+    output_dir: Path,
+    force: bool = False,
+    table_specs: dict[str, Any] | None = None,
+) -> None:
+    """Generate tri-gram SQL file for a single entity.
+
+    When `table_specs` is supplied, declared `scope_columns` are resolved to parent
+    label sources so the view can join parent labels as `context`.
+    """
     output_file: Path = output_dir / f"{entity_key}.sql"
 
     # Skip if file exists and force is False
@@ -90,6 +103,9 @@ def generate_trigram_sql(entity_key: str, entity: dict[str, Any], env: Environme
     logger.debug(f"  Table: {entity['table_name']}")
     logger.debug(f"  ID column: {entity['id_column']}")
     logger.debug(f"  Label column: {entity['label_column']}")
+
+    if table_specs is not None and entity.get("scope_columns"):
+        entity = dict(entity, scope_context=resolve_scope_context(table_specs, entity_key))
 
     trigram_config = get_trigram_config(entity)
     context: dict[str, Any] = {
@@ -243,9 +259,9 @@ def main(
     logger.info("-" * 60)
     for entity_key, entity in trigram_entities.items():
         try:
-            generate_trigram_sql(entity_key, entity, env, output_dir, force=force)
+            generate_trigram_sql(entity_key, entity, env, output_dir, force=force, table_specs=entities_config)
             trigram_success += 1
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error(f"Failed to generate trigram schema for {entity_key}: {e}")
             if verbose:
                 logger.exception(e)
@@ -260,7 +276,7 @@ def main(
             try:
                 generate_semantic_sql(entity_key, entity, env, output_dir, force=force)
                 semantic_success += 1
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 logger.error(f"Failed to generate semantic schema for {entity_key}: {e}")
                 if verbose:
                     logger.exception(e)
@@ -284,4 +300,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    main()  # type: ignore ; pylint: disable=no-value-for-parameter

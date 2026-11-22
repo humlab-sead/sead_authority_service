@@ -124,13 +124,16 @@ class BaseRepository(AbstractRepository):
             logger.exception(f"Error fetching details for entity_id {entity_id}: {e}")
             return None
 
-    async def find(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:  # pylint: disable=unused-argument
-        """Perform fuzzy name search"""
+    async def find(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:
+        """Perform fuzzy name search, binding optional parent context when the query uses it."""
+        sql: str = self.get_find_fuzzy_sql()
         params: dict[str, Any] = {"q": name, "n": limit}
-        if self.specification.get("reconciliation") == "simple":
+        if self.specification.get("reconciliation") in ("simple", "lookup"):
             params["label_threshold"] = ConfigValue("options:reconciliation:label_threshold").resolve()
             params["description_threshold"] = ConfigValue("options:reconciliation:description_threshold").resolve()
-        return await self.fetch_all(self.get_find_fuzzy_sql(), params)
+        if "%(context)s" in sql:
+            params["context"] = _bound_context(kwargs.get("context"))
+        return await self.fetch_all(sql, params)
 
     async def find_by_prefix(self, prefix: str, limit: int = 10) -> list[dict[str, Any]]:
         """Find rows whose normalized label starts with a prefix."""
@@ -139,11 +142,19 @@ class BaseRepository(AbstractRepository):
             raise ValueError(f"No prefix search query is configured for '{self.key}'")
         return await self.fetch_all(query, {"q": prefix, "n": limit})
 
-    async def fetch_by_alternate_identity(
-        self, alternate_identity: str, **kwargs
-    ) -> list[dict[str, Any]]:  # pylint: disable=unused-argument
-        """Fetch entity by alternate identity"""
+    async def fetch_by_alternate_identity(self, alternate_identity: str, **kwargs) -> list[dict[str, Any]]:
+        """Fetch entity by alternate identity, binding optional parent context when the query uses it."""
         sql: str = self.get_sql_query("alternate_identity_sql")
         if not sql:
             return []
-        return await self.fetch_all(sql, {"alternate_identity": alternate_identity})
+        params: dict[str, Any] = {"alternate_identity": alternate_identity}
+        if "%(context)s" in sql:
+            params["context"] = _bound_context(kwargs.get("context"))
+        return await self.fetch_all(sql, params)
+
+
+def _bound_context(value: Any) -> str | None:
+    """Returns a non-blank context value for a bound SQL parameter, or None."""
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None

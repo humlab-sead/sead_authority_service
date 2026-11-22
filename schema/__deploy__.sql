@@ -311,7 +311,9 @@ create or replace view authority.abundance_element as
     t.element_name as label,
     authority.immutable_unaccent(lower(t.element_name)) as norm_label,
   t.element_description as description,
-  authority.immutable_unaccent(lower(t.element_description)) as norm_description  from public.tbl_abundance_elements as t;
+  authority.immutable_unaccent(lower(t.element_description)) as norm_description,
+    nullif(concat_ws(' / ', scope_1.record_type_name), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.record_type_name), ''))) as norm_context  from public.tbl_abundance_elements as t  left join public.tbl_record_types scope_1 on scope_1.record_type_id = t.record_type_id;
 
 create index if not exists tbl_abundance_elements_norm_trgm
   on public.tbl_abundance_elements
@@ -325,41 +327,74 @@ create index if not exists tbl_abundance_elements_norm_trgm
 
 drop function if exists authority.fuzzy_abundance_element(text, integer) cascade;
 drop function if exists authority.fuzzy_abundance_element(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_abundance_element(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_abundance_element(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50) returns table (
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   abundance_element_id integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.abundance_element_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.abundance_element as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
   )
   select
-    s.abundance_element_id,
-    s.label,
-    s.description,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as label_sim,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as name_sim
-  from authority.abundance_element as s
-  cross join params pq
-  where case when s.norm_label = pq.q then 1.0
-             else similarity(s.norm_label, pq.q) end >= p_label_threshold
-  order by name_sim desc, s.label
+    selected.abundance_element_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
   limit p_limit;
 $$;
 
@@ -405,12 +440,12 @@ create or replace function authority.fuzzy_activity_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.activity_type_id,
     s.label,
@@ -424,7 +459,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.activity_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -475,12 +511,12 @@ create or replace function authority.fuzzy_age_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.age_type_id,
     s.label,
@@ -494,7 +530,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.age_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -545,12 +582,12 @@ create or replace function authority.fuzzy_alt_ref_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.alt_ref_type_id,
     s.label,
@@ -564,7 +601,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.alt_ref_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -638,6 +676,77 @@ as $$
 $$;
 
 /**********************************************************************************************
+**  Chronology - Tri-gram Search Objects
+**  Generated from template by generate_entity_schema.py
+**  
+**  Note: This file creates the base view WITHOUT embeddings.
+**        If the entity has embeddings, also install semantic-{entity}.sql to create
+**        the embeddings table and semantic search functions.
+**********************************************************************************************/
+
+drop view if exists authority.chronology cascade;
+
+create or replace view authority.chronology as
+  select
+    t.chronology_id,
+    t.chronology_name as label,
+    authority.immutable_unaccent(lower(t.chronology_name)) as norm_label,
+  t.notes as description,
+  authority.immutable_unaccent(lower(t.notes)) as norm_description  from public.tbl_chronologies as t;
+
+create index if not exists tbl_chronologies_norm_trgm
+  on public.tbl_chronologies
+    using gin ( (authority.immutable_unaccent(lower(chronology_name))) gin_trgm_ops );
+
+/***************************************************************************************************
+ ** Procedure  authority.fuzzy_chronology
+ ** What       Trigram fuzzy search function using pg_trgm similarity
+ ** Usage      SELECT * FROM authority.fuzzy_chronology('query text', 10);
+ ****************************************************************************************************/
+
+drop function if exists authority.fuzzy_chronology(text, integer) cascade;
+drop function if exists authority.fuzzy_chronology(text, integer, double precision, double precision) cascade;
+
+create or replace function authority.fuzzy_chronology(
+  p_text text,
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50) returns table (
+  chronology_id integer,
+  label text,
+  description text,
+  label_sim double precision,
+  name_sim double precision,
+  label_ambiguous boolean
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
+  select
+    s.chronology_id,
+    s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
+  from authority.chronology as s
+  cross join params pq
+  where case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  order by name_sim desc, s.label
+  limit p_limit;
+$$;
+
+
+/**********************************************************************************************
 **  Colour - Tri-gram Search Objects
 **  Generated from template by generate_entity_schema.py
 **  
@@ -654,7 +763,9 @@ create or replace view authority.colour as
     t.colour_name as label,
     authority.immutable_unaccent(lower(t.colour_name)) as norm_label,
   null::text as description,
-  null::text as norm_description  from public.tbl_colours as t;
+  null::text as norm_description,
+    nullif(concat_ws(' / ', scope_1.method_name), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.method_name), ''))) as norm_context  from public.tbl_colours as t  left join public.tbl_methods scope_1 on scope_1.method_id = t.method_id;
 
 create index if not exists tbl_colours_norm_trgm
   on public.tbl_colours
@@ -668,41 +779,74 @@ create index if not exists tbl_colours_norm_trgm
 
 drop function if exists authority.fuzzy_colour(text, integer) cascade;
 drop function if exists authority.fuzzy_colour(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_colour(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_colour(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50) returns table (
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   colour_id integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.colour_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.colour as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
   )
   select
-    s.colour_id,
-    s.label,
-    s.description,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as label_sim,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as name_sim
-  from authority.colour as s
-  cross join params pq
-  where case when s.norm_label = pq.q then 1.0
-             else similarity(s.norm_label, pq.q) end >= p_label_threshold
-  order by name_sim desc, s.label
+    selected.colour_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
   limit p_limit;
 $$;
 
@@ -748,12 +892,12 @@ create or replace function authority.fuzzy_contact_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.contact_type_id,
     s.label,
@@ -767,7 +911,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.contact_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -818,12 +963,12 @@ create or replace function authority.fuzzy_country(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.location_id,
     s.label,
@@ -837,8 +982,80 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.country as s
+  cross join params pq
+  where case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  order by name_sim desc, s.label
+  limit p_limit;
+$$;
+
+
+/**********************************************************************************************
+**  Data Provider - Tri-gram Search Objects
+**  Generated from template by generate_entity_schema.py
+**  
+**  Note: This file creates the base view WITHOUT embeddings.
+**        If the entity has embeddings, also install semantic-{entity}.sql to create
+**        the embeddings table and semantic search functions.
+**********************************************************************************************/
+
+drop view if exists authority.data_provider cascade;
+
+create or replace view authority.data_provider as
+  select
+    t.data_provider_id,
+    t.data_provider_name as label,
+    authority.immutable_unaccent(lower(t.data_provider_name)) as norm_label,
+  t.notes as description,
+  authority.immutable_unaccent(lower(t.notes)) as norm_description  from public.tbl_data_providers as t;
+
+create index if not exists tbl_data_providers_norm_trgm
+  on public.tbl_data_providers
+    using gin ( (authority.immutable_unaccent(lower(data_provider_name))) gin_trgm_ops );
+
+/***************************************************************************************************
+ ** Procedure  authority.fuzzy_data_provider
+ ** What       Trigram fuzzy search function using pg_trgm similarity
+ ** Usage      SELECT * FROM authority.fuzzy_data_provider('query text', 10);
+ ****************************************************************************************************/
+
+drop function if exists authority.fuzzy_data_provider(text, integer) cascade;
+drop function if exists authority.fuzzy_data_provider(text, integer, double precision, double precision) cascade;
+
+create or replace function authority.fuzzy_data_provider(
+  p_text text,
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50) returns table (
+  data_provider_id integer,
+  label text,
+  description text,
+  label_sim double precision,
+  name_sim double precision,
+  label_ambiguous boolean
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
+  select
+    s.data_provider_id,
+    s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
+  from authority.data_provider as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
              else similarity(s.norm_label, pq.q) end >= p_label_threshold
@@ -888,12 +1105,12 @@ create or replace function authority.fuzzy_dataset_submission_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.submission_type_id,
     s.label,
@@ -907,7 +1124,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.dataset_submission_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -958,12 +1176,12 @@ create or replace function authority.fuzzy_data_type_group(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.data_type_group_id,
     s.label,
@@ -977,7 +1195,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.data_type_group as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -1006,7 +1225,9 @@ create or replace view authority.data_type as
   t.definition as description,
   authority.immutable_unaccent(lower(t.definition)) as norm_description,
     dtg.data_type_group_name as data_type_group_name,
-    dtg.description as data_type_group_description  from public.tbl_data_types as t  left join public.tbl_data_type_groups dtg using (data_type_group_id);
+    dtg.description as data_type_group_description,
+    nullif(concat_ws(' / ', scope_1.data_type_group_name), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.data_type_group_name), ''))) as norm_context  from public.tbl_data_types as t  left join public.tbl_data_type_groups dtg using (data_type_group_id)  left join public.tbl_data_type_groups scope_1 on scope_1.data_type_group_id = t.data_type_group_id;
 
 create index if not exists tbl_data_types_norm_trgm
   on public.tbl_data_types
@@ -1020,24 +1241,127 @@ create index if not exists tbl_data_types_norm_trgm
 
 drop function if exists authority.fuzzy_data_type(text, integer) cascade;
 drop function if exists authority.fuzzy_data_type(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_data_type(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_data_type(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50) returns table (
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   data_type_id integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.data_type_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.data_type as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
   )
   select
-    s.data_type_id,
+    selected.data_type_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
+  limit p_limit;
+$$;
+
+
+/**********************************************************************************************
+**  Dating Lab - Tri-gram Search Objects
+**  Generated from template by generate_entity_schema.py
+**  
+**  Note: This file creates the base view WITHOUT embeddings.
+**        If the entity has embeddings, also install semantic-{entity}.sql to create
+**        the embeddings table and semantic search functions.
+**********************************************************************************************/
+
+drop view if exists authority.dating_lab cascade;
+
+create or replace view authority.dating_lab as
+  select
+    t.dating_lab_id,
+    t.lab_name as label,
+    authority.immutable_unaccent(lower(t.lab_name)) as norm_label,
+  t.international_lab_id as description,
+  authority.immutable_unaccent(lower(t.international_lab_id)) as norm_description  from public.tbl_dating_labs as t;
+
+create index if not exists tbl_dating_labs_norm_trgm
+  on public.tbl_dating_labs
+    using gin ( (authority.immutable_unaccent(lower(lab_name))) gin_trgm_ops );
+
+/***************************************************************************************************
+ ** Procedure  authority.fuzzy_dating_lab
+ ** What       Trigram fuzzy search function using pg_trgm similarity
+ ** Usage      SELECT * FROM authority.fuzzy_dating_lab('query text', 10);
+ ****************************************************************************************************/
+
+drop function if exists authority.fuzzy_dating_lab(text, integer) cascade;
+drop function if exists authority.fuzzy_dating_lab(text, integer, double precision, double precision) cascade;
+
+create or replace function authority.fuzzy_dating_lab(
+  p_text text,
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50) returns table (
+  dating_lab_id integer,
+  label text,
+  description text,
+  label_sim double precision,
+  name_sim double precision,
+  label_ambiguous boolean
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
+  select
+    s.dating_lab_id,
     s.label,
     s.description,
     greatest(
@@ -1049,8 +1373,80 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
-  from authority.data_type as s
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
+  from authority.dating_lab as s
+  cross join params pq
+  where case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  order by name_sim desc, s.label
+  limit p_limit;
+$$;
+
+
+/**********************************************************************************************
+**  Dating Material - Tri-gram Search Objects
+**  Generated from template by generate_entity_schema.py
+**  
+**  Note: This file creates the base view WITHOUT embeddings.
+**        If the entity has embeddings, also install semantic-{entity}.sql to create
+**        the embeddings table and semantic search functions.
+**********************************************************************************************/
+
+drop view if exists authority.dating_material cascade;
+
+create or replace view authority.dating_material as
+  select
+    t.dating_material_id,
+    t.material_dated as label,
+    authority.immutable_unaccent(lower(t.material_dated)) as norm_label,
+  t.description as description,
+  authority.immutable_unaccent(lower(t.description)) as norm_description  from public.tbl_dating_material as t;
+
+create index if not exists tbl_dating_material_norm_trgm
+  on public.tbl_dating_material
+    using gin ( (authority.immutable_unaccent(lower(material_dated))) gin_trgm_ops );
+
+/***************************************************************************************************
+ ** Procedure  authority.fuzzy_dating_material
+ ** What       Trigram fuzzy search function using pg_trgm similarity
+ ** Usage      SELECT * FROM authority.fuzzy_dating_material('query text', 10);
+ ****************************************************************************************************/
+
+drop function if exists authority.fuzzy_dating_material(text, integer) cascade;
+drop function if exists authority.fuzzy_dating_material(text, integer, double precision, double precision) cascade;
+
+create or replace function authority.fuzzy_dating_material(
+  p_text text,
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50) returns table (
+  dating_material_id integer,
+  label text,
+  description text,
+  label_sim double precision,
+  name_sim double precision,
+  label_ambiguous boolean
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
+  select
+    s.dating_material_id,
+    s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
+  from authority.dating_material as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
              else similarity(s.norm_label, pq.q) end >= p_label_threshold
@@ -1100,12 +1496,12 @@ create or replace function authority.fuzzy_dating_uncertainty(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.dating_uncertainty_id,
     s.label,
@@ -1119,7 +1515,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.dating_uncertainty as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -1146,7 +1543,9 @@ create or replace view authority.ecocode_definition as
     t.name as label,
     authority.immutable_unaccent(lower(t.name)) as norm_label,
   t.definition as description,
-  authority.immutable_unaccent(lower(t.definition)) as norm_description  from public.tbl_ecocode_definitions as t;
+  authority.immutable_unaccent(lower(t.definition)) as norm_description,
+    nullif(concat_ws(' / ', scope_1.name), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.name), ''))) as norm_context  from public.tbl_ecocode_definitions as t  left join public.tbl_ecocode_groups scope_1 on scope_1.ecocode_group_id = t.ecocode_group_id;
 
 create index if not exists tbl_ecocode_definitions_norm_trgm
   on public.tbl_ecocode_definitions
@@ -1160,41 +1559,74 @@ create index if not exists tbl_ecocode_definitions_norm_trgm
 
 drop function if exists authority.fuzzy_ecocode_definition(text, integer) cascade;
 drop function if exists authority.fuzzy_ecocode_definition(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_ecocode_definition(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_ecocode_definition(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50) returns table (
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   ecocode_definition_id integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.ecocode_definition_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.ecocode_definition as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
   )
   select
-    s.ecocode_definition_id,
-    s.label,
-    s.description,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as label_sim,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as name_sim
-  from authority.ecocode_definition as s
-  cross join params pq
-  where case when s.norm_label = pq.q then 1.0
-             else similarity(s.norm_label, pq.q) end >= p_label_threshold
-  order by name_sim desc, s.label
+    selected.ecocode_definition_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
   limit p_limit;
 $$;
 
@@ -1216,7 +1648,9 @@ create or replace view authority.ecocode_group as
     t.name as label,
     authority.immutable_unaccent(lower(t.name)) as norm_label,
   t.definition as description,
-  authority.immutable_unaccent(lower(t.definition)) as norm_description  from public.tbl_ecocode_groups as t;
+  authority.immutable_unaccent(lower(t.definition)) as norm_description,
+    nullif(concat_ws(' / ', scope_1.name), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.name), ''))) as norm_context  from public.tbl_ecocode_groups as t  left join public.tbl_ecocode_systems scope_1 on scope_1.ecocode_system_id = t.ecocode_system_id;
 
 create index if not exists tbl_ecocode_groups_norm_trgm
   on public.tbl_ecocode_groups
@@ -1230,24 +1664,127 @@ create index if not exists tbl_ecocode_groups_norm_trgm
 
 drop function if exists authority.fuzzy_ecocode_group(text, integer) cascade;
 drop function if exists authority.fuzzy_ecocode_group(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_ecocode_group(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_ecocode_group(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50) returns table (
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   ecocode_group_id integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.ecocode_group_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.ecocode_group as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
   )
   select
-    s.ecocode_group_id,
+    selected.ecocode_group_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
+  limit p_limit;
+$$;
+
+
+/**********************************************************************************************
+**  Ecocode System - Tri-gram Search Objects
+**  Generated from template by generate_entity_schema.py
+**  
+**  Note: This file creates the base view WITHOUT embeddings.
+**        If the entity has embeddings, also install semantic-{entity}.sql to create
+**        the embeddings table and semantic search functions.
+**********************************************************************************************/
+
+drop view if exists authority.ecocode_system cascade;
+
+create or replace view authority.ecocode_system as
+  select
+    t.ecocode_system_id,
+    t.name as label,
+    authority.immutable_unaccent(lower(t.name)) as norm_label,
+  t.definition as description,
+  authority.immutable_unaccent(lower(t.definition)) as norm_description  from public.tbl_ecocode_systems as t;
+
+create index if not exists tbl_ecocode_systems_norm_trgm
+  on public.tbl_ecocode_systems
+    using gin ( (authority.immutable_unaccent(lower(name))) gin_trgm_ops );
+
+/***************************************************************************************************
+ ** Procedure  authority.fuzzy_ecocode_system
+ ** What       Trigram fuzzy search function using pg_trgm similarity
+ ** Usage      SELECT * FROM authority.fuzzy_ecocode_system('query text', 10);
+ ****************************************************************************************************/
+
+drop function if exists authority.fuzzy_ecocode_system(text, integer) cascade;
+drop function if exists authority.fuzzy_ecocode_system(text, integer, double precision, double precision) cascade;
+
+create or replace function authority.fuzzy_ecocode_system(
+  p_text text,
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50) returns table (
+  ecocode_system_id integer,
+  label text,
+  description text,
+  label_sim double precision,
+  name_sim double precision,
+  label_ambiguous boolean
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
+  select
+    s.ecocode_system_id,
     s.label,
     s.description,
     greatest(
@@ -1259,8 +1796,9 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
-  from authority.ecocode_group as s
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
+  from authority.ecocode_system as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
              else similarity(s.norm_label, pq.q) end >= p_label_threshold
@@ -1285,7 +1823,10 @@ create or replace view authority.feature as
     t.feature_id,
     t.feature_name as label,
     authority.immutable_unaccent(lower(t.feature_name)) as norm_label,
-    t.feature_description  from public.tbl_features as t;
+  t.feature_description as description,
+  authority.immutable_unaccent(lower(t.feature_description)) as norm_description,
+    nullif(concat_ws(' / ', scope_1.feature_type_name), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.feature_type_name), ''))) as norm_context  from public.tbl_features as t  left join public.tbl_feature_types scope_1 on scope_1.feature_type_id = t.feature_type_id;
 
 create index if not exists tbl_features_norm_trgm
   on public.tbl_features
@@ -1298,29 +1839,78 @@ create index if not exists tbl_features_norm_trgm
  ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_feature(text, integer) cascade;
+drop function if exists authority.fuzzy_feature(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_feature(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_feature(
   p_text text,
-  p_limit integer default 10) returns table (
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   feature_id integer,
   label text,
-  name_sim double precision
+  description text,
+  label_sim double precision,
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )  select
-    s.feature_id,
-    s.label,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-          else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as name_sim
-  from authority.feature as s
-  cross join params pq  where s.norm_label % pq.q  order by name_sim desc, s.label
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.feature_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.feature as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
+  )
+  select
+    selected.feature_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
   limit p_limit;
 $$;
+
 
 /**********************************************************************************************
 **  Feature Type - Tri-gram Search Objects
@@ -1363,12 +1953,12 @@ create or replace function authority.fuzzy_feature_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.feature_type_id,
     s.label,
@@ -1382,7 +1972,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.feature_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -1409,7 +2000,9 @@ create or replace view authority.horizon as
     t.horizon_name as label,
     authority.immutable_unaccent(lower(t.horizon_name)) as norm_label,
   t.description as description,
-  authority.immutable_unaccent(lower(t.description)) as norm_description  from public.tbl_horizons as t;
+  authority.immutable_unaccent(lower(t.description)) as norm_description,
+    nullif(concat_ws(' / ', scope_1.method_name), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.method_name), ''))) as norm_context  from public.tbl_horizons as t  left join public.tbl_methods scope_1 on scope_1.method_id = t.method_id;
 
 create index if not exists tbl_horizons_norm_trgm
   on public.tbl_horizons
@@ -1423,41 +2016,74 @@ create index if not exists tbl_horizons_norm_trgm
 
 drop function if exists authority.fuzzy_horizon(text, integer) cascade;
 drop function if exists authority.fuzzy_horizon(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_horizon(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_horizon(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50) returns table (
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   horizon_id integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.horizon_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.horizon as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
   )
   select
-    s.horizon_id,
-    s.label,
-    s.description,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as label_sim,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as name_sim
-  from authority.horizon as s
-  cross join params pq
-  where case when s.norm_label = pq.q then 1.0
-             else similarity(s.norm_label, pq.q) end >= p_label_threshold
-  order by name_sim desc, s.label
+    selected.horizon_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
   limit p_limit;
 $$;
 
@@ -1503,12 +2129,12 @@ create or replace function authority.fuzzy_identification_level(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.identification_level_id,
     s.label,
@@ -1522,7 +2148,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.identification_level as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -1573,12 +2200,12 @@ create or replace function authority.fuzzy_language(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.language_id,
     s.label,
@@ -1592,7 +2219,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.language as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -1705,12 +2333,12 @@ create or replace function authority.fuzzy_location_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.location_type_id,
     s.label,
@@ -1724,8 +2352,80 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.location_type as s
+  cross join params pq
+  where case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  order by name_sim desc, s.label
+  limit p_limit;
+$$;
+
+
+/**********************************************************************************************
+**  Master Dataset - Tri-gram Search Objects
+**  Generated from template by generate_entity_schema.py
+**  
+**  Note: This file creates the base view WITHOUT embeddings.
+**        If the entity has embeddings, also install semantic-{entity}.sql to create
+**        the embeddings table and semantic search functions.
+**********************************************************************************************/
+
+drop view if exists authority.master_dataset cascade;
+
+create or replace view authority.master_dataset as
+  select
+    t.master_set_id,
+    t.master_name as label,
+    authority.immutable_unaccent(lower(t.master_name)) as norm_label,
+  t.master_notes as description,
+  authority.immutable_unaccent(lower(t.master_notes)) as norm_description  from public.tbl_dataset_masters as t;
+
+create index if not exists tbl_dataset_masters_norm_trgm
+  on public.tbl_dataset_masters
+    using gin ( (authority.immutable_unaccent(lower(master_name))) gin_trgm_ops );
+
+/***************************************************************************************************
+ ** Procedure  authority.fuzzy_master_dataset
+ ** What       Trigram fuzzy search function using pg_trgm similarity
+ ** Usage      SELECT * FROM authority.fuzzy_master_dataset('query text', 10);
+ ****************************************************************************************************/
+
+drop function if exists authority.fuzzy_master_dataset(text, integer) cascade;
+drop function if exists authority.fuzzy_master_dataset(text, integer, double precision, double precision) cascade;
+
+create or replace function authority.fuzzy_master_dataset(
+  p_text text,
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50) returns table (
+  master_set_id integer,
+  label text,
+  description text,
+  label_sim double precision,
+  name_sim double precision,
+  label_ambiguous boolean
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
+  select
+    s.master_set_id,
+    s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
+  from authority.master_dataset as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
              else similarity(s.norm_label, pq.q) end >= p_label_threshold
@@ -1775,12 +2475,12 @@ create or replace function authority.fuzzy_method_group(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.method_group_id,
     s.label,
@@ -1794,7 +2494,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.method_group as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -1912,6 +2613,77 @@ as $$
 $$;
 
 /**********************************************************************************************
+**  Project - Tri-gram Search Objects
+**  Generated from template by generate_entity_schema.py
+**  
+**  Note: This file creates the base view WITHOUT embeddings.
+**        If the entity has embeddings, also install semantic-{entity}.sql to create
+**        the embeddings table and semantic search functions.
+**********************************************************************************************/
+
+drop view if exists authority.project cascade;
+
+create or replace view authority.project as
+  select
+    t.project_id,
+    t.project_name as label,
+    authority.immutable_unaccent(lower(t.project_name)) as norm_label,
+  t.description as description,
+  authority.immutable_unaccent(lower(t.description)) as norm_description  from public.tbl_projects as t;
+
+create index if not exists tbl_projects_norm_trgm
+  on public.tbl_projects
+    using gin ( (authority.immutable_unaccent(lower(project_name))) gin_trgm_ops );
+
+/***************************************************************************************************
+ ** Procedure  authority.fuzzy_project
+ ** What       Trigram fuzzy search function using pg_trgm similarity
+ ** Usage      SELECT * FROM authority.fuzzy_project('query text', 10);
+ ****************************************************************************************************/
+
+drop function if exists authority.fuzzy_project(text, integer) cascade;
+drop function if exists authority.fuzzy_project(text, integer, double precision, double precision) cascade;
+
+create or replace function authority.fuzzy_project(
+  p_text text,
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50) returns table (
+  project_id integer,
+  label text,
+  description text,
+  label_sim double precision,
+  name_sim double precision,
+  label_ambiguous boolean
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
+  select
+    s.project_id,
+    s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
+  from authority.project as s
+  cross join params pq
+  where case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  order by name_sim desc, s.label
+  limit p_limit;
+$$;
+
+
+/**********************************************************************************************
 **  Project Stage - Tri-gram Search Objects
 **  Generated from template by generate_entity_schema.py
 **  
@@ -1952,12 +2724,12 @@ create or replace function authority.fuzzy_project_stage(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.project_stage_id,
     s.label,
@@ -1971,7 +2743,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.project_stage as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -2022,12 +2795,12 @@ create or replace function authority.fuzzy_project_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.project_type_id,
     s.label,
@@ -2041,7 +2814,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.project_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -2092,12 +2866,12 @@ create or replace function authority.fuzzy_property_type_group(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.property_type_group_id,
     s.label,
@@ -2111,7 +2885,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.property_type_group as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -2138,7 +2913,9 @@ create or replace view authority.property_type as
     t.property_type_name as label,
     authority.immutable_unaccent(lower(t.property_type_name)) as norm_label,
   t.description as description,
-  authority.immutable_unaccent(lower(t.description)) as norm_description  from public.tbl_property_types as t;
+  authority.immutable_unaccent(lower(t.description)) as norm_description,
+    nullif(concat_ws(' / ', scope_1.property_type_group), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.property_type_group), ''))) as norm_context  from public.tbl_property_types as t  left join public.tbl_property_type_groups scope_1 on scope_1.property_type_group_id = t.property_type_group_id;
 
 create index if not exists tbl_property_types_norm_trgm
   on public.tbl_property_types
@@ -2152,41 +2929,74 @@ create index if not exists tbl_property_types_norm_trgm
 
 drop function if exists authority.fuzzy_property_type(text, integer) cascade;
 drop function if exists authority.fuzzy_property_type(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_property_type(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_property_type(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50) returns table (
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   property_type_id integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.property_type_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.property_type as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
   )
   select
-    s.property_type_id,
-    s.label,
-    s.description,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as label_sim,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as name_sim
-  from authority.property_type as s
-  cross join params pq
-  where case when s.norm_label = pq.q then 1.0
-             else similarity(s.norm_label, pq.q) end >= p_label_threshold
-  order by name_sim desc, s.label
+    selected.property_type_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
   limit p_limit;
 $$;
 
@@ -2208,7 +3018,9 @@ create or replace view authority.rdb_code as
     t.rdb_category as label,
     authority.immutable_unaccent(lower(t.rdb_category)) as norm_label,
   t.rdb_definition as description,
-  authority.immutable_unaccent(lower(t.rdb_definition)) as norm_description  from public.tbl_rdb_codes as t;
+  authority.immutable_unaccent(lower(t.rdb_definition)) as norm_description,
+    nullif(concat_ws(' / ', scope_1.rdb_system), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.rdb_system), ''))) as norm_context  from public.tbl_rdb_codes as t  left join public.tbl_rdb_systems scope_1 on scope_1.rdb_system_id = t.rdb_system_id;
 
 create index if not exists tbl_rdb_codes_norm_trgm
   on public.tbl_rdb_codes
@@ -2226,28 +3038,34 @@ create index if not exists tbl_rdb_codes_norm_desc_trgm
 
 drop function if exists authority.fuzzy_rdb_code(text, integer) cascade;
 drop function if exists authority.fuzzy_rdb_code(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_rdb_code(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_rdb_code(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50) returns table (
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   rdb_code_id integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
   , scored as (
     select
       s.rdb_code_id,
       s.label,
       s.description,
-      case when s.norm_label = pq.q then 1.0
+      s.norm_label,      s.context,
+      s.norm_context,      case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q) end as label_sim,
       coalesce(strict_word_similarity(pq.q, s.norm_description), 0) as description_sim
     from authority.rdb_code as s
@@ -2259,14 +3077,106 @@ as $$
     where scored.label_sim >= p_label_threshold
        or scored.description_sim >= p_description_threshold
   )
+  , matched as (
+    select filtered.*
+    from filtered
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(filtered.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select filtered.*, false as context_match
+    from filtered
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
+  )
   select
-    filtered.rdb_code_id,
-    filtered.label,
-    filtered.description,
-    filtered.label_sim,
-    least(1.0, filtered.label_sim + 0.15 * filtered.description_sim) as name_sim
-  from filtered
-  order by name_sim desc, filtered.label_sim desc, filtered.label
+    selected.rdb_code_id,
+    selected.label,
+    selected.description,
+    selected.label_sim,
+    least(1.0, selected.label_sim + 0.15 * selected.description_sim) as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label_sim desc, selected.label
+  limit p_limit;
+$$;
+
+
+/**********************************************************************************************
+**  RDB System - Tri-gram Search Objects
+**  Generated from template by generate_entity_schema.py
+**  
+**  Note: This file creates the base view WITHOUT embeddings.
+**        If the entity has embeddings, also install semantic-{entity}.sql to create
+**        the embeddings table and semantic search functions.
+**********************************************************************************************/
+
+drop view if exists authority.rdb_system cascade;
+
+create or replace view authority.rdb_system as
+  select
+    t.rdb_system_id,
+    t.rdb_system as label,
+    authority.immutable_unaccent(lower(t.rdb_system)) as norm_label,
+  null::text as description,
+  null::text as norm_description  from public.tbl_rdb_systems as t;
+
+create index if not exists tbl_rdb_systems_norm_trgm
+  on public.tbl_rdb_systems
+    using gin ( (authority.immutable_unaccent(lower(rdb_system))) gin_trgm_ops );
+
+/***************************************************************************************************
+ ** Procedure  authority.fuzzy_rdb_system
+ ** What       Trigram fuzzy search function using pg_trgm similarity
+ ** Usage      SELECT * FROM authority.fuzzy_rdb_system('query text', 10);
+ ****************************************************************************************************/
+
+drop function if exists authority.fuzzy_rdb_system(text, integer) cascade;
+drop function if exists authority.fuzzy_rdb_system(text, integer, double precision, double precision) cascade;
+
+create or replace function authority.fuzzy_rdb_system(
+  p_text text,
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50) returns table (
+  rdb_system_id integer,
+  label text,
+  description text,
+  label_sim double precision,
+  name_sim double precision,
+  label_ambiguous boolean
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
+  select
+    s.rdb_system_id,
+    s.label,
+    s.description,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as label_sim,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
+  from authority.rdb_system as s
+  cross join params pq
+  where case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  order by name_sim desc, s.label
   limit p_limit;
 $$;
 
@@ -2312,12 +3222,12 @@ create or replace function authority.fuzzy_record_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.record_type_id,
     s.label,
@@ -2331,7 +3241,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.record_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -2357,7 +3268,8 @@ create or replace view authority.relative_age as
     t.relative_age_id,
     t.relative_age_name as label,
     authority.immutable_unaccent(lower(t.relative_age_name)) as norm_label,
-    t.description  from public.tbl_relative_ages as t;
+  t.description as description,
+  authority.immutable_unaccent(lower(t.description)) as norm_description  from public.tbl_relative_ages as t;
 
 create index if not exists tbl_relative_ages_norm_trgm
   on public.tbl_relative_ages
@@ -2370,29 +3282,46 @@ create index if not exists tbl_relative_ages_norm_trgm
  ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_relative_age(text, integer) cascade;
+drop function if exists authority.fuzzy_relative_age(text, integer, double precision, double precision) cascade;
 
 create or replace function authority.fuzzy_relative_age(
   p_text text,
-  p_limit integer default 10) returns table (
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50) returns table (
   relative_age_id integer,
   label text,
-  name_sim double precision
+  description text,
+  label_sim double precision,
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )  select
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
+  select
     s.relative_age_id,
     s.label,
+    s.description,
     greatest(
       case when s.norm_label = pq.q then 1.0
-          else similarity(s.norm_label, pq.q)
+           else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as label_sim,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.relative_age as s
-  cross join params pq  where s.norm_label % pq.q  order by name_sim desc, s.label
+  cross join params pq
+  where case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  order by name_sim desc, s.label
   limit p_limit;
 $$;
+
 
 /**********************************************************************************************
 **  Relative Age Type - Tri-gram Search Objects
@@ -2435,12 +3364,12 @@ create or replace function authority.fuzzy_relative_age_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.relative_age_type_id,
     s.label,
@@ -2454,7 +3383,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.relative_age_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -2505,12 +3435,12 @@ create or replace function authority.fuzzy_sample_description_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.sample_description_type_id,
     s.label,
@@ -2524,7 +3454,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.sample_description_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -2575,12 +3506,12 @@ create or replace function authority.fuzzy_sample_group_description_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.sample_group_description_type_id,
     s.label,
@@ -2594,7 +3525,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.sample_group_description_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -2645,12 +3577,12 @@ create or replace function authority.fuzzy_sample_location_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.sample_location_type_id,
     s.label,
@@ -2664,7 +3596,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.sample_location_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -2715,12 +3648,12 @@ create or replace function authority.fuzzy_sample_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.sample_type_id,
     s.label,
@@ -2734,7 +3667,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.sample_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -2814,7 +3748,9 @@ create or replace view authority.season as
     t.season_name as label,
     authority.immutable_unaccent(lower(t.season_name)) as norm_label,
   null::text as description,
-  null::text as norm_description  from public.tbl_seasons as t;
+  null::text as norm_description,
+    nullif(concat_ws(' / ', scope_1.season_type), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.season_type), ''))) as norm_context  from public.tbl_seasons as t  left join public.tbl_season_types scope_1 on scope_1.season_type_id = t.season_type_id;
 
 create index if not exists tbl_seasons_norm_trgm
   on public.tbl_seasons
@@ -2828,41 +3764,74 @@ create index if not exists tbl_seasons_norm_trgm
 
 drop function if exists authority.fuzzy_season(text, integer) cascade;
 drop function if exists authority.fuzzy_season(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_season(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_season(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50) returns table (
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   season_id integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.season_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.season as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
   )
   select
-    s.season_id,
-    s.label,
-    s.description,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as label_sim,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as name_sim
-  from authority.season as s
-  cross join params pq
-  where case when s.norm_label = pq.q then 1.0
-             else similarity(s.norm_label, pq.q) end >= p_label_threshold
-  order by name_sim desc, s.label
+    selected.season_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
   limit p_limit;
 $$;
 
@@ -2908,12 +3877,12 @@ create or replace function authority.fuzzy_season_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.season_type_id,
     s.label,
@@ -2927,7 +3896,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.season_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -3044,12 +4014,12 @@ create or replace function authority.fuzzy_site_type_group(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.site_type_group_id,
     s.label,
@@ -3063,7 +4033,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.site_type_group as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -3090,7 +4061,9 @@ create or replace view authority.site_type as
     t.site_type as label,
     authority.immutable_unaccent(lower(t.site_type)) as norm_label,
   t.description as description,
-  authority.immutable_unaccent(lower(t.description)) as norm_description  from public.tbl_site_types as t;
+  authority.immutable_unaccent(lower(t.description)) as norm_description,
+    nullif(concat_ws(' / ', scope_1.site_type_group), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.site_type_group), ''))) as norm_context  from public.tbl_site_types as t  left join public.tbl_site_type_groups scope_1 on scope_1.site_type_group_id = t.site_type_group_id;
 
 create index if not exists tbl_site_types_norm_trgm
   on public.tbl_site_types
@@ -3104,41 +4077,74 @@ create index if not exists tbl_site_types_norm_trgm
 
 drop function if exists authority.fuzzy_site_type(text, integer) cascade;
 drop function if exists authority.fuzzy_site_type(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_site_type(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_site_type(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50) returns table (
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   site_type_id integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.site_type_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.site_type as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
   )
   select
-    s.site_type_id,
-    s.label,
-    s.description,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as label_sim,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as name_sim
-  from authority.site_type as s
-  cross join params pq
-  where case when s.norm_label = pq.q then 1.0
-             else similarity(s.norm_label, pq.q) end >= p_label_threshold
-  order by name_sim desc, s.label
+    selected.site_type_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
   limit p_limit;
 $$;
 
@@ -3184,12 +4190,12 @@ create or replace function authority.fuzzy_species_association_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.association_type_id,
     s.label,
@@ -3203,7 +4209,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.species_association_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -3254,12 +4261,12 @@ create or replace function authority.fuzzy_submission_state(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.submission_state_id,
     s.label,
@@ -3273,7 +4280,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.submission_state as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -3324,12 +4332,12 @@ create or replace function authority.fuzzy_submission_task_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.submission_task_type_id,
     s.label,
@@ -3343,12 +4351,118 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.submission_task_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
              else similarity(s.norm_label, pq.q) end >= p_label_threshold
   order by name_sim desc, s.label
+  limit p_limit;
+$$;
+
+
+/**********************************************************************************************
+**  Taxa Common Names - Tri-gram Search Objects
+**  Generated from template by generate_entity_schema.py
+**  
+**  Note: This file creates the base view WITHOUT embeddings.
+**        If the entity has embeddings, also install semantic-{entity}.sql to create
+**        the embeddings table and semantic search functions.
+**********************************************************************************************/
+
+drop view if exists authority.taxa_common_names cascade;
+
+create or replace view authority.taxa_common_names as
+  select
+    t.taxon_common_name_id,
+    t.common_name as label,
+    authority.immutable_unaccent(lower(t.common_name)) as norm_label,
+  null::text as description,
+  null::text as norm_description,
+    nullif(concat_ws(' / ', scope_1.species), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.species), ''))) as norm_context  from public.tbl_taxa_common_names as t  left join public.tbl_taxa_tree_master scope_1 on scope_1.taxon_id = t.taxon_id;
+
+create index if not exists tbl_taxa_common_names_norm_trgm
+  on public.tbl_taxa_common_names
+    using gin ( (authority.immutable_unaccent(lower(common_name))) gin_trgm_ops );
+
+/***************************************************************************************************
+ ** Procedure  authority.fuzzy_taxa_common_names
+ ** What       Trigram fuzzy search function using pg_trgm similarity
+ ** Usage      SELECT * FROM authority.fuzzy_taxa_common_names('query text', 10);
+ ****************************************************************************************************/
+
+drop function if exists authority.fuzzy_taxa_common_names(text, integer) cascade;
+drop function if exists authority.fuzzy_taxa_common_names(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_taxa_common_names(text, integer, double precision, double precision, text) cascade;
+
+create or replace function authority.fuzzy_taxa_common_names(
+  p_text text,
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
+  taxon_common_name_id integer,
+  label text,
+  description text,
+  label_sim double precision,
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
+) language sql stable
+as $$
+  with params as (
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.taxon_common_name_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.taxa_common_names as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
+  )
+  select
+    selected.taxon_common_name_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
   limit p_limit;
 $$;
 
@@ -3369,6 +4483,8 @@ create or replace view authority.taxa_synonym as
     t.synonym_id,
     t.synonym as label,
     authority.immutable_unaccent(lower(t.synonym)) as norm_label,
+  null::text as description,
+  null::text as norm_description,
     t.taxon_id  from public.tbl_taxa_synonyms as t  join public.tbl_taxa_tree_master ttm using (taxon_id);
 
 create index if not exists tbl_taxa_synonyms_norm_trgm
@@ -3382,29 +4498,46 @@ create index if not exists tbl_taxa_synonyms_norm_trgm
  ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_taxa_synonym(text, integer) cascade;
+drop function if exists authority.fuzzy_taxa_synonym(text, integer, double precision, double precision) cascade;
 
 create or replace function authority.fuzzy_taxa_synonym(
   p_text text,
-  p_limit integer default 10) returns table (
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50) returns table (
   synonym_id integer,
   label text,
-  name_sim double precision
+  description text,
+  label_sim double precision,
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )  select
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
+  select
     s.synonym_id,
     s.label,
+    s.description,
     greatest(
       case when s.norm_label = pq.q then 1.0
-          else similarity(s.norm_label, pq.q)
+           else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as label_sim,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.taxa_synonym as s
-  cross join params pq  where s.norm_label % pq.q  order by name_sim desc, s.label
+  cross join params pq
+  where case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  order by name_sim desc, s.label
   limit p_limit;
 $$;
+
 
 /**********************************************************************************************
 **  Taxa Author - Tri-gram Search Objects
@@ -3447,12 +4580,12 @@ create or replace function authority.fuzzy_taxa_tree_author(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.author_id,
     s.label,
@@ -3466,7 +4599,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.taxa_tree_author as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -3494,7 +4628,9 @@ create or replace view authority.taxa_tree_family as
     authority.immutable_unaccent(lower(t.family_name)) as norm_label,
   null::text as description,
   null::text as norm_description,
-    t.order_id  from public.tbl_taxa_tree_families as t  join public.tbl_taxa_tree_orders ord using (order_id);
+    t.order_id,
+    nullif(concat_ws(' / ', scope_1.order_name), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.order_name), ''))) as norm_context  from public.tbl_taxa_tree_families as t  join public.tbl_taxa_tree_orders ord using (order_id)  left join public.tbl_taxa_tree_orders scope_1 on scope_1.order_id = t.order_id;
 
 create index if not exists tbl_taxa_tree_families_norm_trgm
   on public.tbl_taxa_tree_families
@@ -3508,41 +4644,74 @@ create index if not exists tbl_taxa_tree_families_norm_trgm
 
 drop function if exists authority.fuzzy_taxa_tree_family(text, integer) cascade;
 drop function if exists authority.fuzzy_taxa_tree_family(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_taxa_tree_family(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_taxa_tree_family(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50) returns table (
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   family_id integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.family_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.taxa_tree_family as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
   )
   select
-    s.family_id,
-    s.label,
-    s.description,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as label_sim,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as name_sim
-  from authority.taxa_tree_family as s
-  cross join params pq
-  where case when s.norm_label = pq.q then 1.0
-             else similarity(s.norm_label, pq.q) end >= p_label_threshold
-  order by name_sim desc, s.label
+    selected.family_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
   limit p_limit;
 $$;
 
@@ -3565,7 +4734,9 @@ create or replace view authority.taxa_tree_genus as
     authority.immutable_unaccent(lower(t.genus_name)) as norm_label,
   null::text as description,
   null::text as norm_description,
-    t.family_id  from public.tbl_taxa_tree_genera as t  join public.tbl_taxa_tree_families fam using (family_id);
+    t.family_id,
+    nullif(concat_ws(' / ', scope_1.family_name), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.family_name), ''))) as norm_context  from public.tbl_taxa_tree_genera as t  join public.tbl_taxa_tree_families fam using (family_id)  left join public.tbl_taxa_tree_families scope_1 on scope_1.family_id = t.family_id;
 
 create index if not exists tbl_taxa_tree_genera_norm_trgm
   on public.tbl_taxa_tree_genera
@@ -3579,41 +4750,74 @@ create index if not exists tbl_taxa_tree_genera_norm_trgm
 
 drop function if exists authority.fuzzy_taxa_tree_genus(text, integer) cascade;
 drop function if exists authority.fuzzy_taxa_tree_genus(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_taxa_tree_genus(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_taxa_tree_genus(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50) returns table (
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   genus_id integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.genus_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.taxa_tree_genus as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
   )
   select
-    s.genus_id,
-    s.label,
-    s.description,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as label_sim,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as name_sim
-  from authority.taxa_tree_genus as s
-  cross join params pq
-  where case when s.norm_label = pq.q then 1.0
-             else similarity(s.norm_label, pq.q) end >= p_label_threshold
-  order by name_sim desc, s.label
+    selected.genus_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
   limit p_limit;
 $$;
 
@@ -3713,12 +4917,12 @@ create or replace function authority.fuzzy_taxa_tree_order(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.order_id,
     s.label,
@@ -3732,7 +4936,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.taxa_tree_order as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -3758,7 +4963,8 @@ create or replace view authority.taxonomic_order_system as
     t.taxonomic_order_system_id,
     t.system_name as label,
     authority.immutable_unaccent(lower(t.system_name)) as norm_label,
-    t.system_description  from public.tbl_taxonomic_order_systems as t;
+  t.system_description as description,
+  authority.immutable_unaccent(lower(t.system_description)) as norm_description  from public.tbl_taxonomic_order_systems as t;
 
 create index if not exists tbl_taxonomic_order_systems_norm_trgm
   on public.tbl_taxonomic_order_systems
@@ -3771,29 +4977,46 @@ create index if not exists tbl_taxonomic_order_systems_norm_trgm
  ****************************************************************************************************/
 
 drop function if exists authority.fuzzy_taxonomic_order_system(text, integer) cascade;
+drop function if exists authority.fuzzy_taxonomic_order_system(text, integer, double precision, double precision) cascade;
 
 create or replace function authority.fuzzy_taxonomic_order_system(
   p_text text,
-  p_limit integer default 10) returns table (
+  p_limit integer default 10,
+  p_label_threshold double precision default 0.30,
+  p_description_threshold double precision default 0.50) returns table (
   taxonomic_order_system_id integer,
   label text,
-  name_sim double precision
+  description text,
+  label_sim double precision,
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )  select
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
+  select
     s.taxonomic_order_system_id,
     s.label,
+    s.description,
     greatest(
       case when s.norm_label = pq.q then 1.0
-          else similarity(s.norm_label, pq.q)
+           else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as label_sim,
+    greatest(
+      case when s.norm_label = pq.q then 1.0
+           else similarity(s.norm_label, pq.q)
+      end, 0.0001
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.taxonomic_order_system as s
-  cross join params pq  where s.norm_label % pq.q  order by name_sim desc, s.label
+  cross join params pq
+  where case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  order by name_sim desc, s.label
   limit p_limit;
 $$;
+
 
 /**********************************************************************************************
 **  Taxonomy Note - Tri-gram Search Objects
@@ -3888,12 +5111,12 @@ create or replace function authority.fuzzy_unit(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.unit_id,
     s.label,
@@ -3907,7 +5130,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.unit as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -3934,7 +5158,9 @@ create or replace view authority.value_class as
     t.name as label,
     authority.immutable_unaccent(lower(t.name)) as norm_label,
   t.description as description,
-  authority.immutable_unaccent(lower(t.description)) as norm_description  from public.tbl_value_classes as t;
+  authority.immutable_unaccent(lower(t.description)) as norm_description,
+    nullif(concat_ws(' / ', scope_1.name, scope_2.method_name), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.name, scope_2.method_name), ''))) as norm_context  from public.tbl_value_classes as t  left join public.tbl_value_types scope_1 on scope_1.value_type_id = t.value_type_id  left join public.tbl_methods scope_2 on scope_2.method_id = t.method_id;
 
 create index if not exists tbl_value_classes_norm_trgm
   on public.tbl_value_classes
@@ -3948,41 +5174,74 @@ create index if not exists tbl_value_classes_norm_trgm
 
 drop function if exists authority.fuzzy_value_class(text, integer) cascade;
 drop function if exists authority.fuzzy_value_class(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_value_class(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_value_class(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50) returns table (
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   value_class_id integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.value_class_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.value_class as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
   )
   select
-    s.value_class_id,
-    s.label,
-    s.description,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as label_sim,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as name_sim
-  from authority.value_class as s
-  cross join params pq
-  where case when s.norm_label = pq.q then 1.0
-             else similarity(s.norm_label, pq.q) end >= p_label_threshold
-  order by name_sim desc, s.label
+    selected.value_class_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
   limit p_limit;
 $$;
 
@@ -4028,12 +5287,12 @@ create or replace function authority.fuzzy_value_qualifier(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.qualifier_id,
     s.label,
@@ -4047,7 +5306,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.value_qualifier as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0
@@ -4074,7 +5334,9 @@ create or replace view authority.value_type_item as
     t.name as label,
     authority.immutable_unaccent(lower(t.name)) as norm_label,
   t.description as description,
-  authority.immutable_unaccent(lower(t.description)) as norm_description  from public.tbl_value_type_items as t;
+  authority.immutable_unaccent(lower(t.description)) as norm_description,
+    nullif(concat_ws(' / ', scope_1.name), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.name), ''))) as norm_context  from public.tbl_value_type_items as t  left join public.tbl_value_types scope_1 on scope_1.value_type_id = t.value_type_id;
 
 create index if not exists tbl_value_type_items_norm_trgm
   on public.tbl_value_type_items
@@ -4088,41 +5350,74 @@ create index if not exists tbl_value_type_items_norm_trgm
 
 drop function if exists authority.fuzzy_value_type_item(text, integer) cascade;
 drop function if exists authority.fuzzy_value_type_item(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_value_type_item(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_value_type_item(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50) returns table (
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   value_type_item_id integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.value_type_item_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.value_type_item as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or position(pq.ctx in coalesce(scored.norm_context, '')) > 0
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
   )
   select
-    s.value_type_item_id,
-    s.label,
-    s.description,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as label_sim,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as name_sim
-  from authority.value_type_item as s
-  cross join params pq
-  where case when s.norm_label = pq.q then 1.0
-             else similarity(s.norm_label, pq.q) end >= p_label_threshold
-  order by name_sim desc, s.label
+    selected.value_type_item_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
   limit p_limit;
 $$;
 
@@ -4168,12 +5463,12 @@ create or replace function authority.fuzzy_value_type(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.value_type_id,
     s.label,
@@ -4187,7 +5482,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.value_type as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0

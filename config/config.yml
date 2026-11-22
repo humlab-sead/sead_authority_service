@@ -9,10 +9,12 @@ options:
     label_threshold: 0.30
     description_threshold: 0.50
   # Record selection (browse, details, interactive search, verification). Every
-  # entity marked `reconciliation: simple` in entities.yml is listed here and
-  # every capability is off, so the section is an explicit inventory rather than
-  # an enablement. Enable one type and one capability at a time, and only after
-  # the rollout checks in docs/OPERATIONS.md pass for that type.
+  # entity marked `reconciliation: simple` in entities.yml is listed here; lookups
+  # are reconcilable but are not selectable records, so they are absent. The
+  # shipped defaults enable all five capabilities for every listed type. Set a
+  # switch to false to disable that capability for one type. Adding a type needs
+  # only its entry: startup rejects an entry that enables a capability for a type
+  # that is not a simple classifier. Rollout checks are in docs/OPERATIONS.md.
   record_selection:
     version: 1
     browse_max_rows: 500

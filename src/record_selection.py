@@ -17,7 +17,7 @@ from loguru import logger
 
 from src.configuration import ConfigValue
 from src.record_identifiers import format_record_uri, parse_record_uri, valid_id_base, within_postgres_integer
-from src.strategies.configured_classifier import marked_classifier_keys
+from src.strategies.configured_classifier import simple_classifier_keys
 from src.strategies.query import BaseRepository
 from src.strategies.strategy import Strategies
 
@@ -187,8 +187,11 @@ def _identifier(value: Any, label: str) -> str:
 
 
 def selectable_types() -> tuple[str, ...]:
-    """Return the marked simple classifier keys that record selection can serve."""
-    return tuple(marked_classifier_keys())
+    """Return the marked simple classifier keys that record selection can serve.
+
+    Lookups are registered for reconciliation but are not selectable records.
+    """
+    return tuple(simple_classifier_keys())
 
 
 def build_projection(entity_type: str) -> RecordProjection:

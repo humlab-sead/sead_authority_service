@@ -9,6 +9,7 @@ from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 
 
+# pylint: disable=unused-argument
 class TestAdministrativeRegionBasics:
     """Test basic initialization and registration of administrative region strategy."""
 
@@ -22,7 +23,10 @@ class TestAdministrativeRegionBasics:
     def test_registry_key_attribute(self, test_provider: ExtendedMockConfigProvider):
         """Verify _registry_key attribute is set by decorator."""
         assert hasattr(AdministrativeRegionReconciliationStrategy, "_registry_key")
-        assert AdministrativeRegionReconciliationStrategy._registry_key == "administrative_region"
+        assert (
+            AdministrativeRegionReconciliationStrategy._registry_key  # pylint: disable=protected-access,no-member
+            == "administrative_region"
+        )
 
     @with_test_config
     def test_is_registered(self, test_provider: ExtendedMockConfigProvider):

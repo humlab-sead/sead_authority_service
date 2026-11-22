@@ -115,13 +115,13 @@ async def test_get_connection_missing_pool_raises(provider_with_config: Config) 
 
 
 def _classifier_config() -> dict[str, Any]:
-    """Builds a classifier validation payload from the inline test table specifications."""
+    """Builds a classifier validation payload from the inline test table specifications.
+
+    Every specification is kept, because scope columns resolve against parent
+    entities that are not themselves marked for reconciliation.
+    """
     specs: dict[str, Any] = yaml.safe_load((REPOSITORY_ROOT / "tests/config/config.yml").read_text(encoding="utf-8"))["table_specs"]
-    table_specs: dict[str, Any] = {
-        key: dict(table_spec)
-        for key, table_spec in specs.items()
-        if isinstance(table_spec, dict) and table_spec.get("reconciliation") == "simple"
-    }
+    table_specs: dict[str, Any] = {key: dict(table_spec) for key, table_spec in specs.items() if isinstance(table_spec, dict)}
     return {
         "table_specs": table_specs,
         "options": {"reconciliation": {"label_threshold": 0.30, "description_threshold": 0.50}},
@@ -166,6 +166,37 @@ def _above_one_threshold(config: dict[str, Any]) -> None:
 
 def _non_numeric_threshold(config: dict[str, Any]) -> None:
     config["options"]["reconciliation"]["description_threshold"] = "high"
+
+
+def _unknown_scope_column(config: dict[str, Any]) -> None:
+    config["table_specs"]["colour"]["scope_columns"] = ["missing_parent_id"]
+
+
+def _lookup_description_weight(config: dict[str, Any]) -> None:
+    config["table_specs"]["feature"]["description_match_weight"] = 0.15
+
+
+def _lookup_without_label(config: dict[str, Any]) -> None:
+    config["table_specs"]["feature"]["label_column"] = ""
+
+
+@pytest.mark.parametrize(
+    "mutation, expected_message",
+    [
+        (_unknown_scope_column, "missing_parent_id"),
+        (_lookup_description_weight, "must not score descriptions"),
+        (_lookup_without_label, "label_column"),
+    ],
+)
+def test_validate_classifier_configuration_rejects_invalid_scoped_config(
+    provider_with_config: Config, mutation, expected_message: str
+) -> None:
+    config_data: dict[str, Any] = _classifier_config()
+    mutation(config_data)
+    provider_with_config.update(config_data)
+
+    with pytest.raises(ClassifierConfigurationError, match=expected_message):
+        validate_classifier_configuration()
 
 
 def test_validate_classifier_configuration_accepts_valid_config(provider_with_config: Config) -> None:
