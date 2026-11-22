@@ -10,7 +10,7 @@ Approved identity-ownership decision; generic identity allocation and the approv
 
 ## Documents
 
-- [Tier 2: Context-Scoped Classification and Lookup Reconciliation](./CLASSIFIER_FUZZY_RECONCILIATION_TIER_2/CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md) — proposed feature; extends the tier-1 path with parent-context matching, derived labels, and reconciliation for shared-metadata lookups
+- [Tier 2: Context-Scoped Classification and Lookup Reconciliation](./CLASSIFIER_FUZZY_RECONCILIATION_TIER_2/CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md) — confirmed feature; fixes limit-sensitive duplicate ambiguity and adds parent-context matching and configured lookup reconciliation
 - [One Contract for Simple Classifiers — Enabling a Type](./done/SIMPLE_CLASSIFIER_CONTRACT/SIMPLE_CLASSIFIER_CONTRACT_HANDOFF.md) — handoff note; the ordered steps to enable one simple classifier, the error each misconfiguration produces, and the open rollout decisions
 - [Verify Reconciliation Candidates and Match Readiness](./RECONCILIATION_IDENTITY_CONTRACT/RECONCILIATION_IDENTITY_CONTRACT.md) — proposed change request; add a read-only candidate check (URI validation and SEAD row existence), database-backed match readiness, and a `materialized` rule at SIMS binding for the Shape Shifter reconciliation MVP
 - [Adopt Existing `site` Rows into SIMS as `materialized`](./SIMS_EXISTING_SITE_ADOPTION.md) — proposed change request; one-time, rerunnable backfill of tracked identities for existing `site` rows and initialization of the `site` ID allocator
