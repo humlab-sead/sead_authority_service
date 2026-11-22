@@ -3,7 +3,7 @@
 ## Status
 
 - Proposed feature / change request
-- Tier 2 of a two-tier change. Tier 1 is [Fuzzy Reconciliation for Classifier Entities](./CLASSIFIER_FUZZY_RECONCILIATION/CLASSIFIER_FUZZY_RECONCILIATION.md) and is confirmed. This proposal depends on tier 1 and does not restate its contracts.
+- Tier 2 of a two-tier change. Tier 1, [Fuzzy Reconciliation for Classifier Entities](./done/CLASSIFIER_FUZZY_RECONCILIATION/CLASSIFIER_FUZZY_RECONCILIATION.md), is implemented and validated across Phases 1–3. Its completion records include disposable-database and HTTP checks; production deployment was out of scope. See the [Phase 1](./done/CLASSIFIER_FUZZY_RECONCILIATION/CLASSIFIER_FUZZY_RECONCILIATION_PHASE_1_TASK_PLAN.md), [Phase 2](./done/CLASSIFIER_FUZZY_RECONCILIATION/CLASSIFIER_FUZZY_RECONCILIATION_PHASE_2_TASK_PLAN.md), and [Phase 3](./done/CLASSIFIER_FUZZY_RECONCILIATION/CLASSIFIER_FUZZY_RECONCILIATION_PHASE_3_TASK_PLAN.md) task plans. This proposal depends on the completed tier-1 baseline and does not restate its contracts.
 - Acceptance criteria use the `P2-AC-<N>` prefix so they stay distinguishable from tier-1 `P-AC-<N>` criteria in phase plans.
 - Scope: `sead_authority_service` reconciliation for classifiers whose label is unique only within a parent, for lookups that have no reconciliation strategy, and for `dimension`
 - Goal: extend the tier-1 configured path with parent-context matching, derived labels, and lookup reconciliation, without adding per-entity Python classes
@@ -49,7 +49,7 @@ Because tier 1 already suppresses automatic matches on duplicate labels, tier 2 
 
 ## Current Behavior
 
-Tier 1, once implemented, publishes `authority.<key>` views with `label`, `norm_label`, and optional `description`, and `authority.fuzzy_<key>` functions scoring label plus capped description. Duplicate normalized labels never auto-accept.
+Tier 1 publishes `authority.<key>` views with `label`, `norm_label`, and optional `description`, and `authority.fuzzy_<key>` functions scoring label plus capped description. Duplicate normalized labels never auto-accept.
 
 Against that baseline, tier 2 differs in three verified ways:
 
@@ -63,11 +63,11 @@ Against that baseline, tier 2 differs in three verified ways:
 
 `reconciliation` becomes a three-value capability marker handled by the existing `ConfiguredClassifierStrategy`:
 
-| Value | Use | Candidate source |
-|---|---|---|
-| `simple` | Flat classifiers and flat lookups | Tier-1 generated view and function |
-| `scoped` | Entities whose label repeats across parents | Generated view with context columns |
-| `lookup` | Shared metadata that must resolve to an existing row | Tier-1 generated view and function |
+| Value    | Use                                                  | Candidate source                    |
+|----------|------------------------------------------------------|-------------------------------------|
+| `simple` | Flat classifiers and flat lookups                    | Tier-1 generated view and function  |
+| `scoped` | Entities whose label repeats across parents          | Generated view with context columns |
+| `lookup` | Shared metadata that must resolve to an existing row | Tier-1 generated view and function  |
 
 `lookup` differs from `simple` in defaults, not in code: description scoring stays disabled regardless of `description_match_weight`, and `reconciliation: lookup` is reported distinctly in diagnostics. A lookup therefore can never rank on description text.
 
@@ -182,7 +182,7 @@ Extending startup validation: a `scoped` entry must declare at least one `scope_
 ## Alternatives Considered
 
 - **Keep the 14 scoped classifiers as tier-1 ambiguous suggestions.** Rejected. It is safe but leaves the highest-volume vocabularies unhelpful: `colour`, `site_type`, and `value_type_item` all repeat labels by design.
-- **Move the 14 scoped classifiers out of tier 1 and into tier 2.** Rejected. Tier 1 is confirmed and its registration is harmless; suppressing automatic matches is exactly the correct interim behavior. Tier 2 upgrades accuracy in place rather than rewriting a confirmed scope.
+- **Move the 14 scoped classifiers out of tier 1 and into tier 2.** Rejected. Tier 1 is implemented, and duplicate-label suppression keeps its current behavior safe. Tier 2 upgrades accuracy in place rather than rewriting the completed scope.
 - **Add a bespoke strategy class per scoped entity.** Rejected. It reintroduces the artifact duplication tier 1 removes.
 - **Treat a supplied context as a score boost instead of a narrowing filter.** Rejected. A boost can still auto-accept a candidate from the wrong parent, while narrowing with a visible fallback cannot.
 - **Reconcile lookups through the classifier path with description scoring enabled.** Rejected. Lookups must resolve to an existing row, so a lookup ignores `description_match_weight` and can never rank on description text.
@@ -264,4 +264,4 @@ Open questions to resolve during phase planning:
 
 ## Final Recommendation
 
-Adopt tier 2 as an additive layer on the confirmed tier-1 path. Parent context, derived labels, and lookup markers all fit the same configured strategy, so the work stays configuration and template work rather than new per-entity code. Tier 1 remains safe on its own: deferring tier 2 never produces a wrong automatic match, only a less precise candidate list.
+Adopt tier 2 as an additive layer on the implemented tier-1 path. Parent context, derived labels, and lookup markers all fit the same configured strategy, so the work stays configuration and template work rather than new per-entity code. Tier 1 remains safe on its own: deferring tier 2 never produces a wrong automatic match, only a less precise candidate list.

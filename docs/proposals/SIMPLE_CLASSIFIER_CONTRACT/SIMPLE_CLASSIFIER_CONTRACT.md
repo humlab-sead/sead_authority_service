@@ -7,7 +7,7 @@
 - Scope: `reconciliation: simple` entities, record selection, and classifier registration
 - Schema regeneration and deployment: owned outside this change; this proposal records the required shapes and deploy order only
 - Goal: make the generated database objects the single definition of a simple classifier, so enabling one is configuration-only
-- Amends the generated view contract in [CLASSIFIER_FUZZY_RECONCILIATION](../CLASSIFIER_FUZZY_RECONCILIATION/CLASSIFIER_FUZZY_RECONCILIATION.md), which omits `description` for seven entities
+- Amends the generated view contract in [CLASSIFIER_FUZZY_RECONCILIATION](../done/CLASSIFIER_FUZZY_RECONCILIATION/CLASSIFIER_FUZZY_RECONCILIATION.md), which omits `description` for seven entities
 - Extends the pilot record selection delivered by [RECONCILIATION_IDENTITY_CONTRACT](../RECONCILIATION_IDENTITY_CONTRACT/RECONCILIATION_IDENTITY_CONTRACT.md)
 - Revised from [REVIEW.md](./REVIEW.md)
 - Next step: phase task plan for the single delivery phase

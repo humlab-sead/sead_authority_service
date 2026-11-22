@@ -10,7 +10,6 @@ Approved identity-ownership decision; generic identity allocation and the approv
 
 ## Documents
 
-- [Fuzzy Reconciliation for Classifier Entities](./CLASSIFIER_FUZZY_RECONCILIATION/CLASSIFIER_FUZZY_RECONCILIATION.md) — confirmed feature; one configuration-driven strategy enables fuzzy name and description matching for all simple classifier entities and replaces per-entity boilerplate
 - [Tier 2: Context-Scoped Classification and Lookup Reconciliation](./CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md) — proposed feature; extends the tier-1 path with parent-context matching, derived labels, and reconciliation for shared-metadata lookups
 - [One Contract for Simple Classifiers](./SIMPLE_CLASSIFIER_CONTRACT/SIMPLE_CLASSIFIER_CONTRACT.md) — accepted feature; make the generated view and function the single definition of a simple classifier so record selection becomes configuration-only
 - [One Contract for Simple Classifiers — Enabling a Type](./SIMPLE_CLASSIFIER_CONTRACT/SIMPLE_CLASSIFIER_CONTRACT_HANDOFF.md) — handoff note; the ordered steps to enable one simple classifier, the error each misconfiguration produces, and the open rollout decisions

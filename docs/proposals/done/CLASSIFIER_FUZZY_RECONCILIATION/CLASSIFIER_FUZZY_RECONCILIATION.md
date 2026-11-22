@@ -2,17 +2,11 @@
 
 ## Status
 
-- Confirmed feature / change request (2026-11-14)
-- Tier 1 of 2. Tier 2 is [Context-Scoped Classification and Lookup Reconciliation](../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md).
-- Revision 8: make root `config/` the only tracked runtime configuration source; deployment setup reports drift and overwrites only with explicit approval, tracked by [issue #48](https://github.com/humlab-sead/sead_authority_service/issues/48)
-- Revision 7: enable description scoring only for `rdb_code` after read-only staging population checks; defer the other three code-label weights
-- Revision 6: thresholds are service configuration passed as function parameters, not `pg_trgm` database settings
-- Revision 5: recorded excluded-classifier reasons in the reconciliation type inventory register tracked by [issue #43](https://github.com/humlab-sead/sead_authority_service/issues/43)
-- Revision 4: resolved description-scoring enablement to four code-label classifiers behind a data-population gate
-- Revision 3: description scoring is off by default and opt-in per entity, uses strict word similarity, and never decides `match`
-- Revision 2: scoped the new view and scoring contract to marked entities, defined the fuzzy return contract, replaced the manifest derivation, and settled enablement and ambiguity behavior
+- **Implemented and validated** (Phases 1–3; production deployment was out of scope).
 - Scope: `sead_authority_service` reconciliation for target-model entities whose role is `classifier`
 - Goal: enable trigram fuzzy matching on classifier name and, where a description column exists, on description, without adding per-entity Python classes, resource YAML, or hand-written SQL
+- Validation: Disposable-schema details and fuzzy queries passed for all 45 marked types; representative HTTP checks and the `rdb_code` generated-view population recheck passed. See the [Phase 1 task plan](./CLASSIFIER_FUZZY_RECONCILIATION_PHASE_1_TASK_PLAN.md), [Phase 2 task plan](./CLASSIFIER_FUZZY_RECONCILIATION_PHASE_2_TASK_PLAN.md), and [Phase 3 task plan](./CLASSIFIER_FUZZY_RECONCILIATION_PHASE_3_TASK_PLAN.md).
+- Follow-up: Production deployment remains separate work.
 
 ## Summary
 
@@ -58,7 +52,7 @@ The existing simple classifier implementations `feature_type` and `data_type` mo
 - The existing specialized strategies: `site`, `location`, `method`, `taxon`, `modification_type`, `bibliographic_reference`, `administrative_region`, `country`, and `geonames`.
 - Classifiers without a usable text label: `coordinate_method_dimension` and `value_qualifier_symbol`.
 - `abundance_element_group`, which has no target table.
-- `dimension`. Deferred to [tier 2](../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md), which owns its table spec, generated view, and column verification.
+- `dimension`. Deferred to [tier 2](../../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md), which owns its table spec, generated view, and column verification.
 - Alternate-identity matching beyond the existing `alternate_identity_column` behavior.
 - Embeddings, semantic search, LLM disambiguation, SIMS identity allocation, and OpenRefine UI changes.
 - Renaming existing reconciliation type IDs; Shape Shifter project configuration references them.
@@ -395,7 +389,7 @@ Confirmed decisions:
 - Use one configured path, not per-entity copies.
 - Gate every generated change on `reconciliation: simple` so unmarked entities keep their current contracts.
 - Reuse existing type IDs. Do not add aliases for `sample_group_sampling_context` (`sampling_context`) or `taxa` (`taxon`/`taxa_tree_master`) in this change.
-- Exclude `dimension` from the simple tier. Its table spec, generated view, and resource SQL are deferred to [tier 2](../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md).
+- Exclude `dimension` from the simple tier. Its table spec, generated view, and resource SQL are deferred to [tier 2](../../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md).
 - Keep static registration, and describe enablement as a two-location edit: `entities.yml` plus `CLASSIFIER_KEYS`.
 - Return `description` from marked fuzzy functions whether or not description scoring is enabled; truncate candidates at 500 characters and keep full text in details.
 - Description scoring is off by default. Enabling it sets `description_match_weight` between `0.10` and `0.20`, uses `strict_word_similarity`, and only reorders candidates.
@@ -425,7 +419,7 @@ Expected validation outcomes:
 - A disposable-database smoke test reconciles one classifier per category, including a duplicate-label case.
 - Specialized strategy snapshot and regression suite pass unchanged.
 
-Cross-repository drift against `sead_standard_model.yml` is out of scope for this tier. [Tier 2](../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md) decides whether a sync check is required or the checked-in snapshot is sufficient.
+Cross-repository drift against `sead_standard_model.yml` is out of scope for this tier. [Tier 2](../../CLASSIFIER_FUZZY_RECONCILIATION_TIER_2.md) decides whether a sync check is required or the checked-in snapshot is sufficient.
 
 ## Final Recommendation
 
