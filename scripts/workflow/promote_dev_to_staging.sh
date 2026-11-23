@@ -12,6 +12,8 @@ readonly cli_path="${repository_root}/scripts/workflow/promote_dev_to_staging.sh
 readonly description_script="${repository_root}/scripts/workflow/update_pr_descriptions.py"
 readonly provenance_script="${repository_root}/scripts/ci/verify_promotion_provenance.sh"
 readonly python="${repository_root}/.venv/bin/python"
+# Set by --quiet: progress text moves to stderr and stdout carries only the PR number.
+quiet=0
 cd -- "$repository_root"
 
 usage() {
@@ -21,15 +23,19 @@ Prepare and publish a dev-to-staging promotion pull request.
 Usage:
   scripts/workflow/promote_dev_to_staging.sh prepare
   scripts/workflow/promote_dev_to_staging.sh publish <pull-request-number>
+  scripts/workflow/promote_dev_to_staging.sh merge <pull-request-number>
 
 Commands:
   prepare             Fetch branches, verify provenance, create a draft promotion PR,
                       and generate its local description draft.
   publish <number>    Publish the reviewed description and mark the PR ready for review.
+  merge <number>      Merge the promotion PR into staging with a merge commit.
   -h, --help          Show this help.
+  -q, --quiet         Print only the pull request number on stdout. Progress text moves
+                      to stderr, so every command can be captured.
 
-After review and required checks pass, merge with:
-  gh pr merge <pull-request-number> --merge
+The merge command runs 'gh pr merge --merge', so GitHub still enforces the
+repository's branch protection rules: required reviews and checks must pass.
 EOF
 }
 
@@ -46,12 +52,18 @@ validate_pull_request_number() {
   [[ "$1" =~ ^[1-9][0-9]*$ ]] || die "Pull request number must be a positive integer."
 }
 
-check_environment() {
-  require_command git
+# Run a command, moving its stdout to stderr under --quiet so stdout stays clean.
+run_quietly() {
+  if (( quiet )); then
+    "$@" >&2
+  else
+    "$@"
+  fi
+}
+
+# Checks shared by every command: the GitHub CLI, authentication, and repository identity.
+check_github_environment() {
   require_command gh
-  [[ -x "$python" ]] || die "Python environment not found at ${python}; set up the repository .venv first."
-  [[ -f "$description_script" ]] || die "Description script not found: ${description_script}"
-  [[ -x "$provenance_script" ]] || die "Provenance script is not executable: ${provenance_script}"
 
   gh auth status --hostname github.com >/dev/null 2>&1 || die "Authenticate with 'gh auth login' first."
 
@@ -60,6 +72,16 @@ check_environment() {
     || die "Could not determine the current GitHub repository."
   [[ "$actual_repository" == "$repository" ]] \
     || die "Run this script from ${repository}; current repository is ${actual_repository}."
+}
+
+# Additional checks for prepare and publish, which regenerate descriptions and verify provenance.
+check_environment() {
+  require_command git
+  check_github_environment
+
+  [[ -x "$python" ]] || die "Python environment not found at ${python}; set up the repository .venv first."
+  [[ -f "$description_script" ]] || die "Description script not found: ${description_script}"
+  [[ -x "$provenance_script" ]] || die "Provenance script is not executable: ${provenance_script}"
 
   local origin_url
   origin_url="$(git remote get-url origin)" || die "Git remote 'origin' is required."
@@ -85,7 +107,7 @@ verify_provenance() {
   token="$(gh auth token)" || die "Could not read the GitHub CLI authentication token."
   [[ -n "$token" ]] || die "GitHub CLI returned an empty authentication token."
 
-  GH_TOKEN="$token" "$provenance_script" \
+  run_quietly env GH_TOKEN="$token" "$provenance_script" \
     --base "origin/${target_branch}" \
     --head "origin/${source_branch}"
 }
@@ -141,8 +163,13 @@ EOF
   pull_request_number="${pull_request_url##*/}"
   validate_pull_request_number "$pull_request_number"
 
-  if ! "$python" "$description_script" "$pull_request_number" --draft; then
+  if ! run_quietly "$python" "$description_script" "$pull_request_number" --draft; then
     die "Created ${pull_request_url}, but could not generate its description draft. Run: ${python} ${description_script} ${pull_request_number} --draft"
+  fi
+
+  if (( quiet )); then
+    printf '%s\n' "$pull_request_number"
+    return 0
   fi
 
   printf '\nCreated draft promotion PR: %s\n' "$pull_request_url"
@@ -176,35 +203,103 @@ publish_promotion() {
   fetch_branches
   verify_provenance
 
-  "$python" "$description_script" "$pull_request_number" --publish \
+  run_quietly "$python" "$description_script" "$pull_request_number" --publish \
     || die "Could not publish the reviewed description for PR #${pull_request_number}."
 
-  if ! gh pr ready "$pull_request_number" --repo "$repository"; then
+  if ! run_quietly gh pr ready "$pull_request_number" --repo "$repository"; then
     die "Description published, but PR #${pull_request_number} remains a draft. Run: gh pr ready ${pull_request_number}"
   fi
 
+  if (( quiet )); then
+    printf '%s\n' "$pull_request_number"
+    return 0
+  fi
+
   printf 'Published the description and marked PR #%s ready for review.\n' "$pull_request_number"
-  printf 'After required reviews and checks pass, merge with: gh pr merge %s --merge\n' "$pull_request_number"
+  printf 'After required reviews and checks pass, merge with: %s merge %s\n' "$cli_path" "$pull_request_number"
+}
+
+merge_promotion() {
+  local pull_request_number="$1"
+  validate_pull_request_number "$pull_request_number"
+  check_github_environment
+
+  local metadata
+  metadata="$(gh pr view "$pull_request_number" \
+    --repo "$repository" \
+    --json state,baseRefName,headRefName,isDraft \
+    --jq '[.state, .baseRefName, .headRefName, (.isDraft | tostring)] | @tsv')" \
+    || die "Could not read pull request #${pull_request_number}."
+
+  local state base_branch head_branch is_draft
+  IFS=$'\t' read -r state base_branch head_branch is_draft <<< "$metadata"
+  [[ "$state" == "OPEN" ]] || die "Pull request #${pull_request_number} is not open."
+  [[ "$base_branch" == "$target_branch" && "$head_branch" == "$source_branch" ]] \
+    || die "Pull request #${pull_request_number} is not a ${source_branch}-to-${target_branch} promotion."
+  [[ "$is_draft" == "false" ]] \
+    || die "Pull request #${pull_request_number} is still a draft. Run the publish command first."
+
+  run_quietly gh pr merge "$pull_request_number" --repo "$repository" --merge \
+    || die "Could not merge pull request #${pull_request_number}."
+
+  if (( quiet )); then
+    printf '%s\n' "$pull_request_number"
+    return 0
+  fi
+
+  printf 'Merged PR #%s into %s with a merge commit.\n' "$pull_request_number" "$target_branch"
 }
 
 main() {
-  if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then
+  local -a positional=()
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -q | --quiet)
+        quiet=1
+        shift
+        ;;
+      -h | --help)
+        usage
+        return 0
+        ;;
+      --)
+        shift
+        positional+=("$@")
+        break
+        ;;
+      -*)
+        usage >&2
+        die "Unknown option: $1"
+        ;;
+      *)
+        positional+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  if [[ ${#positional[@]} -eq 0 ]]; then
     usage
     return 0
   fi
 
-  case "$1" in
+  case "${positional[0]}" in
     prepare)
-      [[ $# -eq 1 ]] || die "The prepare command takes no arguments."
+      [[ ${#positional[@]} -eq 1 ]] || die "The prepare command takes no arguments."
       prepare_promotion
       ;;
     publish)
-      [[ $# -eq 2 ]] || die "Usage: scripts/workflow/promote_dev_to_staging.sh publish <pull-request-number>"
-      publish_promotion "$2"
+      [[ ${#positional[@]} -eq 2 ]] || die "Usage: scripts/workflow/promote_dev_to_staging.sh publish <pull-request-number>"
+      publish_promotion "${positional[1]}"
+      ;;
+    merge)
+      [[ ${#positional[@]} -eq 2 ]] || die "Usage: scripts/workflow/promote_dev_to_staging.sh merge <pull-request-number>"
+      merge_promotion "${positional[1]}"
       ;;
     *)
       usage >&2
-      die "Unknown command: $1"
+      die "Unknown command: ${positional[0]}"
       ;;
   esac
 }
