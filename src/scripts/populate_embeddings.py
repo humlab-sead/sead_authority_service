@@ -28,7 +28,6 @@ Options:
 import asyncio
 import os
 import sys
-from pathlib import Path
 from typing import Any
 
 import click
@@ -36,9 +35,6 @@ import ollama
 import psycopg
 from dotenv import load_dotenv
 from loguru import logger
-
-# Preserve direct execution while keeping project imports under the `src` package.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.configuration.interface import ConfigLike  # noqa: E402
 from src.configuration.provider import ConfigStore, get_config_provider  # noqa: E402
@@ -119,7 +115,7 @@ class EmbeddingPopulator:
             try:
                 response: ollama.EmbeddingsResponse = self.ollama_client.embeddings(model=self.model, prompt=text)
                 embeddings.append(response["embedding"])
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-except
                 logger.error(f"Failed to generate embedding for text '{text[:50]}...': {e}")
                 # Return zero vector on error to maintain batch alignment
                 embeddings.append([0.0] * 768)
@@ -147,7 +143,7 @@ class EmbeddingPopulator:
                 on conflict ({id_column}) do update
                     set emb = excluded.emb
             """
-            cur.executemany(insert_sql, [(id_val, emb) for id_val, emb in batch])  # type: ignore
+            cur.executemany(insert_sql, list(batch))  # type: ignore
             conn.commit()
             return len(batch)
 
@@ -195,7 +191,7 @@ class EmbeddingPopulator:
                 logger.success(f"  ✓ Completed {entity_key}: {total_processed} embeddings generated")
                 return total_processed
 
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-except
             logger.error(f"  ✗ Failed to process {entity_key}: {e}")
             return 0
 

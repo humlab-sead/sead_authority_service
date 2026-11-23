@@ -17,7 +17,7 @@ from loguru import logger
 
 from src.configuration import ConfigValue
 from src.record_identifiers import format_record_uri, parse_record_uri, valid_id_base, within_postgres_integer
-from src.strategies.configured_classifier import marked_classifier_keys
+from src.strategies.configured_classifier import simple_classifier_keys
 from src.strategies.query import BaseRepository
 from src.strategies.strategy import Strategies
 
@@ -187,8 +187,11 @@ def _identifier(value: Any, label: str) -> str:
 
 
 def selectable_types() -> tuple[str, ...]:
-    """Return the marked simple classifier keys that record selection can serve."""
-    return tuple(marked_classifier_keys())
+    """Return the marked simple classifier keys that record selection can serve.
+
+    Lookups are registered for reconciliation but are not selectable records.
+    """
+    return tuple(simple_classifier_keys())
 
 
 def build_projection(entity_type: str) -> RecordProjection:
@@ -366,13 +369,13 @@ def validate_interactive_query(raw_queries: Any, policy: RecordSelectionPolicy) 
 
 
 async def search_interactive(entity_type: str, query_text: str, limit: int) -> dict[str, Any]:
-    """Run a bounded search through the registered classifier strategy for one type."""
+    """Run a bounded ranked search, including literal label-substring matches for classifiers."""
     strategy_cls = Strategies.items.get(entity_type)
     if strategy_cls is None or entity_type not in selectable_types():
         raise RecordSelectionError("unsupported_type", f"Unsupported record type '{entity_type}'.")
 
     strategy = strategy_cls()
-    rows: list[dict[str, Any]] = await strategy.find_candidates(query=query_text, properties={}, limit=limit)
+    rows: list[dict[str, Any]] = await strategy.find_interactive_candidates(query=query_text, limit=limit)
     candidates: list[dict[str, Any]] = strategy.as_candidates(rows, query_text)
 
     id_base: str = configured_id_base()

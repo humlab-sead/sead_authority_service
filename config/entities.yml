@@ -28,6 +28,8 @@ data_type:
   description_column: "definition"
   alternate_identity_column: null
   reconciliation: simple
+  scope_columns:
+    - "data_type_group_id"
   type_or_grouping:
     foreign_table: "data_type_group"
     foreign_key_column: "data_type_group_id"
@@ -81,6 +83,9 @@ feature:
   label_column: "feature_name"
   description_column: "feature_description"
   alternate_identity_column: null
+  reconciliation: lookup
+  scope_columns:
+    - "feature_type_id"
   type_or_grouping:
     foreign_table: "feature_type"
     foreign_key_column: "feature_type_id"
@@ -202,6 +207,7 @@ relative_age:
   label_column: "relative_age_name"
   description_column: "description"
   alternate_identity_column: null
+  reconciliation: lookup
   type_or_grouping:
     foreign_table: "relative_age_type"
     foreign_key_column: "relative_age_type_id"
@@ -302,6 +308,8 @@ taxa_tree_family:
   description_column: null
   alternate_identity_column: null
   reconciliation: simple
+  scope_columns:
+    - "order_id"
   type_or_grouping:
     foreign_table: "taxa_tree_order"
     foreign_key_column: "order_id"
@@ -322,6 +330,8 @@ taxa_tree_genus:
   description_column: null
   alternate_identity_column: null
   reconciliation: simple
+  scope_columns:
+    - "family_id"
   type_or_grouping:
     foreign_table: "taxa_tree_family"
     foreign_key_column: "family_id"
@@ -375,6 +385,7 @@ taxonomic_order_system:
   label_column: "system_name"
   description_column: "system_description"
   alternate_identity_column: null
+  reconciliation: lookup
   materialized: false
   extra_columns: []
   embedding_config:
@@ -401,6 +412,7 @@ taxa_synonym:
   label_column: "synonym"
   description_column: null
   alternate_identity_column: null
+  reconciliation: lookup
   materialized: false
   extra_columns:
     - "t.taxon_id"
@@ -418,6 +430,8 @@ abundance_element:
   description_column: "element_description"
   alternate_identity_column: null
   reconciliation: simple
+  scope_columns:
+    - "record_type_id"
 activity_type:
   name: "Activity Type"
   table_name: "tbl_activity_types"
@@ -450,6 +464,8 @@ colour:
   description_column: null
   alternate_identity_column: null
   reconciliation: simple
+  scope_columns:
+    - "method_id"
 contact_type:
   name: "Contact Type"
   table_name: "tbl_contact_types"
@@ -474,6 +490,8 @@ ecocode_definition:
   description_column: "definition"
   alternate_identity_column: null
   reconciliation: simple
+  scope_columns:
+    - "ecocode_group_id"
 ecocode_group:
   name: "Ecocode Group"
   table_name: "tbl_ecocode_groups"
@@ -482,6 +500,8 @@ ecocode_group:
   description_column: "definition"
   alternate_identity_column: null
   reconciliation: simple
+  scope_columns:
+    - "ecocode_system_id"
 horizon:
   name: "Horizon"
   table_name: "tbl_horizons"
@@ -490,6 +510,8 @@ horizon:
   description_column: "description"
   alternate_identity_column: null
   reconciliation: simple
+  scope_columns:
+    - "method_id"
 identification_level:
   name: "Identification Level"
   table_name: "tbl_identification_levels"
@@ -530,6 +552,8 @@ property_type:
   description_column: "description"
   alternate_identity_column: null
   reconciliation: simple
+  scope_columns:
+    - "property_type_group_id"
 property_type_group:
   name: "Property Type Group"
   table_name: "tbl_property_type_groups"
@@ -546,6 +570,8 @@ rdb_code:
   description_column: "rdb_definition"
   alternate_identity_column: null
   reconciliation: simple
+  scope_columns:
+    - "rdb_system_id"
   description_match_weight: 0.15
 season:
   name: "Season"
@@ -555,6 +581,8 @@ season:
   description_column: null
   alternate_identity_column: null
   reconciliation: simple
+  scope_columns:
+    - "season_type_id"
 season_type:
   name: "Season Type"
   table_name: "tbl_season_types"
@@ -571,6 +599,8 @@ site_type:
   description_column: "description"
   alternate_identity_column: null
   reconciliation: simple
+  scope_columns:
+    - "site_type_group_id"
 site_type_group:
   name: "Site Type Group"
   table_name: "tbl_site_type_groups"
@@ -619,6 +649,9 @@ value_class:
   description_column: "description"
   alternate_identity_column: null
   reconciliation: simple
+  scope_columns:
+    - "value_type_id"
+    - "method_id"
 value_qualifier:
   name: "Value Qualifier"
   table_name: "tbl_value_qualifiers"
@@ -643,3 +676,97 @@ value_type_item:
   description_column: "description"
   alternate_identity_column: null
   reconciliation: simple
+  scope_columns:
+    - "value_type_id"
+chronology:
+  name: "Chronology"
+  table_name: "tbl_chronologies"
+  id_column: "chronology_id"
+  label_column: "chronology_name"
+  description_column: "notes"
+  alternate_identity_column: null
+  reconciliation: lookup
+  materialized: false
+  extra_columns: []
+data_provider:
+  name: "Data Provider"
+  table_name: "tbl_data_providers"
+  id_column: "data_provider_id"
+  label_column: "data_provider_name"
+  description_column: "notes"
+  alternate_identity_column: null
+  reconciliation: lookup
+  materialized: false
+  extra_columns: []
+dating_lab:
+  name: "Dating Lab"
+  table_name: "tbl_dating_labs"
+  id_column: "dating_lab_id"
+  label_column: "lab_name"
+  description_column: "international_lab_id"
+  alternate_identity_column: null
+  reconciliation: lookup
+  materialized: false
+  extra_columns: []
+dating_material:
+  name: "Dating Material"
+  table_name: "tbl_dating_material"
+  id_column: "dating_material_id"
+  label_column: "material_dated"
+  description_column: "description"
+  alternate_identity_column: null
+  reconciliation: lookup
+  materialized: false
+  extra_columns: []
+ecocode_system:
+  name: "Ecocode System"
+  table_name: "tbl_ecocode_systems"
+  id_column: "ecocode_system_id"
+  label_column: "name"
+  description_column: "definition"
+  alternate_identity_column: null
+  reconciliation: lookup
+  materialized: false
+  extra_columns: []
+master_dataset:
+  name: "Master Dataset"
+  table_name: "tbl_dataset_masters"
+  id_column: "master_set_id"
+  label_column: "master_name"
+  description_column: "master_notes"
+  alternate_identity_column: null
+  reconciliation: lookup
+  materialized: false
+  extra_columns: []
+project:
+  name: "Project"
+  table_name: "tbl_projects"
+  id_column: "project_id"
+  label_column: "project_name"
+  description_column: "description"
+  alternate_identity_column: null
+  reconciliation: lookup
+  materialized: false
+  extra_columns: []
+rdb_system:
+  name: "RDB System"
+  table_name: "tbl_rdb_systems"
+  id_column: "rdb_system_id"
+  label_column: "rdb_system"
+  description_column: null
+  alternate_identity_column: null
+  reconciliation: lookup
+  materialized: false
+  extra_columns: []
+taxa_common_names:
+  name: "Taxa Common Names"
+  table_name: "tbl_taxa_common_names"
+  id_column: "taxon_common_name_id"
+  label_column: "common_name"
+  description_column: null
+  alternate_identity_column: null
+  reconciliation: lookup
+  scope_columns:
+    - "taxon_id"
+  materialized: false
+  extra_columns: []

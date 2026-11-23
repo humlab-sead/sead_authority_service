@@ -16,7 +16,7 @@ from src.api.router import router
 from src.configuration import MockConfigProvider
 from src.configuration.config import Config
 from src.configuration.provider import set_config_provider
-from src.strategies.configured_classifier import ClassifierConfigurationError, marked_classifier_keys
+from src.strategies.configured_classifier import ClassifierConfigurationError, simple_classifier_keys
 from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
@@ -212,7 +212,7 @@ class TestRecordSelectionDiscovery:
 
         assert response.status_code == 200
         types = {entry["type"]: entry for entry in response.json()["types"]}
-        assert set(types) == set(marked_classifier_keys())
+        assert set(types) == set(simple_classifier_keys())
         assert {"feature_type", "country"} <= set(types)
         assert all(entry["search_supported"] is False for entry in types.values())
         assert all(entry["browse_max_rows"] is None for entry in types.values())
@@ -270,6 +270,65 @@ class TestReconcileEndpoint:
 
         # Verify reconcile_queries was called with correct data
         mock_reconcile_queries.assert_called_once_with({"q0": {"query": "test site", "type": "site"}})
+
+    @patch("src.api.router.reconcile_queries")
+    @with_test_config
+    def test_reconcile_serializes_context_match_states(self, mock_reconcile_queries, client: TestClient, test_provider: MockConfigProvider):
+        """`context_match` is explicit when a context was supplied and omitted otherwise."""
+        mock_reconcile_queries.return_value = {
+            "q0": {
+                "result": [
+                    {
+                        "id": f"{ID_BASE}colour/1",
+                        "name": "Red",
+                        "score": 100.0,
+                        "match": True,
+                        "type": [{"id": "colour", "name": "Red"}],
+                        "context_match": True,
+                    }
+                ]
+            },
+            "q1": {
+                "result": [
+                    {
+                        "id": f"{ID_BASE}colour/2",
+                        "name": "Red",
+                        "score": 100.0,
+                        "match": False,
+                        "type": [{"id": "colour", "name": "Red"}],
+                        "context_match": False,
+                    }
+                ]
+            },
+            "q2": {
+                "result": [
+                    {
+                        "id": f"{ID_BASE}colour/3",
+                        "name": "Red",
+                        "score": 100.0,
+                        "match": True,
+                        "type": [{"id": "colour", "name": "Red"}],
+                    }
+                ]
+            },
+        }
+
+        response = client.post(
+            "/reconcile",
+            json={
+                "queries": {
+                    "q0": {"query": "red", "type": "colour", "properties": [{"pid": "context", "v": "Tempera"}]},
+                    "q1": {"query": "red", "type": "colour", "properties": [{"pid": "context", "v": "Oil"}]},
+                    "q2": {"query": "red", "type": "colour"},
+                }
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["q0"]["result"][0]["context_match"] is True
+        assert data["q1"]["result"][0]["context_match"] is False
+        assert "context_match" not in data["q2"]["result"][0]
 
     @patch("src.api.router.reconcile_queries")
     @with_test_config

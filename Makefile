@@ -5,6 +5,7 @@ export
 
 UVICORN_PORT := 8000
 PODMAN_DEPLOYMENT_DIR := deployment/container
+TARGET_MODEL ?= ../sead_shape_shifter/resources/target_models/sead_standard_model.yml
 
 
 test-workflow:
@@ -16,16 +17,20 @@ fetch-openrefine-manifest:
 fetch-openrefine-manifest-types:
 	@curl -s http://localhost:8000/reconcile | jq -r '.defaultTypes[].id'
 
+.PHONY: generate-reconciliation-inventory
+generate-reconciliation-inventory:
+	@uv run python -m src.scripts.generate_reconciliation_inventory --target-model "$(TARGET_MODEL)"
+
 .PHONY: generate-schema
 generate-schema:
 	@echo "Generating entity schema files from templates..."
-	@uv run python src/scripts/generate_entity_schema.py --all-entities
+	@PYTHONPATH=. uv run python src/scripts/generate_entity_schema.py --all-entities
 	@echo "✅ Schema generation complete!"
 
 .PHONY: generate-schema-force
 generate-schema-force:
 	@echo "Regenerating all entity schema files..."
-	@uv run python src/scripts/generate_entity_schema.py --all-entities --force
+	@PYTHONPATH=. uv run python src/scripts/generate_entity_schema.py --all-entities --force
 	@echo "✅ Schema regeneration complete!"
 	
 

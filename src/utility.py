@@ -324,13 +324,178 @@ def load_resource_yaml(key: str) -> dict[str, Any] | None:
         return yaml.safe_load(f)
 
 
-def build_classifier_fuzzy_sql(key: str) -> str:
-    """Builds the marked-classifier fuzzy query with explicit threshold parameters."""
+RECONCILIATION_MARKERS: tuple[str, ...] = ("simple", "lookup")
+CONTEXT_PROPERTY_ID: str = "context"
+CONTEXT_DESCRIPTION_PREFIX: str = "Context: "
+CONTEXT_SEPARATOR: str = " / "
+
+
+def context_matches(supplied_context: str, row_context: str) -> bool:
+    """Returns whether a supplied parent context selects a row's context.
+
+    A row context holds the parent labels joined in declaration order. A supplied
+    value matches only a whole parent label or the whole joined context. A partial
+    word is rejected, so `age` does not select a parent labelled `Storage` and
+    `empera` does not select `Tempera`. The generated SQL applies the same rule.
+    """
+    if not supplied_context or not row_context:
+        return False
+    if supplied_context == row_context:
+        return True
+    return supplied_context in {normalize_text(part) for part in row_context.split(CONTEXT_SEPARATOR)}
+
+
+def reconciliation_marker(table_spec: Any) -> str | None:
+    """Returns the reconciliation marker of a table specification, or None when unmarked."""
+    if not isinstance(table_spec, dict):
+        return None
+    marker: Any = table_spec.get("reconciliation")
+    return marker if marker in RECONCILIATION_MARKERS else None
+
+
+def is_marked_for_reconciliation(table_spec: Any) -> bool:
+    """Returns True when the table specification declares a supported reconciliation marker."""
+    return reconciliation_marker(table_spec) is not None
+
+
+def scope_columns(table_spec: Any) -> tuple[str, ...]:
+    """Returns the declared scope columns, in declaration order.
+
+    Raises ValueError when the value is not a list of non-empty names.
+    """
+    if not isinstance(table_spec, dict):
+        return ()
+    columns: Any = table_spec.get("scope_columns") or []
+    if not isinstance(columns, list):
+        raise ValueError(f"scope_columns must be a list, got {columns!r}")
+    resolved: list[str] = []
+    for column in columns:
+        if not isinstance(column, str) or not column.strip():
+            raise ValueError(f"scope_columns entries must be non-empty text, got {column!r}")
+        resolved.append(column.strip())
+    return tuple(resolved)
+
+
+def resolve_scope_context(table_specs: dict[str, Any], key: str) -> list[dict[str, Any]]:
+    """Resolves declared scope columns to the parent entity's label source.
+
+    Each scope column must match the `id_column` of exactly one configured parent
+    entity that also declares a `label_column`. The returned dictionaries keep the
+    declaration order and carry the parent table, its ID and label columns, and the
+    join alias used by the generated view.
+    """
+    table_spec: Any = table_specs.get(key)
+    if not isinstance(table_spec, dict):
+        raise ValueError(f"Unknown table specification '{key}'")
+    resolved: list[dict[str, Any]] = []
+    for index, column in enumerate(scope_columns(table_spec), start=1):
+        parents: list[str] = sorted(
+            parent_key
+            for parent_key, parent in table_specs.items()
+            if isinstance(parent, dict) and parent.get("id_column") == column and parent.get("label_column")
+        )
+        if len(parents) != 1:
+            detail: str = "no configured parent entity" if not parents else f"more than one configured parent entity ({', '.join(parents)})"
+            raise ValueError(
+                f"Scope column '{column}' for '{key}' resolves to {detail}; "
+                "declare the parent entity with matching id_column and label_column first"
+            )
+        parent_spec: dict[str, Any] = table_specs[parents[0]]
+        resolved.append(
+            {
+                "column": column,
+                "parent_key": parents[0],
+                "table_name": parent_spec["table_name"],
+                "id_column": parent_spec["id_column"],
+                "label_column": parent_spec["label_column"],
+                "alias": f"scope_{index}",
+            }
+        )
+    return resolved
+
+
+def build_context_property(table_spec: dict[str, Any]) -> list[dict[str, str]]:
+    """Returns the OpenRefine property metadata published for a scoped reconciliation entry."""
+    if not scope_columns(table_spec):
+        return []
+    return [
+        {
+            "id": CONTEXT_PROPERTY_ID,
+            "name": "Context",
+            "type": "string",
+            "description": "Parent label that identifies this entry; supplied context filters candidates before ranking",
+        }
+    ]
+
+
+def build_classifier_fuzzy_sql(key: str, table_spec: dict[str, Any]) -> str:
+    """Builds the marked-classifier fuzzy query with explicit threshold parameters.
+
+    Scoped entities also receive the normalized request context as a bound value.
+    """
+    if scope_columns(table_spec):
+        return (
+            f"select * from authority.fuzzy_{key}("
+            "%(q)s::text, %(n)s::int, "
+            "%(label_threshold)s::double precision, "
+            "%(description_threshold)s::double precision, "
+            "%(context)s::text);"
+        )
     return (
         f"select * from authority.fuzzy_{key}("
         "%(q)s::text, %(n)s::int, "
         "%(label_threshold)s::double precision, "
         "%(description_threshold)s::double precision);"
+    )
+
+
+def build_classifier_alternate_identity_sql(key: str, table_spec: dict[str, Any]) -> str:
+    """Builds an exact alternate-identity query that keeps the configured ID field.
+
+    A scoped entity filters on the supplied parent context using the same
+    whole-label rule as the generated fuzzy function, so a partial word cannot
+    select a row under the wrong parent.
+    """
+    id_column: str = table_spec["id_column"]
+    alternate_column: str = table_spec["alternate_identity_column"]
+    scoped: bool = bool(scope_columns(table_spec))
+    context_filter: str = ""
+    extra_columns: str = ""
+    params_cte: str = ""
+    if scoped:
+        params_cte = "\n".join(
+            (
+                "with params as (",
+                "  select authority.immutable_unaccent(lower(nullif(%(context)s::text, '')))::text as ctx",
+                ")",
+                "",
+            )
+        )
+        context_filter = (
+            "cross join params pq\n"
+            "where pq.ctx is null\n"
+            "   or pq.ctx = t.norm_context\n"
+            "   or pq.ctx = any(string_to_array(t.norm_context, ' / '))"
+        )
+        extra_columns = ", t.context, pq.ctx is not null as context_match"
+    target_cte: str = "with target as (\n" if not scoped else ", target as (\n"
+    return (
+        f"{params_cte}{target_cte}"
+        "  select *\n"
+        f"  from authority.{key}\n"
+        f"  where {alternate_column} = %(alternate_identity)s\n"
+        ")\n"
+        "select\n"
+        f"  t.{id_column},\n"
+        "  t.label,\n"
+        "  1.0 as name_sim,\n"
+        "  exists (\n"
+        f"    select 1 from authority.{key} as other\n"
+        f"    where other.norm_label = t.norm_label and other.{id_column} <> t.{id_column}\n"
+        "  ) as label_ambiguous"
+        f"{extra_columns}\n"
+        "from target as t\n"
+        f"{context_filter if scoped else 'where true'}".rstrip()
     )
 
 
@@ -403,21 +568,33 @@ def build_classifier_details_sql(key: str, table_spec: dict[str, Any]) -> str:
 
 
 def build_classifier_specification(key: str, table_spec: dict[str, Any]) -> dict[str, Any]:
-    """Builds a strategy specification from a marked classifier table specification."""
-    return {
+    """Builds a strategy specification from a marked reconciliation table specification.
+
+    Scoped entries publish a `context` property, and entries with an
+    `alternate_identity_column` receive an exact alternate-identity query that
+    returns the configured ID column under its configured name.
+    """
+    marker: str | None = reconciliation_marker(table_spec)
+    sql_queries: dict[str, str] = {
+        "fuzzy_find_sql": build_classifier_fuzzy_sql(key, table_spec),
+        "prefix_find_sql": build_classifier_prefix_sql(key, table_spec),
+        "details_sql": build_classifier_details_sql(key, table_spec),
+    }
+    specification: dict[str, Any] = {
         "key": key,
         "display_name": table_spec.get("name") or key.replace("_", " ").title(),
         "id_field": table_spec["id_column"],
         "label_field": "label",
-        "properties": [],
+        "properties": build_context_property(table_spec),
         "property_settings": {},
-        "reconciliation": "simple",
-        "sql_queries": {
-            "fuzzy_find_sql": build_classifier_fuzzy_sql(key),
-            "prefix_find_sql": build_classifier_prefix_sql(key, table_spec),
-            "details_sql": build_classifier_details_sql(key, table_spec),
-        },
+        "reconciliation": marker,
+        "sql_queries": sql_queries,
     }
+    alternate_identity_column: Any = table_spec.get("alternate_identity_column")
+    if isinstance(alternate_identity_column, str) and alternate_identity_column.strip():
+        specification["alternate_identity_field"] = alternate_identity_column.strip()
+        sql_queries["alternate_identity_sql"] = build_classifier_alternate_identity_sql(key, table_spec)
+    return specification
 
 
 def classifier_view_columns(table_spec: dict[str, Any]) -> set[str]:
@@ -427,6 +604,8 @@ def classifier_view_columns(table_spec: dict[str, Any]) -> set[str]:
     are listed as the full expression, so details_columns can reference either form.
     """
     columns: set[str] = {table_spec["id_column"], "label", "description"}
+    if scope_columns(table_spec):
+        columns.update({"context", "norm_context"})
     alternate_identity_column: str | None = table_spec.get("alternate_identity_column")
     if alternate_identity_column:
         columns.add(alternate_identity_column)
@@ -438,8 +617,8 @@ def classifier_view_columns(table_spec: dict[str, Any]) -> set[str]:
     return columns
 
 
-_ConfiguredSpecificationResolver = Callable[[str], "dict[str, Any] | None"]
-_configured_specification_resolver: "_ConfiguredSpecificationResolver | None" = None
+_ConfiguredSpecificationResolver = Callable[[str], "dict[str, Any] | None"]  # pylint: disable=invalid-name
+_configured_specification_resolver: "_ConfiguredSpecificationResolver | None" = None  # pylint: disable=invalid-name
 
 
 def set_configured_specification_resolver(resolver: "_ConfiguredSpecificationResolver") -> None:
