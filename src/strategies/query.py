@@ -142,6 +142,53 @@ class BaseRepository(AbstractRepository):
             raise ValueError(f"No prefix search query is configured for '{self.key}'")
         return await self.fetch_all(query, {"q": prefix, "n": limit})
 
+    def get_find_label_substring_sql(self) -> str:
+        """Return SQL that finds configured-view labels containing normalized query text."""
+        return f"""
+            with params as (
+                select authority.immutable_unaccent(lower(btrim(%(q)s::text)))::text as q
+            ),
+            matches as (
+                select
+                    s.*,
+                    greatest(
+                        case when s.norm_label = pq.q then 1.0
+                             else similarity(s.norm_label, pq.q)
+                        end,
+                        0.0001
+                    ) as label_sim,
+                    greatest(
+                        case when s.norm_label = pq.q then 1.0
+                             else similarity(s.norm_label, pq.q)
+                        end,
+                        0.0001
+                    ) as name_sim
+                from authority.{self.key} as s
+                cross join params as pq
+                where s.norm_label like (
+                    '%%' || replace(
+                        replace(
+                            replace(pq.q, chr(92), chr(92) || chr(92)),
+                            '%%', chr(92) || '%%'
+                        ),
+                        '_', chr(92) || '_'
+                    ) || '%%'
+                ) escape chr(92)
+            )
+            select
+                matches.*,
+                count(*) over (partition by matches.norm_label) > 1 as label_ambiguous
+            from matches
+            order by name_sim desc, label
+            limit %(n)s
+        """
+
+    async def find_by_label_substring(self, substring: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Find configured-view rows whose normalized labels contain the query text."""
+        if not substring.strip():
+            raise ValueError("A label substring is required")
+        return await self.fetch_all(self.get_find_label_substring_sql(), {"q": substring, "n": limit})
+
     async def fetch_by_alternate_identity(self, alternate_identity: str, **kwargs) -> list[dict[str, Any]]:
         """Fetch entity by alternate identity, binding optional parent context when the query uses it."""
         sql: str = self.get_sql_query("alternate_identity_sql")

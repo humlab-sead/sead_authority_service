@@ -653,6 +653,42 @@ def test_unscoped_lookups_keep_duplicate_ambiguity_and_null_labels(
 
 
 @with_test_config
+def test_feature_type_substring_search_finds_short_prefixes_and_inner_text(
+    test_provider: MockConfigProvider,  # pylint: disable=unused-argument
+    bootstrapped: DisposablePostgres,
+) -> None:
+    bootstrapped.execute(
+        "truncate public.tbl_feature_types; "
+        "insert into public.tbl_feature_types (feature_type_id, feature_type_name) values "
+        "(4, 'Samples taken by'), (3, 'Samples processed by')"
+    )
+    strategy = _configured_strategy("feature_type")
+    sql: str = strategy.get_repository().get_find_label_substring_sql()
+
+    for query in ("sampl", "sample", "samples", "SAMPL"):
+        rendered_sql: str = sql % {"q": _literal(query), "n": 10}
+        rows: list[dict[str, Any]] = bootstrapped.rows(
+            "select coalesce(json_agg(row_to_json(result)), '[]'::json) " f"from ({rendered_sql}) as result"
+        )
+        assert {row["feature_type_id"] for row in rows} == {3, 4}
+        if query == "sampl":
+            assert all(row["name_sim"] < 0.30 for row in rows)
+
+    rendered_sql = sql % {"q": _literal("taken"), "n": 10}
+    inner_match: list[dict[str, Any]] = bootstrapped.rows(
+        "select coalesce(json_agg(row_to_json(result)), '[]'::json) " f"from ({rendered_sql}) as result"
+    )
+    assert [row["feature_type_id"] for row in inner_match] == [4]
+
+    for query in ("sam%l", "sam_l"):
+        rendered_sql = sql % {"q": _literal(query), "n": 10}
+        wildcard_matches: list[dict[str, Any]] = bootstrapped.rows(
+            "select coalesce(json_agg(row_to_json(result)), '[]'::json) " f"from ({rendered_sql}) as result"
+        )
+        assert wildcard_matches == []
+
+
+@with_test_config
 def test_context_http_response_exposes_context_match_and_description(
     test_provider: MockConfigProvider,
     bootstrapped: DisposablePostgres,

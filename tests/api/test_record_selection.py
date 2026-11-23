@@ -13,7 +13,7 @@ import src.record_selection as record_selection_module
 from src.api.router import router
 from src.configuration import MockConfigProvider
 from src.record_identifiers import POSTGRES_INTEGER_MAX, parse_record_uri
-from src.strategies.configured_classifier import initialize_classifiers, simple_classifier_keys
+from src.strategies.configured_classifier import ConfiguredClassifierStrategy, initialize_classifiers, simple_classifier_keys
 from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
@@ -496,6 +496,41 @@ class TestInteractiveSearch:
     """Marked interactive search is bounded and consistent with lists and details."""
 
     @with_test_config
+    def test_feature_type_search_includes_configured_substring_candidates(
+        self, client: TestClient, test_provider: MockConfigProvider, monkeypatch: pytest.MonkeyPatch
+    ):
+        _set_selection(test_provider, {"feature_type": {"search_supported": True}})
+
+        async def find_candidates(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+            assert query == "sampl"
+            assert limit == 10
+            return [
+                {
+                    "feature_type_id": 4,
+                    "label": "Samples taken by",
+                    "name_sim": 0.26,
+                    "label_ambiguous": False,
+                },
+                {
+                    "feature_type_id": 3,
+                    "label": "Samples processed by",
+                    "name_sim": 0.28,
+                    "label_ambiguous": False,
+                },
+            ]
+
+        monkeypatch.setattr(ConfiguredClassifierStrategy, "find_interactive_candidates", find_candidates)
+        response = client.post(
+            "/reconcile",
+            headers={"X-Record-Selection": "interactive"},
+            json={"queries": {"q0": {"query": "sampl", "type": "feature_type", "limit": 10}}},
+        )
+
+        assert response.status_code == 200
+        candidates = response.json()["q0"]["result"]
+        assert {candidate["name"] for candidate in candidates} == {"Samples processed by", "Samples taken by"}
+
+    @with_test_config
     def test_feature_type_search_round_trips_to_the_same_uri(self, client: TestClient, test_provider: MockConfigProvider):
         _set_selection(
             test_provider,
@@ -535,7 +570,8 @@ class TestInteractiveSearch:
 
         assert response.status_code == 200
         assert response.json()["q0"]["result"][0]["id"] == f"{ID_BASE}country/3"
-        sql, params = cursor.execute.call_args.args
+        fuzzy_search = next(call for call in cursor.execute.call_args_list if "fuzzy_country" in call.args[0])
+        sql, params = fuzzy_search.args
         assert "fuzzy_country" in sql
         assert params["label_threshold"] == 0.30
         assert params["description_threshold"] == 0.50
@@ -871,7 +907,8 @@ class TestThirdSimpleClassifier:
 
         assert search.status_code == 200
         assert search.json()["q0"]["result"][0]["id"] == f"{ID_BASE}{self.ENTITY_TYPE}/7"
-        sql, params = cursor.execute.call_args.args
+        fuzzy_search = next(call for call in cursor.execute.call_args_list if f"fuzzy_{self.ENTITY_TYPE}" in call.args[0])
+        sql, params = fuzzy_search.args
         assert f"fuzzy_{self.ENTITY_TYPE}" in sql
         assert params["label_threshold"] == 0.30
 

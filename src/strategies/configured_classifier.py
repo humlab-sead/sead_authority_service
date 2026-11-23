@@ -52,6 +52,25 @@ class ConfiguredClassifierStrategy(ReconciliationStrategy):
         """Return classifier rows whose normalized labels start with the prefix."""
         return await self.get_repository().find_by_prefix(prefix, limit)
 
+    async def find_interactive_candidates(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Include literal label-substring hits with the strategy's ranked fuzzy results."""
+        fuzzy_rows = await self.find_candidates(query=query, properties={}, limit=limit)
+        substring_rows = await self.get_repository().find_by_label_substring(query, limit)
+
+        rows_by_id: dict[Any, dict[str, Any]] = {}
+        for row in [*fuzzy_rows, *substring_rows]:
+            entity_id: Any = row[self.get_entity_id_field()]
+            previous: dict[str, Any] | None = rows_by_id.get(entity_id)
+            if previous is None or self._interactive_rank(row) > self._interactive_rank(previous):
+                rows_by_id[entity_id] = row
+
+        return sorted(rows_by_id.values(), key=self._interactive_rank, reverse=True)[:limit]
+
+    @staticmethod
+    def _interactive_rank(row: dict[str, Any]) -> float:
+        """Return the candidate score used to combine ranked and substring results."""
+        return float(row.get("name_sim", row.get("score", 0)) or 0)
+
     async def _find_candidates(self, query, properties, limit, proxy) -> list[dict[str, Any]]:
         """Searches the generated fuzzy function, passing optional parent context as a bound value."""
         supplied: dict[str, Any] = properties or {}

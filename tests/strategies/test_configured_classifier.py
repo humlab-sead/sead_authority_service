@@ -119,6 +119,7 @@ class TestConfiguredClassifierRegistration:
             fuzzy_sql: str = strategy.specification["sql_queries"]["fuzzy_find_sql"]
             prefix_sql: str = strategy.specification["sql_queries"]["prefix_find_sql"]
             details_sql: str = strategy.specification["sql_queries"]["details_sql"]
+            substring_sql: str = strategy.get_repository().get_find_label_substring_sql()
             assert fuzzy_sql.startswith(f"select * from authority.fuzzy_{key}(")
             assert "%(label_threshold)s" in fuzzy_sql
             assert "%(description_threshold)s" in fuzzy_sql
@@ -130,6 +131,9 @@ class TestConfiguredClassifierRegistration:
                 assert strategy.get_properties_meta() == []
             assert f"from authority.{key} as s" in prefix_sql
             assert "where left(s.norm_label, char_length(pq.q)) = pq.q" in prefix_sql
+            assert f"from authority.{key} as s" in substring_sql
+            assert "where s.norm_label like (" in substring_sql
+            assert ") escape chr(92)" in substring_sql
             assert f"from authority.{key} as s" in details_sql
 
     @with_test_config
@@ -191,6 +195,32 @@ class TestMarkedFind:
         assert query == strategy.specification["sql_queries"]["prefix_find_sql"]
         assert "where left(s.norm_label, char_length(pq.q)) = pq.q" in query
         assert params == {"q": "Sa", "n": 10}
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_interactive_search_merges_substring_hits_with_fuzzy_results(
+        self, monkeypatch: pytest.MonkeyPatch, test_provider: ExtendedMockConfigProvider
+    ):
+        strategy = feature_type_strategy()
+        fuzzy_rows = [
+            candidate_row(feature_type_id=9, label="Sampel", name_sim=0.8),
+            candidate_row(feature_type_id=4, label="Samples taken by", name_sim=0.35),
+        ]
+        substring_rows = [
+            candidate_row(feature_type_id=4, label="Samples taken by", name_sim=0.26),
+            candidate_row(feature_type_id=3, label="Samples processed by", name_sim=0.28),
+        ]
+        fuzzy_search = AsyncMock(return_value=fuzzy_rows)
+        substring_search = AsyncMock(return_value=substring_rows)
+        monkeypatch.setattr(strategy, "find_candidates", fuzzy_search)
+        monkeypatch.setattr(strategy.get_repository(), "find_by_label_substring", substring_search)
+
+        candidates = await strategy.find_interactive_candidates("sampl", limit=3)
+
+        assert [row["feature_type_id"] for row in candidates] == [9, 4, 3]
+        assert candidates[1]["name_sim"] == 0.35
+        fuzzy_search.assert_awaited_once_with(query="sampl", properties={}, limit=3)
+        substring_search.assert_awaited_once_with("sampl", 3)
 
 
 class TestCandidateBehavior:

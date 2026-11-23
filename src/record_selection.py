@@ -369,13 +369,13 @@ def validate_interactive_query(raw_queries: Any, policy: RecordSelectionPolicy) 
 
 
 async def search_interactive(entity_type: str, query_text: str, limit: int) -> dict[str, Any]:
-    """Run a bounded search through the registered classifier strategy for one type."""
+    """Run a bounded ranked search, including literal label-substring matches for classifiers."""
     strategy_cls = Strategies.items.get(entity_type)
     if strategy_cls is None or entity_type not in selectable_types():
         raise RecordSelectionError("unsupported_type", f"Unsupported record type '{entity_type}'.")
 
     strategy = strategy_cls()
-    rows: list[dict[str, Any]] = await strategy.find_candidates(query=query_text, properties={}, limit=limit)
+    rows: list[dict[str, Any]] = await strategy.find_interactive_candidates(query=query_text, limit=limit)
     candidates: list[dict[str, Any]] = strategy.as_candidates(rows, query_text)
 
     id_base: str = configured_id_base()
