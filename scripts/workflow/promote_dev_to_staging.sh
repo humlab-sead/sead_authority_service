@@ -14,6 +14,10 @@ readonly provenance_script="${repository_root}/scripts/ci/verify_promotion_prove
 readonly python="${repository_root}/.venv/bin/python"
 # Set by --quiet: progress text moves to stderr and stdout carries only the PR number.
 quiet=0
+# Temporary escape hatch for the provenance check. Set SKIP_PROMOTION_PROVENANCE=1
+# or pass --skip-provenance to promote commits that reached dev without a pull
+# request. The check stays available and unchanged; only this caller skips it.
+skip_provenance="${SKIP_PROMOTION_PROVENANCE:-0}"
 cd -- "$repository_root"
 
 usage() {
@@ -33,6 +37,14 @@ Commands:
   -h, --help          Show this help.
   -q, --quiet         Print only the pull request number on stdout. Progress text moves
                       to stderr, so every command can be captured.
+  --skip-provenance   Skip the pull request provenance check. Temporary: commits that
+                      reached dev without a pull request are promoted unreported.
+
+Environment:
+  SKIP_PROMOTION_PROVENANCE   Same as --skip-provenance when set to 1, true, yes, or on.
+
+Commands that fetch branches and verify provenance print a warning when the check
+is skipped, so the bypass stays visible in the output.
 
 The merge command runs 'gh pr merge --merge', so GitHub still enforces the
 repository's branch protection rules: required reviews and checks must pass.
@@ -50,6 +62,14 @@ require_command() {
 
 validate_pull_request_number() {
   [[ "$1" =~ ^[1-9][0-9]*$ ]] || die "Pull request number must be a positive integer."
+}
+
+# Accepts the values used for the provenance bypass, so 1, true, yes, and on all work.
+is_enabled() {
+  case "${1,,}" in
+    1 | true | yes | on) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 # Run a command, moving its stdout to stderr under --quiet so stdout stays clean.
@@ -103,6 +123,11 @@ fetch_branches() {
 }
 
 verify_provenance() {
+  if is_enabled "$skip_provenance"; then
+    printf 'warning: skipping the promotion provenance check; commits without pull requests will not be reported.\n' >&2
+    return 0
+  fi
+
   local token
   token="$(gh auth token)" || die "Could not read the GitHub CLI authentication token."
   [[ -n "$token" ]] || die "GitHub CLI returned an empty authentication token."
@@ -262,6 +287,10 @@ main() {
       -h | --help)
         usage
         return 0
+        ;;
+      --skip-provenance)
+        skip_provenance=1
+        shift
         ;;
       --)
         shift
