@@ -40,12 +40,12 @@ create or replace function authority.fuzzy_taxa_tree_order(
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
-  )
+    select authority.immutable_unaccent(lower(p_text))::text as q  )
   select
     s.order_id,
     s.label,
@@ -59,7 +59,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.taxa_tree_order as s
   cross join params pq
   where case when s.norm_label = pq.q then 1.0

@@ -15,7 +15,9 @@ create or replace view authority.ecocode_definition as
     t.name as label,
     authority.immutable_unaccent(lower(t.name)) as norm_label,
   t.definition as description,
-  authority.immutable_unaccent(lower(t.definition)) as norm_description  from public.tbl_ecocode_definitions as t;
+  authority.immutable_unaccent(lower(t.definition)) as norm_description,
+    nullif(concat_ws(' / ', scope_1.name), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / ', scope_1.name), ''))) as norm_context  from public.tbl_ecocode_definitions as t  left join public.tbl_ecocode_groups scope_1 on scope_1.ecocode_group_id = t.ecocode_group_id;
 
 create index if not exists tbl_ecocode_definitions_norm_trgm
   on public.tbl_ecocode_definitions
@@ -29,40 +31,74 @@ create index if not exists tbl_ecocode_definitions_norm_trgm
 
 drop function if exists authority.fuzzy_ecocode_definition(text, integer) cascade;
 drop function if exists authority.fuzzy_ecocode_definition(text, integer, double precision, double precision) cascade;
+drop function if exists authority.fuzzy_ecocode_definition(text, integer, double precision, double precision, text) cascade;
 
 create or replace function authority.fuzzy_ecocode_definition(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50) returns table (
+  p_description_threshold double precision default 0.50,
+  p_context text default null) returns table (
   ecocode_definition_id integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
+  name_sim double precision,
+  label_ambiguous boolean,
+  context text,
+  context_match boolean
 ) language sql stable
 as $$
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q,
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx  )
+  , scored as (
+    select
+      s.ecocode_definition_id,
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.ecocode_definition as s
+    cross join params pq
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or pq.ctx = scored.norm_context
+       or pq.ctx = any(string_to_array(scored.norm_context, ' / '))
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
   )
   select
-    s.ecocode_definition_id,
-    s.label,
-    s.description,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as label_sim,
-    greatest(
-      case when s.norm_label = pq.q then 1.0
-           else similarity(s.norm_label, pq.q)
-      end, 0.0001
-    ) as name_sim
-  from authority.ecocode_definition as s
-  cross join params pq
-  where case when s.norm_label = pq.q then 1.0
-             else similarity(s.norm_label, pq.q) end >= p_label_threshold
-  order by name_sim desc, s.label
+    selected.ecocode_definition_id,
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
   limit p_limit;
 $$;

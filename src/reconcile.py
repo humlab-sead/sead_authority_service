@@ -43,13 +43,15 @@ async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
         strategy: ReconciliationStrategy = strategy_cls()
         logger.info(f"Created strategy for {entity_type}: {type(strategy).__name__}")
 
+        properties: dict[str, Any] = {p["pid"]: p["v"] for p in query.get("properties", []) if "pid" in p and "v" in p}
+
         candidate_data: list[dict[str, Any]] = await strategy.find_candidates(
             query=query.get("query"),
-            properties={p["pid"]: p["v"] for p in query.get("properties", []) if "pid" in p and "v" in p},
+            properties=properties,
             limit=query.get("limit") if query.get("limit") is not None else default_query_limit,
         )
 
-        candidates = strategy.as_candidates(candidate_data, query.get("query", ""))
+        candidates = strategy.as_candidates(candidate_data, query.get("query", ""), properties)
 
         # Log summary with match counts and score ranges
         if candidates:

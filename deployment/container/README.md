@@ -40,6 +40,13 @@ and preserves them unless `SYNC_CONFIG=true` is explicitly set. Edit
 `~/container/.env` with the target host's own values before starting the
 service. Keep credentials out of tracked files.
 
+`make setup` initializes a fresh directory from `config/` but does not replace a
+mounted file that already exists, so a stale mount is not corrected by a normal
+run. Compare the host's `config/entities.yml` with the repository before enabling
+new reconciliation types, or set `SYNC_CONFIG=true` when replacement is
+intended. The repository test suite checks a candidate generated from the
+current checkout; it does not inspect a running host.
+
 ## First-time setup
 
 For a deployment account that can read the checkout, initialize its runtime

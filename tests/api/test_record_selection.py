@@ -13,7 +13,7 @@ import src.record_selection as record_selection_module
 from src.api.router import router
 from src.configuration import MockConfigProvider
 from src.record_identifiers import POSTGRES_INTEGER_MAX, parse_record_uri
-from src.strategies.configured_classifier import initialize_classifiers, marked_classifier_keys
+from src.strategies.configured_classifier import ConfiguredClassifierStrategy, initialize_classifiers, simple_classifier_keys
 from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
@@ -75,7 +75,7 @@ class TestDiscovery:
 
         assert response.status_code == 200
         types = {entry["type"]: entry for entry in response.json()["types"]}
-        assert set(types) == set(marked_classifier_keys())
+        assert set(types) == set(simple_classifier_keys())
         assert {"feature_type", "country"} <= set(types)
         for entry in types.values():
             assert entry["search_supported"] is False
@@ -88,11 +88,24 @@ class TestDiscovery:
             assert entry["interactive_search_max_results"] is None
 
     @with_test_config
+    def test_lookups_are_not_selectable_record_types(self, client: TestClient, test_provider: MockConfigProvider):
+        """Registered lookups are reconcilable but are not offered as selectable records."""
+        types = {entry["type"] for entry in client.get("/records/types").json()["types"]}
+
+        assert {"feature", "project", "taxa_common_names", "rdb_system"}.isdisjoint(types)
+
+        response = client.post(
+            "/reconcile",
+            headers={"X-Record-Selection": "interactive"},
+            json={"queries": {"q0": {"query": "oak", "type": "taxa_common_names", "limit": 1}}},
+        )
+        assert response.status_code == 422
+
+    @with_test_config
     def test_feature_type_display_fields_and_filters(self, client: TestClient, test_provider: MockConfigProvider):
         _set_selection(test_provider, {"feature_type": {}})
 
         entry = next(item for item in client.get("/records/types").json()["types"] if item["type"] == "feature_type")
-
         assert [field["name"] for field in entry["display_fields"]] == ["name", "target_id", "description"]
         assert all(field["source"] == "record" for field in entry["display_fields"])
         assert entry["text_filter_fields"] == ["name", "description"]
@@ -483,13 +496,50 @@ class TestInteractiveSearch:
     """Marked interactive search is bounded and consistent with lists and details."""
 
     @with_test_config
+    def test_feature_type_search_includes_configured_substring_candidates(
+        self, client: TestClient, test_provider: MockConfigProvider, monkeypatch: pytest.MonkeyPatch
+    ):
+        _set_selection(test_provider, {"feature_type": {"search_supported": True}})
+
+        async def find_candidates(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+            assert query == "sampl"
+            assert limit == 10
+            return [
+                {
+                    "feature_type_id": 4,
+                    "label": "Samples taken by",
+                    "name_sim": 0.26,
+                    "label_ambiguous": False,
+                },
+                {
+                    "feature_type_id": 3,
+                    "label": "Samples processed by",
+                    "name_sim": 0.28,
+                    "label_ambiguous": False,
+                },
+            ]
+
+        monkeypatch.setattr(ConfiguredClassifierStrategy, "find_interactive_candidates", find_candidates)
+        response = client.post(
+            "/reconcile",
+            headers={"X-Record-Selection": "interactive"},
+            json={"queries": {"q0": {"query": "sampl", "type": "feature_type", "limit": 10}}},
+        )
+
+        assert response.status_code == 200
+        candidates = response.json()["q0"]["result"]
+        assert {candidate["name"] for candidate in candidates} == {"Samples processed by", "Samples taken by"}
+
+    @with_test_config
     def test_feature_type_search_round_trips_to_the_same_uri(self, client: TestClient, test_provider: MockConfigProvider):
         _set_selection(
             test_provider,
             {"feature_type": {"search_supported": True, "browse_supported": True, "identifier_search_supported": True}},
         )
         cursor = _mock_db(test_provider, fetchone={"target_id": 5, "name": "Pit", "description": "A pit"})
-        cursor.fetchall.return_value = [{"feature_type_id": 5, "label": "Pit", "description": "A pit", "name_sim": 0.95}]
+        cursor.fetchall.return_value = [
+            {"feature_type_id": 5, "label": "Pit", "description": "A pit", "name_sim": 0.95, "label_ambiguous": False}
+        ]
 
         search = client.post(
             "/reconcile",
@@ -510,7 +560,7 @@ class TestInteractiveSearch:
     @with_test_config
     def test_country_search_uses_country_scoped_fuzzy_function(self, client: TestClient, test_provider: MockConfigProvider):
         _set_selection(test_provider, {"country": {"search_supported": True}})
-        cursor = _mock_db(test_provider, fetchall=[{"location_id": 3, "label": "Sweden", "name_sim": 0.9}])
+        cursor = _mock_db(test_provider, fetchall=[{"location_id": 3, "label": "Sweden", "name_sim": 0.9, "label_ambiguous": False}])
 
         response = client.post(
             "/reconcile",
@@ -520,7 +570,8 @@ class TestInteractiveSearch:
 
         assert response.status_code == 200
         assert response.json()["q0"]["result"][0]["id"] == f"{ID_BASE}country/3"
-        sql, params = cursor.execute.call_args.args
+        fuzzy_search = next(call for call in cursor.execute.call_args_list if "fuzzy_country" in call.args[0])
+        sql, params = fuzzy_search.args
         assert "fuzzy_country" in sql
         assert params["label_threshold"] == 0.30
         assert params["description_threshold"] == 0.50
@@ -532,8 +583,8 @@ class TestInteractiveSearch:
         _mock_db(
             test_provider,
             fetchall=[
-                {"location_id": 3, "label": "Åland", "name_sim": 0.95},
-                {"location_id": 4, "label": "Aland", "name_sim": 0.94},
+                {"location_id": 3, "label": "Åland", "name_sim": 0.95, "label_ambiguous": False},
+                {"location_id": 4, "label": "Aland", "name_sim": 0.94, "label_ambiguous": False},
             ],
         )
 
@@ -545,6 +596,47 @@ class TestInteractiveSearch:
 
         assert response.status_code == 200
         assert [item["match"] for item in response.json()["q0"]["result"]] == [False, False]
+
+    @with_test_config
+    def test_flagged_label_is_not_a_match_at_limit_one(self, client: TestClient, test_provider: MockConfigProvider):
+        """The SQL flag covers a duplicate the limit dropped, so the one row is a suggestion only."""
+        _set_selection(test_provider, {"feature_type": {"search_supported": True}})
+        _mock_db(
+            test_provider,
+            fetchall=[{"feature_type_id": 5, "label": "Flint", "name_sim": 1.0, "label_ambiguous": True}],
+        )
+
+        response = client.post(
+            "/reconcile",
+            headers={"X-Record-Selection": "interactive"},
+            json={"queries": {"q0": {"query": "flint", "type": "feature_type", "limit": 1}}},
+        )
+
+        assert response.status_code == 200
+        result = response.json()["q0"]["result"]
+        assert len(result) == 1
+        assert result[0]["match"] is False
+        assert "label_ambiguous" not in result[0]
+
+    @with_test_config
+    def test_unflagged_exact_label_still_matches_at_limit_one(self, client: TestClient, test_provider: MockConfigProvider):
+        _set_selection(test_provider, {"feature_type": {"search_supported": True}})
+        _mock_db(
+            test_provider,
+            fetchall=[{"feature_type_id": 5, "label": "Flint", "name_sim": 1.0, "label_ambiguous": False}],
+        )
+
+        response = client.post(
+            "/reconcile",
+            headers={"X-Record-Selection": "interactive"},
+            json={"queries": {"q0": {"query": "flint", "type": "feature_type", "limit": 1}}},
+        )
+
+        assert response.status_code == 200
+        result = response.json()["q0"]["result"]
+        assert len(result) == 1
+        assert result[0]["match"] is True
+        assert set(result[0]) == {"id", "name", "score", "match", "type"}
 
     @with_test_config
     def test_search_miss_returns_empty_result(self, client: TestClient, test_provider: MockConfigProvider):
@@ -671,7 +763,9 @@ class TestInteractiveSearch:
     def test_form_encoded_interactive_search_is_supported(self, client: TestClient, test_provider: MockConfigProvider):
         _set_selection(test_provider, {"feature_type": {"search_supported": True}})
         cursor = _mock_db(test_provider)
-        cursor.fetchall.return_value = [{"feature_type_id": 9, "label": "Ditch", "description": None, "name_sim": 0.8}]
+        cursor.fetchall.return_value = [
+            {"feature_type_id": 9, "label": "Ditch", "description": None, "name_sim": 0.8, "label_ambiguous": False}
+        ]
 
         response = client.post(
             "/reconcile",
@@ -718,6 +812,48 @@ class TestInteractiveSearch:
         assert captured == {"q0": {"query": "test", "type": "site"}}
 
 
+class TestBatchCandidateConversion:
+    """Batch reconciliation carries the same ambiguity rule as interactive search."""
+
+    @with_test_config
+    def test_batch_flagged_label_is_not_a_match_and_hides_the_flag(self, client: TestClient, test_provider: MockConfigProvider):
+        _set_selection(test_provider, {})
+        _mock_db(
+            test_provider,
+            fetchall=[{"feature_type_id": 5, "label": "Flint", "name_sim": 1.0, "label_ambiguous": True}],
+        )
+
+        response = client.post(
+            "/reconcile",
+            json={"queries": {"q0": {"query": "flint", "type": "feature_type", "limit": 1}}},
+        )
+
+        assert response.status_code == 200
+        result = response.json()["q0"]["result"]
+        assert len(result) == 1
+        assert result[0]["match"] is False
+        assert result[0]["score"] == 100.0
+        assert "label_ambiguous" not in result[0]
+
+    @with_test_config
+    def test_batch_unflagged_exact_label_matches(self, client: TestClient, test_provider: MockConfigProvider):
+        _set_selection(test_provider, {})
+        _mock_db(
+            test_provider,
+            fetchall=[{"feature_type_id": 5, "label": "Flint", "name_sim": 1.0, "label_ambiguous": False}],
+        )
+
+        response = client.post(
+            "/reconcile",
+            json={"queries": {"q0": {"query": "flint", "type": "feature_type", "limit": 1}}},
+        )
+
+        assert response.status_code == 200
+        result = response.json()["q0"]["result"]
+        assert result[0]["match"] is True
+        assert "label_ambiguous" not in result[0]
+
+
 class TestThirdSimpleClassifier:
     """A simple classifier enabled only through configuration serves every surface.
 
@@ -762,7 +898,7 @@ class TestThirdSimpleClassifier:
         assert details.status_code == 200
         assert details.json()["item"]["id"] == f"{ID_BASE}{self.ENTITY_TYPE}/7"
 
-        cursor.fetchall.return_value = [{"data_type_group_id": 7, "label": "Group", "name_sim": 0.9}]
+        cursor.fetchall.return_value = [{"data_type_group_id": 7, "label": "Group", "name_sim": 0.9, "label_ambiguous": False}]
         search = client.post(
             "/reconcile",
             headers={"X-Record-Selection": "interactive"},
@@ -771,7 +907,8 @@ class TestThirdSimpleClassifier:
 
         assert search.status_code == 200
         assert search.json()["q0"]["result"][0]["id"] == f"{ID_BASE}{self.ENTITY_TYPE}/7"
-        sql, params = cursor.execute.call_args.args
+        fuzzy_search = next(call for call in cursor.execute.call_args_list if f"fuzzy_{self.ENTITY_TYPE}" in call.args[0])
+        sql, params = fuzzy_search.args
         assert f"fuzzy_{self.ENTITY_TYPE}" in sql
         assert params["label_threshold"] == 0.30
 

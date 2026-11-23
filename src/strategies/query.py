@@ -124,13 +124,16 @@ class BaseRepository(AbstractRepository):
             logger.exception(f"Error fetching details for entity_id {entity_id}: {e}")
             return None
 
-    async def find(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:  # pylint: disable=unused-argument
-        """Perform fuzzy name search"""
+    async def find(self, name: str, limit: int = 10, **kwargs) -> list[dict[str, Any]]:
+        """Perform fuzzy name search, binding optional parent context when the query uses it."""
+        sql: str = self.get_find_fuzzy_sql()
         params: dict[str, Any] = {"q": name, "n": limit}
-        if self.specification.get("reconciliation") == "simple":
+        if self.specification.get("reconciliation") in ("simple", "lookup"):
             params["label_threshold"] = ConfigValue("options:reconciliation:label_threshold").resolve()
             params["description_threshold"] = ConfigValue("options:reconciliation:description_threshold").resolve()
-        return await self.fetch_all(self.get_find_fuzzy_sql(), params)
+        if "%(context)s" in sql:
+            params["context"] = _bound_context(kwargs.get("context"))
+        return await self.fetch_all(sql, params)
 
     async def find_by_prefix(self, prefix: str, limit: int = 10) -> list[dict[str, Any]]:
         """Find rows whose normalized label starts with a prefix."""
@@ -139,11 +142,66 @@ class BaseRepository(AbstractRepository):
             raise ValueError(f"No prefix search query is configured for '{self.key}'")
         return await self.fetch_all(query, {"q": prefix, "n": limit})
 
-    async def fetch_by_alternate_identity(
-        self, alternate_identity: str, **kwargs
-    ) -> list[dict[str, Any]]:  # pylint: disable=unused-argument
-        """Fetch entity by alternate identity"""
+    def get_find_label_substring_sql(self) -> str:
+        """Return SQL that finds configured-view labels containing normalized query text."""
+        return f"""
+            with params as (
+                select authority.immutable_unaccent(lower(btrim(%(q)s::text)))::text as q
+            ),
+            matches as (
+                select
+                    s.*,
+                    greatest(
+                        case when s.norm_label = pq.q then 1.0
+                             else similarity(s.norm_label, pq.q)
+                        end,
+                        0.0001
+                    ) as label_sim,
+                    greatest(
+                        case when s.norm_label = pq.q then 1.0
+                             else similarity(s.norm_label, pq.q)
+                        end,
+                        0.0001
+                    ) as name_sim
+                from authority.{self.key} as s
+                cross join params as pq
+                where s.norm_label like (
+                    '%%' || replace(
+                        replace(
+                            replace(pq.q, chr(92), chr(92) || chr(92)),
+                            '%%', chr(92) || '%%'
+                        ),
+                        '_', chr(92) || '_'
+                    ) || '%%'
+                ) escape chr(92)
+            )
+            select
+                matches.*,
+                count(*) over (partition by matches.norm_label) > 1 as label_ambiguous
+            from matches
+            order by name_sim desc, label
+            limit %(n)s
+        """
+
+    async def find_by_label_substring(self, substring: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Find configured-view rows whose normalized labels contain the query text."""
+        if not substring.strip():
+            raise ValueError("A label substring is required")
+        return await self.fetch_all(self.get_find_label_substring_sql(), {"q": substring, "n": limit})
+
+    async def fetch_by_alternate_identity(self, alternate_identity: str, **kwargs) -> list[dict[str, Any]]:
+        """Fetch entity by alternate identity, binding optional parent context when the query uses it."""
         sql: str = self.get_sql_query("alternate_identity_sql")
         if not sql:
             return []
-        return await self.fetch_all(sql, {"alternate_identity": alternate_identity})
+        params: dict[str, Any] = {"alternate_identity": alternate_identity}
+        if "%(context)s" in sql:
+            params["context"] = _bound_context(kwargs.get("context"))
+        return await self.fetch_all(sql, params)
+
+
+def _bound_context(value: Any) -> str | None:
+    """Returns a non-blank context value for a bound SQL parameter, or None."""
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None

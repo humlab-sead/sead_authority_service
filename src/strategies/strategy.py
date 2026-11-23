@@ -103,12 +103,16 @@ class ReconciliationStrategy(ABC):
 
         return candidate
 
-    def as_candidates(self, entity_data: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
+    def as_candidates(
+        self, entity_data: list[dict[str, Any]], query: str, properties: dict[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
         """Converts one query result to candidates.
 
         Specialized strategies can override this to inspect the whole result at once,
-        for example to suppress matches shared by duplicate labels.
+        for example to suppress matches shared by duplicate labels. `properties` carries
+        the request's property hints for strategies that use them.
         """
+        _ = properties
         return [self.as_candidate(row, query) for row in entity_data]
 
     async def find_candidates(self, query: str, properties: None | dict[str, Any] = None, limit: int = 10) -> list[dict[str, Any]]:
@@ -124,6 +128,10 @@ class ReconciliationStrategy(ABC):
         candidates: list[dict] = await self._find_candidates(query, properties, limit, self.get_repository())
 
         return sorted(candidates, key=lambda x: x.get("name_sim", x.get("score", 0)), reverse=True)[:limit]
+
+    async def find_interactive_candidates(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Find candidates for interactive search using the strategy's regular search."""
+        return await self.find_candidates(query=query, properties={}, limit=limit)
 
     async def suggest_candidates(self, prefix: str, limit: int = 10) -> list[dict[str, Any]]:
         """Find autocomplete candidates for a text prefix."""
@@ -162,4 +170,4 @@ class StrategyRegistry(Registry):
         return fn_or_class
 
 
-Strategies: StrategyRegistry = StrategyRegistry()
+Strategies: StrategyRegistry = StrategyRegistry()  # pylint: disable=invalid-name

@@ -2,15 +2,11 @@
 
 ## Status
 
-- Accepted feature / change request
-- Accepted: 2026-11-21
+- **Implemented and validated** on branch `refactor-simple-reconciliation-logic`.
 - Scope: `reconciliation: simple` entities, record selection, and classifier registration
-- Schema regeneration and deployment: owned outside this change; this proposal records the required shapes and deploy order only
 - Goal: make the generated database objects the single definition of a simple classifier, so enabling one is configuration-only
-- Amends the generated view contract in [CLASSIFIER_FUZZY_RECONCILIATION](../CLASSIFIER_FUZZY_RECONCILIATION/CLASSIFIER_FUZZY_RECONCILIATION.md), which omits `description` for seven entities
-- Extends the pilot record selection delivered by [RECONCILIATION_IDENTITY_CONTRACT](../RECONCILIATION_IDENTITY_CONTRACT/RECONCILIATION_IDENTITY_CONTRACT.md)
-- Revised from [REVIEW.md](./REVIEW.md)
-- Next step: phase task plan for the single delivery phase
+- Validation: 1,336 tests passed and 50 were skipped; the generated bundle applied cleanly to a disposable PostgreSQL 17 + PostGIS database. See the [Phase 1 task plan](./SIMPLE_CLASSIFIER_CONTRACT_PHASE_1_TASK_PLAN.md).
+- Follow-up: Deploying the regenerated schema to a real environment remains outside this completed work.
 
 ## Summary
 

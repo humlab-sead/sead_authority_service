@@ -24,7 +24,7 @@ create or replace view authority.{{ entity_key }} as
     t.{{ entity.id_column }},
     t.{{ entity.label_column }} as label,
     authority.immutable_unaccent(lower(t.{{ entity.label_column }})) as norm_label
-{%- if entity.reconciliation == "simple" %}
+{%- if entity.reconciliation in ["simple", "lookup"] %}
 {%- if entity.description_column %},
   t.{{ entity.description_column }} as description,
   authority.immutable_unaccent(lower(t.{{ entity.description_column }})) as norm_description
@@ -41,9 +41,16 @@ create or replace view authority.{{ entity_key }} as
 {%- for col in entity.extra_columns | default([]) %},
     {{ col }}
 {%- endfor %}
+{%- if entity.scope_context | default([]) %},
+    nullif(concat_ws(' / '{% for scope in entity.scope_context %}, {{ scope.alias }}.{{ scope.label_column }}{% endfor %}), '') as context,
+    authority.immutable_unaccent(lower(nullif(concat_ws(' / '{% for scope in entity.scope_context %}, {{ scope.alias }}.{{ scope.label_column }}{% endfor %}), ''))) as norm_context
+{%- endif %}
   from public.{{ entity.table_name }} as t
 {%- for join in entity.joins | default([]) %}
   {{ join }}
+{%- endfor %}
+{%- for scope in entity.scope_context | default([]) %}
+  left join public.{{ scope.table_name }} {{ scope.alias }} on {{ scope.alias }}.{{ scope.id_column }} = t.{{ scope.column }}
 {%- endfor %}
 {%- if entity.where_clause %}
   where {{ entity.where_clause }}
@@ -95,27 +102,34 @@ create index if not exists {{ entity.table_name }}_norm_desc_trgm
 
  ****************************************************************************************************/
 
-{% if entity.reconciliation == "simple" %}
+{% if entity.reconciliation in ["simple", "lookup"] %}
 drop function if exists authority.fuzzy_{{ entity_key }}(text, integer{% for param in trigram_config.filter_params | default([]) %}, {{ param.type }}{% endfor %}) cascade;
 drop function if exists authority.fuzzy_{{ entity_key }}(text, integer, double precision, double precision{% for param in trigram_config.filter_params | default([]) %}, {{ param.type }}{% endfor %}) cascade;
+{% if entity.scope_context | default([]) %}
+drop function if exists authority.fuzzy_{{ entity_key }}(text, integer, double precision, double precision, text{% for param in trigram_config.filter_params | default([]) %}, {{ param.type }}{% endfor %}) cascade;
+{% endif %}
 
 create or replace function authority.fuzzy_{{ entity_key }}(
   p_text text,
   p_limit integer default 10,
   p_label_threshold double precision default 0.30,
-  p_description_threshold double precision default 0.50{% for param in trigram_config.filter_params | default([]) %},
+  p_description_threshold double precision default 0.50{% if entity.scope_context | default([]) %},
+  p_context text default null{% endif %}{% for param in trigram_config.filter_params | default([]) %},
   {{ param.name }} {{ param.type }} default {{ param.default }}{% endfor %}
 ) returns table (
   {{ entity.id_column }} integer,
   label text,
   description text,
   label_sim double precision,
-  name_sim double precision
-) language sql stable
+  name_sim double precision,
+  label_ambiguous boolean{% if entity.scope_context | default([]) %},
+  context text,
+  context_match boolean{% endif %}{{ "\n" }}) language sql stable
 as $$
 {% if entity.description_column and (entity.description_match_weight | default(0) | float) > 0 %}
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q{% if entity.scope_context | default([]) %},
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx{% endif %}
   )
 {% if entity.filter_params %}
   , filter_params as (
@@ -129,6 +143,9 @@ as $$
       s.{{ entity.id_column }},
       s.label,
       s.description,
+      s.norm_label,{% if entity.scope_context | default([]) %}
+      s.context,
+      s.norm_context,{% endif %}
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q) end as label_sim,
       coalesce(strict_word_similarity(pq.q, s.norm_description), 0) as description_sim
@@ -152,18 +169,54 @@ as $$
     where scored.label_sim >= p_label_threshold
        or scored.description_sim >= p_description_threshold
   )
+{% if entity.scope_context | default([]) %}
+  , matched as (
+    select filtered.*
+    from filtered
+    cross join params pq
+    where pq.ctx is null
+       or pq.ctx = filtered.norm_context
+       or pq.ctx = any(string_to_array(filtered.norm_context, ' / '))
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select filtered.*, false as context_match
+    from filtered
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
+  )
+  select
+    selected.{{ entity.id_column }},
+    selected.label,
+    selected.description,
+    selected.label_sim,
+    least(1.0, selected.label_sim + {{ entity.description_match_weight }} * selected.description_sim) as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label_sim desc, selected.label
+  limit p_limit;
+{% else %}
   select
     filtered.{{ entity.id_column }},
     filtered.label,
     filtered.description,
     filtered.label_sim,
-    least(1.0, filtered.label_sim + {{ entity.description_match_weight }} * filtered.description_sim) as name_sim
+    least(1.0, filtered.label_sim + {{ entity.description_match_weight }} * filtered.description_sim) as name_sim,
+    count(*) over (partition by filtered.norm_label) > 1 as label_ambiguous
   from filtered
   order by name_sim desc, filtered.label_sim desc, filtered.label
   limit p_limit;
+{% endif %}
 {% else %}
   with params as (
-    select authority.immutable_unaccent(lower(p_text))::text as q
+    select authority.immutable_unaccent(lower(p_text))::text as q{% if entity.scope_context | default([]) %},
+           authority.immutable_unaccent(lower(nullif(p_context, '')))::text as ctx{% endif %}
   )
 {% if entity.filter_params %}
   , filter_params as (
@@ -172,6 +225,67 @@ as $$
 {% endfor %}
   )
 {% endif %}
+{% if entity.scope_context | default([]) %}
+  , scored as (
+    select
+      s.{{ entity.id_column }},
+      s.label,
+      s.description,
+      s.norm_label,
+      s.context,
+      s.norm_context,
+      greatest(
+        case when s.norm_label = pq.q then 1.0
+             else similarity(s.norm_label, pq.q)
+        end, 0.0001
+      ) as name_sim
+    from authority.{{ entity_key }} as s
+    cross join params pq
+{% if entity.filter_params %}
+{% for param in entity.filter_params %}
+    {{ param.join_clause | indent(4) }}
+{% endfor %}
+{% endif %}
+    where case when s.norm_label = pq.q then 1.0
+               else similarity(s.norm_label, pq.q) end >= p_label_threshold
+{% if entity.filter_params %}
+{% for param in entity.filter_params %}
+      {{ param.where_clause | indent(6) }}
+{% endfor %}
+{% endif %}
+  )
+  , matched as (
+    select scored.*
+    from scored
+    cross join params pq
+    where pq.ctx is null
+       or pq.ctx = scored.norm_context
+       or pq.ctx = any(string_to_array(scored.norm_context, ' / '))
+  )
+  , selected as (
+    select matched.*, params.ctx is not null as context_match
+    from matched
+    cross join params
+    union all
+    select scored.*, false as context_match
+    from scored
+    cross join params
+    where params.ctx is not null
+      and not exists (select 1 from matched)
+  )
+  select
+    selected.{{ entity.id_column }},
+    selected.label,
+    selected.description,
+    selected.name_sim as label_sim,
+    selected.name_sim as name_sim,
+    count(*) over (partition by selected.norm_label) > 1 as label_ambiguous,
+    selected.context,
+    selected.context_match
+  from selected
+  order by name_sim desc, selected.label
+  limit p_limit;
+{% else %}
   select
     s.{{ entity.id_column }},
     s.label,
@@ -185,7 +299,8 @@ as $$
       case when s.norm_label = pq.q then 1.0
            else similarity(s.norm_label, pq.q)
       end, 0.0001
-    ) as name_sim
+    ) as name_sim,
+    count(*) over (partition by s.norm_label) > 1 as label_ambiguous
   from authority.{{ entity_key }} as s
   cross join params pq
 {% if entity.filter_params %}
@@ -202,6 +317,7 @@ as $$
 {% endif %}
   order by name_sim desc, s.label
   limit p_limit;
+{% endif %}
 {% endif %}
 $$;
 {% else %}
