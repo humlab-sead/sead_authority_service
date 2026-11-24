@@ -159,13 +159,6 @@ rtk-install:
 	@rtk init -g --copilot
 	@rtk init -g --codex
 
-# graphify is a uv tool (~/.local/bin), not part of the project .venv.
-# The graph in graphify-out/ is local and not committed.
-create-graphify:
-	@graphify extract . --project
-	@graphify cluster-only $(CURDIR)
-	@graphify export callflow-html
-
 # GRAPHIFY_VIZ_NODE_LIMIT=0 blocks graph.html generation and removes any stale
 # file (the HTML is unused). graphify reads this limit only from the
 # environment, not from .graphifyrc.
