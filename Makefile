@@ -237,6 +237,14 @@ semantic-graphify:
 	graphify export wiki; \
 	echo "✓ Semantic graph and wiki rebuilt in graphify-out/"
 
+# Shows the status of the local setup: graphify (hooks, code graph, LLM-based results, community
+# names, wiki), repository setup, branch promotion and leftover files, with the command to run
+# for each action. Read-only and offline. With STATUS_STRICT=1 it fails (non-zero exit) when an
+# action is listed.
+.PHONY: status
+status:
+	@scripts/dev/status.sh
+
 # Hooks rebuild the code graph (AST only, no LLM) after commit, checkout, merge and rebase.
 # graphify always writes a graph.json merge driver and .gitattributes; both only matter for
 # a tracked graph, so an untracked .gitattributes that holds nothing else is removed.
