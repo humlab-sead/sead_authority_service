@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/roger/source/sead_authority_service/.venv/bin/graphify hook-check"
+            "command": "graphify hook-check"
           }
         ]
       }
