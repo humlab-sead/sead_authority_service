@@ -242,3 +242,11 @@ Rules:
 - If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `GRAPHIFY_VIZ_NODE_LIMIT=0 graphify update .` to keep the graph current (AST-only, no API cost). The env var blocks graph.html generation, which this project does not use. Shrinks caused by `.graphifyignore` rules or deleted files are accepted without `--force`; only unexplained extraction-loss shrinks are refused.
+## Pull Requests
+
+- Changes under `scripts/`, `src/`, `tests/`, `config/`, `schema/`, `deployment/`, `main.py` or `.github/workflows/` must reach `dev` through a pull request. `scripts/ci/verify_promotion_provenance.sh` fails the `dev` into `staging` promotion when such a commit has no pull request of its own.
+- Use `scripts/workflow/create_change_pr.py` to commit named paths to a new branch and open the pull request. Pass one `--path` per file and start from `dev`.
+
+## rtk (Token Optimization)
+
+Prefix shell commands with `rtk` to compress output and reduce token usage (saves 60–90%). Examples: `rtk uv run pytest`, `rtk make test`, `rtk git log -10`. Use `rtk gain` for analytics and `rtk proxy <cmd>` for raw output.
