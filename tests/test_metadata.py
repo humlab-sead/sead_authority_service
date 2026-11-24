@@ -123,7 +123,7 @@ def _registry_with_support_status() -> DummyRegistry:
 
 
 def test_supported_types_come_from_registration_status():
-    supported = _get_supported_types(_registry_with_support_status())
+    supported = _get_supported_types(_registry_with_support_status())  # pyright: ignore
 
     assert supported == ["location", "site"]
     assert len(supported) == len(set(supported))
@@ -131,10 +131,10 @@ def test_supported_types_come_from_registration_status():
 
 def test_excluded_type_is_published_but_not_supported():
     registry = _registry_with_support_status()
-    default_types = _get_default_types(registry)
+    default_types = _get_default_types(registry)  # pyright: ignore
 
     published_ids = {entry["id"] for entry in default_types}
-    supported = _get_supported_types(registry)
+    supported = _get_supported_types(registry)  # pyright: ignore
 
     assert "taxon" in published_ids
     assert "taxon" not in supported
@@ -165,7 +165,7 @@ def test_manifest_publishes_every_approved_classifier(test_provider):  # pylint:
 def test_reconciliation_metadata_adds_supported_types_only(test_provider):  # pylint: disable=unused-argument
     registry = _registry_with_support_status()
 
-    metadata = get_reconciliation_metadata(registry, "http://testserver/")
+    metadata = get_reconciliation_metadata(registry, "http://testserver/")  # pyright: ignore
 
     assert metadata["reconciliation"]["supportedTypes"] == ["location", "site"]
     assert [entry["id"] for entry in metadata["defaultTypes"]].count("taxon") == 1
@@ -182,7 +182,7 @@ def test_reconciliation_metadata_adds_supported_types_only(test_provider):  # py
 def test_real_strategies_declare_their_own_properties(test_provider):  # pylint: disable=unused-argument
     registry = DummyRegistry({"feature_type": Strategies.items["feature_type"], "location": LocationReconciliationStrategy})
 
-    assert get_reconcile_properties(registry, entity_type="feature_type") == []
-    assert [prop["id"] for prop in get_reconcile_properties(registry, entity_type="location")] == ["place_name"]
+    assert get_reconcile_properties(registry, entity_type="feature_type") == []  # pyright: ignore
+    assert [prop["id"] for prop in get_reconcile_properties(registry, entity_type="location")] == ["place_name"]  # pyright: ignore
     compiled = _compile_property_settings(registry)
     assert [(entry["name"], entry["entity_types"]) for entry in compiled] == [("place_name", ["location"])]

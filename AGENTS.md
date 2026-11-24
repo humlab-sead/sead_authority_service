@@ -231,14 +231,32 @@ Image publication:
 
 ## graphify
 
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships. The graph is built locally and is not committed: graphify-out/ is in `.gitignore`. graphify is a uv tool (`~/.local/bin/graphify`), not part of the project `.venv`.
 
 When the user types `/graphify`, invoke the `skill` tool with `skill: "graphify"` before doing anything else.
 
+How the graph is kept current:
+- graphify git hooks (installed by `make install-graphify`) rebuild the code part of the graph in the background after each commit, checkout, merge and rebase. The rebuild is AST-only and makes no LLM calls; its log is `~/.cache/graphify-rebuild.log`.
+- `make update-graphify` rebuilds the code graph and graphify-out/wiki/ on demand. `make graphify-wiki` rebuilds only the wiki (local, about a second, no LLM).
+- `make status` shows whether the graph, the LLM-based results, the community names or the wiki need a rebuild, and lists the command for each action needed.
+- `make semantic-graphify` adds the LLM-based results (documents and community names). Run it only when the user asks.
+
 Rules:
-- graphify is installed via brew (`~/.local/bin/graphify`), not the project `.venv`. If `graphify` is not on `PATH` (for example in a minimal shell), use the absolute path `~/.local/bin/graphify`.
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- When graphify-out/graph.json exists, run `graphify query "<question>"` before your first grep, search or source-file read for a codebase question. Read raw files only for lines the graph or an earlier read already located. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- If a name matches several nodes, graphify lists them; retry with `path/to/file.py::Symbol`. If `graphify path` finds no directed path, retry with `--undirected`.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing. It is not rebuilt by the git hooks, so it can lag behind recent commits.
 - Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `GRAPHIFY_VIZ_NODE_LIMIT=0 graphify update .` to keep the graph current (AST-only, no API cost). The env var blocks graph.html generation, which this project does not use. Shrinks caused by `.graphifyignore` rules or deleted files are accepted without `--force`; only unexplained extraction-loss shrinks are refused.
+- Before your first graph query in a session, check that the graph is usable:
+  - If `graphify hook status` reports a hook as `not installed`, tell the user and suggest `make install-graphify`. Do not install hooks yourself.
+  - If graphify-out/graph.json is missing, or older than the latest commit (compare its modification time with `git log -1 --format=%ct`), run `GRAPHIFY_VIZ_NODE_LIMIT=0 graphify update .` first, and mention it to the user.
+- Do not run `graphify update` after every edit; the hooks do that at commit time. Run `GRAPHIFY_VIZ_NODE_LIMIT=0 graphify update .` only when you changed code in this session and need to query the graph again before the change is committed. The variable blocks graph.html, which this project does not use.
+- Treat the graph as a navigation aid, not the source of truth. If it conflicts with source or tests, trust the source.
+
+## Pull Requests
+
+- Changes under `scripts/`, `src/`, `tests/`, `config/`, `schema/`, `deployment/`, `main.py` or `.github/workflows/` must reach `dev` through a pull request. `scripts/ci/verify_promotion_provenance.sh` fails the `dev` into `staging` promotion when such a commit has no pull request of its own.
+- Use `scripts/workflow/create_change_pr.py` to commit named paths to a new branch and open the pull request. Pass one `--path` per file and start from `dev`.
+
+## rtk (Token Optimization)
+
+Prefix shell commands with `rtk` to compress output and reduce token usage (saves 60–90%). Examples: `rtk uv run pytest`, `rtk make test`, `rtk git log -10`. Use `rtk gain` for analytics and `rtk proxy <cmd>` for raw output.

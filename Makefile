@@ -159,42 +159,104 @@ rtk-install:
 	@rtk init -g --copilot
 	@rtk init -g --codex
 
-# graphify comes from brew (~/.local/bin), not the project .venv.
-create-graphify:
-	@graphify extract . --project
-	@graphify cluster-only $(HOME)/source/sead_authority_service
-	@graphify export callflow-html
-
 # GRAPHIFY_VIZ_NODE_LIMIT=0 blocks graph.html generation and removes any stale
 # file (the HTML is unused). graphify reads this limit only from the
 # environment, not from .graphifyrc.
+.PHONY: update-graphify
 update-graphify:
-	@GRAPHIFY_VIZ_NODE_LIMIT=0 graphify update $(HOME)/source/sead_authority_service --force
-	@git add graphify-out
-	@if git diff --cached --quiet -- graphify-out; then \
-		echo "No changes in graphify-out"; \
-	else \
-		git commit -m "chore: updated graphify graph"; \
-	fi
+	@GRAPHIFY_VIZ_NODE_LIMIT=0 GRAPHIFY_NO_BACKUP=1 graphify update $(CURDIR) --force
+	@$(MAKE) --no-print-directory graphify-wiki
 
+# Regenerates graphify-out/wiki/ (index.md plus one page per community and per highly
+# connected node) from the current graph. Runs locally in about a second with no LLM calls,
+# and removes pages for communities that no longer exist. The git hooks do not run it, so
+# update-graphify and semantic-graphify call it at the end.
+.PHONY: graphify-wiki
+graphify-wiki:
+	@graphify export wiki
+
+# Rebuilds the graph including the LLM-based (semantic) results: document/paper/image
+# extraction and community names. Code is still parsed locally (AST).
+#
+# Uses the same LLM settings as the repo scripts (scripts/workflow/*). Each value is
+# taken from the environment if set, otherwise from its KEY = "value" line in .env:
+#   REPO_SCRIPTS_DEFAULT_PROVIDER_TYPE       must be "openai" (any server with the OpenAI chat API)
+#   REPO_SCRIPTS_DEFAULT_PROVIDER_BASE_URL   server base URL, usually ending in /v1
+#   REPO_SCRIPTS_DEFAULT_MODEL               model id as the server names it
+#   REPO_SCRIPTS_DEFAULT_PROVIDER_KEY        API key; "none" is sent if empty
+# They are passed to graphify's "openai" backend as OPENAI_BASE_URL, GRAPHIFY_OPENAI_MODEL
+# and OPENAI_API_KEY for these two commands only. The values are read by the shell at run
+# time, so make never prints the API key, not even with make -n.
+#
+# Unchanged files are skipped via graphify's cache unless GRAPHIFY_REEXTRACT=1.
+#   make semantic-graphify                          # incremental
+#   make semantic-graphify GRAPHIFY_REEXTRACT=1     # re-extract everything, ignore the cache
+#   make semantic-graphify GRAPHIFY_MODE=deep       # more aggressive inferred-edge extraction
+#   make semantic-graphify GRAPHIFY_RELABEL=1       # rename all communities, not only unnamed ones
+#   make semantic-graphify GRAPHIFY_CONCURRENCY=1   # parallel LLM requests (graphify default: 4)
+#   make semantic-graphify GRAPHIFY_ALLOW_PARTIAL=1 # save the graph even if some LLM chunks failed or it lost
+#                                                   # nodes (graphify refuses this by default; check the log first)
+# Make variable names avoid names graphify itself reads from the environment (GRAPHIFY_FORCE,
+# GRAPHIFY_LLM_*). GRAPHIFY_NO_BACKUP=1 stops graphify from writing a dated backup folder into
+# graphify-out/ on every LLM run.
+.PHONY: semantic-graphify
+semantic-graphify:
+	@set -e; \
+	setting() { \
+		v=$$(printenv "$$1" || true); \
+		if [ -z "$$v" ] && [ -f .env ]; then \
+			v=$$(sed -nE "s/^[[:space:]]*(export[[:space:]]+)?$$1[[:space:]]*=[[:space:]]*(.*)$$/\2/p" .env | tail -n 1); \
+		fi; \
+		printf '%s' "$$v" | sed -E 's/[[:space:]]+$$//; s/^"(.*)"$$/\1/'; \
+	}; \
+	provider=$$(setting REPO_SCRIPTS_DEFAULT_PROVIDER_TYPE); \
+	base_url=$$(setting REPO_SCRIPTS_DEFAULT_PROVIDER_BASE_URL); \
+	model=$$(setting REPO_SCRIPTS_DEFAULT_MODEL); \
+	api_key=$$(setting REPO_SCRIPTS_DEFAULT_PROVIDER_KEY); \
+	if [ "$$provider" != "openai" ]; then \
+		echo "error: REPO_SCRIPTS_DEFAULT_PROVIDER_TYPE is '$$provider'; semantic-graphify only supports 'openai'" >&2; exit 1; \
+	fi; \
+	if [ -z "$$base_url" ] || [ -z "$$model" ]; then \
+		echo "error: set REPO_SCRIPTS_DEFAULT_PROVIDER_BASE_URL and REPO_SCRIPTS_DEFAULT_MODEL (environment or .env)" >&2; exit 1; \
+	fi; \
+	export GRAPHIFY_VIZ_NODE_LIMIT=0 GRAPHIFY_NO_BACKUP=1 OPENAI_BASE_URL="$$base_url" GRAPHIFY_OPENAI_MODEL="$$model" \
+		OPENAI_API_KEY="$${api_key:-none}"; \
+	echo "Using $$model at $$base_url"; \
+	graphify extract $(CURDIR) --backend openai $(if $(GRAPHIFY_CONCURRENCY),--max-concurrency $(GRAPHIFY_CONCURRENCY)) \
+		$(if $(GRAPHIFY_MODE),--mode $(GRAPHIFY_MODE)) $(if $(GRAPHIFY_REEXTRACT),--force) \
+		$(if $(GRAPHIFY_ALLOW_PARTIAL),--allow-partial); \
+	graphify label $(CURDIR) --backend openai $(if $(GRAPHIFY_CONCURRENCY),--max-concurrency $(GRAPHIFY_CONCURRENCY)) \
+		$(if $(GRAPHIFY_RELABEL),,--missing-only); \
+	graphify export wiki; \
+	echo "✓ Semantic graph and wiki rebuilt in graphify-out/"
+
+# Shows the status of the local setup: graphify (hooks, code graph, LLM-based results, community
+# names, wiki), repository setup, branch promotion and leftover files, with the command to run
+# for each action. Read-only and offline. With STATUS_STRICT=1 it fails (non-zero exit) when an
+# action is listed.
+.PHONY: status
+status:
+	@scripts/dev/status.sh
+
+# Hooks rebuild the code graph (AST only, no LLM) after commit, checkout, merge and rebase.
+# graphify always writes a graph.json merge driver and .gitattributes; both only matter for
+# a tracked graph, so an untracked .gitattributes that holds nothing else is removed.
+.PHONY: install-graphify-hooks
+install-graphify-hooks:
+	@if ! command -v graphify >/dev/null 2>&1; then \
+		echo "graphify not found on PATH; skipping graphify git hooks"; exit 0; \
+	fi; \
+	graphify hook install; \
+	if [ -f .gitattributes ] && ! git ls-files --error-unmatch .gitattributes >/dev/null 2>&1 \
+		&& ! grep -qv 'merge=graphify' .gitattributes; then rm -f .gitattributes; fi
+
+.PHONY: install-graphify
 install-graphify:
 	@uv tool install "graphifyy[all]" --force
-	@graphify hook install
+	@$(MAKE) --no-print-directory install-graphify-hooks
 	@graphify vscode install
 	@graphify codex install
-	@echo "✓ Graphify installed and pre-commit hook set up"
-
-#	@graphify extract . --project
-#	@graphify cluster-only $(HOME)/source/sead_authority_service
-# 	@graphify export callflow-html
-
-commit-graphify:
-	@git add graphify-out
-	@if git diff --cached --quiet -- graphify-out; then \
-		echo "No changes in graphify-out"; \
-	else \
-		git commit -m "chore: updated graphify graph"; \
-	fi
+	@echo "✓ Graphify installed and git hooks set up"
 
 ################################################################################
 # Git related checks
