@@ -40,11 +40,11 @@ def parse_record_uri(candidate_id: str, entity_type: str, id_base: str | None) -
     if (
         not candidate.scheme  # pylint: disable=too-many-boolean-expressions
         or not candidate.netloc
-        or candidate.scheme.casefold() != base.scheme.casefold()
-        or candidate.netloc.casefold() != base.netloc.casefold()
+        or candidate.scheme.casefold() != base.scheme.casefold()  # pyright: ignore[reportAttributeAccessIssue]
+        or candidate.netloc.casefold() != base.netloc.casefold()  # pyright: ignore[reportAttributeAccessIssue]
         or candidate.query
         or candidate.fragment
-        or not candidate.path.startswith(base.path)
+        or not candidate.path.startswith(base.path)  # pyright: ignore
     ):
         return None
 
