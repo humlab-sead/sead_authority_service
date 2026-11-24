@@ -1,3 +1,51 @@
+# [1.7.0](https://github.com/humlab-sead/sead_authority_service/compare/v1.6.0...v1.7.0) (2026-11-24)
+
+
+### Bug Fixes
+
+* **deployment:** add --omit-dir-times to target rsync to suppress spurious directory timestamp diffs ([28ab4d1](https://github.com/humlab-sead/sead_authority_service/commit/28ab4d18da860a948bacaf2fbf45fb72bf32f05e))
+* **reconciliation:** address candidate verification review findings ([6038f1e](https://github.com/humlab-sead/sead_authority_service/commit/6038f1eb3b8a8f98783573c9304e39dfd1e800f3))
+* **reconciliation:** address PR 44 review findings ([13738a3](https://github.com/humlab-sead/sead_authority_service/commit/13738a31b6f06d575dd0f65ceff5c38251ee05d4))
+* **reconciliation:** bound target id parsing and reuse id path ([abefb4f](https://github.com/humlab-sead/sead_authority_service/commit/abefb4ffca4bc38cb56c826a56e80ff3ccafc112))
+* **graphify:** detect LLM runs from .graphify_analysis.json in status ([4b73623](https://github.com/humlab-sead/sead_authority_service/commit/4b736238b7b411a8964d6f9b34fe8c788384b5e8))
+* **deployment:** drop redundant sync banner and suppress make directory messages ([116d9d0](https://github.com/humlab-sead/sead_authority_service/commit/116d9d030a4c77f6233de9f59605aa7e48eb578b))
+* **ci:** grant artifact-metadata to the release image build ([77c2c15](https://github.com/humlab-sead/sead_authority_service/commit/77c2c150e935a74ef79370eec60f833e98fdf96d))
+* **reconciliation:** list only configured types in record discovery ([e58adbb](https://github.com/humlab-sead/sead_authority_service/commit/e58adbb977e5a63bb9070e2be4a5fbaf58b960c0)), closes [#55](https://github.com/humlab-sead/sead_authority_service/issues/55)
+* **config:** make deployment configuration drift-safe ([40ac795](https://github.com/humlab-sead/sead_authority_service/commit/40ac7955227f56a4230a90af72323d2987ab9c61)), closes [#48](https://github.com/humlab-sead/sead_authority_service/issues/48)
+* **build:** make schema targets importable ([6c284ce](https://github.com/humlab-sead/sead_authority_service/commit/6c284cee7f96e12bdab39fe477ab654f7fc3f3fe))
+* **reconciliation:** match whole parent labels for supplied context ([062f33f](https://github.com/humlab-sead/sead_authority_service/commit/062f33fee1460c8cd908d7f94ef06d0df7f4d509))
+* **site:** normalize name_sim to float in fetch_site_by_national_id and add corresponding tests ([037443e](https://github.com/humlab-sead/sead_authority_service/commit/037443e7afff955a997c04ccf56fa7e35ad79a50))
+* **makefile:** pass the generator's --all-entities flag ([ac5cf54](https://github.com/humlab-sead/sead_authority_service/commit/ac5cf54e5357811aecfab117fcda4d6fac66a69f))
+* **identity:** PR 40 review fixes ([99ee4d8](https://github.com/humlab-sead/sead_authority_service/commit/99ee4d8f05b639ab02027ddd0d996ee474d08dea))
+* **identity:** ship policy file with the deployment config bundle ([1443783](https://github.com/humlab-sead/sead_authority_service/commit/14437835b2e66d5bf24a291d26c7fd5d44119436))
+* **sync-to-deploy:** suppress output during rsync and preserve source modification times ([d4ba3a8](https://github.com/humlab-sead/sead_authority_service/commit/d4ba3a85f7b6ca9addc10b585769e8281b678be4))
+* **deployment:** suppress staging rsync itemize output for throwaway temp directory ([8cc10a8](https://github.com/humlab-sead/sead_authority_service/commit/8cc10a8d5de38b2a9faf51f9233cf99ca8a51956))
+* update dependency overrides to use lambda functions for mocks ([0581578](https://github.com/humlab-sead/sead_authority_service/commit/0581578ebd5272e144dbb711dcc1b2cc314030c8))
+* **tests:** update geonames options path in repository config test ([320c267](https://github.com/humlab-sead/sead_authority_service/commit/320c267aeb19ea90dc49f8657dc2b161192c5eab))
+* update permissions for artifact metadata and improve GHCR login process ([1886b67](https://github.com/humlab-sead/sead_authority_service/commit/1886b6783833f18ecf50d5fb2c20644c5460809c))
+
+
+### Features
+
+* add a leaner deploy setup without build tools ([5b5dbd3](https://github.com/humlab-sead/sead_authority_service/commit/5b5dbd36b3667b9f8f1a81fd15acbc721c90efce))
+* **reconciliation:** add bounded record selection for pilot types ([1f3f1b8](https://github.com/humlab-sead/sead_authority_service/commit/1f3f1b8470e44b1d0730fb9d8b00e3318ec588eb))
+* **reconciliation:** add context-scoped classifiers and lookups ([5598304](https://github.com/humlab-sead/sead_authority_service/commit/5598304c7864f20bd35e67dd90a9b38b03a4bbbe)), closes [#59](https://github.com/humlab-sead/sead_authority_service/issues/59)
+* add environment variable for GH_TOKEN in artifact attestation step ([99157e6](https://github.com/humlab-sead/sead_authority_service/commit/99157e6d22ddccf97474a1b71f635d3bf27c69f8))
+* **workflow:** add quiet output, merge command, and promote target ([ffd6dae](https://github.com/humlab-sead/sead_authority_service/commit/ffd6dae88b92e9c3e4d2dbabf9d6ea1580266c5c))
+* **schema:** add read-access grants to authority schema deployment ([4fb9b22](https://github.com/humlab-sead/sead_authority_service/commit/4fb9b22c65e4bfc41619b5984af48cbd1af77339))
+* **schema:** deploy both schemas by default ([465b581](https://github.com/humlab-sead/sead_authority_service/commit/465b581de6aa02a130a559fcb8a459dd8ca69301)), closes [#41](https://github.com/humlab-sead/sead_authority_service/issues/41)
+* **record-selection:** enable all capabilities for all configured types ([3509963](https://github.com/humlab-sead/sead_authority_service/commit/35099632b759df12ecc0a1529130bc38754722d0))
+* **identity:** implement phase 4 reconciliation contract ([986e366](https://github.com/humlab-sead/sead_authority_service/commit/986e3665ab74968cbf7e5f7d6b9a82c1162e7db0))
+* **suggestions:** implement prefix-based candidate suggestions in classifier and repository strategies ([5e19232](https://github.com/humlab-sead/sead_authority_service/commit/5e1923281d33419fb1d7379f48f4458f16e1783d))
+* **reconciliation:** match label substrings in interactive search ([13ccd8e](https://github.com/humlab-sead/sead_authority_service/commit/13ccd8ef0391c410c494a078979ef8b23d0cb5f0)), closes [#61](https://github.com/humlab-sead/sead_authority_service/issues/61)
+* **deployment:** print source and destination before staging sync ([2f71b3b](https://github.com/humlab-sead/sead_authority_service/commit/2f71b3b31d143fdbf50f1f5e1436e131ef39451b))
+* **api:** publish supported reconciliation types in the manifest ([3a9e177](https://github.com/humlab-sead/sead_authority_service/commit/3a9e17754cdb1761117db05efce2094acf7b5d9e))
+* **identity:** register provider-scope business-key contracts ([785aa04](https://github.com/humlab-sead/sead_authority_service/commit/785aa04dfc21db4569d6beb004bae1996a0b439a))
+* **reconciliation:** route classifier entities through one configured path ([0732095](https://github.com/humlab-sead/sead_authority_service/commit/07320952e43c510c6d7e3838fac828f9ced030c6)), closes [#43](https://github.com/humlab-sead/sead_authority_service/issues/43)
+* **llm:** support configurable OpenAI-compatible endpoints ([4ecfe54](https://github.com/humlab-sead/sead_authority_service/commit/4ecfe546de4e8b02dec67d32fafbbba7fc7a8fcd)), closes [#33](https://github.com/humlab-sead/sead_authority_service/issues/33)
+* **ai:** update AI coding assistant instructions for pull request generation ([eb312d5](https://github.com/humlab-sead/sead_authority_service/commit/eb312d5c7ef0921f09f75e6b731b8885d278280a))
+* **workflow:** write promotion PR descriptions straight to GitHub ([cbe361e](https://github.com/humlab-sead/sead_authority_service/commit/cbe361eb9e2c90e6fe3a8be7ad5a78ad85552bde))
+
 # [1.6.0](https://github.com/humlab-sead/sead_authority_service/compare/v1.5.0...v1.6.0) (2026-10-22)
 
 
