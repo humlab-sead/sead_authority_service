@@ -159,42 +159,39 @@ rtk-install:
 	@rtk init -g --copilot
 	@rtk init -g --codex
 
-# graphify comes from brew (~/.local/bin), not the project .venv.
+# graphify is a uv tool (~/.local/bin), not part of the project .venv.
+# The graph in graphify-out/ is local and not committed.
 create-graphify:
 	@graphify extract . --project
-	@graphify cluster-only $(HOME)/source/sead_authority_service
+	@graphify cluster-only $(CURDIR)
 	@graphify export callflow-html
 
 # GRAPHIFY_VIZ_NODE_LIMIT=0 blocks graph.html generation and removes any stale
 # file (the HTML is unused). graphify reads this limit only from the
 # environment, not from .graphifyrc.
+.PHONY: update-graphify
 update-graphify:
-	@GRAPHIFY_VIZ_NODE_LIMIT=0 graphify update $(HOME)/source/sead_authority_service --force
-	@git add graphify-out
-	@if git diff --cached --quiet -- graphify-out; then \
-		echo "No changes in graphify-out"; \
-	else \
-		git commit -m "chore: updated graphify graph"; \
-	fi
+	@GRAPHIFY_VIZ_NODE_LIMIT=0 GRAPHIFY_NO_BACKUP=1 graphify update $(CURDIR) --force
 
+# Hooks rebuild the code graph (AST only, no LLM) after commit, checkout, merge and rebase.
+# graphify always writes a graph.json merge driver and .gitattributes; both only matter for
+# a tracked graph, so an untracked .gitattributes that holds nothing else is removed.
+.PHONY: install-graphify-hooks
+install-graphify-hooks:
+	@if ! command -v graphify >/dev/null 2>&1; then \
+		echo "graphify not found on PATH; skipping graphify git hooks"; exit 0; \
+	fi; \
+	graphify hook install; \
+	if [ -f .gitattributes ] && ! git ls-files --error-unmatch .gitattributes >/dev/null 2>&1 \
+		&& ! grep -qv 'merge=graphify' .gitattributes; then rm -f .gitattributes; fi
+
+.PHONY: install-graphify
 install-graphify:
 	@uv tool install "graphifyy[all]" --force
-	@graphify hook install
+	@$(MAKE) --no-print-directory install-graphify-hooks
 	@graphify vscode install
 	@graphify codex install
-	@echo "✓ Graphify installed and pre-commit hook set up"
-
-#	@graphify extract . --project
-#	@graphify cluster-only $(HOME)/source/sead_authority_service
-# 	@graphify export callflow-html
-
-commit-graphify:
-	@git add graphify-out
-	@if git diff --cached --quiet -- graphify-out; then \
-		echo "No changes in graphify-out"; \
-	else \
-		git commit -m "chore: updated graphify graph"; \
-	fi
+	@echo "✓ Graphify installed and git hooks set up"
 
 ################################################################################
 # Git related checks
