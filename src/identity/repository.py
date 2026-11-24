@@ -25,6 +25,7 @@ from src.configuration import get_connection
 from src.identity.models import (
     Binding,
     BindingSet,
+    EntityKeyContract,
     ResolveBatchRecord,
     ResolveBatchResult,
     SourceIdentity,
@@ -159,11 +160,94 @@ class SourceScopeRepository(BaseRepository[SourceScope]):
             INSERT INTO sead_identity.source_scopes
                 (scope_uuid, scope_name, parent_scope_uuid, description, created_by)
             VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (scope_name) DO UPDATE
+            SET scope_name = EXCLUDED.scope_name
             RETURNING *
             """,
             (_uuid(), scope_name, parent_scope_uuid, description, created_by),
         )
         return self._to_model_required(row)
+
+
+# ---------------------------------------------------------------------------
+# ScopeEntityContractRepository
+# ---------------------------------------------------------------------------
+
+
+class ScopeEntityContractRepository(BaseRepository[EntityKeyContract]):
+    """CRUD for sead_identity.scope_entity_contracts.
+
+    One row per (scope_uuid, entity_type). ``business_keys`` keeps the declared
+    order, so an exact ordered match is the only accepted re-registration.
+    """
+
+    model = EntityKeyContract
+    table_name = "sead_identity.scope_entity_contracts"
+    pk_column = "contract_uuid"
+    default_order_by = "entity_type"
+
+    async def list_by_scope(self, scope_uuid: UUID) -> list[EntityKeyContract]:
+        """Return the contracts registered for one scope."""
+        rows = await self._fetchall(
+            """
+            SELECT * FROM sead_identity.scope_entity_contracts
+            WHERE scope_uuid = %s
+            ORDER BY entity_type
+            """,
+            (scope_uuid,),
+        )
+        return [self._to_model_required(row) for row in rows]
+
+    async def list_by_scope_name(self, scope_name: str) -> list[EntityKeyContract]:
+        """Return the contracts registered for one scope name."""
+        rows = await self._fetchall(
+            """
+            SELECT c.*
+            FROM sead_identity.scope_entity_contracts c
+            JOIN sead_identity.source_scopes s
+              ON s.scope_uuid = c.scope_uuid
+            WHERE s.scope_name = %s
+            ORDER BY c.entity_type
+            """,
+            (scope_name,),
+        )
+        return [self._to_model_required(row) for row in rows]
+
+    async def create(
+        self,
+        scope_uuid: UUID,
+        entity_type: str,
+        business_keys: list[str],
+        created_by: str | None = None,
+    ) -> EntityKeyContract:
+        """Insert one entity contract for a scope."""
+        row = await self._fetchone(
+            """
+            INSERT INTO sead_identity.scope_entity_contracts
+                (contract_uuid, scope_uuid, entity_type, business_keys, created_by)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING *
+            """,
+            (_uuid(), scope_uuid, entity_type, business_keys, created_by),
+        )
+        return self._to_model_required(row)
+
+    async def lock_scope(self, scope_uuid: UUID) -> None:
+        """Lock one scope row for the current transaction.
+
+        Contract registration runs inside this lock so concurrent registrations
+        for the same scope serialize and cannot write partial contract sets.
+        """
+        row = await self._fetchone(
+            """
+            SELECT scope_uuid FROM sead_identity.source_scopes
+            WHERE scope_uuid = %s
+            FOR UPDATE
+            """,
+            (scope_uuid,),
+        )
+        if row is None:
+            raise RepositoryError(f"Source scope {scope_uuid} does not exist")
 
 
 # ---------------------------------------------------------------------------
@@ -274,10 +358,7 @@ class SourceIdentityRepository(BaseRepository[SourceIdentity]):
         """Return an existing identity or create one while holding its key locks."""
         async with get_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
             lock_keys = sorted(
-                {
-                    json.dumps([str(scope_uuid), entity_type, key_type, key_value], separators=(",", ":"))
-                    for key_type, key_value in keys
-                }
+                {json.dumps([str(scope_uuid), entity_type, key_type, key_value], separators=(",", ":")) for key_type, key_value in keys}
             )
             for lock_key in lock_keys:
                 await cur.execute(
@@ -375,6 +456,23 @@ class TrackedIdentityRepository(BaseRepository[TrackedIdentity]):
     table_name = "sead_identity.tracked_identities"
     pk_column = "tracked_identity_uuid"
 
+    async def lock_for_binding(
+        self,
+        tracked_identity_uuid: UUID,
+        entity_type: str,
+        aggregate_id: int,
+    ) -> TrackedIdentity | None:
+        """Lock and return the matching tracked identity in the current transaction."""
+        row = await self._fetchone(
+            """
+            SELECT * FROM sead_identity.tracked_identities
+            WHERE tracked_identity_uuid = %s AND entity_type = %s AND aggregate_id = %s
+            FOR UPDATE
+            """,
+            (tracked_identity_uuid, entity_type, aggregate_id),
+        )
+        return self._to_model(row)
+
     async def find_by_aggregate_id(
         self,
         entity_type: str,
@@ -388,9 +486,7 @@ class TrackedIdentityRepository(BaseRepository[TrackedIdentity]):
             (entity_type, aggregate_id),
         )
         if len(rows) > 1:
-            raise RepositoryError(
-                f"Multiple tracked identities exist for {entity_type} aggregate ID {aggregate_id}"
-            )
+            raise RepositoryError(f"Multiple tracked identities exist for {entity_type} aggregate ID {aggregate_id}")
         return self._to_model(rows[0] if rows else None)
 
     async def mint(
@@ -607,14 +703,14 @@ class BindingRepository(BaseRepository[Binding]):
     table_name = "sead_identity.bindings"
     pk_column = "binding_uuid"
 
-    async def create(
+    async def create(  # pylint: disable=too-many-positional-arguments
         self,
         binding_set_uuid: UUID,
         source_identity_uuid: UUID,
         tracked_identity_uuid: UUID,
         method: BindingMethod,
         provenance: dict[str, Any] | None = None,
-        created_by: str | None = None,
+        created_by: str | None = None,  # pylint: disable=unused-argument
     ) -> Binding:
         row = await self._fetchone(
             """

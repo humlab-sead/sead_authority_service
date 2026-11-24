@@ -19,12 +19,17 @@ class TestStrategyRegistry:
     def setup_method(self):
         """Set up clean registry state before each test"""
         # Store original items
-        self.original_items = Strategies.items.copy()
+        self.original_items = Strategies.items.copy()  # pylint: disable=attribute-defined-outside-init
 
     def teardown_method(self):
-        """Restore original registry state after each test"""
-        # Clear test registrations and restore originals
-        Strategies.items = self.original_items
+        """Restore original registry state after each test.
+
+        The shared registry dictionary is restored in place. Assigning a new dictionary
+        to `Strategies.items` would shadow the class attribute and make later
+        registrations invisible to code that reads `Strategies.items`.
+        """
+        Strategies.items.clear()
+        Strategies.items.update(self.original_items)
 
     def test_registry_inheritance(self):
         """Test that StrategyRegistry inherits from Registry"""
@@ -80,14 +85,14 @@ class TestStrategyRegistry:
                 super().__init__(spec, BaseRepository)
 
         assert hasattr(KeyedStrategy, "_registry_key")
-        assert KeyedStrategy._registry_key == "keyed_strategy"
+        assert KeyedStrategy._registry_key == "keyed_strategy"  # pylint: disable=protected-access,no-member
 
     def test_register_strategy_without_explicit_key(self):
         """Test registering strategy without explicit key uses class name"""
         strategies = StrategyRegistry()
 
         @strategies.register()
-        class AutoNamedStrategy(ReconciliationStrategy):
+        class AutoNamedStrategy(ReconciliationStrategy):  # pylint: disable=unused-variable
             def __init__(self, specification=None):
                 spec = specification or {
                     "key": "AutoNamedStrategy",
@@ -129,12 +134,27 @@ class TestStrategyRegistry:
 
         assert "nonexistent_strategy" in str(exc_info.value)
 
+    def test_registration_without_support_does_not_inherit_parent_support(self):
+        """A subclass of a supported strategy registered without support= stays unsupported"""
+        strategies = StrategyRegistry()
+
+        @strategies.register(key="parent_strategy", support="supported")
+        class ParentStrategy(ReconciliationStrategy):
+            pass
+
+        @strategies.register(key="child_strategy")
+        class ChildStrategy(ParentStrategy):
+            pass
+
+        assert ParentStrategy.support_status == "supported"
+        assert ChildStrategy.support_status is None
+
     def test_is_registered_true(self):
         """Test is_registered returns True for registered strategy"""
         strategies = StrategyRegistry()
 
         @strategies.register(key="registered_check")
-        class RegisteredCheck(ReconciliationStrategy):
+        class RegisteredCheck(ReconciliationStrategy):  # pylint: disable=unused-variable
             def __init__(self, specification=None):
                 spec = specification or {
                     "key": "registered_check",
@@ -169,7 +189,7 @@ class TestStrategyRegistry:
         test_registry = TestRegistry()
 
         @test_registry.register(key="hook_test", custom_arg="test_value")
-        class HookTest(ReconciliationStrategy):
+        class HookTest(ReconciliationStrategy):  # pylint: disable=unused-variable
             def __init__(self, specification=None):
                 spec = specification or {
                     "key": "hook_test",
@@ -183,16 +203,15 @@ class TestStrategyRegistry:
 
         assert TestRegistry.hook_called is True
         assert TestRegistry.hook_args is not None
-        assert "custom_arg" in TestRegistry.hook_args
-        assert TestRegistry.hook_args["custom_arg"] == "test_value"
+        assert isinstance(TestRegistry.hook_args, dict)
+        assert "custom_arg" in TestRegistry.hook_args  # pylint: disable=unsupported-membership-test
+        assert TestRegistry.hook_args["custom_arg"] == "test_value"  # pylint: disable=unsubscriptable-object
 
     def test_register_with_repository_cls(self):
         """Test registration with repository_cls argument"""
 
         class CustomRepository(BaseRepository):
             """Custom repository for testing"""
-
-            pass
 
         @Strategies.register(key="custom_repo_strategy", repository_cls=CustomRepository)
         class CustomRepoStrategy(ReconciliationStrategy):
@@ -214,7 +233,7 @@ class TestStrategyRegistry:
         """Test that registering with same key overwrites previous registration"""
 
         @Strategies.register(key="duplicate_key")
-        class FirstStrategy(ReconciliationStrategy):
+        class FirstStrategy(ReconciliationStrategy):  # pylint: disable=unused-variable
             value = "first"
 
             def __init__(self, specification=None):
@@ -229,7 +248,7 @@ class TestStrategyRegistry:
                 super().__init__(spec, BaseRepository)
 
         @Strategies.register(key="duplicate_key")
-        class SecondStrategy(ReconciliationStrategy):
+        class SecondStrategy(ReconciliationStrategy):  # pylint: disable=unused-variable
             value = "second"
 
             def __init__(self, specification=None):
@@ -256,7 +275,7 @@ class TestStrategyRegistry:
         initial_count = len(strategies.items)
 
         @strategies.register(key="isolated_test")
-        class IsolatedTest(ReconciliationStrategy):
+        class IsolatedTest(ReconciliationStrategy):  # pylint: disable=unused-variable
             def __init__(self, specification=None):
                 spec = specification or {
                     "key": "isolated_test",
@@ -272,7 +291,10 @@ class TestStrategyRegistry:
         assert "isolated_test" in strategies.items
 
     @with_test_config
-    def test_registered_strategy_has_key_property(self, test_provider: ExtendedMockConfigProvider):
+    def test_registered_strategy_has_key_property(
+        self,
+        test_provider: ExtendedMockConfigProvider,  # pylint: disable=unused-argument
+    ):
         """Test that registered strategy instances have key property"""
         strategies = StrategyRegistry()
 
@@ -315,7 +337,7 @@ class TestStrategyRegistry:
         strategies = StrategyRegistry()
 
         @strategies.register(key="preserved_class")
-        class PreservedClass(ReconciliationStrategy):
+        class PreservedClass(ReconciliationStrategy):  # pylint: disable=unused-variable
             custom_attr = "preserved"
 
             def __init__(self, specification=None):
@@ -335,7 +357,10 @@ class TestStrategyRegistry:
             assert retrieved.custom_attr == "preserved"  # type: ignore
 
     @with_test_config
-    def test_specification_passed_to_strategy(self, test_provider: ExtendedMockConfigProvider):
+    def test_specification_passed_to_strategy(
+        self,
+        test_provider: ExtendedMockConfigProvider,  # pylint: disable=unused-argument
+    ):
         """Test that specification from registry is used by strategy"""
         strategies = StrategyRegistry()
 

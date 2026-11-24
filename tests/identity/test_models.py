@@ -184,7 +184,7 @@ class TestBindingSet:
         )
         assert bs.lifecycle_state == BindingSetState.CONFIRMED
         assert bs.change_request_name is not None
-        assert bs.change_request_name.startswith("deploy/")
+        assert bs.change_request_name.startswith("deploy/")  # type: ignore ; pylint: disable=no-member
 
 
 class TestBinding:

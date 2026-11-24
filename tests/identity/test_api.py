@@ -127,8 +127,8 @@ def _make_policy_mock(*, configured: tuple[str, ...] = ("site",), supports: bool
 def _make_client(svc: MagicMock) -> TestClient:
     """Build a TestClient with the given service mock injected."""
     app.dependency_overrides[get_identity_service] = lambda: svc
-    app.dependency_overrides[get_config_dep] = lambda: MagicMock()
-    app.dependency_overrides[get_identity_policy] = lambda: _make_policy_mock()
+    app.dependency_overrides[get_config_dep] = lambda: MagicMock()  # pylint: disable=unnecessary-lambda
+    app.dependency_overrides[get_identity_policy] = lambda: _make_policy_mock()  # pylint: disable=unnecessary-lambda
     return TestClient(app)
 
 
@@ -196,9 +196,7 @@ class TestResolveEndpoint:
         assert kwargs["requests"][0].approved_aggregate_id == 4321
 
     def test_resolve_returns_409_for_approved_aggregate_conflict(self):
-        svc = _make_service_mock(
-            resolve_batch=AsyncMock(side_effect=IdentityBindingConflict("approved aggregate ID conflicts"))
-        )
+        svc = _make_service_mock(resolve_batch=AsyncMock(side_effect=IdentityBindingConflict("approved aggregate ID conflicts")))
         client = _make_client(svc)
         body = {
             **self.VALID_BODY,
@@ -404,9 +402,7 @@ class TestAssociateChangeRequest:
             f"/identity/binding-sets/{BINDING_SET_UUID}/change-request",
             json=self.BODY,
         )
-        svc.associate_change_request.assert_called_once_with(
-            UUID(str(BINDING_SET_UUID)), "cr/2026-01-site-data"
-        )
+        svc.associate_change_request.assert_called_once_with(UUID(str(BINDING_SET_UUID)), "cr/2026-01-site-data")
         svc.get_binding_set.assert_called_once()
 
     def test_returns_404_when_not_found(self):

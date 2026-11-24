@@ -5,9 +5,7 @@ import psycopg
 import pytest
 
 import src.strategies.query as query_module
-from src.strategies.data_type import DataTypeRepository
 from src.strategies.dimension import DimensionRepository
-from src.strategies.feature_type import FeatureTypeRepository
 from src.strategies.location import LocationRepository
 from src.strategies.method import MethodRepository
 from src.strategies.query import BaseRepository
@@ -20,11 +18,13 @@ from tests.decorators import with_test_config
 QUERY_PROXY_TESTS_SETUPS = [
     ("location", LocationRepository),
     ("country", LocationRepository),
-    ("feature_type", FeatureTypeRepository),
+    ("feature_type", BaseRepository),
     ("site", SiteRepository),
-    ("data_type", DataTypeRepository),
+    ("data_type", BaseRepository),
     ("dimension", DimensionRepository),
     ("method", MethodRepository),
+    ("feature", BaseRepository),
+    ("colour", BaseRepository),
 ]
 
 
@@ -52,7 +52,13 @@ class TestMultipleRepository:
         result: list[dict[str, Any]] = await proxy.find("test entity", limit=5)
 
         expected_sql: str = proxy.specification["sql_queries"]["fuzzy_find_sql"].strip()
-        test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"q": "test entity", "n": 5})
+        expected_params: dict[str, Any] = {"q": "test entity", "n": 5}
+        if proxy.specification.get("reconciliation") in ("simple", "lookup"):
+            expected_params["label_threshold"] = 0.30
+            expected_params["description_threshold"] = 0.50
+        if "%(context)s" in expected_sql:
+            expected_params["context"] = None
+        test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, expected_params)
         test_provider.cursor_mock.fetchall.assert_called_once()
         assert result == mock_rows
 
@@ -69,7 +75,13 @@ class TestMultipleRepository:
 
         await proxy.find("test")
         expected_sql: str = proxy.specification["sql_queries"]["fuzzy_find_sql"].strip()
-        test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, {"q": "test", "n": 10})
+        expected_params: dict[str, Any] = {"q": "test", "n": 10}
+        if proxy.specification.get("reconciliation") in ("simple", "lookup"):
+            expected_params["label_threshold"] = 0.30
+            expected_params["description_threshold"] = 0.50
+        if "%(context)s" in expected_sql:
+            expected_params["context"] = None
+        test_provider.cursor_mock.execute.assert_called_once_with(expected_sql, expected_params)
 
     @pytest.mark.parametrize(
         "specification, proxy_cls",
@@ -163,6 +175,68 @@ class TestBaseRepositoryUnit:
         rows = await repo.fetch_by_alternate_identity("ABC")
         assert rows == [{"id": 1}]
         fetch_all.assert_awaited_once_with("SQL", {"alternate_identity": "ABC"})
+
+    @pytest.mark.asyncio
+    async def test_find_by_prefix_uses_configured_prefix_query(self, monkeypatch: pytest.MonkeyPatch):
+        repo = self._make_repo(monkeypatch, {"key": "contact_type", "sql_queries": {"prefix_find_sql": "PREFIX SQL"}})
+        fetch_all = AsyncMock(return_value=[{"contact_type_id": 1, "label": "Samples taken by"}])
+        monkeypatch.setattr(repo, "fetch_all", fetch_all)
+
+        rows = await repo.find_by_prefix("Sa", limit=5)
+
+        assert rows == [{"contact_type_id": 1, "label": "Samples taken by"}]
+        fetch_all.assert_awaited_once_with("PREFIX SQL", {"q": "Sa", "n": 5})
+
+    @pytest.mark.asyncio
+    async def test_find_by_prefix_fails_when_query_is_not_configured(self, monkeypatch: pytest.MonkeyPatch):
+        repo = self._make_repo(monkeypatch, {"key": "x", "sql_queries": {}})
+        fetch_all = AsyncMock(return_value=[])
+        monkeypatch.setattr(repo, "fetch_all", fetch_all)
+
+        with pytest.raises(ValueError, match="No prefix search query is configured"):
+            await repo.find_by_prefix("Sa")
+
+        fetch_all.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_find_binds_supplied_context_when_the_query_uses_it(self, monkeypatch: pytest.MonkeyPatch):
+        repo = self._make_repo(
+            monkeypatch,
+            {"key": "colour", "reconciliation": "simple", "sql_queries": {"fuzzy_find_sql": "select %(context)s"}},
+        )
+        fetch_all = AsyncMock(return_value=[])
+        monkeypatch.setattr(repo, "fetch_all", fetch_all)
+
+        await repo.find("red", limit=3, context="  Tempera  ")
+
+        _, params = fetch_all.await_args.args
+        assert params["q"] == "red"
+        assert params["n"] == 3
+        assert params["context"] == "Tempera"
+
+    @pytest.mark.asyncio
+    async def test_find_omits_context_when_the_query_does_not_use_it(self, monkeypatch: pytest.MonkeyPatch):
+        repo = self._make_repo(monkeypatch, {"key": "colour", "sql_queries": {"fuzzy_find_sql": "select 1"}})
+        fetch_all = AsyncMock(return_value=[])
+        monkeypatch.setattr(repo, "fetch_all", fetch_all)
+
+        await repo.find("red", limit=3, context="Tempera")
+
+        _, params = fetch_all.await_args.args
+        assert "context" not in params
+
+    @pytest.mark.asyncio
+    async def test_fetch_by_alternate_identity_binds_context_when_the_query_uses_it(self, monkeypatch: pytest.MonkeyPatch):
+        repo = self._make_repo(
+            monkeypatch,
+            {"key": "x", "sql_queries": {"alternate_identity_sql": "select %(context)s"}},
+        )
+        fetch_all = AsyncMock(return_value=[])
+        monkeypatch.setattr(repo, "fetch_all", fetch_all)
+
+        await repo.fetch_by_alternate_identity("ABC", context="  ")
+
+        fetch_all.assert_awaited_once_with("select %(context)s", {"alternate_identity": "ABC", "context": None})
 
     @pytest.mark.asyncio
     async def test_get_details_handles_psycopg_error(self, monkeypatch: pytest.MonkeyPatch):

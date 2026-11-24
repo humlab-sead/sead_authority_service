@@ -39,3 +39,34 @@ sead-tools/
 *.xls
 *.pdf
 *.pid
+
+# Symlink to AGENTS.md: duplicate content with ambiguous node names
+CLAUDE.md
+
+# Assistant skill folders installed or copied for Codex and Copilot; .agents/skills is the source
+.codex/
+.copilot/
+
+# Generated or historical SQL: no edges to code, only to shared type names
+schema/__deploy__.sql
+schema/generated/
+docs/SEAD/*.sql
+
+# YAML with one node per key and almost no edges to the rest of the graph
+config/config.yml
+tests/config/config.yml
+docs/MCP Server/config-template.yml
+
+# Workflow YAML: no edges to the rest of the graph
+.github/workflows/
+
+# Instructions for AI assistants; .codex/ and .copilot/ are excluded above
+.agents/
+
+# Test helpers used by hundreds of tests; they dominate the most-connected nodes
+tests/decorators.py
+tests/conftest.py
+tests/**/conftest.py
+
+# Release and pull request tooling, not part of the service
+scripts/workflow/

@@ -2,35 +2,164 @@ import json
 from typing import Any, Union
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from loguru import logger
 from starlette.datastructures import UploadFile
+from starlette.exceptions import HTTPException
 
 from src import suggest
+from src.api.candidate_verification import (
+    DATABASE_ERRORS,
+    UnsupportedReadinessType,
+    get_reconciliation_readiness,
+    verify_candidate_batch,
+)
 
 # Not used: ReconBatchRequest, ReconBatchRequestHandler, ReconQueryRequest
 from src.api.model import (
     ReconBatchResponse,
+    ReconcileReadinessResponse,
     ReconQuery,
     ReconServiceManifest,
+    RecordDetailsResponse,
+    RecordListResponse,
+    RecordSelectionErrorEnvelope,
+    RecordSelectionTypesResponse,
     SuggestEntityResponse,
     SuggestPropertyResponse,
     SuggestTypeResponse,
+    VerifyCandidatesRequest,
+    VerifyCandidatesResponse,
 )
 from src.configuration import Config, ConfigValue, get_config_provider, setup_config_store
 from src.configuration.interface import ConfigLike
 from src.metadata import get_reconcile_properties, get_reconciliation_metadata
 from src.preview import render_preview
-from src.reconcile import reconcile_queries
+from src.reconcile import UnsupportedReconciliationTypeError, reconcile_queries
+from src.record_identifiers import POSTGRES_INTEGER_MAX, parse_record_uri
+from src.record_selection import (
+    RecordSelectionConfigurationError,
+    RecordSelectionError,
+    collect_browse_list,
+    configured_id_base,
+    discovery_types,
+    encode_json,
+    fetch_record_row,
+    load_record_selection_policy,
+    record_payload,
+    resolve_id_path,
+    search_interactive,
+    validate_interactive_query,
+    validate_record_selection_configuration,
+)
+from src.strategies.configured_classifier import initialize_classifiers
+from src.strategies.site import MissingCandidateExistsQueryError
 from src.strategies.strategy import Strategies
 
 # pylint: disable=unused-argument, redefined-builtin, too-many-locals, too-many-return-statements, too-many-branches
+
+# Widest digit string that can still fit a PostgreSQL ``integer`` primary key.
+_POSTGRES_INTEGER_MAX_DIGITS: int = len(str(POSTGRES_INTEGER_MAX))
+
+
+def _record_selection_error(exc: RecordSelectionError) -> JSONResponse:
+    """Return the record-selection error envelope for a request-time error."""
+    return JSONResponse({"error": {"code": exc.code, "message": exc.message}}, status_code=exc.status_code)
+
+
+def _configuration_error(exc: RecordSelectionConfigurationError) -> JSONResponse:
+    """Return the record-selection error envelope for a configuration problem."""
+    logger.exception("Record selection is misconfigured: {}", exc)
+    return _record_selection_error(RecordSelectionError("configuration_error", "Record selection is misconfigured.", 500))
+
+
+def _single_record_identifier(request: Request) -> tuple[str, str]:
+    """Require exactly one non-blank ``id`` or ``target_id`` query parameter."""
+    pairs: list[tuple[str, str]] = list(request.query_params.multi_items())
+    if len(pairs) != 1:
+        raise RecordSelectionError("invalid_request", "Provide exactly one of 'id' or 'target_id'.")
+    name, value = pairs[0]
+    if name not in {"id", "target_id"}:
+        raise RecordSelectionError("invalid_request", "Provide exactly one of 'id' or 'target_id'.")
+    if value is None or not value.strip():
+        raise RecordSelectionError("invalid_request", f"The '{name}' value must not be blank.")
+    return name, value
+
+
+def _parse_record_target_id(value: str) -> int | None:
+    """Parse a positive ASCII decimal target ID.
+
+    Returns ``None`` when the digits cannot name a PostgreSQL ``integer`` record, so
+    a very long request value is reported as absent instead of raising from ``int()``,
+    which limits how many digits it converts at once.
+    """
+    if not value.isascii() or not value.isdecimal():
+        raise RecordSelectionError("invalid_request", "The 'target_id' value must be a positive integer.")
+    digits: str = value.lstrip("0")
+    if not digits:
+        raise RecordSelectionError("invalid_request", "The 'target_id' value must be a positive integer.")
+    if len(digits) > _POSTGRES_INTEGER_MAX_DIGITS:
+        return None
+    target_id: int = int(digits)
+    return target_id if target_id <= POSTGRES_INTEGER_MAX else None
+
+
+async def _read_interactive_queries(request: Request) -> Any:
+    """Read the raw query mapping for a marked interactive request."""
+    content_type: str = request.headers.get("content-type", "").lower()
+    payload: Any = None
+    try:
+        if "application/x-www-form-urlencoded" in content_type:
+            form_data = await request.form()
+            raw: UploadFile | str | None = form_data.get("queries")
+            if not isinstance(raw, str) or not raw.strip():
+                raise RecordSelectionError("invalid_request", "No queries provided.")
+            return json.loads(raw)
+        body: bytes = await request.body()
+        if not body:
+            raise RecordSelectionError("invalid_request", "Empty request body.")
+        payload = json.loads(body)
+    except RecordSelectionError:  # pylint: disable=try-except-raise
+        raise
+    except (ValueError, UnicodeDecodeError) as exc:
+        # ``json.loads`` raises a plain ``ValueError`` for an integer literal that
+        # exceeds the interpreter's digit limit, not only ``JSONDecodeError``.
+        raise RecordSelectionError("invalid_request", "Invalid JSON in request.") from exc
+
+    if not isinstance(payload, dict):
+        raise RecordSelectionError("invalid_request", "No queries provided.")
+    queries: Any = payload.get("queries")
+    if isinstance(queries, str):
+        try:
+            queries = json.loads(queries)
+        except ValueError as exc:
+            raise RecordSelectionError("invalid_request", "Invalid JSON in queries.") from exc
+    return queries
+
+
+async def _handle_interactive_search(request: Request) -> Response:
+    """Handle a marked interactive search without changing unmarked batch behavior."""
+    try:
+        raw_queries: Any = await _read_interactive_queries(request)
+        policy = load_record_selection_policy()
+        query_id, entity_type, limit, query_text = validate_interactive_query(raw_queries, policy)
+        result: dict[str, Any] = await search_interactive(entity_type, query_text, limit)
+        return JSONResponse({query_id: result})
+    except RecordSelectionError as exc:
+        return _record_selection_error(exc)
+    except RecordSelectionConfigurationError as exc:
+        return _configuration_error(exc)
+    except DATABASE_ERRORS as exc:
+        logger.exception("Interactive record selection failed because the SEAD database is unavailable: {}", exc)
+        return _record_selection_error(RecordSelectionError("database_unavailable", "SEAD database is unavailable.", 503))
 
 
 async def get_config_dependency() -> ConfigLike:
     if not get_config_provider().is_configured():
         logger.info("Config Store is not configured, setting up...")
         await setup_config_store()
+        initialize_classifiers()
+        validate_record_selection_configuration()
     return get_config_provider().get_config()
 
 
@@ -67,6 +196,41 @@ async def meta(request: Request, config: Config = Depends(get_config_dependency)
     metadata: dict[str, Any] = get_reconciliation_metadata(Strategies, host=str(request.base_url))
     manifest: ReconServiceManifest = ReconServiceManifest(**metadata)
     return ReconServiceManifest.model_validate(manifest)
+
+
+@router.post(
+    "/reconcile/verify-candidates",
+    response_model=VerifyCandidatesResponse,
+    response_model_exclude_none=True,
+)
+async def verify_candidates(
+    body: VerifyCandidatesRequest,
+    config: Config = Depends(get_config_dependency),
+) -> VerifyCandidatesResponse:
+    """Check candidate site IDs against SEAD without writing SIMS identity data."""
+    try:
+        return VerifyCandidatesResponse(results=await verify_candidate_batch(body.items))
+    except MissingCandidateExistsQueryError as exc:
+        logger.exception("Candidate verification is misconfigured: {}", exc)
+        raise HTTPException(status_code=500, detail="Candidate verification is misconfigured") from exc
+    except RecordSelectionConfigurationError as exc:
+        logger.exception("Candidate verification is misconfigured: {}", exc)
+        raise HTTPException(status_code=500, detail="Candidate verification is misconfigured") from exc
+    except DATABASE_ERRORS as exc:
+        logger.exception("Candidate verification failed because the SEAD database is unavailable: {}", exc)
+        raise HTTPException(status_code=503, detail="SEAD database is unavailable") from exc
+
+
+@router.get("/reconcile/readiness", response_model=ReconcileReadinessResponse)
+async def reconciliation_readiness(
+    type: str,
+    config: Config = Depends(get_config_dependency),
+) -> ReconcileReadinessResponse:
+    """Check whether a reconciliation type can run its database-backed match query."""
+    try:
+        return await get_reconciliation_readiness(type)
+    except UnsupportedReadinessType as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("/reconcile", response_model=ReconBatchResponse, response_model_exclude_none=True)
@@ -164,6 +328,9 @@ async def reconcile(request: Request, config: Config = Depends(get_config_depend
     - 400: Missing queries, invalid JSON format
     - 500: Database errors, internal server errors
     """
+    if (request.headers.get("x-record-selection") or "").strip().lower() == "interactive":
+        return await _handle_interactive_search(request)  # type: ignore
+
     try:
         content_type = request.headers.get("content-type", "").lower()
         logger.info(f"Content-Type: {content_type}")
@@ -230,6 +397,9 @@ async def reconcile(request: Request, config: Config = Depends(get_config_depend
         response = ReconBatchResponse(root=results)
         return response
 
+    except UnsupportedReconciliationTypeError as exc:
+        logger.info("Unsupported reconciliation type: {}", exc)
+        return JSONResponse({"error": str(exc)}, status_code=422)
     except Exception as e:  # pylint: disable=broad-exception-caught
         logger.exception(f"Exception in reconcile endpoint: {e}", exc_info=True)
         return JSONResponse({"error": f"Server error: {str(e)}"}, status_code=500)
@@ -272,6 +442,95 @@ async def preview(id: str, config: Config = Depends(get_config_dependency)) -> H
         return HTMLResponse(html)
     except ValueError as e:
         return HTMLResponse(f"Error: {str(e)}", status_code=500)
+
+
+# ============================================================================
+# Record selection (discovery, lists, details)
+# ============================================================================
+# `GET /records/types` is declared before `GET /records/{type}` so the static
+# discovery route is not captured by the type path parameter.
+
+
+@router.get("/records/types", response_model=RecordSelectionTypesResponse)
+async def record_selection_types(config: Config = Depends(get_config_dependency)) -> RecordSelectionTypesResponse:
+    """Return independent record-selection capabilities for the pilot types."""
+    return RecordSelectionTypesResponse(types=discovery_types())  # type: ignore
+
+
+@router.get(
+    "/records/{type}/details",
+    response_model=RecordDetailsResponse,
+    response_model_exclude_none=True,
+    responses={
+        404: {"description": "Record not found", "model": RecordSelectionErrorEnvelope},
+        422: {"description": "Invalid or unsupported request", "model": RecordSelectionErrorEnvelope},
+        503: {"description": "SEAD database unavailable", "model": RecordSelectionErrorEnvelope},
+    },
+)
+async def record_details(
+    request: Request, type: str, config: Config = Depends(get_config_dependency)
+) -> Response:  # pylint: disable=redefined-builtin
+    """Return one record by URI (`id`) or positive integer ID (`target_id`)."""
+    try:
+        policy = load_record_selection_policy()
+        flags = policy.flags_for(type)
+        id_base: str = configured_id_base()
+        identifier, raw_value = _single_record_identifier(request)
+        if identifier == "id":
+            if not flags.details:
+                raise RecordSelectionError("unsupported_capability", f"Details lookup by URI is not enabled for '{type}'.")
+            target_id = parse_record_uri(raw_value, type, id_base)
+            if target_id is None:
+                raise RecordSelectionError("invalid_request", "The 'id' value is not a valid record URI for this type.")
+        else:
+            if not flags.identifier_search:
+                raise RecordSelectionError("unsupported_capability", f"Identifier lookup is not enabled for '{type}'.")
+            target_id = _parse_record_target_id(raw_value)
+
+        row = await fetch_record_row(type, target_id) if target_id is not None else None
+        if row is None:
+            raise RecordSelectionError("record_not_found", "No record exists for the requested identifier.", 404)
+
+        body: bytes = encode_json({"item": record_payload(type, row, id_base, resolve_id_path(type))})
+        return Response(content=body, media_type="application/json")
+    except RecordSelectionError as exc:
+        return _record_selection_error(exc)
+    except RecordSelectionConfigurationError as exc:
+        return _configuration_error(exc)
+    except DATABASE_ERRORS as exc:
+        logger.exception("Record details lookup failed because the SEAD database is unavailable: {}", exc)
+        return _record_selection_error(RecordSelectionError("database_unavailable", "SEAD database is unavailable.", 503))
+
+
+@router.get(
+    "/records/{type}",
+    response_model=RecordListResponse,
+    responses={
+        409: {"description": "List too large to browse", "model": RecordSelectionErrorEnvelope},
+        422: {"description": "Invalid or unsupported request", "model": RecordSelectionErrorEnvelope},
+        503: {"description": "SEAD database unavailable", "model": RecordSelectionErrorEnvelope},
+    },
+)
+async def record_list(
+    request: Request, type: str, config: Config = Depends(get_config_dependency)
+) -> Response:  # pylint: disable=redefined-builtin
+    """Return the complete projected record list for one type, or an explicit too-large error."""
+    try:
+        if list(request.query_params.multi_items()):
+            raise RecordSelectionError("invalid_request", "The record list does not accept query parameters.")
+        policy = load_record_selection_policy()
+        flags = policy.flags_for(type)
+        if not flags.browse:
+            raise RecordSelectionError("unsupported_capability", f"Browse is not enabled for '{type}'.")
+        body: bytes = await collect_browse_list(type, policy)
+        return Response(content=body, media_type="application/json")
+    except RecordSelectionError as exc:
+        return _record_selection_error(exc)
+    except RecordSelectionConfigurationError as exc:
+        return _configuration_error(exc)
+    except DATABASE_ERRORS as exc:
+        logger.exception("Record list failed because the SEAD database is unavailable: {}", exc)
+        return _record_selection_error(RecordSelectionError("database_unavailable", "SEAD database is unavailable.", 503))
 
 
 # ============================================================================

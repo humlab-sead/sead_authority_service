@@ -15,7 +15,7 @@ class TestMultipleReconciliationStrategy:
 
     @pytest.mark.parametrize(
         "strategy_cls",
-        [strategy_cls for strategy_cls in Strategies.items.values()],
+        list(Strategies.items.values()),
     )
     @pytest.mark.asyncio
     @with_test_config
@@ -58,7 +58,7 @@ class TestMultipleReconciliationStrategy:
 
     @pytest.mark.parametrize(
         "strategy_cls",
-        [strategy_cls for strategy_cls in Strategies.items.values()],
+        list(Strategies.items.values()),
     )
     @with_test_config
     def test_get_entity_id_field(self, strategy_cls, test_provider: MockConfigProvider):
@@ -88,7 +88,7 @@ class TestMultipleReconciliationStrategy:
 
     @pytest.mark.parametrize(
         "strategy_cls",
-        [strategy_cls for strategy_cls in Strategies.items.values()],
+        list(Strategies.items.values()),
     )
     @with_test_config
     def test_get_property_settings(self, strategy_cls, test_provider: MockConfigProvider):
@@ -161,7 +161,7 @@ class _StubConfigValue:
 
 
 class _FakeRepository(strategy_module.BaseRepository):  # type: ignore[misc]
-    def __init__(self, specification):
+    def __init__(self, specification):  # pylint: disable=super-init-not-called
         self.specification = specification
         self.fetch_by_alternate_identity_calls: list[str] = []
         self.find_calls: list[tuple[str, int]] = []
@@ -179,7 +179,7 @@ class _FakeRepository(strategy_module.BaseRepository):  # type: ignore[misc]
 
 
 class _DummyRepoInstance(strategy_module.BaseRepository):  # type: ignore[misc]
-    def __init__(self):
+    def __init__(self):  # pylint: disable=super-init-not-called
         pass
 
 

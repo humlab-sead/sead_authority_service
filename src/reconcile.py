@@ -6,6 +6,10 @@ from src.configuration import get_config_provider
 from src.strategies.strategy import ReconciliationStrategy, Strategies
 
 
+class UnsupportedReconciliationTypeError(ValueError):
+    """Raised when a query names an unregistered reconciliation type."""
+
+
 async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
 
     default_query_limit: int = get_config_provider().get_config().get("options:default_query_limit") or 10
@@ -31,21 +35,23 @@ async def reconcile_queries(queries: dict[str, Any]) -> dict[str, Any]:
 
         if not Strategies.items.get(entity_type):
             logger.error(f"Unknown query type '{entity_type}' in query {query_id}. Available types: {list(Strategies.items.keys())}")
-            raise ValueError(f"Unknown query type '{entity_type}' in query")
+            raise UnsupportedReconciliationTypeError(f"Unknown query type '{entity_type}' in query")
 
         strategy_cls: Type[ReconciliationStrategy] | None = Strategies.items.get(entity_type)
         if not strategy_cls:
-            raise ValueError(f"Unknown entity type: {entity_type}")
+            raise UnsupportedReconciliationTypeError(f"Unknown entity type: {entity_type}")
         strategy: ReconciliationStrategy = strategy_cls()
         logger.info(f"Created strategy for {entity_type}: {type(strategy).__name__}")
 
+        properties: dict[str, Any] = {p["pid"]: p["v"] for p in query.get("properties", []) if "pid" in p and "v" in p}
+
         candidate_data: list[dict[str, Any]] = await strategy.find_candidates(
             query=query.get("query"),
-            properties={p["pid"]: p["v"] for p in query.get("properties", []) if "pid" in p and "v" in p},
-            limit=default_query_limit,
+            properties=properties,
+            limit=query.get("limit") if query.get("limit") is not None else default_query_limit,
         )
 
-        candidates = [strategy.as_candidate(data, query.get("query", "")) for data in candidate_data]
+        candidates = strategy.as_candidates(candidate_data, query.get("query", ""), properties)
 
         # Log summary with match counts and score ranges
         if candidates:

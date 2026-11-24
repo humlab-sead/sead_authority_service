@@ -18,7 +18,7 @@ class MethodRepository(BaseRepository):
     """Method-specific query proxy"""
 
 
-@Strategies.register(key="method", repository_cls=MethodRepository)
+@Strategies.register(key="method", repository_cls=MethodRepository, support="supported")
 class MethodReconciliationStrategy(ReconciliationStrategy):
     """Method-specific reconciliation with place names and coordinates"""
 

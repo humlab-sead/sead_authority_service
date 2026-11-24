@@ -113,9 +113,10 @@ Provider abstraction over OpenAI, Anthropic, and Ollama. Active provider is sele
 
 SIMS is the identity service within the Authority Service. The current implementation manages identity resolution and Binding lifecycles using a legacy per-entity policy. The target contract requires generic allocation driven by validated SIMS configuration; see [SIMS documentation](./SIMS/).
 
-- **`models.py`**: Pydantic domain types — `SourceScope`, `Submission`, `SourceIdentity`, `TrackedIdentity`, `BindingSet`, `Binding`, `ResolutionOutcome`, `ChangeDetectionResult`
+- **`models.py`**: Pydantic domain types — `SourceScope`, `Submission`, `SourceIdentity`, `TrackedIdentity`, `BindingSet`, `Binding`, `ResolutionOutcome`, `ChangeDetectionResult`, `EntityKeyContract`
 - **`policy.py`**: `IdentityPolicy` loads the current legacy `config/identity_policy.yml`; it does not define the target generic configuration contract
-- **`repository.py`**: async repositories for all six identity tables
+- **`contracts.py`**: provider-scope business-key contract rules — scope checks, caller authorization, and conflict/required errors
+- **`repository.py`**: async repositories for all identity tables
 - **`service.py`**: `IdentityService` orchestrates the full resolution and binding lifecycle
 - **`types.py`**: `StrEnum` types for identity state, binding method, and change outcomes
 
@@ -155,7 +156,8 @@ Submission tool → POST /identity/resolve
   ↓
 identity_router.py: validate ResolutionRequest
   ↓
-IdentityService.resolve_identity()
+IdentityService.resolve_batch()
+  ├─ require_registered_contracts() for a provider:// scope
   ├─ get_or_create_scope(source_system)
   ├─ create_submission()
   ├─ for each source identity:
@@ -172,11 +174,11 @@ ResolutionOutcome → JSON
 
 ## Data and Persistence Design
 
-**No application database of its own.** The service reads entity data from the SEAD PostgreSQL database (via generated `authority.*` views) and writes identity and binding records to six identity tables in the same database.
+**No application database of its own.** The service reads entity data from the SEAD PostgreSQL database (via generated `authority.*` views) and writes identity and binding records to the identity tables in the same database.
 
 **Entity views**: generated SQL in `schema/generated/` defines views (`authority.view_site`, etc.), trigram indexes, and optional embedding tables (`authority.method_embeddings`). The authority schema is logically separate from the SEAD `public` schema.
 
-**Identity tables**: `identity_scopes`, `identity_submissions`, `source_identities`, `tracked_identities`, `binding_sets`, `bindings`. All managed exclusively by the identity service; no other component writes to them.
+**Identity tables**: `source_scopes`, `submissions`, `source_identities`, `source_identity_keys`, `submission_source_identities`, `tracked_identities`, `binding_sets`, `bindings`, `resolve_batches`, `scope_entity_contracts`. All managed exclusively by the identity service; no other component writes to them.
 
 **Configuration files**: `config/*.yml` are the source of truth for entity schema definitions and identity policy. They are read-only at runtime.
 
@@ -202,7 +204,8 @@ Loguru throughout. All modules use `from loguru import logger`. No `print()` for
 - All SQL uses parameterized queries; no string interpolation with user input.
 - Database credentials are read from environment variables at startup; never logged or included in responses.
 - Pydantic validates all inbound request bodies at the API boundary.
-- The service has no authentication layer; it is expected to run inside a trusted network or behind a reverse proxy.
+- The reconciliation and identity resolution endpoints have no authentication layer; the service is expected to run inside a trusted network or behind a reverse proxy.
+- `POST /identity/scope-contracts` is the exception: it requires a caller name and token that match an entry under `identity.contract_registration.callers`, and the caller can only register scopes under its configured prefixes.
 
 ---
 

@@ -12,9 +12,11 @@ from src.strategies.query import BaseRepository
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 
+# pylint: disable=protected-access,no-member,unused-argument
 
-class _FakeBiblioRepo(BaseRepository):
-    def __init__(self):
+
+class _FakeBiblioRepo(BaseRepository):  # pylint: disable=too-many-instance-attributes
+    def __init__(self):  # pylint: disable=super-init-not-called
         self.fetch_by_isbn = AsyncMock()
         self.fetch_by_doi = AsyncMock()
         self.fetch_by_exact_full_reference = AsyncMock()

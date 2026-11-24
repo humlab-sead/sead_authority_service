@@ -102,7 +102,8 @@ async def suggest_entities(prefix: str, entity_type: str = "", limit: int = 10) 
     """
     logger.info(f"Entity suggest: prefix='{prefix}', type='{entity_type}', limit={limit}")
 
-    if not prefix or len(prefix) < 2:
+    query = prefix.strip()
+    if len(query) < 2:
         return {"result": []}
 
     id_base: str = ConfigValue("options:id_base").resolve() or ""
@@ -121,7 +122,7 @@ async def suggest_entities(prefix: str, entity_type: str = "", limit: int = 10) 
 
         # Use the existing find_candidates method with limit
         try:
-            candidates = await strategy.find_candidates(query=prefix, properties={}, limit=limit)
+            candidates = await strategy.suggest_candidates(prefix=query, limit=limit)
 
             # Convert to suggest API format
             for candidate in candidates[:limit]:

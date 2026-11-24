@@ -11,17 +11,37 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx import Response
 
+import src.api.router as router_module
 from src.api.router import router
 from src.configuration import MockConfigProvider
+from src.configuration.config import Config
+from src.configuration.provider import set_config_provider
+from src.strategies.configured_classifier import ClassifierConfigurationError, simple_classifier_keys
 from tests.decorators import with_test_config
 
 ID_BASE = "https://w3id.org/sead/id/"
+
+SUPPORTED_TYPE_IDS = (
+    "administrative_region",
+    "bibliographic_reference",
+    "country",
+    "data_type",
+    "dimension",
+    "feature_type",
+    "location",
+    "method",
+    "sampling_context",
+    "site",
+)
+EXCLUDED_TYPE_IDS = ("geonames", "modification_type", "taxon")
 
 # pylint: disable=protected-access, unused-argument, redefined-outer-name
 
 
 class MockStrategy:
     """Mock strategy class with get_properties_meta method"""
+
+    support_status = "supported"
 
     def get_properties_meta(self):
         return [
@@ -45,11 +65,20 @@ class MockStrategy:
         return "Sites"
 
 
+class MockExcludedStrategy(MockStrategy):
+    """Mock strategy class registered without reconciliation support."""
+
+    support_status = "excluded"
+
+
 class MockStrategies:
     """Mock Strategies class for testing"""
 
     def __init__(self):
-        self.items: dict[str, type[MockStrategy]] = {"site": MockStrategy, "taxon": MockStrategy}
+        # Declared supported types plus registered types without a matcher, so
+        # the manifest can distinguish the two lists.
+        self.items: dict[str, type[MockStrategy]] = {type_id: MockStrategy for type_id in SUPPORTED_TYPE_IDS}
+        self.items.update({type_id: MockExcludedStrategy for type_id in EXCLUDED_TYPE_IDS})
 
 
 @pytest.fixture
@@ -103,10 +132,36 @@ class TestMetaEndpoint:
         assert "defaultTypes" in data
 
         # Check entity types
-        assert len(data["defaultTypes"]) == 2
+        assert len(data["defaultTypes"]) == len(MockStrategies().items)
         type_ids = [t["id"] for t in data["defaultTypes"]]
         assert "site" in type_ids
         assert "taxon" in type_ids
+
+        # Check the reconciliation-specific supported types
+        assert "reconciliation" in data
+        supported = data["reconciliation"]["supportedTypes"]
+        assert supported == sorted(SUPPORTED_TYPE_IDS)
+        assert len(supported) == len(set(supported))
+        assert set(supported) <= set(type_ids)
+        assert "taxon" not in supported
+
+    @with_test_config
+    def test_meta_endpoint_publishes_approved_classifiers(self, client, test_provider: MockConfigProvider):
+        """Test the manifest lists every approved classifier and none of the excluded ones."""
+        response = client.get("/reconcile")
+        assert response.status_code == 200
+
+        data = response.json()
+        type_ids = [entry["id"] for entry in data["defaultTypes"]]
+        supported = data["reconciliation"]["supportedTypes"]
+
+        for entity_key in ("abundance_element", "age_type", "rdb_code", "value_qualifier"):
+            assert entity_key in type_ids
+            assert entity_key in supported
+
+        for excluded_key in ("abundance_element_group", "coordinate_method_dimension", "value_qualifier_symbol"):
+            assert excluded_key not in type_ids
+            assert excluded_key not in supported
 
     @patch("src.api.router.Strategies", MockStrategies())
     @with_test_config
@@ -139,6 +194,40 @@ class TestMetaEndpoint:
         assert lat_prop["type"] == "number"
         assert lat_prop["settings"]["min"] == -90.0
         assert lat_prop["settings"]["max"] == 90.0
+
+
+class TestRecordSelectionDiscovery:
+    """Test record-selection discovery and the marked request entry point."""
+
+    @with_test_config
+    def test_manifest_includes_record_selection_descriptor(self, client, test_provider: MockConfigProvider):
+        data = client.get("/reconcile").json()
+
+        assert data["reconciliation"]["record_selection"] == {"version": 1, "types_path": "/records/types"}
+        assert "supportedTypes" in data["reconciliation"]
+
+    @with_test_config
+    def test_discovery_lists_selectable_types_with_capabilities_off(self, client, test_provider: MockConfigProvider):
+        response = client.get("/records/types")
+
+        assert response.status_code == 200
+        types = {entry["type"]: entry for entry in response.json()["types"]}
+        assert set(types) == set(simple_classifier_keys())
+        assert {"feature_type", "country"} <= set(types)
+        assert all(entry["search_supported"] is False for entry in types.values())
+        assert all(entry["browse_max_rows"] is None for entry in types.values())
+        assert all(entry["interactive_search_max_results"] is None for entry in types.values())
+
+    @with_test_config
+    def test_marked_request_without_enabled_capability_is_rejected(self, client, test_provider: MockConfigProvider):
+        response = client.post(
+            "/reconcile",
+            headers={"X-Record-Selection": "interactive"},
+            json={"queries": {"q0": {"query": "pit", "type": "feature_type", "limit": 5}}},
+        )
+
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "unsupported_capability"
 
 
 class TestReconcileEndpoint:
@@ -184,6 +273,65 @@ class TestReconcileEndpoint:
 
     @patch("src.api.router.reconcile_queries")
     @with_test_config
+    def test_reconcile_serializes_context_match_states(self, mock_reconcile_queries, client: TestClient, test_provider: MockConfigProvider):
+        """`context_match` is explicit when a context was supplied and omitted otherwise."""
+        mock_reconcile_queries.return_value = {
+            "q0": {
+                "result": [
+                    {
+                        "id": f"{ID_BASE}colour/1",
+                        "name": "Red",
+                        "score": 100.0,
+                        "match": True,
+                        "type": [{"id": "colour", "name": "Red"}],
+                        "context_match": True,
+                    }
+                ]
+            },
+            "q1": {
+                "result": [
+                    {
+                        "id": f"{ID_BASE}colour/2",
+                        "name": "Red",
+                        "score": 100.0,
+                        "match": False,
+                        "type": [{"id": "colour", "name": "Red"}],
+                        "context_match": False,
+                    }
+                ]
+            },
+            "q2": {
+                "result": [
+                    {
+                        "id": f"{ID_BASE}colour/3",
+                        "name": "Red",
+                        "score": 100.0,
+                        "match": True,
+                        "type": [{"id": "colour", "name": "Red"}],
+                    }
+                ]
+            },
+        }
+
+        response = client.post(
+            "/reconcile",
+            json={
+                "queries": {
+                    "q0": {"query": "red", "type": "colour", "properties": [{"pid": "context", "v": "Tempera"}]},
+                    "q1": {"query": "red", "type": "colour", "properties": [{"pid": "context", "v": "Oil"}]},
+                    "q2": {"query": "red", "type": "colour"},
+                }
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["q0"]["result"][0]["context_match"] is True
+        assert data["q1"]["result"][0]["context_match"] is False
+        assert "context_match" not in data["q2"]["result"][0]
+
+    @patch("src.api.router.reconcile_queries")
+    @with_test_config
     def test_reconcile_queries_as_string(self, mock_reconcile_queries, client: TestClient, test_provider: MockConfigProvider):
         """Test when queries parameter is a JSON string"""
         mock_reconcile_queries.return_value = {"q0": {"result": []}}
@@ -204,6 +352,13 @@ class TestReconcileEndpoint:
         response = client.post("/reconcile", json={})
         assert response.status_code == 400
         assert "No queries provided" in response.json()["error"]
+
+    @with_test_config
+    def test_reconcile_unsupported_type_returns_client_error(self, client: TestClient, test_provider: MockConfigProvider):
+        response = client.post("/reconcile", json={"queries": {"q0": {"query": "site", "type": "not-registered"}}})
+
+        assert response.status_code == 422
+        assert "Unknown query type" in response.json()["error"]
 
     @with_test_config
     def test_reconcile_invalid_json(self, client: TestClient, test_provider: MockConfigProvider):
@@ -508,6 +663,37 @@ class TestErrorHandling:
         response = client.post("/reconcile", json={})
         assert response.status_code in [400, 422]
         assert "No queries provided" in response.json()["error"]
+
+
+class _LazyConfigProvider(MockConfigProvider):
+    """Provider that reports unconfigured until the lazy setup hook runs."""
+
+    def __init__(self, config: Config) -> None:
+        super().__init__(config)
+        self._configured = False
+
+    def is_configured(self, context: str | None = None) -> bool:  # pylint: disable=unused-argument
+        return self._configured
+
+    def mark_configured(self) -> None:
+        self._configured = True
+
+
+class TestLazyConfigurationValidation:
+    @pytest.mark.asyncio
+    async def test_lazy_setup_validates_classifier_configuration(self, monkeypatch: pytest.MonkeyPatch):
+        provider = _LazyConfigProvider(Config(data={"table_specs": {}, "options": {}}))
+
+        async def fake_setup_config_store() -> None:
+            provider.mark_configured()
+
+        previous = set_config_provider(provider)
+        monkeypatch.setattr(router_module, "setup_config_store", fake_setup_config_store)
+        try:
+            with pytest.raises(ClassifierConfigurationError):
+                await router_module.get_config_dependency()
+        finally:
+            set_config_provider(previous)
 
 
 if __name__ == "__main__":

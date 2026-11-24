@@ -29,10 +29,12 @@ g_port="${SEAD_AUTHORITY_OPTIONS_DATABASE_PORT:-5432}"
 g_db="${SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME:-}"
 
 g_generate_deploy_sql="YES"
+g_bundle_only="NO"
 g_single_sql="YES"
 g_deploy="NO"
 g_schema_folder="schema/generated"
 g_deploy_semantic="NO"
+g_schema="both"
 
 if [[ -z "$g_host" ]] && [[ -f ~/vault/.default.sead.server ]]; then
     g_host=$(cat ~/vault/.default.sead.server)
@@ -75,10 +77,13 @@ Options:
   --user, -U USERNAME      Database user (overrides SEAD_AUTHORITY_OPTIONS_DATABASE_USER)
   --host, -h HOSTNAME      Database host (overrides SEAD_AUTHORITY_OPTIONS_DATABASE_HOST)
   --schema-folder FOLDER   Directory to store generated SQL files (default: ${g_schema_folder})
+  --schema SCHEMA          Schemas to install: authority, sead_identity, or both (default: both)
   --single-sql             Output single combined SQL file instead of multiple files with \i commands
   --no-single-sql          Output multiple SQL files with \i commands (default)
-  --deploy, -D             Deploy the generated schema to the target database
-  --no-generate            Skip schema generation, only deploy existing files
+  --deploy, -D             Deploy the selected schema(s) to the target database
+  --no-generate            Skip authority schema generation and deploy existing files
+  --bundle-only            Rebuild the deployment SQL file from existing generated
+                           files without re-running the generator or deleting them
   --deploy-semantic        Deploy semantic search schemas (requires --deploy)
   --help                   Show this help message and exit
 
@@ -95,8 +100,17 @@ Examples:
   # Generate and deploy to local database
   $0 --deploy --database sead_staging --host localhost --user postgres
 
+  # Deploy only the SIMS identity migrations
+  $0 --schema sead_identity --deploy --database sead_staging --host localhost --user postgres
+
+  # Deploy only the authority schema
+  $0 --schema authority --deploy --database sead_staging --host localhost --user postgres
+
   # Deploy previously generated schema
   $0 --no-generate --deploy --database sead_production
+
+  # Rebuild only the deployment SQL file, keeping schema/generated as-is
+  $0 --bundle-only
 
 EOF
     [[ -n "${1:-}" ]] && exit 1 || exit 0
@@ -128,7 +142,26 @@ while [[ $# -gt 0 ]]; do
             g_schema_folder="$2"
             shift 2
             ;;
+        --schema)
+            if [[ $# -lt 2 ]]; then
+                print_usage "The --schema option requires a value"
+            fi
+            case "$2" in
+                authority|sead_identity|both)
+                    g_schema="$2"
+                    ;;
+                *)
+                    print_usage "Invalid schema '$2'. Choose authority, sead_identity, or both"
+                    ;;
+            esac
+            shift 2
+            ;;
         --no-generate)
+            g_generate_deploy_sql="NO"
+            shift
+            ;;
+        --bundle-only)
+            g_bundle_only="YES"
             g_generate_deploy_sql="NO"
             shift
             ;;
@@ -162,10 +195,14 @@ if [[ "$g_deploy" == "YES" ]]; then
         print_usage "Database connection parameters (--database, --user, --host) are required for deployment"
     fi
 fi
+if [[ "$g_bundle_only" == "YES" ]] && [[ "$g_schema" == "sead_identity" ]]; then
+    print_usage "--bundle-only has no effect with --schema sead_identity: that schema has no generated files"
+fi
 log_info "g_host=$g_host"
 log_info "g_user=$g_user"
 log_info "g_port=$g_port"
 log_info "g_db=$g_db"
+log_info "g_schema=$g_schema"
 cleanup() {
     log_info "Cleaning up generated schema files"
     rm -rf schema/generated
@@ -199,6 +236,18 @@ function generate_deploy_sql() {
     # Create combined deployment SQL file
     log_info "Creating deployment SQL file: ${g_deploy_sql_filename}"
 
+    shopt -s nullglob
+    local entity_files=( "${g_schema_folder}"/*.sql )
+    shopt -u nullglob
+    if [[ ${#entity_files[@]} -eq 0 ]]; then
+        log_error "No generated SQL files found in ${g_schema_folder}/"
+        log_error "Run the generator first, or drop --bundle-only"
+        return 1
+    fi
+
+    # Truncate first: the concatenation below appends, and --bundle-only skips cleanup.
+    : > "${g_deploy_sql_filename}"
+
     echo "-- SEAD Authority Service Database Schema"          >> "${g_deploy_sql_filename}"
     echo ""                                                   >> "${g_deploy_sql_filename}"
     echo "-- Generated automatically by create_schema.sh"     >> "${g_deploy_sql_filename}"
@@ -223,8 +272,7 @@ function generate_deploy_sql() {
     fi
 
     local file_count=0
-    for sql_file in schema/generated/*.sql; do
-        [[ -f "$sql_file" ]] || continue
+    for sql_file in "${entity_files[@]}"; do
         [[ "$sql_file" =~ semantic- ]] && continue
 
         if [[ "$g_single_sql" == "YES" ]]; then
@@ -240,7 +288,7 @@ function generate_deploy_sql() {
     if [[ "$g_deploy_semantic" == "YES" ]]; then
         # Add semantic entity schemas last
         log_info "Including semantic search schemas"
-        for sql_file in schema/generated/semantic-*.sql; do
+        for sql_file in "${g_schema_folder}"/semantic-*.sql; do
             [[ -f "$sql_file" ]] || continue
             if [[ "$g_single_sql" == "YES" ]]; then
                 cat "$sql_file"                               >> "${g_deploy_sql_filename}"
@@ -254,6 +302,15 @@ function generate_deploy_sql() {
         log_info "Skipping semantic search schemas (use --deploy-semantic to include)"
     fi
 
+    # Grants must be last: authority.sql drops and recreates the schema, and
+    # GRANT ... ON ALL ... IN SCHEMA only covers objects that exist when it runs.
+    if [[ "$g_single_sql" == "NO" ]]; then
+        echo "\i schema/sql/grants.sql"                       >> "${g_deploy_sql_filename}"
+    else
+        cat schema/sql/grants.sql                             >> "${g_deploy_sql_filename}"
+        echo ""                                               >> "${g_deploy_sql_filename}"
+    fi
+
     echo "commit;"                                            >> "${g_deploy_sql_filename}"
 
     log_info "Deployment SQL file created with $file_count schema files"
@@ -261,7 +318,7 @@ function generate_deploy_sql() {
     return 0
 }
 
-# Deploy schema to database
+# Deploy the authority schema to the database.
 deploy_schema() {
     if [[ ! -f "${g_deploy_sql_filename}" ]]; then
         log_error "Deployment SQL file not found: ${g_deploy_sql_filename}"
@@ -279,40 +336,84 @@ deploy_schema() {
 
     if psql -h "$g_host" -p "$g_port" -U "$g_user" -d "$g_db" \
             -v ON_ERROR_STOP=1 -q -t -A -f "${g_deploy_sql_filename}"; then
-        log_info "Schema deployment completed successfully!"
+        log_info "Authority schema deployment completed successfully!"
         return 0
     else
-        log_error "Schema deployment failed!"
+        log_error "Authority schema deployment failed!"
         return 1
     fi
+}
+
+deploy_identity_schema() {
+    local LC_ALL=C
+    local schema_file
+    local migration_count=0
+
+    for schema_file in schema/sql/identity/[0-9]*.sql; do
+        [[ -f "$schema_file" ]] || continue
+
+        log_info "Applying identity migration: $schema_file"
+        if ! psql -X -h "$g_host" -p "$g_port" -U "$g_user" -d "$g_db" \
+                -v ON_ERROR_STOP=1 -q -t -A -f "$schema_file"; then
+            log_error "Identity schema deployment failed at migration: $schema_file"
+            return 1
+        fi
+        migration_count=$((migration_count + 1))
+    done
+
+    if [[ "$migration_count" -eq 0 ]]; then
+        log_error "No numbered identity migrations found in schema/sql/identity"
+        return 1
+    fi
+
+    log_info "Identity schema deployment completed successfully ($migration_count migrations)"
+    return 0
 }
 
 main() {
     local exit_code=0
 
-    if [[ "$g_generate_deploy_sql" == "YES" ]]; then
-        cleanup
-        if ! generate_entity_schema; then
-            log_error "Schema generation failed"
-            exit_code=1
-        fi
-        if [[ $exit_code -eq 0 ]]; then
+    if [[ "$g_schema" != "sead_identity" ]]; then
+        if [[ "$g_bundle_only" == "YES" ]]; then
+            # Rebuild the bundle from the files already on disk; never touch them.
             if ! generate_deploy_sql; then
                 log_error "Failed to create deployment SQL file"
                 exit_code=1
             fi
+        elif [[ "$g_generate_deploy_sql" == "YES" ]]; then
+            cleanup
+            if ! generate_entity_schema; then
+                log_error "Schema generation failed"
+                exit_code=1
+            fi
+            if [[ $exit_code -eq 0 ]]; then
+                if ! generate_deploy_sql; then
+                    log_error "Failed to create deployment SQL file"
+                    exit_code=1
+                fi
+            fi
         fi
-
     fi
 
     if [[ "$g_deploy" == "YES" ]] && [[ $exit_code -eq 0 ]]; then
-        if ! deploy_schema; then
+        if [[ "$g_schema" != "sead_identity" ]] && ! deploy_schema; then
+            exit_code=1
+        fi
+        if [[ "$g_schema" != "authority" ]] && [[ $exit_code -eq 0 ]] && ! deploy_identity_schema; then
             exit_code=1
         fi
     elif [[ "$g_deploy" == "NO" ]] && [[ $exit_code -eq 0 ]]; then
-        log_info "Schema files generated successfully"
-        log_info "To deploy the schema, re-run with the --deploy option"
-        log_info "Example: $0 --deploy --database sead_staging --host localhost --user postgres"
+        if [[ "$g_schema" == "sead_identity" ]]; then
+            log_info "No schema files are generated for sead_identity"
+        elif [[ "$g_bundle_only" == "YES" ]]; then
+            log_info "Deployment SQL file rebuilt from existing files in ${g_schema_folder}/"
+        elif [[ "$g_generate_deploy_sql" == "YES" ]]; then
+            log_info "Authority schema files generated successfully"
+        else
+            log_info "Schema generation skipped"
+        fi
+        log_info "To deploy the selected schema(s), re-run with the --deploy option"
+        log_info "Example: $0 --schema $g_schema --deploy --database sead_staging --host localhost --user postgres"
     fi
 
     popd > /dev/null || true

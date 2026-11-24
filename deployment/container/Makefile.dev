@@ -1,0 +1,47 @@
+# Developer image build and publication commands.
+#
+# This file includes the runtime Makefile and adds image build targets. Keep it
+# and the build inputs in the checkout; do not copy them to a deployment user.
+
+MAKEFILE_DEV_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+DEPLOY_DIR ?= $(HOME)/container-dev
+ENV_TEMPLATE ?= $(MAKEFILE_DEV_DIR).env.dev.example
+
+include $(MAKEFILE_DEV_DIR)Makefile
+
+.DEFAULT_GOAL := dev-help
+
+# The developer runtime and unit use separate names and paths from production.
+SERVICE_NAME := sead-authority-service-dev
+SERVICE_UNIT := service-dev/$(SERVICE_NAME).service
+RUNTIME_FILES := podman-compose.yml Makefile .env.example $(SERVICE_UNIT)
+
+DEV_IMAGE_TAG ?= $(if $(IMAGE_TAG),$(IMAGE_TAG),dev)
+
+.PHONY: dev-help
+dev-help:
+	@echo "SEAD Authority Service developer commands"
+	@echo "  setup              Create $(DEPLOY_DIR) from the development template"
+	@echo "  build              Build the image configured in $(DEPLOY_DIR)/.env"
+	@echo "  push               Build and publish a dev-prefixed tag to GHCR"
+	@echo "  pull               Pull the tag configured in $(DEPLOY_DIR)/.env"
+	@echo "  service-install    Install the separate developer user unit"
+	@echo "  service-enable     Enable and start the developer user unit"
+	@echo "  pull, up, down, restart, logs, status, healthcheck, config"
+	@echo "                     Runtime commands inherited from Makefile"
+	@echo "  Override DEPLOY_DIR=... to use another development runtime directory."
+
+.PHONY: check-dev-image-tag
+check-dev-image-tag:
+	@case "$(DEV_IMAGE_TAG)" in \
+		dev|dev-*|dev.*|dev_*) ;; \
+		*) echo "Makefile.dev only builds or publishes dev-prefixed tags (got '$(DEV_IMAGE_TAG)')." >&2; exit 2 ;; \
+	esac
+
+.PHONY: build
+build: check-dev-image-tag
+	@cd "$(DEPLOY_DIR)" && "$(BUNDLE_DIR)scripts/build.sh" --target-env dev --tag "$(DEV_IMAGE_TAG)"
+
+.PHONY: push
+push: check-dev-image-tag
+	@cd "$(DEPLOY_DIR)" && "$(BUNDLE_DIR)scripts/build.sh" --target-env dev --tag "$(DEV_IMAGE_TAG)" --push

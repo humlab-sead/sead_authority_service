@@ -1,6 +1,7 @@
 from typing import Any
 
 from src.configuration import ConfigValue
+from src.record_selection import record_selection_manifest
 from src.strategies.strategy import ReconciliationStrategy, StrategyRegistry
 
 
@@ -108,6 +109,17 @@ def _get_default_types(strategies: StrategyRegistry) -> list[dict[str, str]]:
     return default_types
 
 
+def _get_supported_types(strategies: StrategyRegistry) -> list[str]:
+    """Returns the reconciliation type IDs whose registration declares support.
+
+    Support is declared on the registration itself, so a new registration cannot
+    become supported by default and the manifest cannot drift from the registry.
+    """
+    return sorted(
+        type_id for type_id, strategy_class in strategies.items.items() if getattr(strategy_class, "support_status", None) == "supported"
+    )
+
+
 def get_reconciliation_metadata(strategies: StrategyRegistry, host: str) -> dict[str, Any]:
     """
     Collects reconciliation metadata from all registered strategies.
@@ -126,6 +138,10 @@ def get_reconciliation_metadata(strategies: StrategyRegistry, host: str) -> dict
         "identifierSpace": f"{id_base}",
         "schemaSpace": "http://www.w3.org/2004/02/skos/core#",
         "defaultTypes": default_types,
+        "reconciliation": {
+            "supportedTypes": _get_supported_types(strategies),
+            "record_selection": record_selection_manifest(),
+        },
         "view": {"url": f"{base_url_clean}/reconcile/preview?id={{{{id}}}}"},
         "preview": {"url": f"{base_url_clean}/reconcile/preview?id={{{{id}}}}", "width": 400, "height": 300},
         "suggest": {

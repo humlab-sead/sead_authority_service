@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 
 import src.reconcile as reconcile_module
+from src.api.model import ReconBatchResponse
 
 
 class _ConfigProvider:
@@ -32,6 +33,14 @@ class _RecordingStrategy:
             "type": data.get("type", []),
             "query": query,
         }
+
+    def as_candidates(
+        self,
+        entity_data: list[dict[str, Any]],
+        query: str,
+        properties: dict[str, Any] | None = None,  # pylint: disable=unused-argument
+    ) -> list[dict[str, Any]]:
+        return [self.as_candidate(data, query) for data in entity_data]
 
 
 @pytest.mark.asyncio
@@ -119,6 +128,24 @@ async def test_reconcile_queries_fallback_default_limit(monkeypatch: pytest.Monk
 
 
 @pytest.mark.asyncio
+async def test_reconcile_queries_uses_each_validated_limit(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(reconcile_module, "get_config_provider", lambda: _ConfigProvider({"options:default_query_limit": 10}))
+    monkeypatch.setattr(reconcile_module.Strategies, "items", {"site": _RecordingStrategy}, raising=False)
+
+    _RecordingStrategy.calls = []
+    _RecordingStrategy.candidates = []
+
+    await reconcile_module.reconcile_queries(
+        {
+            "q0": {"query": "first", "type": "site", "limit": 1},
+            "q1": {"query": "second", "type": "site", "limit": 500},
+        }
+    )
+
+    assert [call["limit"] for call in _RecordingStrategy.calls] == [1, 500]
+
+
+@pytest.mark.asyncio
 async def test_reconcile_queries_covers_strategy_cls_none_branch(monkeypatch: pytest.MonkeyPatch):
     class _FlakyItems:
         def __init__(self):
@@ -141,3 +168,32 @@ async def test_reconcile_queries_covers_strategy_cls_none_branch(monkeypatch: py
 
     with pytest.raises(ValueError, match="Unknown entity type: site"):
         await reconcile_module.reconcile_queries({"q0": {"query": "ab", "type": "site"}})
+
+
+@pytest.mark.asyncio
+async def test_reconcile_queries_accepts_candidate_description_at_limit(monkeypatch: pytest.MonkeyPatch):
+    class _DescriptionStrategy:  # pylint: disable=unused-argument
+        async def find_candidates(self, *, query: str, properties: dict[str, Any], limit: int) -> list[dict[str, Any]]:
+            return [{"feature_type_id": 1, "label": "Flint", "name_sim": 1.0}]
+
+        def as_candidates(
+            self, entity_data: list[dict[str, Any]], query: str, properties: dict[str, Any] | None = None
+        ) -> list[dict[str, Any]]:
+            return [
+                {
+                    "id": "https://w3id.org/sead/id/feature_type/1",
+                    "name": "Flint",
+                    "score": 100.0,
+                    "match": True,
+                    "type": [{"id": "feature_type", "name": "Flint"}],
+                    "description": "d" * 500,
+                }
+            ]
+
+    monkeypatch.setattr(reconcile_module, "get_config_provider", lambda: _ConfigProvider({"options:default_query_limit": 10}))
+    monkeypatch.setattr(reconcile_module.Strategies, "items", {"feature_type": _DescriptionStrategy}, raising=False)
+
+    results = await reconcile_module.reconcile_queries({"q0": {"query": "flint", "type": "feature_type"}})
+
+    response = ReconBatchResponse.model_validate(results)
+    assert len(response.root["q0"].result[0].description or "") == 500

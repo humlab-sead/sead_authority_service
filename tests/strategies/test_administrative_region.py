@@ -1,6 +1,7 @@
 """Comprehensive tests for AdministrativeRegionReconciliationStrategy."""
 
 from src.strategies.administrative_region import AdministrativeRegionReconciliationStrategy
+from src.strategies.configured_classifier import ConfiguredClassifierStrategy, initialize_classifiers
 from src.strategies.location import LocationReconciliationStrategy
 from src.strategies.query import BaseRepository
 from src.strategies.strategy import Strategies
@@ -8,6 +9,7 @@ from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 
 
+# pylint: disable=unused-argument
 class TestAdministrativeRegionBasics:
     """Test basic initialization and registration of administrative region strategy."""
 
@@ -21,7 +23,10 @@ class TestAdministrativeRegionBasics:
     def test_registry_key_attribute(self, test_provider: ExtendedMockConfigProvider):
         """Verify _registry_key attribute is set by decorator."""
         assert hasattr(AdministrativeRegionReconciliationStrategy, "_registry_key")
-        assert AdministrativeRegionReconciliationStrategy._registry_key == "administrative_region"
+        assert (
+            AdministrativeRegionReconciliationStrategy._registry_key  # pylint: disable=protected-access,no-member
+            == "administrative_region"
+        )
 
     @with_test_config
     def test_is_registered(self, test_provider: ExtendedMockConfigProvider):
@@ -209,25 +214,24 @@ class TestAdministrativeRegionIntegration:
 
 
 class TestAdministrativeRegionDistinctionFromCountry:
-    """Test that administrative region is distinct from country strategy."""
+    """Test that administrative region is distinct from the configured country classifier."""
 
     @with_test_config
     def test_different_registry_keys(self, test_provider: ExtendedMockConfigProvider):
-        """Administrative region has different key than country."""
+        """Administrative region has a different key than country."""
+        initialize_classifiers()
+
         admin_strategy = AdministrativeRegionReconciliationStrategy()
 
-        # Import country strategy
-        from src.strategies.country import CountryReconciliationStrategy
-
-        country_strategy = CountryReconciliationStrategy()
-
         assert admin_strategy.key == "administrative_region"
-        assert country_strategy.key == "country"
-        assert admin_strategy.key != country_strategy.key
+        assert "country" in Strategies.items
+        assert Strategies.items["country"] is not Strategies.items["administrative_region"]
 
     @with_test_config
     def test_both_registered_separately(self, test_provider: ExtendedMockConfigProvider):
         """Both administrative_region and country are registered."""
+        initialize_classifiers()
+
         assert Strategies.is_registered("administrative_region")
         assert Strategies.is_registered("country")
 
@@ -238,15 +242,15 @@ class TestAdministrativeRegionDistinctionFromCountry:
         assert admin_class == AdministrativeRegionReconciliationStrategy
 
     @with_test_config
-    def test_both_inherit_from_location(self, test_provider: ExtendedMockConfigProvider):
-        """Both strategies inherit from LocationReconciliationStrategy."""
-        from src.strategies.country import CountryReconciliationStrategy
+    def test_country_is_a_configured_classifier(self, test_provider: ExtendedMockConfigProvider):
+        """Country comes from configuration, not a dedicated strategy class."""
+        initialize_classifiers()
 
-        admin_strategy = AdministrativeRegionReconciliationStrategy()
-        country_strategy = CountryReconciliationStrategy()
+        country_class = Strategies.get("country")
 
-        assert isinstance(admin_strategy, LocationReconciliationStrategy)
-        assert isinstance(country_strategy, LocationReconciliationStrategy)
+        assert issubclass(country_class, ConfiguredClassifierStrategy)
+        assert not issubclass(country_class, LocationReconciliationStrategy)
+        assert isinstance(AdministrativeRegionReconciliationStrategy(), LocationReconciliationStrategy)
 
 
 class TestAdministrativeRegionEdgeCases:

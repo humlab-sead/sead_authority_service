@@ -106,7 +106,7 @@ class BibliographicReferenceRepository(BaseRepository):
         return [r | {"name_sim": min(0.7, float(r["name_sim"]))} for r in rows]
 
 
-@Strategies.register(key="bibliographic_reference", repository_cls=BibliographicReferenceRepository)
+@Strategies.register(key="bibliographic_reference", repository_cls=BibliographicReferenceRepository, support="supported")
 class BibliographicReferenceReconciliationStrategy(ReconciliationStrategy):
     """Reconcile bibliographic references using exact identifiers and fuzzy text."""
 

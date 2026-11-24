@@ -45,6 +45,9 @@ Request flow: `OpenRefine → POST /reconcile → router.py → reconcile.py →
 - Run targeted tests for the changed area before finishing.
 - Run broader tests when a change crosses layers.
 - When completing work tracked by a task or phase plan, update its progress tracker, checklist, status, and deliverables in the same change; do not leave completed work marked as not started.
+- When drafting a pull request title or description, follow `.github/pr-description-instructions.md`. Use `.github/promotion_pr_template.md` for promotions (`dev` into `staging` or `staging` into `main`), and `.github/pull_request_template.md` for other pull requests.
+- When uncommitted work must reach `dev` through review, run `scripts/workflow/create_change_pr.py` instead of assembling branch, commit, push, and `gh pr create` calls by hand. Pass `--closes <issue>` for every issue the change resolves.
+- Prepare and publish a promotion with `scripts/workflow/promote_dev_to_staging.sh prepare` and `publish <number>`. The script verifies that code changes reached the source branch through pull requests.
 
 ## Cross-cutting instructions
 
@@ -54,7 +57,7 @@ Request flow: `OpenRefine → POST /reconcile → router.py → reconcile.py →
 
 ## graphify
 
-When `graphify-out/graph.json` exists, run `.venv/bin/graphify query "<question>"` before broad codebase exploration, architecture searches, or relationship searches. Use `.venv/bin/graphify path "<source>" "<target>"` for a specific relationship and `.venv/bin/graphify explain "<concept>"` for a focused concept. Verify graphify results against current source code, tests, configuration, and applicable instructions. Use `rg` or targeted file reads for exact text and local implementation details. After modifying code, run `.venv/bin/graphify update .` to refresh the graph. Follow the full graphify quick start and fallback guidance in `AGENTS.md`.
+graphify is a uv tool (`~/.local/bin/graphify`), not part of the project `.venv`. The graph in `graphify-out/` is built locally and is not committed; git hooks installed by `make install-graphify` rebuild it after commit, checkout, merge and rebase. When `graphify-out/graph.json` exists, run `graphify query "<question>"` before broad codebase exploration, architecture searches, or relationship searches. Use `graphify path "<source>" "<target>"` for a specific relationship and `graphify explain "<concept>"` for a focused concept. Verify graphify results against current source code, tests, configuration, and applicable instructions. Use `rg` or targeted file reads for exact text and local implementation details. Do not run `graphify update` after every edit; run `GRAPHIFY_VIZ_NODE_LIMIT=0 graphify update .` only when you changed code and need to query the graph before committing. Follow the full graphify quick start and fallback guidance in `AGENTS.md`.
 
 <!-- rtk-instructions v2 -->
 **rtk** is a CLI proxy that filters and compresses command outputs, saving 60-90% tokens.

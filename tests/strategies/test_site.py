@@ -2,13 +2,14 @@
 Unit tests for Site reconciliation strategy.
 """
 
+from decimal import Decimal
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import psycopg
 import pytest
 
-from src.strategies.site import SiteReconciliationStrategy, SiteRepository
+from src.strategies.site import MissingCandidateExistsQueryError, SiteReconciliationStrategy, SiteRepository
 from tests.conftest import ExtendedMockConfigProvider
 from tests.decorators import with_test_config
 
@@ -17,6 +18,36 @@ from tests.decorators import with_test_config
 
 class TestSiteRepository:
     """Tests for SiteRepository class."""
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_site_exists_uses_parameterized_lookup(self, test_provider: ExtendedMockConfigProvider):
+        test_provider.create_connection_mock(fetchone={"site_id": 123}, execute=None)
+        repository = SiteRepository("site")
+
+        assert await repository.site_exists(123)
+
+        expected_sql = repository.get_sql_query("candidate_exists_sql").strip()
+        cursor = test_provider.cursor_mock
+        cursor.execute.assert_called_once_with(expected_sql, {"site_id": 123})
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_site_exists_propagates_database_errors(self, test_provider: ExtendedMockConfigProvider):
+        repository = SiteRepository("site")
+        repository.fetch_one = AsyncMock(side_effect=psycopg.OperationalError("database unavailable"))
+
+        with pytest.raises(psycopg.OperationalError, match="database unavailable"):
+            await repository.site_exists(123)
+
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_site_exists_rejects_missing_query(self, monkeypatch, test_provider: ExtendedMockConfigProvider):
+        repository = SiteRepository("site")
+        monkeypatch.setattr(repository, "get_sql_query", lambda key: "")
+
+        with pytest.raises(MissingCandidateExistsQueryError, match="candidate_exists_sql"):
+            await repository.site_exists(123)
 
     @pytest.mark.asyncio
     @with_test_config
@@ -286,6 +317,34 @@ class TestSiteReconciliationStrategy:
         mock_proxy.fetch_site_by_national_id.assert_called_once_with("TEST123")
         mock_proxy.find.assert_not_called()
         assert result == mock_sites
+
+    @patch("src.strategies.site.SiteRepository")
+    @pytest.mark.asyncio
+    @with_test_config
+    async def test_decimal_national_id_score_accepts_location_boosts(
+        self, mock_query_proxy_class, test_provider: ExtendedMockConfigProvider
+    ):
+        """Normalize exact-ID scores before adding geographic and place-name boosts."""
+        strategy: SiteReconciliationStrategy = SiteReconciliationStrategy()
+        mock_proxy = AsyncMock()
+        mock_query_proxy_class.return_value = mock_proxy
+        mock_proxy.fetch_site_by_national_id.return_value = [{"site_id": 1, "label": "Test Site", "name_sim": Decimal("0.5")}]
+        mock_proxy.fetch_site_distances.return_value = {1: 0.5}
+        mock_proxy.fetch_site_location_similarity.return_value = {1: 0.9}
+        properties: dict[str, Any] = {
+            "national_id": "TEST123",
+            "latitude": 59.3293,
+            "longitude": 18.0686,
+            "place_name": "Stockholm",
+        }
+
+        with patch.object(strategy, "get_repository", return_value=mock_proxy):
+            result = await strategy.find_candidates("test query", properties, limit=10)
+
+        mock_proxy.fetch_site_by_national_id.assert_called_once_with("TEST123")
+        mock_proxy.find.assert_not_called()
+        assert isinstance(result[0]["name_sim"], float)
+        assert result[0]["name_sim"] == pytest.approx(0.78)
 
     @patch("src.strategies.site.SiteRepository")
     @pytest.mark.asyncio

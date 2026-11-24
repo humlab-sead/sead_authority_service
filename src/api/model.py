@@ -2,7 +2,7 @@
 from collections.abc import Mapping
 from typing import Annotated, Any, Dict, ForwardRef, Generic, List, Optional, TypeVar, Union
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, RootModel, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, RootModel, field_validator, model_validator
 from typing_extensions import Literal
 
 # ---------- Common ----------
@@ -80,6 +80,10 @@ class ReconCandidate(BaseModel):
     type: List[TypeRef] = Field(default_factory=list)
     score: Optional[Annotated[float, Field(ge=0.0, le=100.0)]] = None
     match: Optional[bool] = None
+    context_match: Optional[bool] = Field(
+        default=None,
+        description="Whether the candidate matched the supplied parent context; omitted when no context was supplied",
+    )
     description: Optional[str] = Field(None, max_length=500)  # optional, but useful
     # You may also return extra keys like 'uri', 'notable', etc., if you want.
 
@@ -92,6 +96,40 @@ class ReconBatchResponse(RootModel[Mapping[str, ReconQueryResult]]):
     """Batch response mirrors request keys -> {result: [...] }."""
 
     root: Mapping[str, ReconQueryResult]
+
+
+# ---------- Candidate verification and reconciliation readiness ----------
+
+
+class CandidateVerificationItem(BaseModel):
+    type: str = Field(..., min_length=1)
+    id: str = Field(..., min_length=1)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class VerifyCandidatesRequest(BaseModel):
+    items: List[CandidateVerificationItem] = Field(..., min_length=1, max_length=100)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CandidateVerificationResult(BaseModel):
+    type: str
+    id: str
+    outcome: Literal["exists", "not_found", "invalid_candidate", "unsupported_type"]
+    entity_type: str | None = None
+    aggregate_id: int | None = Field(default=None, gt=0)
+
+
+class VerifyCandidatesResponse(BaseModel):
+    results: List[CandidateVerificationResult]
+
+
+class ReconcileReadinessResponse(BaseModel):
+    type: str
+    ready: bool
+    reason: str | None = None
 
 
 # ---------- /reconcile (service manifest, GET with no params) ----------
@@ -139,14 +177,34 @@ class ProposePropertiesDescriptor(BaseModel):
 
 
 class PropertySetting(BaseModel):
-    """Property setting for OpenRefine."""
+    """Property setting for OpenRefine.
 
-    name: str
+    Each entry declares the type IDs it serves, so a client can select properties
+    for a type without a hard-coded per-type map.
+    """
+
+    name: str = Field(..., min_length=1, description="Property ID")
     label: str
     type: str
     help_text: str
-    entity_types: List[str]
+    entity_types: List[str] = Field(..., description="Type IDs that serve this property")
     settings: Optional[Dict[str, Any]] = None
+
+    @field_validator("name", "label", "type")
+    @classmethod
+    def validate_non_blank_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value
+
+    @field_validator("entity_types")
+    @classmethod
+    def validate_entity_types(cls, value: List[str]) -> List[str]:
+        if not value:
+            raise ValueError("entity_types must declare at least one type ID")
+        if any(not isinstance(type_id, str) or not type_id.strip() for type_id in value):
+            raise ValueError("entity_types entries must be non-blank type IDs")
+        return value
 
 
 class ExtendDescriptor(BaseModel):
@@ -156,18 +214,163 @@ class ExtendDescriptor(BaseModel):
     property_settings: List[PropertySetting]
 
 
+# ---------- Record selection (discovery, lists, details) ----------
+
+
+class RecordSelectionDescriptor(BaseModel):
+    """Points a client at the versioned record-selection discovery route."""
+
+    version: int = Field(..., ge=1)
+    types_path: str = Field(..., min_length=1)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class RecordDisplayField(BaseModel):
+    """One ordered display field advertised for a record type."""
+
+    name: str = Field(..., min_length=1)
+    source: Literal["record", "fields"]
+    label: str = Field(..., min_length=1)
+    value_type: Literal["string", "integer", "number", "boolean"]
+    display: bool
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class RecordFieldFilter(BaseModel):
+    """A client-side field filter advertised for a record type."""
+
+    field: str = Field(..., min_length=1)
+    operator: Literal["contains_ci", "equals"]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class RecordSelectionTypeDescriptor(BaseModel):
+    """Capabilities, limits, and declared fields for one record-selection type.
+
+    A limit is ``null`` when its capability is not enabled. Field references must
+    name a projected display field.
+    """
+
+    type: str = Field(..., min_length=1)
+    search_supported: bool
+    identifier_search_supported: bool
+    browse_supported: bool
+    details_supported: bool
+    export_verification_supported: bool
+    id_base: Optional[str] = None
+    id_path: str = Field(..., min_length=1)
+    browse_max_rows: Optional[int] = Field(default=None, gt=0)
+    browse_max_bytes: Optional[int] = Field(default=None, gt=0)
+    interactive_search_max_results: Optional[int] = Field(default=None, gt=0)
+    display_fields: List[RecordDisplayField]
+    text_filter_fields: List[str] = Field(default_factory=list)
+    sort_fields: List[str] = Field(default_factory=list)
+    field_filters: List[RecordFieldFilter] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("display_fields")
+    @classmethod
+    def validate_unique_display_names(cls, value: List[RecordDisplayField]) -> List[RecordDisplayField]:
+        names: List[str] = [field.name for field in value]
+        if len(set(names)) != len(names):
+            raise ValueError("display_fields names must be unique")
+        return value
+
+    @model_validator(mode="after")
+    def validate_declared_field_references(self) -> "RecordSelectionTypeDescriptor":
+        projected: set[str] = {field.name for field in self.display_fields}
+        for name in [*self.text_filter_fields, *self.sort_fields]:
+            if name not in projected:
+                raise ValueError(f"field '{name}' is referenced but not projected")
+        for field_filter in self.field_filters:
+            if field_filter.field not in projected:
+                raise ValueError(f"field filter '{field_filter.field}' references an unprojected field")
+        return self
+
+
+class RecordSelectionTypesResponse(BaseModel):
+    """Discovery response listing capabilities for the pilot record types."""
+
+    types: List[RecordSelectionTypeDescriptor]
+
+
+class RecordItem(BaseModel):
+    """One projected record shared by list and details responses."""
+
+    id: str = Field(..., min_length=1)
+    target_id: int = Field(..., gt=0)
+    type: str = Field(..., min_length=1)
+    name: str
+    description: Optional[str] = None
+    fields: Dict[str, JsonScalar] = Field(default_factory=dict)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class RecordListResponse(BaseModel):
+    """A complete record list for one type."""
+
+    items: List[RecordItem]
+    completeness: Literal["complete"] = "complete"
+
+
+class RecordDetailsResponse(BaseModel):
+    """A single record returned by an exact-ID or URI lookup."""
+
+    item: RecordItem
+
+
+class RecordSelectionErrorDetail(BaseModel):
+    """A machine-readable record-selection error."""
+
+    code: str = Field(..., min_length=1)
+    message: str = Field(..., min_length=1)
+
+
+class RecordSelectionErrorEnvelope(BaseModel):
+    """The error envelope used by record-selection routes."""
+
+    error: RecordSelectionErrorDetail
+
+
+class ReconciliationDescriptor(BaseModel):
+    """Declares the OpenRefine types this service implements for matching.
+
+    `defaultTypes` is the OpenRefine type list and may contain types without a
+    matcher. `supportedTypes` lists only implemented matching behavior; an empty
+    array is valid and means no type is implemented. `record_selection` points a
+    client at the independent record-selection capabilities.
+    """
+
+    supportedTypes: List[str]
+    record_selection: Optional[RecordSelectionDescriptor] = None
+
+    @field_validator("supportedTypes")
+    @classmethod
+    def validate_supported_types(cls, value: List[str]) -> List[str]:
+        if any(not isinstance(type_id, str) or not type_id.strip() for type_id in value):
+            raise ValueError("supportedTypes entries must be non-blank type IDs")
+        if len(set(value)) != len(value):
+            raise ValueError("supportedTypes entries must be unique")
+        return value
+
+
 class ReconServiceManifest(BaseModel):
     """Service manifest with proper caching hints"""
 
     name: str
     identifierSpace: str  # Changed from HttpUrl to str to handle the format from metadata
     schemaSpace: str  # Changed from HttpUrl to str
-    defaultTypes: List[TypeRef] = Field(default_factory=list)
-
+    defaultTypes: List[TypeRef]
+    reconciliation: ReconciliationDescriptor
     view: Optional[ViewTemplate] = None
     preview: Optional[PreviewTemplate] = None
     suggest: Optional[SuggestDescriptor] = None
-    extend: Optional[ExtendDescriptor] = None
+    extend: ExtendDescriptor
 
     # Optional extras:
     versions: Optional[List[str]] = None  # e.g., ["0.2", "0.3"]
@@ -182,6 +385,25 @@ class ReconServiceManifest(BaseModel):
         # Add caching hints for FastAPI
         json_schema_extra={"cache_control": "public, max-age=3600"},
     )
+
+    @field_validator("defaultTypes")
+    @classmethod
+    def validate_default_types(cls, value: List[TypeRef]) -> List[TypeRef]:
+        ids: List[str] = [type_ref.id for type_ref in value]
+        if any(not isinstance(type_id, str) or not type_id.strip() for type_id in ids):
+            raise ValueError("defaultTypes ids must be non-blank type IDs")
+        if len(set(ids)) != len(ids):
+            raise ValueError("defaultTypes ids must be unique")
+        return value
+
+    @model_validator(mode="after")
+    def validate_supported_types_reference_default_types(self) -> "ReconServiceManifest":
+        """Require every supported type ID to resolve to exactly one default type."""
+        known_ids: set[str] = {type_ref.id for type_ref in self.defaultTypes}
+        unresolved: List[str] = [type_id for type_id in self.reconciliation.supportedTypes if type_id not in known_ids]
+        if unresolved:
+            raise ValueError(f"supportedTypes entries are not in defaultTypes: {', '.join(unresolved)}")
+        return self
 
 
 # ---------- /suggest/* (entity/property/type) ----------

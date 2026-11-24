@@ -1,6 +1,6 @@
 # SEAD Authority Service
 
-[![Podman Build](https://github.com/humlab-sead/sead_authority_service/actions/workflows/docker-build.yml/badge.svg)](https://github.com/humlab-sead/sead_authority_service/actions/workflows/docker-build.yml)
+[![Podman Build](https://github.com/humlab-sead/sead_authority_service/actions/workflows/build.yml/badge.svg)](https://github.com/humlab-sead/sead_authority_service/actions/workflows/build.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 FastAPI service implementing the [OpenRefine Reconciliation API](https://reconciliation-api.github.io/specs/latest/) for SEAD (Strategic Environmental Archaeology Database). It resolves fuzzy text queries to canonical SEAD entity identifiers and manages stable UUIDs for incoming data submissions via the SIMS identity module.

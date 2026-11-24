@@ -23,8 +23,9 @@ class OpenAIProvider(LLMProvider):
 
         api_key = api_key or ConfigValue(f"llm.{self.key}.api_key").resolve() or ""
         self.model: str = model or ConfigValue(f"llm.{self.key}.model").resolve() or ""
+        base_url = ConfigValue(f"llm.{self.key}.base_url").resolve()
 
-        self.client = AsyncOpenAI(api_key=api_key)
+        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
 
     async def complete(self, prompt: str, roles: dict[str, str] | None = None, **kwargs) -> str:
         opts: dict[str, Any] = kwargs.get("options", {})

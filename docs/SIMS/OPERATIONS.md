@@ -15,47 +15,69 @@ For design context see the system reference docs in `docs/SIMS/` (reflect Phases
 | `sead_authority_service` running | Module wires in at startup via `main.py`                     |
 | Python deps                      | `psycopg`, `psycopg-pool` — already in `pyproject.toml`      |
 
-### Applying the Schema
+### Applying Both Schemas
 
-SQL files live in `schema/sql/identity/`. Apply them in order against the target database:
-
-```bash
-PGPASSWORD=<password> psql -h <host> -p <port> -U <user> -d <dbname> \
-  -f schema/sql/identity/000_schema.sql \
-  -f schema/sql/identity/001_source_scopes.sql \
-  -f schema/sql/identity/002_submissions.sql \
-  -f schema/sql/identity/003_source_identities.sql \
-  -f schema/sql/identity/003b_source_identity_keys.sql \
-  -f schema/sql/identity/004_submission_source_identities.sql \
-  -f schema/sql/identity/005_tracked_identities.sql \
-  -f schema/sql/identity/006_binding_sets.sql \
-  -f schema/sql/identity/007_bindings.sql \
-  -f schema/sql/identity/008_seed_scopes.sql
-```
-
-Or use the merged file for a single-shot deploy:
+Start with a SEAD database that contains the public tables used by the
+reconciliation strategies. From the Authority Service repository, generate
+and apply both schemas:
 
 ```bash
-psql ... -f schema/sql/identity/__merged.sql
+schema/create_schema.sh --schema both --deploy \
+  --database "$DB_NAME" \
+  --host "$DB_HOST" \
+  --port "$DB_PORT" \
+  --user "$DB_USER"
 ```
 
-`__merged.sql` is checked in and reflects the full schema. Regenerate it after any DDL change:
+The script generates `schema/__deploy__.sql`, deploys the `authority` schema,
+then applies the numbered `sead_identity` SQL files in lexical order. The
+generated authority SQL drops and recreates `authority` with `CASCADE`, creates
+the required extensions, and builds the configured reconciliation views and
+functions. Use it only when that schema replacement is appropriate for the
+target database. Store credentials in `~/.pgpass` or `PGPASSFILE`, not in
+command arguments.
 
-```bash
-cat schema/sql/identity/0*.sql > schema/sql/identity/__merged.sql
-```
+Use `--schema authority` to install only the authority schema or
+`--schema sead_identity` to apply only the identity migrations. The script
+does not track applied identity migrations and runs every numbered migration
+whenever `sead_identity` is selected. Use `both` only when those migrations
+have not already been applied. To refresh `authority` after SIMS has been
+installed, select `--schema authority` so the identity migrations are not
+replayed.
+
+The current sequence ends with `011_resolve_batch_idempotency.sql` and
+`012_scope_entity_contracts.sql`. These migrations rename `sead_internal_id` to
+`aggregate_id`, add the `resolve_batches` table, and add the
+`scope_entity_contracts` table.
+
+`012_scope_entity_contracts.sql` must be applied before the Shape Shifter client
+starts registering provider-scope contracts. Provider scopes have no contract
+rows before that change, so no backfill is needed. Existing internal scopes
+(`sead://admin`, `sead://migration`, `sead://reconciliation`) stay valid without
+contracts.
 
 ### Verify After Deployment
 
 ```sql
--- Schema and extension
+-- Both schemas and required extensions
 SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'sead_identity';
+SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'authority';
 SELECT extname FROM pg_extension WHERE extname = 'pgcrypto';
+SELECT to_regprocedure('authority.fuzzy_site(text,integer)');
 
--- All seven tables exist
+-- All ten SIMS tables exist
 SELECT table_name FROM information_schema.tables
 WHERE table_schema = 'sead_identity'
 ORDER BY table_name;
+
+-- Current identity column and batch table exist
+SELECT column_name FROM information_schema.columns
+WHERE table_schema = 'sead_identity'
+  AND table_name = 'tracked_identities';
+SELECT to_regclass('sead_identity.resolve_batches');
+
+-- Provider-scope contract table exists
+SELECT to_regclass('sead_identity.scope_entity_contracts');
 
 -- Well-known scopes seeded
 SELECT scope_name FROM sead_identity.source_scopes ORDER BY scope_name;
@@ -73,16 +95,21 @@ Set these in `.env` (root) or via environment before starting the service:
 | `SEAD_AUTHORITY_OPTIONS_DATABASE_USER`   | `database_user`             | DB user          |
 | `SEAD_AUTHORITY_OPTIONS_DATABASE_PORT`   | `nnnn`                      | DB port          |
 | `CONFIG_FILE`                            | `./config/config.yml`       | Config file path |
+| `SIMS_CONTRACT_REGISTRATION_TOKEN`       | (secret)                    | Token that a caller sends in `X-SIMS-Caller-Token` when it registers provider-scope contracts. The matching caller entry lives under `identity.contract_registration.callers` in `config/config.yml`. An unset token keeps the caller disabled and registration closed. |
 
 The identity module uses the shared connection pool set up by `setup_config_store()` at startup — no separate identity-specific connection configuration is needed.
 
 ### Running Integration Tests
 
 ```bash
-SIMS_INTEGRATION_DB=1 ENV_FILE=tests/.env uv run pytest tests/identity/test_service_integration.py -v
+SIMS_INTEGRATION_DB=1 uv run pytest -o addopts='' -q tests/identity/test_service_integration.py
+SIMS_INTEGRATION_DB=1 uv run pytest -o addopts='' -q tests/identity/test_scope_contracts_integration.py
 ```
 
-`tests/.env` must contain the DB credentials above. The integration tests create isolated scopes (unique per run) and do not pollute persistent data.
+Run these tests only against the helper-owned disposable database. See
+[DEVELOPMENT.md](../DEVELOPMENT.md#disposable-database-for-integration-tests)
+for its Podman setup, source dump, and connection settings. The test fixture
+rejects targets other than `127.0.0.1:55432/sead_staging`.
 
 ---
 
@@ -189,8 +216,8 @@ Re-submitting the same entity in the same scope is expected to produce the **sam
 FileNotFoundError: ... config/identity_policy.yml
 ```
 
-**Cause:** Working directory is not the repo root, or `CONFIG_FILE` env var points to a non-standard location that changes the resolved path.  
-**Fix:** Run the service from the repo root, or set an explicit policy path by overriding `ConfigValue("identity:policy_file")` in `config.yml`.
+**Cause:** The resolved policy path does not exist. Resolution order is the `IDENTITY_POLICY_FILE` environment variable, then `identity.policy_file` in the loaded configuration (a relative value resolves from the application root), then the default `config/identity_policy.yml`. A container that mounts `config/` without shipping `identity_policy.yml` leaves `/app/config/identity_policy.yml` missing.  
+**Fix:** Ship `identity_policy.yml` in the mounted `config/` directory (the tracked deployment bundle includes it), or set `identity.policy_file` in `config.yml`, or set `IDENTITY_POLICY_FILE` in the deployment environment.
 
 ---
 

@@ -111,6 +111,7 @@ tests/output
 **/.env
 **/.env.*
 !deployment/container/.env.example
+!deployment/container/.env.dev.example
 **/chat*.json
 bin
 *.pdf
@@ -122,19 +123,10 @@ output*.xlsx
 sead-tools
 chat-transcripts
 
-graphify-out/cost.json
-graphify-out/cache/
-graphify-out/memory/
-graphify-out/reflections/
-graphify-out/.graphify_*
-graphify-out/*-*-*
-graphify-out/manifest.json 
+graphify-out/
 
 **/TLDR.md
 
 /.chats/
 
-# graphify-out
-# Optional: commit cache for speed, skip to keep repo small.
-graphify-out/cache/
 secrets

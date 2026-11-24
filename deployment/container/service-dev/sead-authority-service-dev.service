@@ -1,0 +1,20 @@
+[Unit]
+Description=SEAD Authority Service Development Podman Container
+Documentation=https://github.com/humlab-sead/sead_authority_service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=%h/container-dev
+ExecStart=/usr/bin/podman-compose -f %h/container-dev/podman-compose.yml up -d
+ExecStop=/usr/bin/podman-compose -f %h/container-dev/podman-compose.yml down
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sead-authority-service-dev
+
+[Install]
+WantedBy=default.target

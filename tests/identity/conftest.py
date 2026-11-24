@@ -43,9 +43,7 @@ async def setup_identity_config():
     database_port = os.environ.get("SEAD_AUTHORITY_OPTIONS_DATABASE_PORT")
     database_name = os.environ.get("SEAD_AUTHORITY_OPTIONS_DATABASE_DBNAME")
     if (database_host, database_port, database_name) != _DISPOSABLE_DB:
-        pytest.skip(
-            "Integration tests require the helper-owned 127.0.0.1:55432/sead_staging database"
-        )
+        pytest.skip("Integration tests require the helper-owned 127.0.0.1:55432/sead_staging database")
 
     await setup_config_store(
         filename="config/config.yml",
