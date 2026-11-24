@@ -237,7 +237,8 @@ When the user types `/graphify`, invoke the `skill` tool with `skill: "graphify"
 
 How the graph is kept current:
 - graphify git hooks (installed by `make install-graphify`) rebuild the code part of the graph in the background after each commit, checkout, merge and rebase. The rebuild is AST-only and makes no LLM calls; its log is `~/.cache/graphify-rebuild.log`.
-- `make update-graphify` rebuilds the code graph on demand.
+- `make update-graphify` rebuilds the code graph and graphify-out/wiki/ on demand. `make graphify-wiki` rebuilds only the wiki (local, about a second, no LLM).
+- `make semantic-graphify` adds the LLM-based results (documents and community names). Run it only when the user asks.
 
 Rules:
 - When graphify-out/graph.json exists, run `graphify query "<question>"` before your first grep, search or source-file read for a codebase question. Read raw files only for lines the graph or an earlier read already located. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
