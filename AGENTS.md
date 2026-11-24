@@ -238,6 +238,7 @@ When the user types `/graphify`, invoke the `skill` tool with `skill: "graphify"
 How the graph is kept current:
 - graphify git hooks (installed by `make install-graphify`) rebuild the code part of the graph in the background after each commit, checkout, merge and rebase. The rebuild is AST-only and makes no LLM calls; its log is `~/.cache/graphify-rebuild.log`.
 - `make update-graphify` rebuilds the code graph and graphify-out/wiki/ on demand. `make graphify-wiki` rebuilds only the wiki (local, about a second, no LLM).
+- `make status` shows whether the graph, the LLM-based results, the community names or the wiki need a rebuild, and lists the command for each action needed.
 - `make semantic-graphify` adds the LLM-based results (documents and community names). Run it only when the user asks.
 
 Rules:
